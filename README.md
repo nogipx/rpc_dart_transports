@@ -1,151 +1,114 @@
-# gRPC Bridge
+# RPC Dart
 
 Платформонезависимая реализация gRPC-подобного протокола для Dart/Flutter.
 
 ## Особенности
 
-- 🚀 **Платформонезависимость** - работает на всех платформах, поддерживаемых Dart и Flutter
-- 🔄 **Двунаправленная коммуникация** - полностью двунаправленный обмен данными
-- 🔐 **Типобезопасность** - поддержка типизированных контрактов и эндпоинтов
-- 📦 **Контракты сервисов** - декларативное описание API
-- 🔁 **Унарные вызовы и стриминг** - поддержка как обычных запросов, так и потоков данных
-- 🧩 **Расширяемость** - легко добавить новые транспорты и сериализаторы
+- 🚀 **Платформонезависимость** - работает на всех платформах Dart/Flutter
+- 🔄 **Двунаправленная коммуникация** - поддержка двусторонней передачи данных
+- 🔐 **Типобезопасность** - строгая типизация API через контракты сервисов
+- 📦 **Декларативные сервисы** - четкое определение API через контракты
+- 🔁 **Различные типы RPC** - унарные вызовы, серверный и клиентский стриминг, bidirectional
+- 🧩 **Расширяемость** - поддержка плагинов, middleware и кастомных транспортов
 
 ## Установка
 
 ```yaml
 dependencies:
-  grpc_bridge: ^0.1.0
+  rpc_dart: ^0.1.0
 ```
 
-## Использование
+## Архитектура
 
-### Основные компоненты
+- **RpcTransport** - обеспечивает передачу двоичных данных между узлами
+- **RpcSerializer** - сериализует и десериализует сообщения
+- **RpcEndpoint** - базовый API для регистрации и вызова методов
+- **RpcMiddleware** - промежуточная обработка запросов и ответов
+- **RpcServiceContract** - описание методов сервиса с типизацией
 
-Библиотека строится на нескольких ключевых компонентах:
-
-1. **Transport** - отвечает за передачу бинарных данных
-2. **Serializer** - сериализует/десериализует сообщения
-3. **Endpoint** - базовый API для RPC-вызовов
-4. **TypedEndpoint** - типизированный API с поддержкой контрактов
-5. **ServiceContract** - описание доступных методов сервиса 
-
-### Простой пример
+## Быстрый старт
 
 ```dart
-import 'package:grpc_bridge/grpc_bridge.dart';
+import 'package:rpc_dart/rpc_dart.dart';
 
 void main() async {
-  // Создаем транспорты (в реальном примере они могут быть на разных устройствах)
-  final transport1 = MemoryTransport('client');
-  final transport2 = MemoryTransport('server');
+  // Настройка транспорта и сериализатора
+  final clientTransport = MemoryTransport('client');
+  final serverTransport = MemoryTransport('server');
+  clientTransport.connect(serverTransport);
+  serverTransport.connect(clientTransport);
   
-  // Соединяем транспорты для демонстрации
-  transport1.connect(transport2);
-  transport2.connect(transport1);
-  
-  // Создаем сериализатор
   final serializer = JsonSerializer();
+  final client = RpcEndpoint(clientTransport, serializer);
+  final server = RpcEndpoint(serverTransport, serializer);
   
-  // Создаем конечные точки
-  final client = Endpoint(transport1, serializer);
-  final server = Endpoint(transport2, serializer);
-  
-  // Регистрируем метод на сервере
+  // Регистрация метода на сервере
   server.registerMethod(
     'CalculatorService',
     'add',
     (context) async {
       final payload = context.payload as Map<String, dynamic>;
-      final a = payload['a'] as int;
-      final b = payload['b'] as int;
-      return {'result': a + b};
+      return {'result': payload['a'] + payload['b']};
     },
   );
   
-  // Вызываем метод с клиента
+  // Вызов метода с клиента
   final result = await client.invoke(
     'CalculatorService',
     'add',
     {'a': 5, 'b': 3},
   );
   
-  print('Result: ${result['result']}'); // Result: 8
+  print('Результат: ${result['result']}'); // Результат: 8
   
-  // Закрываем ресурсы
+  // Освобождение ресурсов
   await client.close();
   await server.close();
 }
 ```
 
-### Потоковая передача данных
+## Стриминг данных
 
 ```dart
-import 'package:grpc_bridge/grpc_bridge.dart';
+// Регистрация стрима на сервере
+server.registerMethod(
+  'StreamService',
+  'generateNumbers',
+  (context) async {
+    final count = context.payload['count'] as int;
+    final messageId = context.messageId;
+    
+    // Запуск асинхронной генерации
+    Future.microtask(() async {
+      for (var i = 1; i <= count; i++) {
+        await server.sendStreamData(messageId, i);
+        await Future.delayed(Duration(milliseconds: 100));
+      }
+      await server.closeStream(messageId);
+    });
+    
+    return {'status': 'started'};
+  },
+);
 
-void main() async {
-  // Настройка как в предыдущем примере
-  final transport1 = MemoryTransport('client');
-  final transport2 = MemoryTransport('server');
-  transport1.connect(transport2);
-  transport2.connect(transport1);
-  
-  final serializer = JsonSerializer();
-  final client = Endpoint(transport1, serializer);
-  final server = Endpoint(transport2, serializer);
-  
-  // Регистрируем потоковый метод на сервере
-  server.registerMethod(
-    'StreamService',
-    'generateNumbers',
-    (context) async {
-      final payload = context.payload as Map<String, dynamic>;
-      final count = payload['count'] as int;
-      
-      // Получаем ID сообщения из контекста для потока
-      final messageId = context.messageId;
-      
-      // Запускаем генерацию чисел в отдельном потоке
-      Future.microtask(() async {
-        for (var i = 1; i <= count; i++) {
-          // Отправляем данные в поток
-          await server.sendStreamData(messageId, i);
-          await Future.delayed(Duration(milliseconds: 100));
-        }
-        
-        // Сигнализируем о завершении потока
-        await server.closeStream(messageId);
-      });
-      
-      // Возвращаем подтверждение активации стрима
-      return {'status': 'streaming'};
-    },
-  );
-  
-  // Открываем поток со стороны клиента
-  final stream = client.openStream(
-    'StreamService',
-    'generateNumbers',
-    request: {'count': 5},
-  );
-  
-  // Подписываемся на получение данных
-  stream.listen(
-    (data) => print('Received: $data'),
-    onDone: () => print('Stream completed'),
-  );
-}
+// Получение данных на клиенте
+final stream = client.openStream(
+  'StreamService',
+  'generateNumbers',
+  request: {'count': 5},
+);
+
+stream.listen(
+  (data) => print('Получено: $data'),
+  onDone: () => print('Стрим завершен'),
+);
 ```
 
-### Использование типизированных контрактов
-
-Библиотека поддерживает декларативное определение контрактов сервисов:
+## Типизированные контракты
 
 ```dart
-import 'package:grpc_bridge/grpc_bridge.dart';
-
-// Определяем сообщения для запросов и ответов
-class CalculatorRequest implements TypedMessage {
+// Сообщения
+class CalculatorRequest implements RpcSerializableMessage {
   final int a;
   final int b;
 
@@ -154,18 +117,12 @@ class CalculatorRequest implements TypedMessage {
   @override
   Map<String, dynamic> toJson() => {'a': a, 'b': b};
 
-  @override
-  String get messageType => 'CalculatorRequest';
-
   static CalculatorRequest fromJson(Map<String, dynamic> json) {
-    return CalculatorRequest(
-      json['a'] as int,
-      json['b'] as int,
-    );
+    return CalculatorRequest(json['a'] as int, json['b'] as int);
   }
 }
 
-class CalculatorResponse implements TypedMessage {
+class CalculatorResponse implements RpcSerializableMessage {
   final int result;
 
   CalculatorResponse(this.result);
@@ -173,54 +130,75 @@ class CalculatorResponse implements TypedMessage {
   @override
   Map<String, dynamic> toJson() => {'result': result};
 
-  @override
-  String get messageType => 'CalculatorResponse';
-
   static CalculatorResponse fromJson(Map<String, dynamic> json) {
     return CalculatorResponse(json['result'] as int);
   }
 }
 
-// Определяем контракт сервиса
-abstract base class CalculatorContract extends DeclarativeServiceContract {
-  TypedEndpoint? get client;
-
+// Контракт сервиса
+abstract base class CalculatorContract extends DeclarativeRpcServiceContract {
   @override
   final String serviceName = 'CalculatorService';
 
   @override
   void registerMethodsFromClass() {
-    // Регистрируем унарный метод
+    // Унарные методы
     addUnaryMethod<CalculatorRequest, CalculatorResponse>(
       methodName: 'add',
       handler: add,
       argumentParser: CalculatorRequest.fromJson,
       responseParser: CalculatorResponse.fromJson,
     );
+    
+    addUnaryMethod<CalculatorRequest, CalculatorResponse>(
+      methodName: 'multiply',
+      handler: multiply,
+      argumentParser: CalculatorRequest.fromJson,
+      responseParser: CalculatorResponse.fromJson,
+    );
+    
+    // Стриминговый метод
+    addServerStreamingMethod<SequenceRequest, SequenceResponse>(
+      methodName: 'generateSequence',
+      handler: generateSequence,
+      argumentParser: SequenceRequest.fromJson,
+      responseParser: SequenceResponse.fromJson,
+    );
   }
 
-  // Определяем метод с типизированной сигнатурой
+  // Абстрактные методы контракта
   Future<CalculatorResponse> add(CalculatorRequest request);
+  Future<CalculatorResponse> multiply(CalculatorRequest request);
+  Stream<SequenceResponse> generateSequence(SequenceRequest request);
 }
 
-// Реализация контракта на сервере
-final class ServerCalculator extends CalculatorContract {
-  @override
-  TypedEndpoint? get client => null;
-
+// Реализация на сервере
+final class ServerCalculatorContract extends CalculatorContract {
   @override
   Future<CalculatorResponse> add(CalculatorRequest request) async {
     return CalculatorResponse(request.a + request.b);
   }
+  
+  @override
+  Future<CalculatorResponse> multiply(CalculatorRequest request) async {
+    return CalculatorResponse(request.a * request.b);
+  }
+  
+  @override
+  Stream<SequenceResponse> generateSequence(SequenceRequest request) {
+    return Stream.periodic(
+      Duration(milliseconds: 200),
+      (i) => SequenceResponse(i + 1),
+    ).take(request.count);
+  }
 }
 
-// Реализация контракта на клиенте
-final class ClientCalculator extends CalculatorContract {
-  @override
-  final TypedEndpoint client;
-
-  ClientCalculator(this.client);
-
+// Реализация на клиенте
+final class ClientCalculatorContract extends CalculatorContract {
+  final RpcEndpoint client;
+  
+  ClientCalculatorContract(this.client);
+  
   @override
   Future<CalculatorResponse> add(CalculatorRequest request) {
     return client.invokeTyped<CalculatorRequest, CalculatorResponse>(
@@ -229,113 +207,68 @@ final class ClientCalculator extends CalculatorContract {
       request: request,
     );
   }
-}
-
-void main() async {
-  // Настройка транспорта как в предыдущих примерах
-  final transport1 = MemoryTransport('client');
-  final transport2 = MemoryTransport('server');
-  transport1.connect(transport2);
-  transport2.connect(transport1);
   
-  final serializer = JsonSerializer();
-  
-  // Создаем типизированные эндпоинты
-  final clientEndpoint = TypedEndpoint(transport1, serializer);
-  final serverEndpoint = TypedEndpoint(transport2, serializer);
-  
-  // Создаем и регистрируем сервис
-  final calculatorService = ServerCalculator();
-  serverEndpoint.registerContract(calculatorService);
-  
-  // Создаем клиента
-  final calculator = ClientCalculator(clientEndpoint);
-  
-  // Вызываем типизированный метод
-  final request = CalculatorRequest(10, 5);
-  final response = await calculator.add(request);
-  
-  print('Результат: ${request.a} + ${request.b} = ${response.result}');
-  
-  // Закрываем ресурсы
-  await clientEndpoint.close();
-  await serverEndpoint.close();
-}
-```
-
-### Стриминг с типизированными контрактами
-
-```dart
-// Добавляем в контракт калькулятора поддержку стрима
-abstract base class CalculatorContract extends DeclarativeServiceContract {
-  // ... существующий код ...
-
   @override
-  void registerMethodsFromClass() {
-    // ... существующие методы ...
-    
-    // Регистрируем стриминговый метод
-    addServerStreamingMethod<SequenceRequest, int>(
-      methodName: 'generateSequence',
-      handler: generateSequence,
-      argumentParser: SequenceRequest.fromJson,
-      responseParser: (json) => json['count'] as int,
+  Future<CalculatorResponse> multiply(CalculatorRequest request) {
+    return client.invokeTyped<CalculatorRequest, CalculatorResponse>(
+      serviceName: serviceName,
+      methodName: 'multiply',
+      request: request,
     );
   }
-
-  // Определяем стриминговый метод
-  Stream<int> generateSequence(SequenceRequest request);
-}
-
-// Реализация на сервере
-final class ServerCalculator extends CalculatorContract {
-  // ... существующий код ...
-
+  
   @override
-  Stream<int> generateSequence(SequenceRequest request) {
-    return Stream.periodic(
-      Duration(milliseconds: 200),
-      (i) => i + 1,
-    ).take(request.count);
-  }
-}
-
-// Реализация на клиенте
-final class ClientCalculator extends CalculatorContract {
-  // ... существующий код ...
-
-  @override
-  Stream<int> generateSequence(SequenceRequest request) {
-    return client.openTypedStream<SequenceRequest, int>(
+  Stream<SequenceResponse> generateSequence(SequenceRequest request) {
+    return client.openTypedStream<SequenceRequest, SequenceResponse>(
       serviceName,
       'generateSequence',
-      request,
+      request: request,
     );
   }
 }
 
 // Использование
-void main() async {
-  // ... настройка как в предыдущем примере ...
-  
-  // Создаем запрос
-  final sequenceRequest = SequenceRequest(5);
-  
-  // Получаем стрим чисел
-  await for (final number in calculator.generateSequence(sequenceRequest)) {
-    print('Получено число: $number');
-  }
-  
-  print('Стрим завершен');
-}
+final serverContract = ServerCalculatorContract();
+server.registerContract(serverContract);
+
+final calculator = ClientCalculatorContract(client);
+final response = await calculator.add(CalculatorRequest(10, 5));
+print('Результат: ${response.result}'); // Результат: 15
 ```
 
-## Создание собственных транспортов
-
-Можно создать собственную реализацию транспорта, имплементировав интерфейс `Transport`:
+## Middleware и расширения
 
 ```dart
-class WebSocketTransport implements Transport {
+// Добавление логирования
+client.addMiddleware(LoggingMiddleware(
+  logger: (message) => print(message),
+));
+
+// Добавление измерения времени запросов
+server.addMiddleware(TimingMiddleware(
+  onTiming: (message, duration) => print(
+    'Время выполнения: $message - ${duration.inMilliseconds}ms',
+  ),
+));
+
+// Доступные встроенные middleware
+// - LoggingMiddleware - логирование
+// - TimingMiddleware - измерение времени
+// - DebugMiddleware - отладка
+// - MetadataMiddleware - работа с метаданными
+```
+
+## Транспорты
+
+По умолчанию библиотека включает:
+
+- **MemoryTransport** - для обмена в пределах одного процесса
+- **IsolateTransport** - для обмена между изолятами
+
+### Пользовательский транспорт
+
+```dart
+class WebSocketTransport implements RpcTransport {
   @override
   final String id;
   
@@ -353,10 +286,7 @@ class WebSocketTransport implements Transport {
   
   @override
   Future<void> send(Uint8List data) async {
-    if (!isAvailable) {
-      throw StateError('Transport is not available');
-    }
-    
+    if (!isAvailable) throw StateError('Transport is not available');
     _socket.add(data);
   }
   
@@ -375,42 +305,11 @@ class WebSocketTransport implements Transport {
 }
 ```
 
-## Расширенные возможности
+## Контекст метода (RpcMethodContext)
 
-### Контекст метода
-
-При обработке запросов, каждый обработчик получает `MethodContext`, который содержит:
-
-- `messageId` - уникальный идентификатор сообщения
+При обработке запросов каждый обработчик получает контекст с полями:
+- `messageId` - уникальный ID сообщения
 - `payload` - данные запроса
 - `metadata` - дополнительные метаданные
-- `serviceName` - имя вызываемого сервиса
-- `methodName` - имя вызываемого метода
-
-```dart
-server.registerMethod(
-  'ExampleService',
-  'contextAwareMethod',
-  (context) async {
-    print('Вызван метод: ${context.serviceName}.${context.methodName}');
-    print('ID сообщения: ${context.messageId}');
-    print('Метаданные: ${context.metadata}');
-    
-    return {'status': 'ok'};
-  },
-);
-```
-
-### Декларативные контракты
-
-Декларативный подход позволяет определять контракты в виде классов:
-
-1. Создаем базовый абстрактный класс, наследующий от `DeclarativeServiceContract`
-2. Определяем абстрактные методы с типизированными сигнатурами
-3. Реализуем эти методы на сервере и клиенте
-
-Это дает преимущества в виде:
-- Проверки типов во время компиляции
-- Автодополнения в IDE
-- Лучшей масштабируемости и поддержки кода
-
+- `serviceName` - имя сервиса
+- `methodName` - имя метода
