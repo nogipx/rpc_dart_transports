@@ -8,7 +8,7 @@ import '_index.dart';
 /// Обратите внимание, как методы объявлены в контракте с полными сигнатурами,
 /// но без реализации
 abstract base class CalculatorContract extends DeclarativeRpcServiceContract {
-  TypedRpcEndpoint? get endpoint;
+  RpcEndpoint? get endpoint;
 
   @override
   final String serviceName = 'CalculatorService';

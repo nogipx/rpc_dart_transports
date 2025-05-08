@@ -1,3 +1,10 @@
-export 'endpoint.dart';
-export 'typed_endpoint.dart';
-export 'method_context.dart';
+import 'dart:async';
+import 'dart:math';
+import 'dart:typed_data';
+
+import 'package:rpc_dart/rpc_dart.dart';
+
+part 'method_context.dart';
+part 'endpoint_abstract.dart';
+part 'endpoint_base.dart';
+part 'endpoint_typed.dart';

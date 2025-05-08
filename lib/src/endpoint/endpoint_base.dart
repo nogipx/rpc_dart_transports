@@ -1,16 +1,18 @@
-import 'dart:async';
-import 'dart:math';
-import 'dart:typed_data';
-import 'package:rpc_dart/rpc_dart.dart';
+part of '_index.dart';
 
-/// Конечная точка для обмена сообщениями
-base class RpcEndpoint {
+/// Базовая реализация конечной точки для обмена сообщениями
+///
+/// Этот класс является внутренней реализацией и не должен использоваться напрямую.
+/// Для публичного API используйте [RpcEndpoint].
+final class _RpcEndpointBase implements _RpcEndpoint {
   /// Транспорт для отправки/получения сообщений
   final RpcTransport _transport;
+  @override
   RpcTransport get transport => _transport;
 
   /// Сериализатор для преобразования сообщений
   final RpcSerializer _serializer;
+  @override
   RpcSerializer get serializer => _serializer;
 
   /// Обработчики ожидающих ответов
@@ -23,6 +25,9 @@ base class RpcEndpoint {
   final Map<String, Map<String, Future<dynamic> Function(RpcMethodContext)>>
       _methodHandlers = {};
 
+  /// Цепочка middleware для обработки запросов и ответов
+  final RpcMiddlewareChain _middlewareChain = RpcMiddlewareChain();
+
   /// Подписка на входящие сообщения
   StreamSubscription<Uint8List>? _subscription;
 
@@ -33,7 +38,7 @@ base class RpcEndpoint {
   ///
   /// [transport] - транспорт для обмена сообщениями
   /// [serializer] - сериализатор для преобразования сообщений
-  RpcEndpoint(this._transport, this._serializer) {
+  _RpcEndpointBase(this._transport, this._serializer) {
     _initialize();
   }
 
@@ -42,11 +47,20 @@ base class RpcEndpoint {
     _subscription = _transport.receive().listen(_handleIncomingData);
   }
 
+  /// Добавляет middleware для обработки запросов и ответов
+  ///
+  /// [middleware] - объект, реализующий интерфейс RpcMiddleware
+  @override
+  void addMiddleware(RpcMiddleware middleware) {
+    _middlewareChain.add(middleware);
+  }
+
   /// Регистрирует обработчик метода
   ///
   /// [serviceName] - имя сервиса
   /// [methodName] - имя метода
   /// [handler] - функция обработки запроса, которая принимает контекст вызова
+  @override
   void registerMethod(
     String serviceName,
     String methodName,
@@ -63,6 +77,7 @@ base class RpcEndpoint {
   /// [request] - данные запроса
   /// [timeout] - таймаут ожидания ответа
   /// Возвращает Future с результатом вызова
+  @override
   Future<dynamic> invoke(
     String serviceName,
     String methodName,
@@ -107,6 +122,7 @@ base class RpcEndpoint {
   /// [metadata] - дополнительные метаданные
   /// [streamId] - опциональный ID для потока, если не указан, будет сгенерирован
   /// Возвращает Stream с данными от удаленной стороны
+  @override
   Stream<dynamic> openStream(
     String serviceName,
     String methodName, {
@@ -210,20 +226,63 @@ base class RpcEndpoint {
         methodName: methodName,
       );
 
-      // Вызываем обработчик с контекстом
-      final result = await methodHandler(context);
+      // Применяем middleware для обработки запроса
+      dynamic processedPayload = await _middlewareChain.executeRequest(
+        serviceName,
+        methodName,
+        message.payload,
+        context,
+      );
+
+      // Создаем обновленный контекст с обработанной полезной нагрузкой
+      final updatedContext = MutableRpcMethodContext(
+        messageId: message.id,
+        metadata: message.metadata,
+        payload: processedPayload,
+        serviceName: serviceName,
+        methodName: methodName,
+      );
+
+      // Вызываем обработчик с обновленным контекстом
+      final result = await methodHandler(updatedContext);
+
+      // Применяем middleware для обработки ответа
+      final processedResult = await _middlewareChain.executeResponse(
+        serviceName,
+        methodName,
+        result,
+        context,
+      );
 
       await _sendMessage(
         RpcMessage(
           type: RpcMessageType.response,
           id: message.id,
-          payload: result,
-          metadata: message.metadata,
+          payload: processedResult,
+          metadata: updatedContext.metadata,
         ),
       );
-    } catch (e) {
+    } catch (e, stackTrace) {
+      // Применяем middleware для обработки ошибки
+      final processedError = await _middlewareChain.executeError(
+        serviceName,
+        methodName,
+        e,
+        stackTrace,
+        RpcMethodContext(
+          messageId: message.id,
+          metadata: message.metadata,
+          payload: message.payload,
+          serviceName: serviceName,
+          methodName: methodName,
+        ),
+      );
+
       await _sendErrorMessage(
-          message.id, 'Ошибка при выполнении метода: $e', message.metadata);
+        message.id,
+        processedError.toString(),
+        message.metadata,
+      );
     }
   }
 
@@ -239,7 +298,23 @@ base class RpcEndpoint {
   void _handleStreamData(RpcMessage message) {
     final controller = _streamControllers[message.id];
     if (controller != null && !controller.isClosed) {
-      controller.add(message.payload);
+      // Если известны имена сервиса и метода, применяем middleware
+      if (message.service != null && message.method != null) {
+        _middlewareChain
+            .executeStreamData(
+          message.service!,
+          message.method!,
+          message.payload,
+          message.id,
+        )
+            .then((processedData) {
+          controller.add(processedData);
+        }).catchError((error) {
+          controller.addError(error);
+        });
+      } else {
+        controller.add(message.payload);
+      }
     }
   }
 
@@ -247,7 +322,23 @@ base class RpcEndpoint {
   void _handleStreamEnd(RpcMessage message) {
     final controller = _streamControllers.remove(message.id);
     if (controller != null && !controller.isClosed) {
-      controller.close();
+      // Если известны имена сервиса и метода, применяем middleware
+      if (message.service != null && message.method != null) {
+        _middlewareChain
+            .executeStreamEnd(
+          message.service!,
+          message.method!,
+          message.id,
+        )
+            .then((_) {
+          controller.close();
+        }).catchError((error) {
+          controller.addError(error);
+          controller.close();
+        });
+      } else {
+        controller.close();
+      }
     }
   }
 
@@ -304,9 +395,11 @@ base class RpcEndpoint {
   }
 
   /// Проверяет, активна ли конечная точка
+  @override
   bool get isActive => _transport.isAvailable;
 
   /// Закрывает конечную точку
+  @override
   Future<void> close() async {
     await _subscription?.cancel();
     _subscription = null;
@@ -335,15 +428,33 @@ base class RpcEndpoint {
   /// [streamId] - ID потока
   /// [data] - данные для отправки
   /// [metadata] - дополнительные метаданные
+  /// [serviceName] - имя сервиса (опционально, для middleware)
+  /// [methodName] - имя метода (опционально, для middleware)
+  @override
   Future<void> sendStreamData(
     String streamId,
     dynamic data, {
     Map<String, dynamic>? metadata,
+    String? serviceName,
+    String? methodName,
   }) async {
+    // Если указаны имена сервиса и метода, обрабатываем данные через middleware
+    dynamic processedData = data;
+    if (serviceName != null && methodName != null) {
+      processedData = await _middlewareChain.executeStreamData(
+        serviceName,
+        methodName,
+        data,
+        streamId,
+      );
+    }
+
     final message = RpcMessage(
       type: RpcMessageType.streamData,
       id: streamId,
-      payload: data,
+      service: serviceName,
+      method: methodName,
+      payload: processedData,
       metadata: metadata,
     );
 
@@ -355,6 +466,7 @@ base class RpcEndpoint {
   /// [streamId] - ID потока
   /// [error] - сообщение об ошибке
   /// [metadata] - дополнительные метаданные
+  @override
   Future<void> sendStreamError(
     String streamId,
     String error, {
@@ -374,13 +486,29 @@ base class RpcEndpoint {
   ///
   /// [streamId] - ID потока
   /// [metadata] - дополнительные метаданные
+  /// [serviceName] - имя сервиса (опционально, для middleware)
+  /// [methodName] - имя метода (опционально, для middleware)
+  @override
   Future<void> closeStream(
     String streamId, {
     Map<String, dynamic>? metadata,
+    String? serviceName,
+    String? methodName,
   }) async {
+    // Если указаны имена сервиса и метода, уведомляем middleware о закрытии потока
+    if (serviceName != null && methodName != null) {
+      await _middlewareChain.executeStreamEnd(
+        serviceName,
+        methodName,
+        streamId,
+      );
+    }
+
     final message = RpcMessage(
       type: RpcMessageType.streamEnd,
       id: streamId,
+      service: serviceName,
+      method: methodName,
       metadata: metadata,
     );
 

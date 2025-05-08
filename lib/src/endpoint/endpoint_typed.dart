@@ -1,9 +1,10 @@
-import 'dart:async';
-import 'package:rpc_dart/rpc_dart.dart';
+part of '_index.dart';
 
 /// Типизированный Endpoint с поддержкой контрактов
-base class TypedRpcEndpoint<T extends RpcSerializableMessage>
-    extends RpcEndpoint {
+class RpcEndpoint<T extends RpcSerializableMessage> implements _RpcEndpoint {
+  /// Делегат для базовой функциональности
+  final _RpcEndpointBase _delegate;
+
   /// Зарегистрированные контракты сервисов
   final Map<String, RpcServiceContract<T>> _contracts = {};
 
@@ -11,7 +12,102 @@ base class TypedRpcEndpoint<T extends RpcSerializableMessage>
   final Map<String, Map<String, RpcMethodImplementation>> _implementations = {};
 
   /// Создает новый типизированный Endpoint
-  TypedRpcEndpoint(super.transport, super.serializer);
+  RpcEndpoint(RpcTransport transport, RpcSerializer serializer)
+      : _delegate = _RpcEndpointBase(transport, serializer);
+
+  @override
+  RpcTransport get transport => _delegate.transport;
+
+  @override
+  RpcSerializer get serializer => _delegate.serializer;
+
+  @override
+  void addMiddleware(RpcMiddleware middleware) =>
+      _delegate.addMiddleware(middleware);
+
+  @override
+  Future<void> close() => _delegate.close();
+
+  @override
+  Future<void> closeStream(
+    String streamId, {
+    Map<String, dynamic>? metadata,
+    String? serviceName,
+    String? methodName,
+  }) =>
+      _delegate.closeStream(
+        streamId,
+        metadata: metadata,
+        serviceName: serviceName,
+        methodName: methodName,
+      );
+
+  @override
+  Future<dynamic> invoke(
+    String serviceName,
+    String methodName,
+    dynamic request, {
+    Duration? timeout,
+    Map<String, dynamic>? metadata,
+  }) =>
+      _delegate.invoke(
+        serviceName,
+        methodName,
+        request,
+        timeout: timeout,
+        metadata: metadata,
+      );
+
+  @override
+  bool get isActive => _delegate.isActive;
+
+  @override
+  Stream<dynamic> openStream(
+    String serviceName,
+    String methodName, {
+    dynamic request,
+    Map<String, dynamic>? metadata,
+    String? streamId,
+  }) =>
+      _delegate.openStream(
+        serviceName,
+        methodName,
+        request: request,
+        metadata: metadata,
+        streamId: streamId,
+      );
+
+  @override
+  void registerMethod(
+    String serviceName,
+    String methodName,
+    Future<dynamic> Function(RpcMethodContext) handler,
+  ) =>
+      _delegate.registerMethod(serviceName, methodName, handler);
+
+  @override
+  Future<void> sendStreamData(
+    String streamId,
+    dynamic data, {
+    Map<String, dynamic>? metadata,
+    String? serviceName,
+    String? methodName,
+  }) =>
+      _delegate.sendStreamData(
+        streamId,
+        data,
+        metadata: metadata,
+        serviceName: serviceName,
+        methodName: methodName,
+      );
+
+  @override
+  Future<void> sendStreamError(
+    String streamId,
+    String error, {
+    Map<String, dynamic>? metadata,
+  }) =>
+      _delegate.sendStreamError(streamId, error, metadata: metadata);
 
   /// Регистрирует контракт сервиса
   void registerContract(RpcServiceContract<T> contract) {
@@ -76,7 +172,7 @@ base class TypedRpcEndpoint<T extends RpcSerializableMessage>
     _implementations[serviceName]![methodName] = implementation;
 
     // Регистрируем обертку для стандартного endpoint
-    super.registerMethod(
+    _delegate.registerMethod(
       serviceName,
       methodName,
       (RpcMethodContext context) async {
@@ -87,11 +183,13 @@ base class TypedRpcEndpoint<T extends RpcSerializableMessage>
               ? argumentParser(context.payload)
               : context.payload;
 
+          // Получаем типизированный ответ от обработчика
           final response = await implementation.invoke(typedRequest);
-          if (response is RpcMessage) {
-            return response.toJson();
-          }
-          return response;
+
+          // Преобразуем ответ в формат для передачи (JSON для RpcMessage)
+          final result = response is RpcMessage ? response.toJson() : response;
+
+          return result;
         } catch (e) {
           rethrow;
         }
@@ -119,7 +217,7 @@ base class TypedRpcEndpoint<T extends RpcSerializableMessage>
     _implementations[serviceName]![methodName] = implementation;
 
     // Регистрируем низкоуровневый обработчик
-    super.registerMethod(
+    _delegate.registerMethod(
       serviceName,
       methodName,
       (RpcMethodContext context) async {
@@ -135,7 +233,13 @@ base class TypedRpcEndpoint<T extends RpcSerializableMessage>
 
           // Запускаем обработку стрима в фоновом режиме
           _activateStreamHandler(
-              messageId, serviceName, methodName, typedRequest, implementation);
+            messageId,
+            serviceName,
+            methodName,
+            typedRequest,
+            implementation,
+            responseParser,
+          );
 
           // Возвращаем только подтверждение принятия запроса
           // Сами данные будут отправляться через streamData сообщения при активации потока
@@ -153,26 +257,36 @@ base class TypedRpcEndpoint<T extends RpcSerializableMessage>
       String serviceName,
       String methodName,
       Request request,
-      RpcMethodImplementation<Request, Response> implementation) {
+      RpcMethodImplementation<Request, Response> implementation,
+      [Response Function(Map<String, dynamic>)? responseParser]) {
     // Запускаем стрим от обработчика
     final stream = implementation.openStream(request);
 
     // Подписываемся на события и пересылаем их через публичный API Endpoint
     stream.listen((data) {
-      // Отправляем данные в поток
-      super.sendStreamData(
+      // Преобразуем данные и отправляем их в поток
+      // Важно отправлять с указанием serviceName и methodName для middleware
+      final processedData = data is RpcMessage ? data.toJson() : data;
+
+      _delegate.sendStreamData(
         messageId,
-        data is RpcMessage ? data.toJson() : data,
+        processedData,
+        serviceName: serviceName,
+        methodName: methodName,
       );
     }, onError: (error) {
       // Отправляем ошибку
-      super.sendStreamError(
+      _delegate.sendStreamError(
         messageId,
         error.toString(),
       );
     }, onDone: () {
-      // Закрываем стрим
-      super.closeStream(messageId);
+      // Закрываем стрим с указанием serviceName и methodName для middleware
+      _delegate.closeStream(
+        messageId,
+        serviceName: serviceName,
+        methodName: methodName,
+      );
     });
   }
 
@@ -203,8 +317,8 @@ base class TypedRpcEndpoint<T extends RpcSerializableMessage>
     // Конвертируем запрос в JSON, если это Message
     final dynamicRequest = request is RpcMessage ? request.toJson() : request;
 
-    // Вызываем метод через базовый Endpoint
-    final response = await super.invoke(
+    // Вызываем метод через базовый Endpoint (с поддержкой middleware)
+    final response = await _delegate.invoke(
       serviceName,
       methodName,
       dynamicRequest,
@@ -249,8 +363,8 @@ base class TypedRpcEndpoint<T extends RpcSerializableMessage>
     // Конвертируем запрос в JSON, если это Message
     final dynamicRequest = request is RpcMessage ? request.toJson() : request;
 
-    // Открываем поток через базовый Endpoint
-    final stream = super.openStream(
+    // Открываем поток через базовый Endpoint (с поддержкой middleware)
+    final stream = _delegate.openStream(
       serviceName,
       methodName,
       request: dynamicRequest,
@@ -259,40 +373,29 @@ base class TypedRpcEndpoint<T extends RpcSerializableMessage>
     );
 
     // Оборачиваем поток для проверки типов
-    return stream.map((data) {
-      dynamic dynamicData = data;
+    final responseParser = contract.getResponseParser(methodContract);
+    final typedController = StreamController<Response>.broadcast();
 
-      if (data is Map<String, dynamic>) {
+    stream.listen(
+      (data) {
         try {
-          dynamicData = contract.getResponseParser(methodContract)(data);
-
-          // Обязательно проверяем, что распарсенные данные соответствуют ожидаемому типу
-          if (!methodContract.validateResponse(dynamicData)) {
-            throw StateError(
-                'Тип данных в потоке после парсинга не соответствует контракту метода $methodName');
+          final typedData = responseParser(data);
+          if (methodContract.validateResponse(typedData)) {
+            typedController.add(typedData);
+          } else {
+            typedController
+                .addError('Тип данных в потоке не соответствует контракту');
           }
         } catch (e) {
-          // В случае ошибки парсинга или валидации выбрасываем исключение
-          throw StateError(
-              'Ошибка при парсинге данных потока для метода $methodName: ${e.toString()}');
+          typedController.addError(e);
         }
-      } else if (data is Response) {
-        // Если данные уже имеют тип Response, проверяем их валидность
-        if (!methodContract.validateResponse(data)) {
-          throw StateError(
-              'Тип данных в потоке ${data.runtimeType} не соответствует контракту метода $methodName');
-        }
-      } else {
-        // Данные не являются ни Map<String, dynamic>, ни Response - это ошибка
-        throw StateError(
-            'Получены данные неожиданного типа ${data.runtimeType} в потоке для метода $methodName');
-      }
+      },
+      onError: (error) => typedController.addError(error),
+      onDone: () => typedController.close(),
+    );
 
-      return dynamicData;
-    });
+    return typedController.stream;
   }
-
-  // Вспомогательные методы
 
   /// Получает контракт сервиса
   RpcServiceContract<T> _getServiceContract(String serviceName) {

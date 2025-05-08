@@ -16,6 +16,9 @@ class CalculatorRequest implements RpcSerializableMessage {
       json['b'] as int,
     );
   }
+
+  @override
+  String toString() => 'CalculatorRequest(a: $a, b: $b)';
 }
 
 /// Пример класса ответа для калькулятора
@@ -30,6 +33,9 @@ class CalculatorResponse implements RpcSerializableMessage {
   static CalculatorResponse fromJson(Map<String, dynamic> json) {
     return CalculatorResponse(json['result'] as int);
   }
+
+  @override
+  String toString() => 'CalculatorResponse(result: $result)';
 }
 
 /// Пример запроса для генерации последовательности
@@ -44,6 +50,9 @@ class SequenceRequest implements RpcSerializableMessage {
   static SequenceRequest fromJson(Map<String, dynamic> json) {
     return SequenceRequest(json['count'] as int);
   }
+
+  @override
+  String toString() => 'SequenceRequest(count: $count)';
 }
 
 /// Пример запроса для генерации последовательности

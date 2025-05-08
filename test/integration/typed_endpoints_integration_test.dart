@@ -32,7 +32,7 @@ class TestResponse implements RpcSerializableMessage {
 // Контракт для тестов
 abstract base class TestContract
     extends DeclarativeRpcServiceContract<RpcSerializableMessage> {
-  TypedRpcEndpoint? get endpoint;
+  RpcEndpoint? get endpoint;
 
   @override
   final String serviceName = 'TestService';
@@ -64,7 +64,7 @@ abstract base class TestContract
 // Серверная реализация контракта
 base class ServerTestService extends TestContract {
   @override
-  TypedRpcEndpoint? get endpoint => null;
+  RpcEndpoint? get endpoint => null;
 
   @override
   Future<TestResponse> multiply(TestRequest request) async {
@@ -83,7 +83,7 @@ base class ServerTestService extends TestContract {
 // Клиентская реализация контракта
 base class ClientTestService extends TestContract {
   @override
-  final TypedRpcEndpoint endpoint;
+  final RpcEndpoint endpoint;
 
   ClientTestService(this.endpoint);
 
@@ -151,8 +151,8 @@ void main() {
     late MemoryTransport clientTransport;
     late MemoryTransport serverTransport;
     late JsonSerializer serializer;
-    late TypedRpcEndpoint clientEndpoint;
-    late TypedRpcEndpoint serverEndpoint;
+    late RpcEndpoint clientEndpoint;
+    late RpcEndpoint serverEndpoint;
     late ClientTestService clientService;
     late ServerTestService serverService;
 
@@ -169,8 +169,8 @@ void main() {
       serializer = JsonSerializer();
 
       // Создаем эндпоинты
-      clientEndpoint = TypedRpcEndpoint(clientTransport, serializer);
-      serverEndpoint = TypedRpcEndpoint(serverTransport, serializer);
+      clientEndpoint = RpcEndpoint(clientTransport, serializer);
+      serverEndpoint = RpcEndpoint(serverTransport, serializer);
 
       // Создаем сервисы
       clientService = ClientTestService(clientEndpoint);

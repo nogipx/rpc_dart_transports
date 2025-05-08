@@ -4,7 +4,7 @@ import '_index.dart';
 
 final class ClientCalculatorContract extends CalculatorContract {
   @override
-  final TypedRpcEndpoint endpoint;
+  final RpcEndpoint endpoint;
 
   ClientCalculatorContract(this.endpoint);
 

@@ -69,7 +69,7 @@ class NotificationMessage implements RpcSerializableMessage {
 // Контракт сервиса пользователей
 abstract base class UserServiceContract
     extends DeclarativeRpcServiceContract<RpcSerializableMessage> {
-  TypedRpcEndpoint? get client;
+  RpcEndpoint? get client;
 
   @override
   final String serviceName = 'UserService';
@@ -103,7 +103,7 @@ base class ServerUserService extends UserServiceContract {
   final Map<String, UserResponse> _users = {};
 
   @override
-  TypedRpcEndpoint? get client => null;
+  RpcEndpoint? get client => null;
 
   @override
   Future<UserResponse> registerUser(UserRequest request) async {
@@ -158,7 +158,7 @@ base class ServerUserService extends UserServiceContract {
 // Клиентская реализация
 base class ClientUserService extends UserServiceContract {
   @override
-  final TypedRpcEndpoint client;
+  final RpcEndpoint client;
 
   ClientUserService(this.client);
 
@@ -191,8 +191,8 @@ void main() {
     late MemoryTransport clientTransport;
     late MemoryTransport serverTransport;
     late JsonSerializer serializer;
-    late TypedRpcEndpoint clientEndpoint;
-    late TypedRpcEndpoint serverEndpoint;
+    late RpcEndpoint clientEndpoint;
+    late RpcEndpoint serverEndpoint;
     late ClientUserService clientService;
     late ServerUserService serverService;
 
@@ -209,8 +209,8 @@ void main() {
       serializer = JsonSerializer();
 
       // Создаем эндпоинты
-      clientEndpoint = TypedRpcEndpoint(clientTransport, serializer);
-      serverEndpoint = TypedRpcEndpoint(serverTransport, serializer);
+      clientEndpoint = RpcEndpoint(clientTransport, serializer);
+      serverEndpoint = RpcEndpoint(serverTransport, serializer);
 
       // Создаем сервисы
       clientService = ClientUserService(clientEndpoint);
