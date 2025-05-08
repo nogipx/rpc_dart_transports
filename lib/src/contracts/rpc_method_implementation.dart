@@ -11,11 +11,15 @@ final class RpcMethodImplementation<Request, Response> {
   /// Обработчик для стримингового метода
   final Stream<Response> Function(Request)? streamHandler;
 
+  /// Обработчик для двунаправленного стрима
+  final Stream<Response> Function(Stream<Request>)? bidirectionalHandler;
+
   /// Стандартный конструктор
   RpcMethodImplementation({
     required this.contract,
     this.unaryHandler,
     this.streamHandler,
+    this.bidirectionalHandler,
   });
 
   /// Создает реализацию метода-заглушки
@@ -23,14 +27,16 @@ final class RpcMethodImplementation<Request, Response> {
       : contract =
             RpcMethodContract(methodName: '', methodType: RpcMethodType.unary),
         unaryHandler = null,
-        streamHandler = null;
+        streamHandler = null,
+        bidirectionalHandler = null;
 
   /// Создает реализацию унарного метода
   RpcMethodImplementation.unary(
     this.contract,
     Future<Response> Function(Request) handler,
   )   : unaryHandler = handler,
-        streamHandler = null {
+        streamHandler = null,
+        bidirectionalHandler = null {
     if (contract.methodType != RpcMethodType.unary) {
       throw ArgumentError('Метод ${contract.methodName} не является унарным');
     }
@@ -41,10 +47,24 @@ final class RpcMethodImplementation<Request, Response> {
     this.contract,
     Stream<Response> Function(Request) handler,
   )   : streamHandler = handler,
-        unaryHandler = null {
+        unaryHandler = null,
+        bidirectionalHandler = null {
     if (contract.methodType != RpcMethodType.serverStreaming) {
       throw ArgumentError(
           'Метод ${contract.methodName} не является серверным стримом');
+    }
+  }
+
+  /// Создает реализацию двунаправленного стримингового метода
+  RpcMethodImplementation.bidirectionalStream(
+    this.contract,
+    Stream<Response> Function(Stream<Request>) handler,
+  )   : bidirectionalHandler = handler,
+        streamHandler = null,
+        unaryHandler = null {
+    if (contract.methodType != RpcMethodType.bidirectional) {
+      throw ArgumentError(
+          'Метод ${contract.methodName} не является двунаправленным стримом');
     }
   }
 
@@ -95,5 +115,36 @@ final class RpcMethodImplementation<Request, Response> {
 
     throw UnsupportedError(
         'Метод ${contract.methodName} не поддерживает потоковый вызов');
+  }
+
+  /// Открывает двунаправленный поток
+  Stream<Response> openBidirectionalStream(Stream<dynamic> requestStream) {
+    if (bidirectionalHandler == null) {
+      throw UnsupportedError(
+          'Метод ${contract.methodName} не поддерживает двунаправленный потоковый вызов');
+    }
+
+    // Преобразуем входящие данные к типизированному стриму Request
+    final typedRequestStream = requestStream.map((request) {
+      if (!contract.validateRequest(request)) {
+        throw ArgumentError(
+          'Неверный тип запроса в потоке: ${request.runtimeType}, ожидается: $Request',
+        );
+      }
+      return request as Request;
+    });
+
+    // Получаем ответный стрим от обработчика
+    final responseStream = bidirectionalHandler!(typedRequestStream);
+
+    // Проверяем типы всех исходящих элементов
+    return responseStream.map((response) {
+      if (!contract.validateResponse(response)) {
+        throw StateError(
+          'Неверный тип ответа в потоке: ${response.runtimeType}, ожидается: $Response',
+        );
+      }
+      return response;
+    });
   }
 }

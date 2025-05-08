@@ -126,6 +126,7 @@ final class RpcMiddlewareChain {
   /// [methodName] - имя метода
   /// [data] - исходные данные
   /// [streamId] - ID потока
+  /// [direction] - направление потока данных
   ///
   /// Возвращает обработанные данные
   Future<dynamic> executeStreamData(
@@ -133,6 +134,7 @@ final class RpcMiddlewareChain {
     String methodName,
     dynamic data,
     String streamId,
+    StreamDataDirection direction,
   ) async {
     if (isEmpty) return data;
 
@@ -144,6 +146,7 @@ final class RpcMiddlewareChain {
         methodName,
         currentData,
         streamId,
+        direction,
       );
     }
 

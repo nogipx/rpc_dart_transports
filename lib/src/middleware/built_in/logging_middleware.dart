@@ -1,8 +1,10 @@
 import 'package:rpc_dart/rpc_dart.dart'
-    show RpcMethodContext, SimpleRpcMiddleware;
+    show RpcMethodContext, SimpleRpcMiddleware, StreamDataDirection;
 
 /// Middleware для логирования RPC-вызовов
 class LoggingMiddleware implements SimpleRpcMiddleware {
+  final String id;
+
   /// Функция для логирования
   final void Function(String message)? _logger;
 
@@ -10,11 +12,15 @@ class LoggingMiddleware implements SimpleRpcMiddleware {
   ///
   /// [logger] - опциональная функция для логирования
   /// Если не указана, используется `print`
-  LoggingMiddleware({void Function(String message)? logger}) : _logger = logger;
+  LoggingMiddleware({void Function(String message)? logger, this.id = ""})
+      : _logger = logger;
 
   /// Внутренний метод для логирования сообщений
   void _log(String message) {
-    _logger != null ? _logger!(message) : print(message);
+    final prefix = id.isEmpty ? "LoggingMiddleware" : "LoggingMiddleware[$id]";
+    _logger != null
+        ? _logger!("$prefix: $message")
+        : print("$prefix: $message");
   }
 
   @override
@@ -24,7 +30,7 @@ class LoggingMiddleware implements SimpleRpcMiddleware {
     dynamic payload,
     RpcMethodContext context,
   ) {
-    _log('[RPC REQUEST] $serviceName.$methodName: $payload');
+    _log('[REQ] $serviceName.$methodName: $payload');
     return Future.value(payload);
   }
 
@@ -35,7 +41,7 @@ class LoggingMiddleware implements SimpleRpcMiddleware {
     dynamic response,
     RpcMethodContext context,
   ) {
-    _log('[RPC RESPONSE] $serviceName.$methodName: $response');
+    _log('[RES] $serviceName.$methodName: $response');
     return Future.value(response);
   }
 
@@ -47,7 +53,7 @@ class LoggingMiddleware implements SimpleRpcMiddleware {
     StackTrace? stackTrace,
     RpcMethodContext context,
   ) {
-    _log('[RPC ERROR] $serviceName.$methodName: $error');
+    _log('[ERR] $serviceName.$methodName: $error');
     if (stackTrace != null) {
       _log(stackTrace.toString());
     }
@@ -60,8 +66,10 @@ class LoggingMiddleware implements SimpleRpcMiddleware {
     String methodName,
     dynamic data,
     String streamId,
+    StreamDataDirection direction,
   ) {
-    _log('[RPC STREAM DATA] $serviceName.$methodName[$streamId]: $data');
+    final directionMark = direction == StreamDataDirection.toRemote ? '↗' : '↘';
+    _log('[STR $directionMark] $serviceName.$methodName[$streamId]: $data');
     return Future.value(data);
   }
 
@@ -71,7 +79,7 @@ class LoggingMiddleware implements SimpleRpcMiddleware {
     String methodName,
     String streamId,
   ) {
-    _log('[RPC STREAM END] $serviceName.$methodName[$streamId]');
+    _log('[STR END] $serviceName.$methodName[$streamId]');
     return Future.value();
   }
 }

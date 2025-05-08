@@ -130,7 +130,7 @@ abstract base class RpcServiceContractBase<T extends RpcSerializableMessage>
   /// Добавляет двунаправленный стриминговый метод в контракт
   void addBidirectionalStreamingMethod<Request extends T, Response extends T>({
     required String methodName,
-    required RpcMethodStreamHandler<Request, Response> handler,
+    required RpcMethodBidirectionalHandler<Request, Response> handler,
     required RpcMethodArgumentParser<Request> argumentParser,
     required RpcMethodResponseParser<Response> responseParser,
   }) {

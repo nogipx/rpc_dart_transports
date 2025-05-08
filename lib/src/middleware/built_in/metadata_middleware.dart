@@ -1,5 +1,9 @@
 import 'package:rpc_dart/rpc_dart.dart'
-    show MutableRpcMethodContext, RpcMethodContext, SimpleRpcMiddleware;
+    show
+        MutableRpcMethodContext,
+        RpcMethodContext,
+        SimpleRpcMiddleware,
+        StreamDataDirection;
 
 /// Middleware для добавления метаданных к запросам и ответам
 class MetadataMiddleware implements SimpleRpcMiddleware {
@@ -112,6 +116,7 @@ class MetadataMiddleware implements SimpleRpcMiddleware {
     String methodName,
     dynamic data,
     String streamId,
+    StreamDataDirection direction,
   ) {
     // Для стрим-данных не добавляем метаданные
     return Future.value(data);

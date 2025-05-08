@@ -1,5 +1,13 @@
 part of '_index.dart';
 
+final _random = Random();
+
+/// Генерирует уникальный ID запроса
+String _generateUniqueId([String? prefix]) {
+  // Текущее время в миллисекундах + случайное число
+  return '${prefix != null ? '${prefix}_' : ''}${DateTime.now().toUtc().toIso8601String()}_${_random.nextInt(1000000)}';
+}
+
 /// Абстрактный базовый класс для RPC-конечных точек
 ///
 /// Этот класс определяет общий публичный интерфейс для всех RPC-конечных точек.

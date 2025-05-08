@@ -92,8 +92,13 @@ class DebugMiddleware implements RpcMiddleware {
     String methodName,
     dynamic data,
     String streamId,
+    StreamDataDirection direction,
   ) {
-    _log('ПОТОК ДАННЫЕ: $serviceName.$methodName');
+    final directionText = direction == StreamDataDirection.toRemote
+        ? 'ОТПРАВКА В ПОТОК'
+        : 'ПОЛУЧЕНИЕ ИЗ ПОТОКА';
+
+    _log('$directionText: $serviceName.$methodName');
     _log('StreamID: $streamId');
     _log('Data: $data');
 

@@ -38,7 +38,8 @@ class MemoryTransport implements RpcTransport {
   @override
   Future<void> send(Uint8List data) async {
     if (!isAvailable || _destination == null) {
-      throw StateError('Транспорт недоступен или нет получателя');
+      print('Transport is not available or destination is null: $id');
+      return;
     }
 
     // Имитируем небольшую задержку при отправке сообщения

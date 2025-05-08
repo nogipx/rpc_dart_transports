@@ -6,6 +6,10 @@ typedef RpcMethodUnaryHandler<Request, Response> = Future<Response> Function(
 typedef RpcMethodStreamHandler<Request, Response> = Stream<Response> Function(
     Request);
 
+/// Тип для двунаправленного стримингового метода
+typedef RpcMethodBidirectionalHandler<Request, Response> = Stream<Response>
+    Function(Stream<Request>);
+
 /// Тип для десериализации JSON в объект
 typedef RpcMethodArgumentParser<Request> = Request Function(
     Map<String, dynamic>);

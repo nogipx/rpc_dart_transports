@@ -104,6 +104,130 @@ stream.listen(
 );
 ```
 
+## Двунаправленный стриминг (Bidirectional)
+
+### С использованием контрактов (декларативный подход):
+
+```dart
+// Определение контракта с двунаправленным методом
+abstract base class ChatServiceContract extends DeclarativeRpcServiceContract<ChatMessage> {
+  @override
+  final String serviceName = 'ChatService';
+
+  @override
+  void registerMethodsFromClass() {
+    addBidirectionalStreamingMethod<ChatMessage, ChatMessage>(
+      methodName: 'chat',
+      handler: chat,
+      argumentParser: ChatMessage.fromJson,
+      responseParser: ChatMessage.fromJson,
+    );
+  }
+
+  // Метод принимает поток сообщений и возвращает поток ответов
+  Stream<ChatMessage> chat(Stream<ChatMessage> messages);
+}
+
+// Реализация на сервере
+final class ServerChatService extends ChatServiceContract {
+  @override
+  Stream<ChatMessage> chat(Stream<ChatMessage> messages) async* {
+    // Обрабатываем каждое входящее сообщение
+    await for (final message in messages) {
+      print('Сервер получил: ${message.text}');
+      
+      // Отправляем ответ
+      yield ChatMessage(
+        'server',
+        'Ответ на: ${message.text}',
+        DateTime.now(),
+      );
+    }
+  }
+}
+
+// Реализация на клиенте
+final class ClientChatService extends ChatServiceContract {
+  final RpcEndpoint client;
+  
+  ClientChatService(this.client);
+  
+  @override
+  Stream<ChatMessage> chat(Stream<ChatMessage> messages) {
+    return client.openBidirectionalStream<ChatMessage, ChatMessage>(
+      serviceName,
+      'chat',
+      messages,
+    );
+  }
+}
+
+// Использование
+final chatServer = ServerChatService();
+serverEndpoint.registerContract(chatServer);
+
+final chatClient = ClientChatService(clientEndpoint);
+
+// Создаем контроллер для отправки сообщений
+final messageController = StreamController<ChatMessage>();
+
+// Открываем двунаправленный стрим
+final responses = chatClient.chat(messageController.stream);
+
+// Подписываемся на ответы
+responses.listen((message) {
+  print('Клиент получил: ${message.text}');
+});
+
+// Отправляем сообщения
+messageController.add(ChatMessage('client', 'Привет!', DateTime.now()));
+```
+
+### Упрощенный подход с BidirectionalChannel
+
+```dart
+// Регистрируем обработчик на сервере
+serverEndpoint.registerBidirectionalHandler(
+  'EchoService',
+  'echo',
+  (incomingStream, messageId) {
+    print('[Сервер]: Принимаю входящие сообщения...');
+    
+    // Просто отправляем назад сообщения с префиксом
+    return incomingStream.map((data) {
+      print('[Сервер]: Получено: $data');
+      
+      if (data is String) {
+        return 'Эхо: $data';
+      } else if (data is Map<String, dynamic> && data['text'] != null) {
+        return 'Эхо: ${data['text']}';
+      } else {
+        return 'Получено неизвестное сообщение';
+      }
+    });
+  },
+);
+
+// Создаем двунаправленный канал на клиенте
+final channel = clientEndpoint.createBidirectionalChannel(
+  'EchoService',
+  'echo',
+);
+
+// Подписываемся на входящие сообщения
+channel.listen(
+  (message) => print('[Клиент]: Получил ответ: $message'),
+  onError: (e) => print('[Клиент]: Ошибка: $e'),
+  onDone: () => print('[Клиент]: Соединение закрыто'),
+);
+
+// Отправляем сообщения
+channel.send('Привет, сервер!');
+
+// Закрываем канал когда он больше не нужен
+await channel.close();
+```
+
 ## Типизированные контракты
 
 ```dart

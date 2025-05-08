@@ -31,9 +31,6 @@ final class _RpcEndpointBase implements _RpcEndpoint {
   /// Подписка на входящие сообщения
   StreamSubscription<Uint8List>? _subscription;
 
-  /// Генератор случайных чисел для ID сообщений
-  final Random _random = Random();
-
   /// Создаёт новую конечную точку
   ///
   /// [transport] - транспорт для обмена сообщениями
@@ -85,7 +82,7 @@ final class _RpcEndpointBase implements _RpcEndpoint {
     Duration? timeout,
     Map<String, dynamic>? metadata,
   }) async {
-    final requestId = _generateRequestId();
+    final requestId = _generateUniqueId('request');
     final completer = Completer<dynamic>();
     _pendingRequests[requestId] = completer;
 
@@ -131,7 +128,7 @@ final class _RpcEndpointBase implements _RpcEndpoint {
     String? streamId,
   }) {
     // Используем переданный streamId или генерируем новый
-    final actualStreamId = streamId ?? _generateRequestId();
+    final actualStreamId = streamId ?? _generateUniqueId('stream');
 
     // Если поток с таким ID уже существует, возвращаем его
     if (_streamControllers.containsKey(actualStreamId)) {
@@ -306,6 +303,8 @@ final class _RpcEndpointBase implements _RpcEndpoint {
           message.method!,
           message.payload,
           message.id,
+          StreamDataDirection
+              .fromRemote, // Данные получены от удаленной стороны
         )
             .then((processedData) {
           controller.add(processedData);
@@ -388,12 +387,6 @@ final class _RpcEndpointBase implements _RpcEndpoint {
     await _transport.send(data);
   }
 
-  /// Генерирует уникальный ID запроса
-  String _generateRequestId() {
-    // Текущее время в миллисекундах + случайное число
-    return '${DateTime.now().millisecondsSinceEpoch}_${_random.nextInt(1000000)}';
-  }
-
   /// Проверяет, активна ли конечная точка
   @override
   bool get isActive => _transport.isAvailable;
@@ -446,6 +439,7 @@ final class _RpcEndpointBase implements _RpcEndpoint {
         methodName,
         data,
         streamId,
+        StreamDataDirection.toRemote, // Данные отправляются удаленной стороне
       );
     }
 

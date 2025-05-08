@@ -1,6 +1,15 @@
 import 'dart:async';
 import 'package:rpc_dart/rpc_dart.dart';
 
+/// Направление потока данных
+enum StreamDataDirection {
+  /// Данные отправляются удаленной стороне
+  toRemote,
+
+  /// Данные получены от удаленной стороны
+  fromRemote,
+}
+
 /// Базовый интерфейс для middleware RPC
 ///
 /// Middleware используется для перехвата и обработки запросов, ответов и ошибок
@@ -60,6 +69,7 @@ abstract class RpcMiddleware {
   /// [methodName] - имя метода
   /// [data] - данные потока
   /// [streamId] - ID потока
+  /// [direction] - направление потока данных (к удаленной стороне или от нее)
   ///
   /// Возвращает либо модифицированные данные, либо исходные.
   FutureOr<dynamic> onStreamData(
@@ -67,6 +77,7 @@ abstract class RpcMiddleware {
     String methodName,
     dynamic data,
     String streamId,
+    StreamDataDirection direction,
   );
 
   /// Вызывается при завершении потока
@@ -119,6 +130,7 @@ abstract class SimpleRpcMiddleware implements RpcMiddleware {
     String methodName,
     dynamic data,
     String streamId,
+    StreamDataDirection direction,
   ) =>
       data;
 
