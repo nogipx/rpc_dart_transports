@@ -33,6 +33,7 @@ final class RpcMiddlewareChain {
     String methodName,
     dynamic payload,
     RpcMethodContext context,
+    RpcDataDirection direction,
   ) async {
     if (isEmpty) return payload;
 
@@ -44,6 +45,7 @@ final class RpcMiddlewareChain {
         methodName,
         currentPayload,
         context,
+        direction,
       );
     }
 
@@ -63,6 +65,7 @@ final class RpcMiddlewareChain {
     String methodName,
     dynamic response,
     RpcMethodContext context,
+    RpcDataDirection direction,
   ) async {
     if (isEmpty) return response;
 
@@ -75,6 +78,7 @@ final class RpcMiddlewareChain {
         methodName,
         currentResponse,
         context,
+        direction,
       );
     }
 
@@ -96,6 +100,7 @@ final class RpcMiddlewareChain {
     dynamic error,
     StackTrace? stackTrace,
     RpcMethodContext context,
+    RpcDataDirection direction,
   ) async {
     if (isEmpty) return error;
 
@@ -111,6 +116,7 @@ final class RpcMiddlewareChain {
           currentError,
           currentStackTrace,
           context,
+          direction,
         );
       }
       return currentError;
@@ -134,7 +140,7 @@ final class RpcMiddlewareChain {
     String methodName,
     dynamic data,
     String streamId,
-    StreamDataDirection direction,
+    RpcDataDirection direction,
   ) async {
     if (isEmpty) return data;
 

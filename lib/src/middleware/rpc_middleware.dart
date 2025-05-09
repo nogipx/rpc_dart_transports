@@ -2,12 +2,16 @@ import 'dart:async';
 import 'package:rpc_dart/rpc_dart.dart';
 
 /// Направление потока данных
-enum StreamDataDirection {
+enum RpcDataDirection {
   /// Данные отправляются удаленной стороне
-  toRemote,
+  toRemote('↗'),
 
   /// Данные получены от удаленной стороны
-  fromRemote,
+  fromRemote('↘');
+
+  final String symbol;
+
+  const RpcDataDirection(this.symbol);
 }
 
 /// Базовый интерфейс для middleware RPC
@@ -29,6 +33,7 @@ abstract class RpcMiddleware {
     String methodName,
     dynamic payload,
     RpcMethodContext context,
+    RpcDataDirection direction,
   );
 
   /// Вызывается после успешной обработки запроса
@@ -44,6 +49,7 @@ abstract class RpcMiddleware {
     String methodName,
     dynamic response,
     RpcMethodContext context,
+    RpcDataDirection direction,
   );
 
   /// Вызывается при возникновении ошибки в обработке запроса
@@ -61,6 +67,7 @@ abstract class RpcMiddleware {
     dynamic error,
     StackTrace? stackTrace,
     RpcMethodContext context,
+    RpcDataDirection direction,
   );
 
   /// Вызывается при получении данных потока
@@ -77,7 +84,7 @@ abstract class RpcMiddleware {
     String methodName,
     dynamic data,
     String streamId,
-    StreamDataDirection direction,
+    RpcDataDirection direction,
   );
 
   /// Вызывается при завершении потока
@@ -102,6 +109,7 @@ abstract class SimpleRpcMiddleware implements RpcMiddleware {
     String methodName,
     dynamic payload,
     RpcMethodContext context,
+    RpcDataDirection direction,
   ) =>
       payload;
 
@@ -111,6 +119,7 @@ abstract class SimpleRpcMiddleware implements RpcMiddleware {
     String methodName,
     dynamic response,
     RpcMethodContext context,
+    RpcDataDirection direction,
   ) =>
       response;
 
@@ -121,6 +130,7 @@ abstract class SimpleRpcMiddleware implements RpcMiddleware {
     dynamic error,
     StackTrace? stackTrace,
     RpcMethodContext context,
+    RpcDataDirection direction,
   ) =>
       error;
 
@@ -130,7 +140,7 @@ abstract class SimpleRpcMiddleware implements RpcMiddleware {
     String methodName,
     dynamic data,
     String streamId,
-    StreamDataDirection direction,
+    RpcDataDirection direction,
   ) =>
       data;
 

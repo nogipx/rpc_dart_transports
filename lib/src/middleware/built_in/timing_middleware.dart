@@ -1,5 +1,5 @@
 import 'package:rpc_dart/rpc_dart.dart'
-    show RpcMethodContext, SimpleRpcMiddleware, StreamDataDirection;
+    show RpcMethodContext, SimpleRpcMiddleware, RpcDataDirection;
 
 /// Middleware для измерения времени выполнения RPC-вызовов
 class TimingMiddleware implements SimpleRpcMiddleware {
@@ -30,6 +30,7 @@ class TimingMiddleware implements SimpleRpcMiddleware {
     String methodName,
     dynamic payload,
     RpcMethodContext context,
+    RpcDataDirection direction,
   ) {
     _requestStartTimes[context.messageId] = DateTime.now();
     return Future.value(payload);
@@ -41,6 +42,7 @@ class TimingMiddleware implements SimpleRpcMiddleware {
     String methodName,
     dynamic response,
     RpcMethodContext context,
+    RpcDataDirection direction,
   ) {
     final startTime = _requestStartTimes.remove(context.messageId);
     if (startTime != null) {
@@ -57,6 +59,7 @@ class TimingMiddleware implements SimpleRpcMiddleware {
     dynamic error,
     StackTrace? stackTrace,
     RpcMethodContext context,
+    RpcDataDirection direction,
   ) {
     final startTime = _requestStartTimes.remove(context.messageId);
     if (startTime != null) {
@@ -72,7 +75,7 @@ class TimingMiddleware implements SimpleRpcMiddleware {
     String methodName,
     dynamic data,
     String streamId,
-    StreamDataDirection direction,
+    RpcDataDirection direction,
   ) {
     // Для стрим-данных не замеряем время, просто пропускаем
     return Future.value(data);

@@ -1,5 +1,5 @@
 import 'package:rpc_dart/rpc_dart.dart'
-    show RpcMethodContext, SimpleRpcMiddleware, StreamDataDirection;
+    show RpcMethodContext, SimpleRpcMiddleware, RpcDataDirection;
 
 /// Middleware для логирования RPC-вызовов
 class LoggingMiddleware implements SimpleRpcMiddleware {
@@ -29,8 +29,9 @@ class LoggingMiddleware implements SimpleRpcMiddleware {
     String methodName,
     dynamic payload,
     RpcMethodContext context,
+    RpcDataDirection direction,
   ) {
-    _log('[REQ] $serviceName.$methodName: $payload');
+    _log('[REQ ${direction.symbol}] $serviceName.$methodName: $payload');
     return Future.value(payload);
   }
 
@@ -40,8 +41,9 @@ class LoggingMiddleware implements SimpleRpcMiddleware {
     String methodName,
     dynamic response,
     RpcMethodContext context,
+    RpcDataDirection direction,
   ) {
-    _log('[RES] $serviceName.$methodName: $response');
+    _log('[RES ${direction.symbol}] $serviceName.$methodName: $response');
     return Future.value(response);
   }
 
@@ -52,6 +54,7 @@ class LoggingMiddleware implements SimpleRpcMiddleware {
     dynamic error,
     StackTrace? stackTrace,
     RpcMethodContext context,
+    RpcDataDirection direction,
   ) {
     _log('[ERR] $serviceName.$methodName: $error');
     if (stackTrace != null) {
@@ -66,10 +69,11 @@ class LoggingMiddleware implements SimpleRpcMiddleware {
     String methodName,
     dynamic data,
     String streamId,
-    StreamDataDirection direction,
+    RpcDataDirection direction,
   ) {
-    final directionMark = direction == StreamDataDirection.toRemote ? '↗' : '↘';
-    _log('[STR $directionMark] $serviceName.$methodName[$streamId]: $data');
+    _log(
+      '[STR ${direction.symbol}] $serviceName.$methodName[$streamId]: $data',
+    );
     return Future.value(data);
   }
 

@@ -1,5 +1,4 @@
 import 'dart:async';
-
 import 'package:rpc_dart/rpc_dart.dart';
 
 class StringMessage implements RpcSerializableMessage {
@@ -21,11 +20,11 @@ class StringMessage implements RpcSerializableMessage {
   String toString() => 'StringMessage(text: $text)';
 }
 
-/// Пример простого использования двунаправленного канала без контрактной системы
+/// Пример для отладки проблемы с дополнительным запросом
 void main() async {
-  print('=== Простой пример двунаправленного канала ===\n');
+  print('=== Отладка двунаправленного канала ===\n');
 
-  // Создаем транспорт в памяти для локального теста
+  // Создаем отладочный транспорт для видимости всех сообщений
   final transport1 = MemoryTransport("server");
   final transport2 = MemoryTransport("client");
 
@@ -34,12 +33,10 @@ void main() async {
   transport2.connect(transport1);
 
   // Создаем сервер и клиент
-  final serverEndpoint = RpcEndpoint(transport1, JsonSerializer());
-  final clientEndpoint = RpcEndpoint(transport2, JsonSerializer());
-
-  // Добавляем middleware для логирования на обоих endpoints
-  serverEndpoint.addMiddleware(DebugMiddleware(id: "server"));
-  clientEndpoint.addMiddleware(DebugMiddleware(id: "client"));
+  final serverEndpoint = RpcEndpoint(transport1, JsonSerializer())
+    ..addMiddleware(DebugMiddleware(id: 'server'));
+  final clientEndpoint = RpcEndpoint(transport2, JsonSerializer())
+    ..addMiddleware(DebugMiddleware(id: 'client'));
 
   // Имя сервиса и метода
   const serviceName = 'EchoService';
@@ -60,6 +57,7 @@ void main() async {
       .bidirectional(serviceName, methodName)
       .register<StringMessage, StringMessage>(
         handler: (incomingStream, messageId) {
+          print('Вызван обработчик сервера с ID: $messageId');
           // Просто отправляем назад сообщения с префиксом
           return incomingStream.map((data) {
             return StringMessage(text: 'Эхо: ${data.text}');
@@ -72,6 +70,7 @@ void main() async {
   print('Обработчик зарегистрирован');
 
   // Создаем двунаправленный канал на клиенте
+  print('Создаем двунаправленный канал...');
   final channel = clientEndpoint
       .bidirectional(serviceName, methodName)
       .createChannel<StringMessage, StringMessage>(
@@ -81,43 +80,22 @@ void main() async {
 
   print('Двунаправленный канал создан');
 
-  // Подписываемся на входящие сообщения
-  final subscription = channel.incoming.listen(
-    (message) => print('Клиент получил: $message'),
-    onError: (e) => print('Ошибка: $e'),
-    onDone: () => print('Соединение закрыто'),
-  );
-
-  // Отправляем простые текстовые сообщения
-  print('\n--- Отправляем текстовые сообщения ---\n');
-
-  channel.send(StringMessage(text: 'Привет, сервер!'));
-  await Future.delayed(Duration(milliseconds: 300));
-
-  channel.send(StringMessage(text: 'Это тест двунаправленного стрима'));
-  await Future.delayed(Duration(milliseconds: 300));
-
-  channel.send(StringMessage(text: 'Отправляем структурированные данные'));
-  await Future.delayed(Duration(milliseconds: 300));
-
-  // Ждем немного для получения ответов
+  // Ждем немного, чтобы увидеть все сообщения
   await Future.delayed(Duration(seconds: 1));
 
-  // Корректное закрытие ресурсов
+  // Отправляем тестовое сообщение
+  channel.send(StringMessage(text: 'Тестовое сообщение'));
+
+  // Ждем для получения ответа
+  await Future.delayed(Duration(seconds: 1));
+
+  // Закрываем ресурсы
   print('\n--- Завершение работы ---');
-
-  // Сначала закрываем канал
   await channel.close();
-  // Затем отменяем подписку
-  await subscription.cancel();
-
-  // В последнюю очередь закрываем клиента и сервер
-  // Важно сначала закрыть клиент, затем сервер
   await clientEndpoint.close();
-  await Future.delayed(Duration(milliseconds: 100));
   await serverEndpoint.close();
 
-  print('\n--- Пример завершен ---');
+  print('\n--- Отладка завершена ---');
 }
 
 /// Пустой контракт для регистрации сервиса

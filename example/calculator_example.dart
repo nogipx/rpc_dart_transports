@@ -24,8 +24,8 @@ Future<void> main() async {
   print('Эндпоинты созданы');
 
   // Добавляем middleware для логирования
-  clientEndpoint.addMiddleware(LoggingMiddleware(id: 'client'));
-  serverEndpoint.addMiddleware(LoggingMiddleware(id: 'server'));
+  clientEndpoint.addMiddleware(DebugMiddleware(id: 'client'));
+  serverEndpoint.addMiddleware(DebugMiddleware(id: 'server'));
 
   // Создаем контракты
   final clientContract = ClientCalculatorContract(clientEndpoint);

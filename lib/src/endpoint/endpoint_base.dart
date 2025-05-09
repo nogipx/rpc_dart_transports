@@ -213,6 +213,8 @@ final class _RpcEndpointBase implements _RpcEndpoint {
       return;
     }
 
+    var direction = RpcDataDirection.fromRemote;
+
     try {
       // Создаем контекст вызова метода
       final context = RpcMethodContext(
@@ -229,6 +231,7 @@ final class _RpcEndpointBase implements _RpcEndpoint {
         methodName,
         message.payload,
         context,
+        RpcDataDirection.fromRemote,
       );
 
       // Создаем обновленный контекст с обработанной полезной нагрузкой
@@ -243,12 +246,16 @@ final class _RpcEndpointBase implements _RpcEndpoint {
       // Вызываем обработчик с обновленным контекстом
       final result = await methodHandler(updatedContext);
 
+      // Изменяем направление на отправку
+      direction = RpcDataDirection.toRemote;
+
       // Применяем middleware для обработки ответа
       final processedResult = await _middlewareChain.executeResponse(
         serviceName,
         methodName,
         result,
         context,
+        RpcDataDirection.toRemote,
       );
 
       await _sendMessage(
@@ -273,6 +280,7 @@ final class _RpcEndpointBase implements _RpcEndpoint {
           serviceName: serviceName,
           methodName: methodName,
         ),
+        direction,
       );
 
       await _sendErrorMessage(
@@ -303,8 +311,7 @@ final class _RpcEndpointBase implements _RpcEndpoint {
           message.method!,
           message.payload,
           message.id,
-          StreamDataDirection
-              .fromRemote, // Данные получены от удаленной стороны
+          RpcDataDirection.fromRemote, // Данные получены от удаленной стороны
         )
             .then((processedData) {
           controller.add(processedData);
@@ -374,10 +381,11 @@ final class _RpcEndpointBase implements _RpcEndpoint {
   ) async {
     await _sendMessage(
       RpcMessage(
-          type: RpcMessageType.error,
-          id: requestId,
-          payload: errorMessage,
-          metadata: metadata),
+        type: RpcMessageType.error,
+        id: requestId,
+        payload: errorMessage,
+        metadata: metadata,
+      ),
     );
   }
 
@@ -439,7 +447,7 @@ final class _RpcEndpointBase implements _RpcEndpoint {
         methodName,
         data,
         streamId,
-        StreamDataDirection.toRemote, // Данные отправляются удаленной стороне
+        RpcDataDirection.toRemote, // Данные отправляются удаленной стороне
       );
     }
 

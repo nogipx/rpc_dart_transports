@@ -33,14 +33,17 @@ class DebugMiddleware implements RpcMiddleware {
     String methodName,
     dynamic payload,
     RpcMethodContext context,
+    RpcDataDirection direction,
   ) {
-    _log('ЗАПРОС: $serviceName.$methodName');
-    _log('ID: ${context.messageId}');
-    _log('Payload: $payload');
+    var message = 'ЗАПРОС ${direction.symbol}: $serviceName.$methodName\n'
+        'ID: ${context.messageId}\n'
+        'Payload: $payload';
 
     if (context.metadata != null && context.metadata!.isNotEmpty) {
-      _log('Metadata: ${context.metadata}');
+      message += '\nMetadata: ${context.metadata}';
     }
+
+    _log('$message\n');
 
     return payload;
   }
@@ -51,14 +54,17 @@ class DebugMiddleware implements RpcMiddleware {
     String methodName,
     dynamic response,
     RpcMethodContext context,
+    RpcDataDirection direction,
   ) {
-    _log('ОТВЕТ: $serviceName.$methodName');
-    _log('ID: ${context.messageId}');
-    _log('Response: $response');
+    var message = 'ОТВЕТ ${direction.symbol}: $serviceName.$methodName\n'
+        'ID: ${context.messageId}\n'
+        'Response: $response';
 
     if (context.metadata != null && context.metadata!.isNotEmpty) {
-      _log('Metadata: ${context.metadata}');
+      message += '\nMetadata: ${context.metadata}';
     }
+
+    _log('$message\n');
 
     return response;
   }
@@ -70,18 +76,21 @@ class DebugMiddleware implements RpcMiddleware {
     dynamic error,
     StackTrace? stackTrace,
     RpcMethodContext context,
+    RpcDataDirection direction,
   ) {
-    _log('ОШИБКА: $serviceName.$methodName');
-    _log('ID: ${context.messageId}');
-    _log('Error: $error');
+    var message = 'ОШИБКА ${direction.symbol}: $serviceName.$methodName\n'
+        'ID: ${context.messageId}\n'
+        'Error: $error';
 
     if (stackTrace != null) {
-      _log('StackTrace: $stackTrace');
+      message += '\nStackTrace: $stackTrace';
     }
 
     if (context.metadata != null && context.metadata!.isNotEmpty) {
-      _log('Metadata: ${context.metadata}');
+      message += '\nMetadata: ${context.metadata}';
     }
+
+    _log('$message\n');
 
     return error;
   }
@@ -92,15 +101,18 @@ class DebugMiddleware implements RpcMiddleware {
     String methodName,
     dynamic data,
     String streamId,
-    StreamDataDirection direction,
+    RpcDataDirection direction,
   ) {
-    final directionText = direction == StreamDataDirection.toRemote
+    final directionText = direction == RpcDataDirection.toRemote
         ? 'ОТПРАВКА В ПОТОК'
         : 'ПОЛУЧЕНИЕ ИЗ ПОТОКА';
 
-    _log('$directionText: $serviceName.$methodName');
-    _log('StreamID: $streamId');
-    _log('Data: $data');
+    var message =
+        '$directionText ${direction.symbol}: $serviceName.$methodName\n'
+        'StreamID: $streamId\n'
+        'Data: $data';
+
+    _log('$message\n');
 
     return data;
   }
@@ -111,8 +123,10 @@ class DebugMiddleware implements RpcMiddleware {
     String methodName,
     String streamId,
   ) {
-    _log('ПОТОК ЗАКРЫТ: $serviceName.$methodName');
-    _log('StreamID: $streamId');
+    var message = 'ПОТОК ЗАКРЫТ: $serviceName.$methodName\n'
+        'StreamID: $streamId';
+
+    _log('$message\n');
   }
 }
 
@@ -133,9 +147,11 @@ class DebugWithTimingMiddleware extends DebugMiddleware {
     String methodName,
     dynamic payload,
     RpcMethodContext context,
+    RpcDataDirection direction,
   ) {
     _requestStartTimes[context.messageId] = DateTime.now();
-    return super.onRequest(serviceName, methodName, payload, context);
+    return super
+        .onRequest(serviceName, methodName, payload, context, direction);
   }
 
   @override
@@ -144,9 +160,11 @@ class DebugWithTimingMiddleware extends DebugMiddleware {
     String methodName,
     dynamic response,
     RpcMethodContext context,
+    RpcDataDirection direction,
   ) {
     _logTiming(serviceName, methodName, context.messageId);
-    return super.onResponse(serviceName, methodName, response, context);
+    return super
+        .onResponse(serviceName, methodName, response, context, direction);
   }
 
   @override
@@ -156,9 +174,11 @@ class DebugWithTimingMiddleware extends DebugMiddleware {
     dynamic error,
     StackTrace? stackTrace,
     RpcMethodContext context,
+    RpcDataDirection direction,
   ) {
     _logTiming(serviceName, methodName, context.messageId);
-    return super.onError(serviceName, methodName, error, stackTrace, context);
+    return super.onError(
+        serviceName, methodName, error, stackTrace, context, direction);
   }
 
   /// Вычисляет и логирует время выполнения запроса

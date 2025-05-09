@@ -3,7 +3,7 @@ import 'package:rpc_dart/rpc_dart.dart'
         MutableRpcMethodContext,
         RpcMethodContext,
         SimpleRpcMiddleware,
-        StreamDataDirection;
+        RpcDataDirection;
 
 /// Middleware для добавления метаданных к запросам и ответам
 class MetadataMiddleware implements SimpleRpcMiddleware {
@@ -45,6 +45,7 @@ class MetadataMiddleware implements SimpleRpcMiddleware {
     String methodName,
     dynamic payload,
     RpcMethodContext context,
+    RpcDataDirection direction,
   ) {
     // Если у нас есть метаданные в контексте, добавляем к ним новые
     final metadata = context.metadata ?? {};
@@ -81,6 +82,7 @@ class MetadataMiddleware implements SimpleRpcMiddleware {
     String methodName,
     dynamic response,
     RpcMethodContext context,
+    RpcDataDirection direction,
   ) {
     // Для responses метаданные можно добавить только к объектам, которые
     // их поддерживают (например, RpcMessage)
@@ -105,6 +107,7 @@ class MetadataMiddleware implements SimpleRpcMiddleware {
     dynamic error,
     StackTrace? stackTrace,
     RpcMethodContext context,
+    RpcDataDirection direction,
   ) {
     // Для ошибок не добавляем метаданные
     return Future.value(error);
@@ -116,7 +119,7 @@ class MetadataMiddleware implements SimpleRpcMiddleware {
     String methodName,
     dynamic data,
     String streamId,
-    StreamDataDirection direction,
+    RpcDataDirection direction,
   ) {
     // Для стрим-данных не добавляем метаданные
     return Future.value(data);

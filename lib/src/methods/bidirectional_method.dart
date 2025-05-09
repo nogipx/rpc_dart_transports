@@ -175,9 +175,7 @@ final class BidirectionalRpcMethod<T extends RpcSerializableMessage>
 
         // Получаем или создаем ID стрима, отличный от ID сообщения
         String effectiveStreamId;
-        if (isBidirectional &&
-            requestData is Map<String, dynamic> &&
-            requestData['_streamId'] != null) {
+        if (isBidirectional && requestData['_streamId'] != null) {
           // Если клиент указал ID стрима, используем его
           effectiveStreamId = requestData['_streamId'] as String;
         } else {

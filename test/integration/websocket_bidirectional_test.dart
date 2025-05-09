@@ -33,7 +33,7 @@ void main() {
         serverEndpoint = RpcEndpoint(serverTransport, JsonSerializer());
 
         // Добавляем middleware для логирования
-        serverEndpoint.addMiddleware(LoggingMiddleware(id: 'server'));
+        serverEndpoint.addMiddleware(DebugMiddleware(id: 'server'));
 
         // Регистрируем обработчик двунаправленного стриминга на сервере
         serverEndpoint
@@ -77,7 +77,7 @@ void main() {
     clientEndpoint = RpcEndpoint(clientTransport, JsonSerializer());
 
     // Добавляем middleware для логирования
-    clientEndpoint.addMiddleware(LoggingMiddleware(id: 'client'));
+    clientEndpoint.addMiddleware(DebugMiddleware(id: 'client'));
 
     // Ждем готовности сервера с таймаутом
     await serverReady.future.timeout(
