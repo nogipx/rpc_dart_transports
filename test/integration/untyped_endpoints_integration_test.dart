@@ -24,8 +24,14 @@ void main() {
       serializer = JsonSerializer();
 
       // Создаем эндпоинты
-      clientEndpoint = RpcEndpoint(clientTransport, serializer);
-      serverEndpoint = RpcEndpoint(serverTransport, serializer);
+      clientEndpoint = RpcEndpoint(
+        transport: clientTransport,
+        serializer: serializer,
+      );
+      serverEndpoint = RpcEndpoint(
+        transport: serverTransport,
+        serializer: serializer,
+      );
     });
 
     tearDown(() async {

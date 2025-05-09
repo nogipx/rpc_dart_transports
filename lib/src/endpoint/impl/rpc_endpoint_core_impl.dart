@@ -2,13 +2,14 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-part of '_index.dart';
+part of '../_index.dart';
 
 /// Базовая реализация конечной точки для обмена сообщениями
 ///
 /// Этот класс является внутренней реализацией и не должен использоваться напрямую.
 /// Для публичного API используйте [RpcEndpoint].
-final class _RpcEndpointBase implements _RpcEndpoint {
+final class _RpcEndpointCoreImpl<T extends IRpcSerializableMessage>
+    implements _IRpcEndpointCore<T> {
   /// Транспорт для отправки/получения сообщений
   final RpcTransport _transport;
   @override
@@ -18,6 +19,9 @@ final class _RpcEndpointBase implements _RpcEndpoint {
   final RpcSerializer _serializer;
   @override
   RpcSerializer get serializer => _serializer;
+
+  /// Метка для отладки
+  final String? debugLabel;
 
   /// Обработчики ожидающих ответов
   final Map<String, Completer<dynamic>> _pendingRequests = {};
@@ -39,7 +43,8 @@ final class _RpcEndpointBase implements _RpcEndpoint {
   ///
   /// [transport] - транспорт для обмена сообщениями
   /// [serializer] - сериализатор для преобразования сообщений
-  _RpcEndpointBase(this._transport, this._serializer) {
+  /// [debugLabel] - опциональная метка для отладки и логирования
+  _RpcEndpointCoreImpl(this._transport, this._serializer, {this.debugLabel}) {
     _initialize();
   }
 
@@ -52,7 +57,7 @@ final class _RpcEndpointBase implements _RpcEndpoint {
   ///
   /// [middleware] - объект, реализующий интерфейс RpcMiddleware
   @override
-  void addMiddleware(RpcMiddleware middleware) {
+  void addMiddleware(IRpcMiddleware middleware) {
     _middlewareChain.add(middleware);
   }
 
@@ -522,26 +527,34 @@ final class _RpcEndpointBase implements _RpcEndpoint {
   }
 
   @override
-  BidirectionalRpcMethod<RpcSerializableMessage> bidirectional(
-      String serviceName, String methodName) {
+  BidirectionalRpcMethod<T> bidirectional(
+    String serviceName,
+    String methodName,
+  ) {
     throw UnimplementedError();
   }
 
   @override
-  ClientStreamingRpcMethod<RpcSerializableMessage> clientStreaming(
-      String serviceName, String methodName) {
+  ClientStreamingRpcMethod<T> clientStreaming(
+    String serviceName,
+    String methodName,
+  ) {
     throw UnimplementedError();
   }
 
   @override
-  ServerStreamingRpcMethod<RpcSerializableMessage> serverStreaming(
-      String serviceName, String methodName) {
+  ServerStreamingRpcMethod<T> serverStreaming(
+    String serviceName,
+    String methodName,
+  ) {
     throw UnimplementedError();
   }
 
   @override
-  UnaryRpcMethod<RpcSerializableMessage> unary(
-      String serviceName, String methodName) {
+  UnaryRpcMethod<T> unary(
+    String serviceName,
+    String methodName,
+  ) {
     throw UnimplementedError();
   }
 }

@@ -21,13 +21,14 @@ enum RpcMethodType {
 }
 
 /// Интерфейс для типизированных сообщений
-abstract interface class RpcSerializableMessage {
+abstract interface class IRpcSerializableMessage {
   /// Преобразует сообщение в JSON
   Map<String, dynamic> toJson();
 }
 
 /// Базовый интерфейс для всех сервисных контрактов
-abstract interface class IRpcServiceContract<T extends RpcSerializableMessage> {
+abstract interface class IRpcServiceContract<
+    T extends IRpcSerializableMessage> {
   const IRpcServiceContract();
 
   /// Уникальное имя сервиса
@@ -40,6 +41,10 @@ abstract interface class IRpcServiceContract<T extends RpcSerializableMessage> {
   RpcMethodContract<Request, Response>?
       findMethodTyped<Request extends T, Response extends T>(String methodName);
 
+  /// Метод для регистрации методов в контракте.
+  /// Необходимо переопределить в классе-наследнике.
+  void setup();
+
   dynamic getHandler(RpcMethodContract<T, T> method);
 
   dynamic getArgumentParser(RpcMethodContract<T, T> method);
@@ -48,8 +53,8 @@ abstract interface class IRpcServiceContract<T extends RpcSerializableMessage> {
 }
 
 /// Контракт метода сервиса
-final class RpcMethodContract<Request extends RpcSerializableMessage,
-    Response extends RpcSerializableMessage> {
+final class RpcMethodContract<Request extends IRpcSerializableMessage,
+    Response extends IRpcSerializableMessage> {
   /// Имя метода
   final String methodName;
 

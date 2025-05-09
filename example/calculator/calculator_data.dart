@@ -1,7 +1,7 @@
 import 'package:rpc_dart/rpc_dart.dart';
 
 /// Пример класса запроса для калькулятора
-class CalculatorRequest implements RpcSerializableMessage {
+class CalculatorRequest implements IRpcSerializableMessage {
   final int a;
   final int b;
 
@@ -22,7 +22,7 @@ class CalculatorRequest implements RpcSerializableMessage {
 }
 
 /// Пример класса ответа для калькулятора
-class CalculatorResponse implements RpcSerializableMessage {
+class CalculatorResponse implements IRpcSerializableMessage {
   final int result;
 
   CalculatorResponse(this.result);
@@ -39,7 +39,7 @@ class CalculatorResponse implements RpcSerializableMessage {
 }
 
 /// Пример запроса для генерации последовательности
-class SequenceRequest implements RpcSerializableMessage {
+class SequenceRequest implements IRpcSerializableMessage {
   final int count;
 
   SequenceRequest(this.count);
@@ -56,7 +56,7 @@ class SequenceRequest implements RpcSerializableMessage {
 }
 
 /// Пример запроса для генерации последовательности
-class SequenceData implements RpcSerializableMessage {
+class SequenceData implements IRpcSerializableMessage {
   final int count;
 
   SequenceData(this.count);

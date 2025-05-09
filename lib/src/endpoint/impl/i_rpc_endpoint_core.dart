@@ -2,13 +2,13 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-part of '_index.dart';
+part of '../_index.dart';
 
 /// Абстрактный базовый класс для RPC-конечных точек
 ///
 /// Этот класс определяет общий публичный интерфейс для всех RPC-конечных точек.
 /// Для типизированной реализации используйте [RpcEndpoint].
-abstract interface class _RpcEndpoint<T extends RpcSerializableMessage> {
+abstract interface class _IRpcEndpointCore<T extends IRpcSerializableMessage> {
   /// Транспорт для отправки/получения сообщений
   RpcTransport get transport;
 
@@ -16,7 +16,7 @@ abstract interface class _RpcEndpoint<T extends RpcSerializableMessage> {
   RpcSerializer get serializer;
 
   /// Добавляет middleware для обработки запросов и ответов
-  void addMiddleware(RpcMiddleware middleware);
+  void addMiddleware(IRpcMiddleware middleware);
 
   /// Регистрирует обработчик метода
   void registerMethod(

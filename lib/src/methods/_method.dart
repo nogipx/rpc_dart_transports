@@ -15,9 +15,9 @@ part 'unary_method.dart';
 final _random = Random();
 
 /// Базовый абстрактный класс для всех типов RPC методов
-abstract base class RpcMethod<T extends RpcSerializableMessage> {
+abstract base class RpcMethod<T extends IRpcSerializableMessage> {
   /// Endpoint, с которым связан метод
-  final RpcEndpoint<T> _endpoint;
+  final IRpcEndpoint<T> _endpoint;
 
   /// Название сервиса
   final String serviceName;
@@ -26,7 +26,7 @@ abstract base class RpcMethod<T extends RpcSerializableMessage> {
   final String methodName;
 
   /// Создает новый объект RPC метода
-  RpcMethod(this._endpoint, this.serviceName, this.methodName);
+  const RpcMethod(this._endpoint, this.serviceName, this.methodName);
 
   /// Получает контракт метода
   RpcMethodContract<Request, Response>
@@ -53,8 +53,19 @@ abstract base class RpcMethod<T extends RpcSerializableMessage> {
     return methodContract;
   }
 
-  /// Доступ к endpoint'у (для наследников)
-  RpcEndpoint<T> get endpoint => _endpoint;
+  IRpcEndpointCore get _core {
+    if (_endpoint is! IRpcEndpointCore) {
+      throw ArgumentError('Is not valid subtype');
+    }
+    return _endpoint as IRpcEndpointCore;
+  }
+
+  IRpcRegistrar<T> get _registrar {
+    if (_endpoint is! IRpcRegistrar<T>) {
+      throw ArgumentError('Is not valid subtype');
+    }
+    return _endpoint as IRpcRegistrar<T>;
+  }
 
   /// Генерирует уникальный ID запроса
   static String generateUniqueId([String? prefix]) {

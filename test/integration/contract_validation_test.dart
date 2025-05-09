@@ -3,7 +3,7 @@ import 'package:rpc_dart/rpc_dart.dart';
 import 'package:test/test.dart';
 
 // Тестовые модели сообщений
-class UserRequest implements RpcSerializableMessage {
+class UserRequest implements IRpcSerializableMessage {
   final String username;
   final int age;
 
@@ -23,7 +23,7 @@ class UserRequest implements RpcSerializableMessage {
   }
 }
 
-class UserResponse implements RpcSerializableMessage {
+class UserResponse implements IRpcSerializableMessage {
   final String id;
   final String name;
   final bool isActive;
@@ -46,7 +46,7 @@ class UserResponse implements RpcSerializableMessage {
   }
 }
 
-class NotificationMessage implements RpcSerializableMessage {
+class NotificationMessage implements IRpcSerializableMessage {
   final String type;
   final String message;
 
@@ -68,14 +68,14 @@ class NotificationMessage implements RpcSerializableMessage {
 
 // Контракт сервиса пользователей
 abstract base class UserServiceContract
-    extends RpcServiceContract<RpcSerializableMessage> {
+    extends RpcServiceContract<IRpcSerializableMessage> {
   RpcEndpoint? get client;
 
   @override
   final String serviceName = 'UserService';
 
   @override
-  void registerMethodsFromClass() {
+  void setup() {
     // Регистрация пользователя (унарный метод)
     addUnaryMethod<UserRequest, UserResponse>(
       methodName: 'registerUser',
@@ -167,7 +167,7 @@ base class ClientUserService extends UserServiceContract {
     return client
         .unary(serviceName, 'registerUser')
         .call<UserRequest, UserResponse>(
-          request,
+          request: request,
           responseParser: UserResponse.fromJson,
         );
   }
@@ -177,7 +177,7 @@ base class ClientUserService extends UserServiceContract {
     return client
         .serverStreaming(serviceName, 'subscribeToNotifications')
         .openStream<UserRequest, NotificationMessage>(
-          request,
+          request: request,
           responseParser: NotificationMessage.fromJson,
         );
   }
@@ -211,8 +211,14 @@ void main() {
       serializer = JsonSerializer();
 
       // Создаем эндпоинты
-      clientEndpoint = RpcEndpoint(clientTransport, serializer);
-      serverEndpoint = RpcEndpoint(serverTransport, serializer);
+      clientEndpoint = RpcEndpoint(
+        transport: clientTransport,
+        serializer: serializer,
+      );
+      serverEndpoint = RpcEndpoint(
+        transport: serverTransport,
+        serializer: serializer,
+      );
 
       // Создаем сервисы
       clientService = ClientUserService(clientEndpoint);

@@ -7,18 +7,25 @@ import '_index.dart'
         RpcMethodContract,
         RpcMethodType,
         IRpcServiceContract,
-        RpcSerializableMessage;
+        IRpcSerializableMessage;
 import 'typedefs.dart';
 
-/// Базовый интерфейс для декларативных контрактов
-abstract base class RpcServiceContract<T extends RpcSerializableMessage>
-    extends _RpcServiceContractBase<T> {
-  /// Регистрирует методы контракта
-  void registerMethodsFromClass();
+final class SimpleRpcServiceContract
+    extends RpcServiceContract<IRpcSerializableMessage> {
+  @override
+  final String serviceName;
+  SimpleRpcServiceContract(this.serviceName);
+
+  @override
+  void setup() {}
 }
 
+/// Базовый интерфейс для декларативных контрактов
+abstract base class RpcServiceContract<T extends IRpcSerializableMessage>
+    extends _RpcServiceContractBase<T> {}
+
 /// Базовый класс для определения контрактов сервисов
-abstract base class _RpcServiceContractBase<T extends RpcSerializableMessage>
+abstract base class _RpcServiceContractBase<T extends IRpcSerializableMessage>
     implements IRpcServiceContract<T> {
   _RpcServiceContractBase();
 

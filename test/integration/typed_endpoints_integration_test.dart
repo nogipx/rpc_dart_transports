@@ -3,7 +3,7 @@ import 'package:rpc_dart/rpc_dart.dart';
 import 'package:test/test.dart';
 
 // Тестовые модели сообщений
-class TestRequest implements RpcSerializableMessage {
+class TestRequest implements IRpcSerializableMessage {
   final int value;
 
   TestRequest(this.value);
@@ -16,7 +16,7 @@ class TestRequest implements RpcSerializableMessage {
   }
 }
 
-class TestResponse implements RpcSerializableMessage {
+class TestResponse implements IRpcSerializableMessage {
   final int result;
 
   TestResponse(this.result);
@@ -31,14 +31,14 @@ class TestResponse implements RpcSerializableMessage {
 
 // Контракт для тестов
 abstract base class TestContract
-    extends RpcServiceContract<RpcSerializableMessage> {
+    extends RpcServiceContract<IRpcSerializableMessage> {
   RpcEndpoint? get endpoint;
 
   @override
   final String serviceName = 'TestService';
 
   @override
-  void registerMethodsFromClass() {
+  void setup() {
     // Унарный метод
     addUnaryMethod<TestRequest, TestResponse>(
       methodName: 'multiply',
@@ -92,7 +92,7 @@ base class ClientTestService extends TestContract {
     return endpoint
         .unary(serviceName, 'multiply')
         .call<TestRequest, TestResponse>(
-          request,
+          request: request,
           responseParser: TestResponse.fromJson,
         );
   }
@@ -102,48 +102,9 @@ base class ClientTestService extends TestContract {
     return endpoint
         .serverStreaming(serviceName, 'countTo')
         .openStream<TestRequest, TestResponse>(
-          request,
+          request: request,
           responseParser: TestResponse.fromJson,
         );
-  }
-}
-
-// Специальная реализация для тестирования произвольных методов
-base class CustomServiceContract
-    implements IRpcServiceContract<RpcSerializableMessage> {
-  @override
-  dynamic getArgumentParser(
-      RpcMethodContract<RpcSerializableMessage, RpcSerializableMessage>
-          method) {
-    return null;
-  }
-
-  @override
-  dynamic getHandler(
-      RpcMethodContract<RpcSerializableMessage, RpcSerializableMessage>
-          method) {
-    return null;
-  }
-
-  @override
-  List<RpcMethodContract<RpcSerializableMessage, RpcSerializableMessage>>
-      get methods => [];
-
-  @override
-  dynamic getResponseParser(
-      RpcMethodContract<RpcSerializableMessage, RpcSerializableMessage>
-          method) {
-    return null;
-  }
-
-  @override
-  String get serviceName => 'CustomService';
-
-  @override
-  RpcMethodContract<Request, Response>? findMethodTyped<
-      Request extends RpcSerializableMessage,
-      Response extends RpcSerializableMessage>(String methodName) {
-    return null;
   }
 }
 
@@ -171,8 +132,14 @@ void main() {
       serializer = JsonSerializer();
 
       // Создаем эндпоинты
-      clientEndpoint = RpcEndpoint(clientTransport, serializer);
-      serverEndpoint = RpcEndpoint(serverTransport, serializer);
+      clientEndpoint = RpcEndpoint(
+        transport: clientTransport,
+        serializer: serializer,
+      );
+      serverEndpoint = RpcEndpoint(
+        transport: serverTransport,
+        serializer: serializer,
+      );
 
       // Создаем сервисы
       clientService = ClientTestService(clientEndpoint);
@@ -251,7 +218,7 @@ void main() {
         () => clientEndpoint
             .unary('NonexistentService', 'nonexistentMethod')
             .call<TestRequest, TestResponse>(
-              TestRequest(5),
+              request: TestRequest(5),
               responseParser: TestResponse.fromJson,
             ),
         throwsA(anything),

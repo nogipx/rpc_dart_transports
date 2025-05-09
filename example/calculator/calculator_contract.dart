@@ -8,7 +8,7 @@ import '_index.dart';
 /// Обратите внимание, как методы объявлены в контракте с полными сигнатурами,
 /// но без реализации
 abstract base class CalculatorContract
-    extends RpcServiceContract<RpcSerializableMessage> {
+    extends RpcServiceContract<IRpcSerializableMessage> {
   RpcEndpoint? get endpoint;
 
   @override
@@ -16,7 +16,7 @@ abstract base class CalculatorContract
 
   /// Регистрация методов на основе их сигнатур
   @override
-  void registerMethodsFromClass() {
+  void setup() {
     addUnaryMethod<CalculatorRequest, CalculatorResponse>(
       methodName: 'add',
       handler: add,

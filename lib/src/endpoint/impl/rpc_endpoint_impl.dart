@@ -2,12 +2,13 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-part of '_index.dart';
+part of '../_index.dart';
 
 /// Типизированный Endpoint с поддержкой контрактов
-class RpcEndpoint<T extends RpcSerializableMessage> implements _RpcEndpoint {
+class _RpcEndpointImpl<T extends IRpcSerializableMessage>
+    implements _IRpcEndpointCore<T>, IRpcEndpoint<T> {
   /// Делегат для базовой функциональности
-  final _RpcEndpointBase _delegate;
+  final _RpcEndpointCoreImpl<T> _delegate;
 
   /// Зарегистрированные контракты сервисов
   final Map<String, IRpcServiceContract<T>> _contracts = {};
@@ -15,9 +16,17 @@ class RpcEndpoint<T extends RpcSerializableMessage> implements _RpcEndpoint {
   /// Зарегистрированные реализации методов
   final Map<String, Map<String, RpcMethodImplementation>> _implementations = {};
 
+  /// Метка для отладки
+  @override
+  final String? debugLabel;
+
   /// Создает новый типизированный Endpoint
-  RpcEndpoint(RpcTransport transport, RpcSerializer serializer)
-      : _delegate = _RpcEndpointBase(transport, serializer);
+  _RpcEndpointImpl({
+    required RpcTransport transport,
+    required RpcSerializer serializer,
+    this.debugLabel,
+  }) : _delegate =
+            _RpcEndpointCoreImpl(transport, serializer, debugLabel: debugLabel);
 
   @override
   RpcTransport get transport => _delegate.transport;
@@ -26,7 +35,7 @@ class RpcEndpoint<T extends RpcSerializableMessage> implements _RpcEndpoint {
   RpcSerializer get serializer => _delegate.serializer;
 
   @override
-  void addMiddleware(RpcMiddleware middleware) =>
+  void addMiddleware(IRpcMiddleware middleware) =>
       _delegate.addMiddleware(middleware);
 
   @override
@@ -118,27 +127,27 @@ class RpcEndpoint<T extends RpcSerializableMessage> implements _RpcEndpoint {
       );
 
   /// Регистрирует контракт сервиса
-  void registerServiceContract(IRpcServiceContract<T> contract) {
+  void registerServiceContract(
+    IRpcServiceContract<T> contract,
+  ) {
     // Проверяем, не зарегистрирован ли уже контракт с таким именем
     if (_contracts.containsKey(contract.serviceName)) {
       throw StateError(
           'Контракт для сервиса ${contract.serviceName} уже зарегистрирован');
     }
 
-    // Сохраняем контракт
-    _contracts[contract.serviceName] = contract;
-    _implementations.putIfAbsent(contract.serviceName, () => {});
-
-    // Проверяем, является ли контракт декларативным
-    if (contract is RpcServiceContract<T>) {
-      _registerDeclarativeContract(contract);
-    }
+    _registerContract(contract);
   }
 
   /// Регистрирует методы из декларативного контракта
-  void _registerDeclarativeContract(RpcServiceContract<T> contract) {
+  void _registerContract(
+    IRpcServiceContract<T> contract,
+  ) {
+    _contracts[contract.serviceName] = contract;
+    _implementations.putIfAbsent(contract.serviceName, () => {});
+
     // Регистрируем методы из класса
-    contract.registerMethodsFromClass();
+    contract.setup();
 
     // Для каждого метода в контракте
     for (final method in contract.methods) {
@@ -181,7 +190,10 @@ class RpcEndpoint<T extends RpcSerializableMessage> implements _RpcEndpoint {
   }
 
   /// Получает контракт сервиса по имени
-  IRpcServiceContract<T>? getServiceContract(String serviceName) {
+  @override
+  IRpcServiceContract<T>? getServiceContract(
+    String serviceName,
+  ) {
     return _contracts[serviceName];
   }
 

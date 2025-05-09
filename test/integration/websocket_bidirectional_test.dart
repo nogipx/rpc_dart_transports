@@ -30,7 +30,10 @@ void main() {
             WebSocketTransport.fromWebSocket('server', webSocket);
 
         // Создаем серверный эндпоинт
-        serverEndpoint = RpcEndpoint(serverTransport, JsonSerializer());
+        serverEndpoint = RpcEndpoint(
+          transport: serverTransport,
+          serializer: JsonSerializer(),
+        );
 
         // Добавляем middleware для логирования
         serverEndpoint.addMiddleware(DebugMiddleware(id: 'server'));
@@ -74,7 +77,10 @@ void main() {
     print('Клиент подключен к серверу');
 
     // Создаем клиентский endpoint
-    clientEndpoint = RpcEndpoint(clientTransport, JsonSerializer());
+    clientEndpoint = RpcEndpoint(
+      transport: clientTransport,
+      serializer: JsonSerializer(),
+    );
 
     // Добавляем middleware для логирования
     clientEndpoint.addMiddleware(DebugMiddleware(id: 'client'));
@@ -211,7 +217,7 @@ void main() {
 }
 
 /// Сообщения для тестирования
-class ChatMessage implements RpcSerializableMessage {
+class ChatMessage implements IRpcSerializableMessage {
   final String text;
   final String sender;
   final DateTime timestamp;

@@ -5,12 +5,14 @@
 part of '_method.dart';
 
 /// Класс для работы с RPC методом типа "клиентский стриминг" (поток запросов - один ответ)
-final class ClientStreamingRpcMethod<T extends RpcSerializableMessage>
+final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
     extends RpcMethod<T> {
   /// Создает новый объект клиентского стриминг RPC метода
   ClientStreamingRpcMethod(
-      RpcEndpoint<T> endpoint, String serviceName, String methodName)
-      : super(endpoint, serviceName, methodName);
+    IRpcEndpoint<T> endpoint,
+    String serviceName,
+    String methodName,
+  ) : super(endpoint, serviceName, methodName);
 
   /// Открывает поток для отправки данных на сервер
   ///
@@ -20,14 +22,15 @@ final class ClientStreamingRpcMethod<T extends RpcSerializableMessage>
   /// [responseParser] - функция преобразования JSON в объект ответа (опционально)
   ///
   /// Возвращает тюпл из потока для отправки и Future для получения результата
-  (StreamController<Request>, Future<Response>)
+  ({StreamController<Request> controller, Future<Response> response})
       openClientStream<Request extends T, Response extends T>({
+    required Request Function(Map<String, dynamic>) requestParser,
+    required Response Function(Map<String, dynamic>) responseParser,
     Map<String, dynamic>? metadata,
     String? streamId,
-    Request Function(Map<String, dynamic>)? requestParser,
-    Response Function(Map<String, dynamic>)? responseParser,
   }) {
-    final effectiveStreamId = streamId ?? RpcMethod.generateUniqueId('stream');
+    final effectiveStreamId =
+        streamId ?? RpcMethod.generateUniqueId('client_stream');
 
     // Создаем контроллер для отправки данных
     final controller = StreamController<Request>();
@@ -36,7 +39,7 @@ final class ClientStreamingRpcMethod<T extends RpcSerializableMessage>
     final completer = Completer<Response>();
 
     // Открываем базовый стрим
-    endpoint
+    _core
         .openStream(
       serviceName,
       methodName,
@@ -46,7 +49,7 @@ final class ClientStreamingRpcMethod<T extends RpcSerializableMessage>
         .listen((data) {
       // Финальный ответ приходит как последнее сообщение стрима
       if (!completer.isCompleted) {
-        if (data is Map<String, dynamic> && responseParser != null) {
+        if (data is Map<String, dynamic>) {
           completer.complete(responseParser(data));
         } else {
           completer.complete(data as Response);
@@ -62,7 +65,7 @@ final class ClientStreamingRpcMethod<T extends RpcSerializableMessage>
     controller.stream.listen((data) {
       final processedData = data is RpcMessage ? data.toJson() : data;
 
-      endpoint.sendStreamData(
+      _core.sendStreamData(
         effectiveStreamId,
         processedData,
         serviceName: serviceName,
@@ -70,7 +73,7 @@ final class ClientStreamingRpcMethod<T extends RpcSerializableMessage>
       );
     }, onDone: () {
       // Когда поток запросов закончен, отправляем маркер завершения
-      endpoint.sendStreamData(
+      _core.sendStreamData(
         effectiveStreamId,
         {'_clientStreamEnd': true},
         serviceName: serviceName,
@@ -78,14 +81,14 @@ final class ClientStreamingRpcMethod<T extends RpcSerializableMessage>
       );
 
       // Закрываем клиентскую часть стрима
-      endpoint.closeStream(
+      _core.closeStream(
         effectiveStreamId,
         serviceName: serviceName,
         methodName: methodName,
       );
     });
 
-    return (controller, completer.future);
+    return (controller: controller, response: completer.future);
   }
 
   /// Регистрирует обработчик клиентского стриминг метода
@@ -95,19 +98,19 @@ final class ClientStreamingRpcMethod<T extends RpcSerializableMessage>
   /// [responseParser] - функция преобразования JSON в объект ответа (опционально)
   void register<Request extends T, Response extends T>({
     required Future<Response> Function(Stream<Request>) handler,
-    Request Function(Map<String, dynamic>)? requestParser,
-    Response Function(Map<String, dynamic>)? responseParser,
+    required Request Function(Map<String, dynamic>) requestParser,
+    required Response Function(Map<String, dynamic>) responseParser,
   }) {
     final contract =
         getMethodContract<Request, Response>(RpcMethodType.clientStreaming);
     final implementation =
         RpcMethodImplementation.clientStream(contract, handler);
 
-    endpoint.registerMethodImplementation(
+    _registrar.registerMethodImplementation(
         serviceName, methodName, implementation);
 
     // Регистрируем низкоуровневый обработчик
-    endpoint.registerMethod(
+    _registrar.registerMethod(
       serviceName,
       methodName,
       (RpcMethodContext context) async {
@@ -118,7 +121,7 @@ final class ClientStreamingRpcMethod<T extends RpcSerializableMessage>
         final controller = StreamController<Request>();
 
         // Открываем входящий поток и преобразуем его к типу Request
-        final incomingStream = endpoint.openStream(
+        final incomingStream = _core.openStream(
           serviceName,
           methodName,
           streamId: messageId,
@@ -135,7 +138,7 @@ final class ClientStreamingRpcMethod<T extends RpcSerializableMessage>
           }
 
           // Преобразуем данные и добавляем в контроллер
-          if (data is Map<String, dynamic> && requestParser != null) {
+          if (data is Map<String, dynamic>) {
             controller.add(requestParser(data));
           } else {
             controller.add(data as Request);
@@ -157,7 +160,7 @@ final class ClientStreamingRpcMethod<T extends RpcSerializableMessage>
           // Преобразуем результат и отправляем как последнее сообщение стрима
           final result = response is RpcMessage ? response.toJson() : response;
 
-          endpoint.sendStreamData(
+          _core.sendStreamData(
             messageId,
             result,
             serviceName: serviceName,
@@ -165,7 +168,7 @@ final class ClientStreamingRpcMethod<T extends RpcSerializableMessage>
           );
 
           // Закрываем стрим
-          endpoint.closeStream(
+          _core.closeStream(
             messageId,
             serviceName: serviceName,
             methodName: methodName,
@@ -175,8 +178,8 @@ final class ClientStreamingRpcMethod<T extends RpcSerializableMessage>
           return {'status': 'streaming'};
         } catch (e) {
           // В случае ошибки, отправляем её и закрываем стрим
-          endpoint.sendStreamError(messageId, e.toString());
-          endpoint.closeStream(messageId);
+          _core.sendStreamError(messageId, e.toString());
+          _core.closeStream(messageId);
           rethrow;
         }
       },

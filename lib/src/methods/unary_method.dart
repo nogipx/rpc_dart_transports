@@ -5,11 +5,14 @@
 part of '_method.dart';
 
 /// Класс для работы с унарным RPC методом (один запрос - один ответ)
-final class UnaryRpcMethod<T extends RpcSerializableMessage>
+final class UnaryRpcMethod<T extends IRpcSerializableMessage>
     extends RpcMethod<T> {
   /// Создает новый объект унарного RPC метода
-  UnaryRpcMethod(RpcEndpoint<T> endpoint, String serviceName, String methodName)
-      : super(endpoint, serviceName, methodName);
+  UnaryRpcMethod(
+    IRpcEndpoint<T> endpoint,
+    String serviceName,
+    String methodName,
+  ) : super(endpoint, serviceName, methodName);
 
   /// Вызывает унарный метод и возвращает результат
   ///
@@ -17,13 +20,13 @@ final class UnaryRpcMethod<T extends RpcSerializableMessage>
   /// [metadata] - метаданные (опционально)
   /// [timeout] - таймаут (опционально)
   /// [responseParser] - функция преобразования JSON в объект ответа (опционально)
-  Future<Response> call<Request extends T, Response extends T>(
-    Request request, {
+  Future<Response> call<Request extends T, Response extends T>({
+    required Request request,
+    required Response Function(Map<String, dynamic>) responseParser,
     Map<String, dynamic>? metadata,
     Duration? timeout,
-    Response Function(Map<String, dynamic>)? responseParser,
   }) async {
-    final result = await endpoint.invoke(
+    final result = await _core.invoke(
       serviceName,
       methodName,
       request is RpcMessage ? request.toJson() : request,
@@ -32,7 +35,7 @@ final class UnaryRpcMethod<T extends RpcSerializableMessage>
     );
 
     // Если результат - Map<String, dynamic> и предоставлен парсер, используем его
-    if (result is Map<String, dynamic> && responseParser != null) {
+    if (result is Map<String, dynamic>) {
       return responseParser(result);
     }
 
@@ -47,25 +50,24 @@ final class UnaryRpcMethod<T extends RpcSerializableMessage>
   /// [responseParser] - функция преобразования JSON в объект ответа (опционально)
   void register<Request extends T, Response extends T>({
     required Future<Response> Function(Request) handler,
-    Request Function(Map<String, dynamic>)? requestParser,
-    Response Function(Map<String, dynamic>)? responseParser,
+    required Request Function(Map<String, dynamic>) requestParser,
+    required Response Function(Map<String, dynamic>) responseParser,
   }) {
     final contract = getMethodContract<Request, Response>(RpcMethodType.unary);
     final implementation = RpcMethodImplementation.unary(contract, handler);
 
-    endpoint.registerMethodImplementation(
+    _registrar.registerMethodImplementation(
         serviceName, methodName, implementation);
 
-    endpoint.registerMethod(
+    _registrar.registerMethod(
       serviceName,
       methodName,
       (RpcMethodContext context) async {
         try {
           // Если request - это Map и мы получили функцию fromJson, преобразуем объект
-          final typedRequest =
-              (context.payload is Map<String, dynamic> && requestParser != null)
-                  ? requestParser(context.payload)
-                  : context.payload;
+          final typedRequest = (context.payload is Map<String, dynamic>)
+              ? requestParser(context.payload)
+              : context.payload;
 
           // Получаем типизированный ответ от обработчика
           final response = await implementation.invoke(typedRequest);

@@ -24,8 +24,14 @@ void main() {
       serializer = JsonSerializer();
 
       // Создаем конечные точки
-      endpoint1 = RpcEndpoint(transport1, serializer);
-      endpoint2 = RpcEndpoint(transport2, serializer);
+      endpoint1 = RpcEndpoint(
+        transport: transport1,
+        serializer: serializer,
+      );
+      endpoint2 = RpcEndpoint(
+        transport: transport2,
+        serializer: serializer,
+      );
     });
 
     tearDown(() async {

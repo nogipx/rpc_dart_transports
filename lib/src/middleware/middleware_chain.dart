@@ -12,12 +12,12 @@ import 'package:rpc_dart/rpc_dart.dart';
 /// Для ответов и ошибок - в обратном порядке.
 final class RpcMiddlewareChain {
   /// Список middleware в цепочке
-  final List<RpcMiddleware> _middlewares = [];
+  final List<IRpcMiddleware> _middlewares = [];
 
   /// Добавляет middleware в цепочку
   ///
   /// [middleware] - объект реализующий RpcMiddleware
-  void add(RpcMiddleware middleware) {
+  void add(IRpcMiddleware middleware) {
     _middlewares.add(middleware);
   }
 

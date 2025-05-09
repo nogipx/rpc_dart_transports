@@ -13,7 +13,7 @@ final class ClientCalculatorContract extends CalculatorContract {
     return endpoint
         .unary(serviceName, 'add')
         .call<CalculatorRequest, CalculatorResponse>(
-          request,
+          request: request,
           responseParser: CalculatorResponse.fromJson,
         );
   }
@@ -23,7 +23,7 @@ final class ClientCalculatorContract extends CalculatorContract {
     return endpoint
         .unary(serviceName, 'multiply')
         .call<CalculatorRequest, CalculatorResponse>(
-          request,
+          request: request,
           responseParser: CalculatorResponse.fromJson,
         );
   }
@@ -33,7 +33,7 @@ final class ClientCalculatorContract extends CalculatorContract {
     return endpoint
         .serverStreaming(serviceName, 'generateSequence')
         .openStream<SequenceRequest, SequenceData>(
-          request,
+          request: request,
           responseParser: SequenceData.fromJson,
         );
   }

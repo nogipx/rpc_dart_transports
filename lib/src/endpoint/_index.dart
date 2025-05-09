@@ -8,7 +8,13 @@ import 'dart:typed_data';
 
 import 'package:rpc_dart/rpc_dart.dart';
 
-part 'method_context.dart';
-part 'endpoint_abstract.dart';
-part 'endpoint_base.dart';
-part 'endpoint_typed.dart';
+part 'impl/i_rpc_endpoint_core.dart';
+part 'impl/rpc_endpoint_core_impl.dart';
+part 'impl/rpc_endpoint_impl.dart';
+part 'impl/method_context.dart';
+
+part 'interfaces/i_rpc_endpoint_core.dart';
+part 'interfaces/i_rpc_endpoint.dart';
+part 'interfaces/i_rpc_registrar.dart';
+
+part 'rpc_endpoint.dart';

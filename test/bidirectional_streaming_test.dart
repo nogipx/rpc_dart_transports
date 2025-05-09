@@ -15,8 +15,14 @@ void main() {
 
       // Создаем эндпоинты
       final serializer = JsonSerializer();
-      final clientEndpoint = RpcEndpoint(clientTransport, serializer);
-      final serverEndpoint = RpcEndpoint(serverTransport, serializer);
+      final clientEndpoint = RpcEndpoint(
+        transport: clientTransport,
+        serializer: serializer,
+      );
+      final serverEndpoint = RpcEndpoint(
+        transport: serverTransport,
+        serializer: serializer,
+      );
 
       // Регистрируем обработчик для стрима на сервере
       serverEndpoint.registerMethod('TestService', 'bidirectionalStream',
@@ -140,8 +146,14 @@ void main() {
 
       // Создаем эндпоинты
       final serializer = JsonSerializer();
-      final clientEndpoint = RpcEndpoint(clientTransport, serializer);
-      final serverEndpoint = RpcEndpoint(serverTransport, serializer);
+      final clientEndpoint = RpcEndpoint(
+        transport: clientTransport,
+        serializer: serializer,
+      );
+      final serverEndpoint = RpcEndpoint(
+        transport: serverTransport,
+        serializer: serializer,
+      );
 
       // Регистрируем обработчик на сервере, который будет выдавать ошибку для определенных значений
       serverEndpoint.registerMethod(

@@ -109,7 +109,7 @@ stream.listen(
 
 ```dart
 // Регистрация на сервере
-server.bidirectionalMethod('ChatService', 'chat')
+server.bidirectional('ChatService', 'chat')
     .register<ChatMessage, ChatMessage>(
       handler: (incomingStream, messageId) {
         // Обрабатываем входящие сообщения и отправляем ответы
@@ -127,7 +127,7 @@ server.bidirectionalMethod('ChatService', 'chat')
 
 // Создание канала на клиенте
 final channel = client
-    .bidirectionalMethod('ChatService', 'chat')
+    .bidirectional('ChatService', 'chat')
     .createChannel<ChatMessage, ChatMessage>(
       requestParser: ChatMessage.fromJson,
       responseParser: ChatMessage.fromJson,
@@ -153,7 +153,7 @@ await channel.close();
 ```dart
 // Определение контракта
 abstract base class CalculatorContract 
-    extends DeclarativeRpcServiceContract<RpcSerializableMessage> {
+    extends RpcServiceContract<RpcSerializableMessage> {
   
   @override
   final String serviceName = 'CalculatorService';
@@ -213,7 +213,7 @@ final class ClientCalculatorContract extends CalculatorContract {
   @override
   Future<CalculatorResponse> add(CalculatorRequest request) {
     return endpoint
-        .unaryMethod(serviceName, 'add')
+        .unary(serviceName, 'add')
         .call<CalculatorRequest, CalculatorResponse>(
           request,
           responseParser: CalculatorResponse.fromJson,
@@ -223,7 +223,7 @@ final class ClientCalculatorContract extends CalculatorContract {
   @override
   Stream<SequenceData> generateSequence(SequenceRequest request) {
     return endpoint
-        .serverStreamingMethod(serviceName, 'generateSequence')
+        .serverStreaming(serviceName, 'generateSequence')
         .openStream<SequenceRequest, SequenceData>(
           request,
           responseParser: SequenceData.fromJson,
@@ -284,7 +284,7 @@ class CalculatorResponse implements RpcSerializableMessage {
 }
 
 // Контракт сервиса
-abstract base class CalculatorContract extends DeclarativeRpcServiceContract {
+abstract base class CalculatorContract extends RpcServiceContract {
   @override
   final String serviceName = 'CalculatorService';
 
@@ -319,91 +319,6 @@ abstract base class CalculatorContract extends DeclarativeRpcServiceContract {
   Future<CalculatorResponse> multiply(CalculatorRequest request);
   Stream<SequenceResponse> generateSequence(SequenceRequest request);
 }
-
-// Реализация на сервере
-final class ServerCalculatorContract extends CalculatorContract {
-  @override
-  Future<CalculatorResponse> add(CalculatorRequest request) async {
-    return CalculatorResponse(request.a + request.b);
-  }
-  
-  @override
-  Future<CalculatorResponse> multiply(CalculatorRequest request) async {
-    return CalculatorResponse(request.a * request.b);
-  }
-  
-  @override
-  Stream<SequenceResponse> generateSequence(SequenceRequest request) {
-    return Stream.periodic(
-      Duration(milliseconds: 200),
-      (i) => SequenceResponse(i + 1),
-    ).take(request.count);
-  }
-}
-
-// Реализация на клиенте
-final class ClientCalculatorContract extends CalculatorContract {
-  final RpcEndpoint client;
-  
-  ClientCalculatorContract(this.client);
-  
-  @override
-  Future<CalculatorResponse> add(CalculatorRequest request) {
-    return client.invokeTyped<CalculatorRequest, CalculatorResponse>(
-      serviceName: serviceName,
-      methodName: 'add',
-      request: request,
-    );
-  }
-  
-  @override
-  Future<CalculatorResponse> multiply(CalculatorRequest request) {
-    return client.invokeTyped<CalculatorRequest, CalculatorResponse>(
-      serviceName: serviceName,
-      methodName: 'multiply',
-      request: request,
-    );
-  }
-  
-  @override
-  Stream<SequenceResponse> generateSequence(SequenceRequest request) {
-    return client.openTypedStream<SequenceRequest, SequenceResponse>(
-      serviceName,
-      'generateSequence',
-      request: request,
-    );
-  }
-}
-
-// Использование
-final serverContract = ServerCalculatorContract();
-server.registerContract(serverContract);
-
-final calculator = ClientCalculatorContract(client);
-final response = await calculator.add(CalculatorRequest(10, 5));
-print('Результат: ${response.result}'); // Результат: 15
-```
-
-## Middleware и расширения
-
-```dart
-// Добавление логирования
-client.addMiddleware(LoggingMiddleware(
-  logger: (message) => print(message),
-));
-
-// Добавление измерения времени запросов
-server.addMiddleware(TimingMiddleware(
-  onTiming: (message, duration) => print(
-    'Время выполнения: $message - ${duration.inMilliseconds}ms',
-  ),
-));
-
-// Доступные встроенные middleware
-// - LoggingMiddleware - логирование
-// - TimingMiddleware - измерение времени
-// - DebugMiddleware - отладка
-// - MetadataMiddleware - работа с метаданными
 ```
 
 ## Транспорты
@@ -412,44 +327,67 @@ server.addMiddleware(TimingMiddleware(
 
 - **MemoryTransport** - для обмена в пределах одного процесса
 - **IsolateTransport** - для обмена между изолятами
+- **WebSocketTransport** - для обмена через WebSocket соединения
 
-### Пользовательский транспорт
+### Пример WebSocket транспорта
 
 ```dart
-class WebSocketTransport implements RpcTransport {
-  @override
-  final String id;
-  
-  final WebSocket _socket;
-  final StreamController<Uint8List> _incomingController = StreamController<Uint8List>.broadcast();
-  bool _isAvailable = true;
-  
-  WebSocketTransport(this.id, this._socket) {
-    _socket.listen(
-      (data) => _incomingController.add(data is Uint8List ? data : Uint8List.fromList(data)),
-      onDone: () => _isAvailable = false,
-      onError: (e) => _isAvailable = false,
-    );
+// Клиентская часть
+final wsClientTransport = WebSocketTransport('client', 'ws://localhost:8080', 
+  autoConnect: true);
+final clientEndpoint = RpcEndpoint(wsClientTransport, JsonSerializer());
+
+// Серверная часть (при наличии WebSocket сервера)
+final server = await HttpServer.bind('localhost', 8080);
+await for (var request in server) {
+  if (request.uri.path == '/ws') {
+    final socket = await WebSocketTransformer.upgrade(request);
+    final transport = WebSocketTransport.fromWebSocket('server', socket);
+    final endpoint = RpcEndpoint(transport, JsonSerializer());
+    
+    // Регистрация методов...
   }
-  
-  @override
-  Future<void> send(Uint8List data) async {
-    if (!isAvailable) throw StateError('Transport is not available');
-    _socket.add(data);
+}
+```
+
+## Middleware и расширения
+
+```dart
+// Добавление логирования
+client.addMiddleware(DebugMiddleware(id: 'client'));
+
+// Добавление middleware для изменения запросов
+server.addMiddleware(
+  RpcMiddleware(
+    onRequest: (request) {
+      // Модифицируем запрос
+      final metadata = request.metadata ?? {};
+      metadata['timestamp'] = DateTime.now().toIso8601String();
+      return request.copyWith(metadata: metadata);
+    },
+    onResponse: (response) {
+      // Можем модифицировать ответ
+      return response;
+    },
+  ),
+);
+```
+
+## Обработка ошибок
+
+```dart
+try {
+  final result = await client.invoke(
+    'CalculatorService',
+    'divide',
+    {'a': 10, 'b': 0},
+  );
+} catch (e) {
+  if (e is RpcException) {
+    print('RPC ошибка: ${e.message}, код: ${e.code}');
+  } else {
+    print('Неизвестная ошибка: $e');
   }
-  
-  @override
-  Stream<Uint8List> receive() => _incomingController.stream;
-  
-  @override
-  Future<void> close() async {
-    _isAvailable = false;
-    await _socket.close();
-    await _incomingController.close();
-  }
-  
-  @override
-  bool get isAvailable => _isAvailable && _socket.readyState == WebSocket.open;
 }
 ```
 
@@ -462,96 +400,11 @@ class WebSocketTransport implements RpcTransport {
 - `serviceName` - имя сервиса
 - `methodName` - имя метода
 
-## Типизированные вызовы методов
-
-```dart
-// Типизированные сообщения
-class CalculatorRequest implements RpcSerializableMessage {
-  final int a;
-  final int b;
-
-  CalculatorRequest(this.a, this.b);
-
-  @override
-  Map<String, dynamic> toJson() => {'a': a, 'b': b};
-
-  static CalculatorRequest fromJson(Map<String, dynamic> json) {
-    return CalculatorRequest(
-      json['a'] as int, 
-      json['b'] as int,
-    );
-  }
-}
-
-class CalculatorResponse implements RpcSerializableMessage {
-  final int result;
-
-  CalculatorResponse(this.result);
-
-  @override
-  Map<String, dynamic> toJson() => {'result': result};
-
-  static CalculatorResponse fromJson(Map<String, dynamic> json) {
-    return CalculatorResponse(json['result'] as int);
-  }
-}
-
-// Регистрация унарного метода на сервере
-server.unaryMethod('CalculatorService', 'add')
-    .register<CalculatorRequest, CalculatorResponse>(
-      handler: (request) async {
-        return CalculatorResponse(request.a + request.b);
-      },
-      requestParser: CalculatorRequest.fromJson,
-      responseParser: CalculatorResponse.fromJson,
-    );
-
-// Вызов типизированного унарного метода с клиента
-final response = await client
-    .unaryMethod('CalculatorService', 'add')
-    .call<CalculatorRequest, CalculatorResponse>(
-      CalculatorRequest(5, 3),
-      responseParser: CalculatorResponse.fromJson,
-    );
-    
-print('Результат: ${response.result}'); // Результат: 8
-```
-
-## Стриминг данных (Server Streaming)
-
-```dart
-// Регистрация стрима на сервере
-server.serverStreamingMethod('NumberService', 'generateNumbers')
-    .register<NumberRequest, NumberResponse>(
-      handler: (request) async* {
-        for (var i = 1; i <= request.count; i++) {
-          yield NumberResponse(i);
-          await Future.delayed(Duration(milliseconds: 100));
-        }
-      },
-      requestParser: NumberRequest.fromJson,
-      responseParser: NumberResponse.fromJson,
-    );
-
-// Получение данных на клиенте
-final stream = client
-    .serverStreamingMethod('NumberService', 'generateNumbers')
-    .openStream<NumberRequest, NumberResponse>(
-      NumberRequest(5),
-      responseParser: NumberResponse.fromJson,
-    );
-
-stream.listen(
-  (data) => print('Получено: ${data.value}'),
-  onDone: () => print('Стрим завершен'),
-);
-```
-
 ## Клиентский стриминг (Client Streaming)
 
 ```dart
 // Регистрация обработчика на сервере
-server.clientStreamingMethod('SumService', 'calculateSum')
+server.clientStreaming('SumService', 'calculateSum')
     .register<NumberValue, SumResult>(
       handler: (stream) async {
         int sum = 0;
@@ -566,7 +419,7 @@ server.clientStreamingMethod('SumService', 'calculateSum')
 
 // Использование на клиенте
 final (controller, resultFuture) = client
-    .clientStreamingMethod('SumService', 'calculateSum')
+    .clientStreaming('SumService', 'calculateSum')
     .openClientStream<NumberValue, SumResult>(
       responseParser: SumResult.fromJson,
     );
@@ -581,3 +434,19 @@ await controller.close();
 final result = await resultFuture;
 print('Сумма: ${result.total}'); // Сумма: 60
 ```
+
+## Статусы транспорта
+
+RPC Dart предоставляет статусы выполнения операций транспорта:
+
+```dart
+enum RpcTransportActionStatus {
+  success,
+  transportUnavailable,
+  connectionClosed,
+  connectionNotEstablished,
+  unknownError,
+}
+```
+
+Это позволяет точно определить причину проблемы при отправке сообщений.

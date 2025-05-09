@@ -19,8 +19,14 @@ Future<void> main() async {
   final serializer = JsonSerializer();
 
   // Создаем эндпоинты
-  final clientEndpoint = RpcEndpoint(clientTransport, serializer);
-  final serverEndpoint = RpcEndpoint(serverTransport, serializer);
+  final clientEndpoint = RpcEndpoint(
+    transport: clientTransport,
+    serializer: serializer,
+  );
+  final serverEndpoint = RpcEndpoint(
+    transport: serverTransport,
+    serializer: serializer,
+  );
   print('Эндпоинты созданы');
 
   // Добавляем middleware для логирования

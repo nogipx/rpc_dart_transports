@@ -22,7 +22,7 @@ enum RpcDataDirection {
 ///
 /// Middleware используется для перехвата и обработки запросов, ответов и ошибок
 /// в конвейере RPC.
-abstract class RpcMiddleware {
+abstract interface class IRpcMiddleware {
   /// Вызывается перед обработкой запроса
   ///
   /// [serviceName] - имя сервиса
@@ -106,7 +106,7 @@ abstract class RpcMiddleware {
 /// Упрощенный интерфейс middleware с пустыми реализациями по умолчанию
 ///
 /// Используется для случаев, когда нужно перехватить только часть операций
-abstract class SimpleRpcMiddleware implements RpcMiddleware {
+abstract class SimpleRpcMiddleware implements IRpcMiddleware {
   @override
   FutureOr<dynamic> onRequest(
     String serviceName,

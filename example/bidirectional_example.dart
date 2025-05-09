@@ -2,10 +2,32 @@ import 'dart:async';
 
 import 'package:rpc_dart/rpc_dart.dart';
 
-/// Пример простого использования двунаправленного канала без контрактной системы
+/// Пример использования двунаправленных и клиентских стримов
 void main() async {
-  print('=== Простой пример двунаправленного канала ===\n');
+  print('=== Пример использования различных типов стримингов ===\n');
 
+  // Инициализация транспорта и эндпоинтов
+  final endpoints = setupEndpoints();
+  final serverEndpoint = endpoints.server;
+  final clientEndpoint = endpoints.client;
+
+  // Регистрация обработчиков
+  registerServerHandlers(serverEndpoint);
+
+  // Демонстрация клиентского стриминга
+  await demonstrateClientStreaming(clientEndpoint);
+
+  // Демонстрация двунаправленного стрима
+  await demonstrateBidirectionalStream(clientEndpoint);
+
+  // Закрытие соединений
+  await cleanupResources(clientEndpoint, serverEndpoint);
+
+  print('\n--- Пример завершен ---');
+}
+
+/// Настройка и инициализация транспорта и эндпоинтов
+({RpcEndpoint server, RpcEndpoint client}) setupEndpoints() {
   // Создаем транспорт в памяти для локального теста
   final transport1 = MemoryTransport("server");
   final transport2 = MemoryTransport("client");
@@ -14,27 +36,39 @@ void main() async {
   transport1.connect(transport2);
   transport2.connect(transport1);
 
-  // Создаем сервер и клиент
-  final serverEndpoint = RpcEndpoint(transport1, JsonSerializer());
-  final clientEndpoint = RpcEndpoint(transport2, JsonSerializer());
+  // Создаем сервер и клиент с метками для отладки
+  final serverEndpoint = RpcEndpoint(
+    transport: transport1,
+    serializer: JsonSerializer(),
+    debugLabel: "server",
+  );
+  final clientEndpoint = RpcEndpoint(
+    transport: transport2,
+    serializer: JsonSerializer(),
+    debugLabel: "client",
+  );
+
+  final serviceContract = SimpleRpcServiceContract(serviceName);
 
   // Добавляем middleware для логирования на обоих endpoints
   serverEndpoint.addMiddleware(DebugMiddleware(id: "server"));
   clientEndpoint.addMiddleware(DebugMiddleware(id: "client"));
 
-  // Имя сервиса и метода
-  const serviceName = 'EchoService';
-  const methodName = 'echo';
+  // Регистрируем контракт на обоих эндпоинтах
+  serverEndpoint.registerServiceContract(serviceContract);
+  clientEndpoint.registerServiceContract(serviceContract);
 
-  // Создаем и регистрируем пустой контракт для сервиса EchoService
-  final serverContract = EmptyServiceContract(serviceName);
-  final clientContract = EmptyServiceContract(serviceName);
+  return (server: serverEndpoint, client: clientEndpoint);
+}
 
-  // Важно зарегистрировать контракт на обоих эндпоинтах
-  serverEndpoint.registerServiceContract(serverContract);
-  clientEndpoint.registerServiceContract(clientContract);
+/// Константы для имен сервисов и методов
+const serviceName = 'EchoService';
+const methodName = 'echo';
+const clientStreamMethodName = 'streamData';
 
-  // Регистрируем обработчик на сервере
+/// Регистрация обработчиков на сервере
+void registerServerHandlers(RpcEndpoint serverEndpoint) {
+  // Регистрируем обработчик двунаправленного стрима
   serverEndpoint
       .bidirectional(serviceName, methodName)
       .register<StringMessage, StringMessage>(
@@ -47,6 +81,113 @@ void main() async {
         requestParser: StringMessage.fromJson,
         responseParser: StringMessage.fromJson,
       );
+
+  // Регистрируем обработчик клиентского стриминга
+  serverEndpoint
+      .clientStreaming(serviceName, clientStreamMethodName)
+      .register<StringMessage, StringMessage>(
+        handler: (requests) async {
+          print('\nСервер: начал обработку потока клиентских сообщений\n');
+          StringMessage? lastMessage;
+          int count = 0;
+
+          try {
+            await for (final message in requests) {
+              count++;
+              print('Сервер: получил сообщение #$count: ${message.text}');
+              lastMessage = message;
+
+              // Имитация обработки данных
+              await Future.delayed(Duration(milliseconds: 300));
+            }
+
+            print(
+                '\nСервер: поток клиентских сообщений завершен, всего получено: $count\n');
+
+            // Подготавливаем итоговый ответ на основе последнего полученного сообщения
+            final response = lastMessage != null
+                ? StringMessage(
+                    text:
+                        'Обработано $count сообщений. Последнее: ${lastMessage.text}')
+                : StringMessage(text: 'Не получено ни одного сообщения');
+
+            return response;
+          } catch (e) {
+            print('\nСервер: ошибка при обработке потока: $e\n');
+            return StringMessage(text: 'Ошибка: $e');
+          }
+        },
+        requestParser: StringMessage.fromJson,
+        responseParser: StringMessage.fromJson,
+      );
+
+  // Регистрируем обработчик для простого клиентского стриминга
+  serverEndpoint
+      .clientStreaming(serviceName, 'test')
+      .register<StringMessage, StringMessage>(
+        handler: (requests) async {
+          int tickCount = 0;
+
+          await for (final tick in requests) {
+            tickCount++;
+            print('Сервер получил тик: ${tick.text}');
+          }
+
+          return StringMessage(text: 'Сервер получил $tickCount тиков');
+        },
+        requestParser: StringMessage.fromJson,
+        responseParser: StringMessage.fromJson,
+      );
+}
+
+/// Демонстрация клиентского стриминга
+Future<void> demonstrateClientStreaming(RpcEndpoint clientEndpoint) async {
+  print('\n=== Демонстрация клиентского стриминга ===\n');
+  print('Клиент: открытие потока для отправки данных на сервер...');
+
+  // Открываем клиентский поток
+  final clientStream = clientEndpoint
+      .clientStreaming(serviceName, clientStreamMethodName)
+      .openClientStream<StringMessage, StringMessage>(
+        responseParser: StringMessage.fromJson,
+        requestParser: StringMessage.fromJson,
+      );
+
+  // Отслеживаем ответ сервера
+  clientStream.response.then(
+    (response) =>
+        print('\nКлиент: получен финальный ответ: ${response.text}\n'),
+    onError: (e) => print('\nКлиент: ошибка при получении ответа: $e\n'),
+  );
+
+  // Определяем источник данных для отправки
+  final dataSource = Stream<StringMessage>.periodic(Duration(seconds: 1),
+      (index) => StringMessage(text: 'Пакет данных #$index')).take(5);
+
+  print('Клиент: начинаем отправку данных...');
+
+  // Отправляем данные в поток
+  await dataSource.forEach((message) {
+    print('Клиент: отправка ${message.text}');
+    clientStream.controller.add(message);
+  });
+
+  // Закрываем контроллер после отправки всех данных
+  print('Клиент: завершаем отправку данных');
+  clientStream.controller.close();
+
+  // Ждем получения результата
+  await clientStream.response;
+
+  print('\n=== Демонстрация клиентского стриминга завершена ===\n');
+
+  // Временная пауза перед запуском следующего примера
+  await Future.delayed(Duration(seconds: 1));
+}
+
+/// Демонстрация двунаправленного стрима
+Future<void> demonstrateBidirectionalStream(RpcEndpoint clientEndpoint) async {
+  print('\n=== Демонстрация двунаправленного стрима ===\n');
 
   // Создаем двунаправленный канал на клиенте
   final channel = clientEndpoint
@@ -80,16 +221,22 @@ void main() async {
   // Затем отменяем подписку
   await subscription.cancel();
 
-  // В последнюю очередь закрываем клиента и сервер
+  print('\n=== Демонстрация двунаправленного стрима завершена ===\n');
+}
+
+/// Закрытие ресурсов
+Future<void> cleanupResources(
+    RpcEndpoint clientEndpoint, RpcEndpoint serverEndpoint) async {
+  print('\nЗакрытие соединений...');
+
   // Важно сначала закрыть клиент, затем сервер
   await clientEndpoint.close();
   await Future.delayed(Duration(milliseconds: 100));
   await serverEndpoint.close();
-
-  print('\n--- Пример завершен ---');
 }
 
-class StringMessage implements RpcSerializableMessage {
+/// Сообщение с текстовым полем
+class StringMessage implements IRpcSerializableMessage {
   final String text;
 
   StringMessage({required this.text});
@@ -106,43 +253,4 @@ class StringMessage implements RpcSerializableMessage {
 
   @override
   String toString() => 'StringMessage(text: $text)';
-}
-
-/// Пустой контракт для регистрации сервиса
-class EmptyServiceContract
-    implements IRpcServiceContract<RpcSerializableMessage> {
-  final String _serviceName;
-
-  EmptyServiceContract(this._serviceName);
-
-  @override
-  String get serviceName => _serviceName;
-
-  @override
-  dynamic getArgumentParser(
-          RpcMethodContract<RpcSerializableMessage, RpcSerializableMessage>
-              method) =>
-      null;
-
-  @override
-  dynamic getHandler(
-          RpcMethodContract<RpcSerializableMessage, RpcSerializableMessage>
-              method) =>
-      null;
-
-  @override
-  List<RpcMethodContract<RpcSerializableMessage, RpcSerializableMessage>>
-      get methods => [];
-
-  @override
-  dynamic getResponseParser(
-          RpcMethodContract<RpcSerializableMessage, RpcSerializableMessage>
-              method) =>
-      null;
-
-  @override
-  RpcMethodContract<Request, Response>? findMethodTyped<
-          Request extends RpcSerializableMessage,
-          Response extends RpcSerializableMessage>(String methodName) =>
-      null;
 }

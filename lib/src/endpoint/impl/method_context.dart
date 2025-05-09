@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-part of '_index.dart';
+part of '../_index.dart';
 
 /// Интерфейс для контекстов, поддерживающих обновление метаданных
 abstract class MetadataUpdatable {

@@ -9,7 +9,7 @@ import 'package:rpc_dart/rpc_dart.dart';
 ///
 /// Логирует все запросы, ответы, ошибки и потоковые данные
 /// аналогично DebugTransport, но на уровне RPC-вызовов
-class DebugMiddleware implements RpcMiddleware {
+class DebugMiddleware implements IRpcMiddleware {
   /// Идентификатор для логов
   final String id;
 

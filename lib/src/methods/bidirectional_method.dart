@@ -5,12 +5,14 @@
 part of '_method.dart';
 
 /// Класс для работы с RPC методом типа "двунаправленный стриминг" (поток запросов - поток ответов)
-final class BidirectionalRpcMethod<T extends RpcSerializableMessage>
+final class BidirectionalRpcMethod<T extends IRpcSerializableMessage>
     extends RpcMethod<T> {
   /// Создает новый объект двунаправленного стриминг RPC метода
-  BidirectionalRpcMethod(
-      RpcEndpoint<T> endpoint, String serviceName, String methodName)
-      : super(endpoint, serviceName, methodName);
+  const BidirectionalRpcMethod(
+    IRpcEndpoint<T> endpoint,
+    String serviceName,
+    String methodName,
+  ) : super(endpoint, serviceName, methodName);
 
   /// Создает типизированный двунаправленный канал связи
   ///
@@ -20,19 +22,20 @@ final class BidirectionalRpcMethod<T extends RpcSerializableMessage>
   /// [streamId] - необязательный идентификатор стрима (генерируется автоматически)
   BidirectionalChannel<Request, Response>
       createChannel<Request extends T, Response extends T>({
-    Request Function(Map<String, dynamic>)? requestParser,
-    Response Function(Map<String, dynamic>)? responseParser,
+    required Request Function(Map<String, dynamic>) requestParser,
+    required Response Function(Map<String, dynamic>) responseParser,
     Map<String, dynamic>? metadata,
     String? streamId,
   }) {
     // Генерируем ID стрима если не указан
-    final effectiveStreamId = streamId ?? RpcMethod.generateUniqueId('stream');
+    final effectiveStreamId =
+        streamId ?? RpcMethod.generateUniqueId('bidirectional_stream');
 
     // Создаем контроллер для исходящих сообщений
     final outgoingController = StreamController<Request>();
 
     // Инициируем соединение
-    endpoint.invoke(
+    _core.invoke(
       serviceName,
       methodName,
       {'_bidirectional': true, '_streamId': effectiveStreamId},
@@ -41,75 +44,56 @@ final class BidirectionalRpcMethod<T extends RpcSerializableMessage>
 
     // Трансформируем входящий поток, применяя parser
     Stream<Response> typedIncomingStream;
-    if (responseParser != null) {
-      typedIncomingStream = endpoint
-          .openStream(
-        serviceName,
-        methodName,
-        streamId: effectiveStreamId,
-      )
-          .map((data) {
-        if (data is Map<String, dynamic>) {
-          // Проверяем маркер конца стрима
-          if (data['_clientStreamEnd'] == true) {
-            // Пропускаем маркер завершения
-            throw StateError('StreamEnd');
-          }
-          // Проверяем маркер закрытия канала
-          if (data['_channelClosed'] == true) {
-            throw StateError('ChannelClosed');
-          }
-          try {
-            return responseParser(data);
-          } catch (e) {
-            // В случае ошибки преобразования, логируем через метаданные для middleware
-            endpoint.sendStreamData(
-              effectiveStreamId,
-              null,
-              metadata: {
-                '_error': 'Ошибка преобразования: $e',
-                '_level': 'warning'
-              },
-              serviceName: serviceName,
-              methodName: methodName,
-            );
-            return data as Response;
-          }
-        } else {
+    typedIncomingStream = _core
+        .openStream(
+      serviceName,
+      methodName,
+      streamId: effectiveStreamId,
+    )
+        .map((data) {
+      if (data is Map<String, dynamic>) {
+        // Проверяем маркер конца стрима
+        if (data['_clientStreamEnd'] == true) {
+          // Пропускаем маркер завершения
+          throw StateError('StreamEnd');
+        }
+        // Проверяем маркер закрытия канала
+        if (data['_channelClosed'] == true) {
+          throw StateError('ChannelClosed');
+        }
+        try {
+          return responseParser(data);
+        } catch (e) {
+          // В случае ошибки преобразования, логируем через метаданные для middleware
+          _core.sendStreamData(
+            effectiveStreamId,
+            null,
+            metadata: {
+              '_error': 'Ошибка преобразования: $e',
+              '_level': 'warning'
+            },
+            serviceName: serviceName,
+            methodName: methodName,
+          );
           return data as Response;
         }
-      }).handleError((error) {
-        // Игнорируем ошибки маркера завершения стрима
-        if (error is StateError &&
-            (error.message == 'StreamEnd' ||
-                error.message == 'ChannelClosed')) {
-          return;
-        }
-        // Другие ошибки пробрасываем дальше
-        throw error;
-      });
-    } else {
-      typedIncomingStream = endpoint
-          .openStream(
-        serviceName,
-        methodName,
-        streamId: effectiveStreamId,
-      )
-          .where((data) {
-        // Фильтруем маркеры завершения стрима
-        if (data is Map<String, dynamic> &&
-            (data['_clientStreamEnd'] == true ||
-                data['_channelClosed'] == true)) {
-          return false;
-        }
-        return true;
-      }).cast<Response>();
-    }
+      } else {
+        return data as Response;
+      }
+    }).handleError((error) {
+      // Игнорируем ошибки маркера завершения стрима
+      if (error is StateError &&
+          (error.message == 'StreamEnd' || error.message == 'ChannelClosed')) {
+        return;
+      }
+      // Другие ошибки пробрасываем дальше
+      throw error;
+    });
 
     // Подписываемся на исходящий поток и пересылаем сообщения
     outgoingController.stream.listen(
       (data) {
-        endpoint.sendStreamData(
+        _core.sendStreamData(
           effectiveStreamId,
           data is RpcMessage ? data.toJson() : data,
           serviceName: serviceName,
@@ -118,7 +102,7 @@ final class BidirectionalRpcMethod<T extends RpcSerializableMessage>
       },
       onDone: () {
         // Маркер завершения для клиентского стрима
-        endpoint.sendStreamData(
+        _core.sendStreamData(
           effectiveStreamId,
           {'_clientStreamEnd': true},
           serviceName: serviceName,
@@ -129,7 +113,7 @@ final class BidirectionalRpcMethod<T extends RpcSerializableMessage>
 
     // Создаем и возвращаем канал
     return BidirectionalChannel<Request, Response>(
-      endpoint: endpoint,
+      endpoint: _endpoint,
       serviceName: serviceName,
       methodName: methodName,
       streamId: effectiveStreamId,
@@ -145,8 +129,8 @@ final class BidirectionalRpcMethod<T extends RpcSerializableMessage>
   /// [responseParser] - функция для преобразования JSON в объект ответа (опционально)
   void register<Request extends T, Response extends T>({
     required Stream<Response> Function(Stream<Request>, String) handler,
-    Request Function(Map<String, dynamic>)? requestParser,
-    Response Function(Map<String, dynamic>)? responseParser,
+    required Request Function(Map<String, dynamic>) requestParser,
+    required Response Function(Map<String, dynamic>) responseParser,
   }) {
     // Пытаемся получить контракт, но не требуем его обязательного наличия
     RpcMethodContract<Request, Response> contract;
@@ -164,11 +148,11 @@ final class BidirectionalRpcMethod<T extends RpcSerializableMessage>
     final implementation =
         RpcMethodImplementation.bidirectional(contract, handler);
 
-    endpoint.registerMethodImplementation(
+    _registrar.registerMethodImplementation(
         serviceName, methodName, implementation);
 
     // Регистрируем обработчик метода
-    endpoint.registerMethod(
+    _registrar.registerMethod(
       serviceName,
       methodName,
       (context) async {
@@ -191,52 +175,35 @@ final class BidirectionalRpcMethod<T extends RpcSerializableMessage>
         if (isBidirectional) {
           // Открываем входящий поток и преобразуем его к типу Request
           Stream<Request> typedIncomingStream;
-          if (requestParser != null) {
-            typedIncomingStream = endpoint
-                .openStream(
-              serviceName,
-              methodName,
-              streamId: effectiveStreamId,
-            )
-                .map((data) {
-              if (data is Map<String, dynamic>) {
-                // Проверяем маркер конца стрима
-                if (data['_clientStreamEnd'] == true) {
-                  throw StateError('StreamEnd');
-                }
-                // Проверяем маркер закрытия канала
-                if (data['_channelClosed'] == true) {
-                  throw StateError('ChannelClosed');
-                }
-                return requestParser(data);
-              } else {
-                return data as Request;
+          typedIncomingStream = _core
+              .openStream(
+            serviceName,
+            methodName,
+            streamId: effectiveStreamId,
+          )
+              .map((data) {
+            if (data is Map<String, dynamic>) {
+              // Проверяем маркер конца стрима
+              if (data['_clientStreamEnd'] == true) {
+                throw StateError('StreamEnd');
               }
-            }).handleError((error) {
-              // Игнорируем ошибки маркера завершения
-              if (error is StateError &&
-                  (error.message == 'StreamEnd' ||
-                      error.message == 'ChannelClosed')) {
-                return;
+              // Проверяем маркер закрытия канала
+              if (data['_channelClosed'] == true) {
+                throw StateError('ChannelClosed');
               }
-              throw error;
-            });
-          } else {
-            typedIncomingStream = endpoint
-                .openStream(
-              serviceName,
-              methodName,
-              streamId: effectiveStreamId,
-            )
-                .where((data) {
-              if (data is Map<String, dynamic> &&
-                  (data['_clientStreamEnd'] == true ||
-                      data['_channelClosed'] == true)) {
-                return false;
-              }
-              return true;
-            }).cast<Request>();
-          }
+              return requestParser(data);
+            } else {
+              return data as Request;
+            }
+          }).handleError((error) {
+            // Игнорируем ошибки маркера завершения
+            if (error is StateError &&
+                (error.message == 'StreamEnd' ||
+                    error.message == 'ChannelClosed')) {
+              return;
+            }
+            throw error;
+          });
 
           // Создаем исходящий поток через обработчик
           final outgoingStream = implementation.openBidirectionalStream(
@@ -247,7 +214,7 @@ final class BidirectionalRpcMethod<T extends RpcSerializableMessage>
           // Подписываемся на исходящий поток и отправляем данные
           outgoingStream.listen(
             (data) {
-              endpoint.sendStreamData(
+              _core.sendStreamData(
                 effectiveStreamId,
                 data is RpcMessage ? data.toJson() : data,
                 serviceName: serviceName,
@@ -255,13 +222,13 @@ final class BidirectionalRpcMethod<T extends RpcSerializableMessage>
               );
             },
             onError: (error) {
-              endpoint.sendStreamError(
+              _core.sendStreamError(
                 effectiveStreamId,
                 error.toString(),
               );
             },
             onDone: () {
-              endpoint.closeStream(
+              _core.closeStream(
                 effectiveStreamId,
                 serviceName: serviceName,
                 methodName: methodName,
@@ -285,10 +252,10 @@ final class BidirectionalRpcMethod<T extends RpcSerializableMessage>
 }
 
 /// Двунаправленный канал связи для типизированного обмена сообщениями
-final class BidirectionalChannel<Request extends RpcSerializableMessage,
-    Response extends RpcSerializableMessage> {
+final class BidirectionalChannel<Request extends IRpcSerializableMessage,
+    Response extends IRpcSerializableMessage> {
   /// Endpoint для связи
-  final RpcEndpoint _endpoint;
+  final IRpcEndpoint<IRpcSerializableMessage> _endpoint;
 
   /// Название сервиса
   final String serviceName;
@@ -307,7 +274,7 @@ final class BidirectionalChannel<Request extends RpcSerializableMessage,
 
   /// Создает новый двунаправленный канал
   BidirectionalChannel({
-    required RpcEndpoint endpoint,
+    required IRpcEndpoint<IRpcSerializableMessage> endpoint,
     required this.serviceName,
     required this.methodName,
     required this.streamId,
@@ -332,7 +299,7 @@ final class BidirectionalChannel<Request extends RpcSerializableMessage,
     await outgoingController.close();
 
     // Отправляем маркер завершения канала
-    await _endpoint.sendStreamData(
+    await _core.sendStreamData(
       streamId,
       {'_channelClosed': true},
       serviceName: serviceName,
@@ -340,10 +307,17 @@ final class BidirectionalChannel<Request extends RpcSerializableMessage,
     );
 
     // Закрываем канал
-    await _endpoint.closeStream(
+    await _core.closeStream(
       streamId,
       serviceName: serviceName,
       methodName: methodName,
     );
+  }
+
+  IRpcEndpointCore get _core {
+    if (_endpoint is! IRpcEndpointCore) {
+      throw ArgumentError('Is not valid subtype');
+    }
+    return _endpoint as IRpcEndpointCore;
   }
 }
