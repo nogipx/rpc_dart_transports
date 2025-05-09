@@ -164,20 +164,22 @@ base class ClientUserService extends UserServiceContract {
 
   @override
   Future<UserResponse> registerUser(UserRequest request) {
-    return client.invokeTyped<UserRequest, UserResponse>(
-      serviceName: serviceName,
-      methodName: 'registerUser',
-      request: request,
-    );
+    return client
+        .unaryMethod(serviceName, 'registerUser')
+        .call<UserRequest, UserResponse>(
+          request,
+          responseParser: UserResponse.fromJson,
+        );
   }
 
   @override
   Stream<NotificationMessage> subscribeToNotifications(UserRequest request) {
-    return client.openTypedStream<UserRequest, NotificationMessage>(
-      serviceName,
-      'subscribeToNotifications',
-      request,
-    );
+    return client
+        .serverStreamingMethod(serviceName, 'subscribeToNotifications')
+        .openStream<UserRequest, NotificationMessage>(
+          request,
+          responseParser: NotificationMessage.fromJson,
+        );
   }
 }
 
@@ -217,8 +219,8 @@ void main() {
       serverService = ServerUserService();
 
       // Регистрируем контракты на обоих концах
-      serverEndpoint.registerContract(serverService);
-      clientEndpoint.registerContract(clientService);
+      serverEndpoint.registerServiceContract(serverService);
+      clientEndpoint.registerServiceContract(clientService);
     });
 
     tearDown(() async {

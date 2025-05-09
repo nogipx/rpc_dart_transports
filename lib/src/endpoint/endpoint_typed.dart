@@ -81,7 +81,7 @@ class RpcEndpoint<T extends RpcSerializableMessage> implements _RpcEndpoint {
   void registerMethod(
     String serviceName,
     String methodName,
-    Future<dynamic> Function(RpcMethodContext) handler,
+    Future<dynamic> Function(RpcMethodContext context) handler,
   ) =>
       _delegate.registerMethod(serviceName, methodName, handler);
 
@@ -104,28 +104,33 @@ class RpcEndpoint<T extends RpcSerializableMessage> implements _RpcEndpoint {
   @override
   Future<void> sendStreamError(
     String streamId,
-    String error, {
+    String errorMessage, {
     Map<String, dynamic>? metadata,
   }) =>
-      _delegate.sendStreamError(streamId, error, metadata: metadata);
+      _delegate.sendStreamError(
+        streamId,
+        errorMessage,
+        metadata: metadata,
+      );
 
   /// Регистрирует контракт сервиса
-  void registerContract(RpcServiceContract<T> contract) {
-    if (_contracts.containsKey(contract.serviceName)) {
-      throw StateError(
-          'Контракт для сервиса ${contract.serviceName} уже зарегистрирован');
-    }
+  void registerServiceContract(RpcServiceContract<T> contract) {
+    // Сохраняем контракт
     _contracts[contract.serviceName] = contract;
-    _implementations[contract.serviceName] = {};
+    _implementations.putIfAbsent(contract.serviceName, () => {});
 
+    // Проверяем, является ли контракт декларативным
     if (contract is DeclarativeRpcServiceContract<T>) {
       _registerDeclarativeContract(contract);
     }
   }
 
+  /// Регистрирует методы из декларативного контракта
   void _registerDeclarativeContract(DeclarativeRpcServiceContract<T> contract) {
+    // Регистрируем методы из класса
     contract.registerMethodsFromClass();
 
+    // Для каждого метода в контракте
     for (final method in contract.methods) {
       final methodType = method.methodType;
       final methodName = method.methodName;
@@ -134,110 +139,72 @@ class RpcEndpoint<T extends RpcSerializableMessage> implements _RpcEndpoint {
       final responseParser = contract.getResponseParser(method);
 
       if (methodType == RpcMethodType.unary) {
-        registerUnaryMethod(
-          contract.serviceName,
-          methodName,
-          handler,
-          argumentParser,
-          responseParser,
+        // Унарный метод
+        unaryMethod(contract.serviceName, methodName).register(
+          handler: handler,
+          requestParser: argumentParser,
+          responseParser: responseParser,
         );
       } else if (methodType == RpcMethodType.serverStreaming) {
-        registerStreamMethod(
-          contract.serviceName,
-          methodName,
-          handler,
-          argumentParser,
-          responseParser,
+        // Серверный стриминг
+        serverStreamingMethod(contract.serviceName, methodName).register(
+          handler: handler,
+          requestParser: argumentParser,
+          responseParser: responseParser,
+        );
+      } else if (methodType == RpcMethodType.clientStreaming) {
+        // Клиентский стриминг
+        clientStreamingMethod(contract.serviceName, methodName).register(
+          handler: handler,
+          requestParser: argumentParser,
+          responseParser: responseParser,
         );
       } else if (methodType == RpcMethodType.bidirectional) {
-        registerBidirectionalStreamMethod(
-          contract.serviceName,
-          methodName,
-          handler,
-          argumentParser,
-          responseParser,
+        // Двунаправленный стриминг
+        bidirectionalMethod(contract.serviceName, methodName).register(
+          handler: handler,
+          requestParser: argumentParser,
+          responseParser: responseParser,
         );
       }
     }
   }
 
-  /// Вызывает типизированный метод и возвращает типизированный ответ
-  Future<Response> invokeTyped<Request extends T, Response extends T>({
-    required String serviceName,
-    required String methodName,
-    required Request request,
-    Duration? timeout,
-    Map<String, dynamic>? metadata,
-  }) async {
-    // Проверяем наличие контракта
-    final contract = _getServiceContract(serviceName);
-    final methodContract =
-        contract.findMethodTyped<Request, Response>(methodName);
-
-    if (methodContract == null) {
-      throw ArgumentError(
-          'Метод $methodName не найден в контракте сервиса $serviceName');
-    }
-
-    // Проверяем типы
-    if (!methodContract.validateRequest(request)) {
-      throw ArgumentError(
-          'Тип запроса ${request.runtimeType} не соответствует контракту метода $methodName');
-    }
-
-    // Конвертируем запрос в JSON, если это Message
-    final dynamicRequest = request is RpcMessage ? request.toJson() : request;
-
-    // Вызываем метод через базовый Endpoint (с поддержкой middleware)
-    final response = await _delegate.invoke(
-      serviceName,
-      methodName,
-      dynamicRequest,
-      timeout: timeout,
-      metadata: metadata,
-    );
-
-    final typedResponse = contract.getResponseParser(methodContract)(response);
-
-    if (!methodContract.validateResponse(typedResponse)) {
-      throw ArgumentError(
-          'Тип ответа ${response.runtimeType} не соответствует контракту метода $methodName');
-    }
-
-    return typedResponse;
+  /// Получает контракт сервиса по имени
+  RpcServiceContract<T>? getServiceContract(String serviceName) {
+    return _contracts[serviceName];
   }
 
-  /// Получает контракт сервиса
-  RpcServiceContract<T> _getServiceContract(String serviceName) {
-    final contract = _contracts[serviceName];
-    if (contract == null) {
-      throw ArgumentError(
-          'Контракт для сервиса $serviceName не зарегистрирован');
-    }
-    return contract;
-  }
-
-  /// Получает типизированный контракт метода
-  RpcMethodContract<Request, Response>
-      _getMethodContract<Request extends T, Response extends T>(
+  /// Регистрирует реализацию метода (для внутреннего использования)
+  void registerMethodImplementation(
     String serviceName,
     String methodName,
-    RpcMethodType expectedType,
+    RpcMethodImplementation implementation,
   ) {
-    final contract = _getServiceContract(serviceName);
-    final methodContract =
-        contract.findMethodTyped<Request, Response>(methodName);
+    _implementations.putIfAbsent(serviceName, () => {});
+    _implementations[serviceName]![methodName] = implementation;
+  }
 
-    if (methodContract == null) {
-      throw ArgumentError(
-          'Метод $methodName не найден в контракте сервиса $serviceName');
-    }
+  /// Создает объект унарного метода для указанного сервиса и метода
+  UnaryRpcMethod<T> unaryMethod(String serviceName, String methodName) {
+    return UnaryRpcMethod<T>(this, serviceName, methodName);
+  }
 
-    if (methodContract.methodType != expectedType) {
-      throw ArgumentError(
-          'Метод $methodName имеет тип ${methodContract.methodType}, но ожидался $expectedType');
-    }
+  /// Создает объект серверного стриминг метода для указанного сервиса и метода
+  ServerStreamingRpcMethod<T> serverStreamingMethod(
+      String serviceName, String methodName) {
+    return ServerStreamingRpcMethod<T>(this, serviceName, methodName);
+  }
 
-    return methodContract;
+  /// Создает объект клиентского стриминг метода для указанного сервиса и метода
+  ClientStreamingRpcMethod<T> clientStreamingMethod(
+      String serviceName, String methodName) {
+    return ClientStreamingRpcMethod<T>(this, serviceName, methodName);
+  }
+
+  /// Создает объект двунаправленного стриминг метода для указанного сервиса и метода
+  BidirectionalRpcMethod<T> bidirectionalMethod(
+      String serviceName, String methodName) {
+    return BidirectionalRpcMethod<T>(this, serviceName, methodName);
   }
 }

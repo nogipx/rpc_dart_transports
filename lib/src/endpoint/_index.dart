@@ -3,11 +3,7 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:rpc_dart/rpc_dart.dart';
-
-part 'extensions/bidirectional_extension.dart';
-part 'extensions/client_streaming_extension.dart';
-part 'extensions/server_streaming_extension.dart';
-part 'extensions/unary_extension.dart';
+import 'package:rpc_dart/src/methods/_method.dart';
 
 part 'method_context.dart';
 part 'endpoint_abstract.dart';

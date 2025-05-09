@@ -89,20 +89,22 @@ base class ClientTestService extends TestContract {
 
   @override
   Future<TestResponse> multiply(TestRequest request) {
-    return endpoint.invokeTyped<TestRequest, TestResponse>(
-      serviceName: serviceName,
-      methodName: 'multiply',
-      request: request,
-    );
+    return endpoint
+        .unaryMethod(serviceName, 'multiply')
+        .call<TestRequest, TestResponse>(
+          request,
+          responseParser: TestResponse.fromJson,
+        );
   }
 
   @override
   Stream<TestResponse> countTo(TestRequest request) {
-    return endpoint.openTypedStream<TestRequest, TestResponse>(
-      serviceName,
-      'countTo',
-      request,
-    );
+    return endpoint
+        .serverStreamingMethod(serviceName, 'countTo')
+        .openStream<TestRequest, TestResponse>(
+          request,
+          responseParser: TestResponse.fromJson,
+        );
   }
 }
 
@@ -177,8 +179,8 @@ void main() {
       serverService = ServerTestService();
 
       // Регистрируем контракты
-      serverEndpoint.registerContract(serverService);
-      clientEndpoint.registerContract(clientService);
+      serverEndpoint.registerServiceContract(serverService);
+      clientEndpoint.registerServiceContract(clientService);
     });
 
     tearDown(() async {
@@ -246,11 +248,12 @@ void main() {
     test('вызов_несуществующего_метода_вызывает_исключение', () async {
       // Act & Assert - действие и проверка
       expect(
-        () => clientEndpoint.invokeTyped<TestRequest, TestResponse>(
-          serviceName: 'NonexistentService',
-          methodName: 'nonexistentMethod',
-          request: TestRequest(5),
-        ),
+        () => clientEndpoint
+            .unaryMethod('NonexistentService', 'nonexistentMethod')
+            .call<TestRequest, TestResponse>(
+              TestRequest(5),
+              responseParser: TestResponse.fromJson,
+            ),
         throwsA(anything),
       );
     });

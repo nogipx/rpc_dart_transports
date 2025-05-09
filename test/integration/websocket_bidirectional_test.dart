@@ -36,23 +36,23 @@ void main() {
         serverEndpoint.addMiddleware(LoggingMiddleware(id: 'server'));
 
         // Регистрируем обработчик двунаправленного стриминга на сервере
-        serverEndpoint.registerBidirectionalHandler<ChatMessage, ChatMessage>(
-          serviceName: 'ChatService',
-          methodName: 'chatStream',
-          requestParser: ChatMessage.fromJson,
-          responseParser: ChatMessage.fromJson,
-          handler: (incomingStream, messageId) {
-            print('Сервер: запрос на создание двунаправленного стрима');
-            // Обработчик преобразует сообщения от клиента в ответы
-            return incomingStream.map((clientMessage) {
-              print('Сервер получил: ${clientMessage.text}');
-              return ChatMessage(
-                text: 'Ответ на: ${clientMessage.text}',
-                sender: 'Сервер',
-              );
-            });
-          },
-        );
+        serverEndpoint
+            .bidirectionalMethod('ChatService', 'chatStream')
+            .register<ChatMessage, ChatMessage>(
+              handler: (incomingStream, messageId) {
+                print('Сервер: запрос на создание двунаправленного стрима');
+                // Обработчик преобразует сообщения от клиента в ответы
+                return incomingStream.map((clientMessage) {
+                  print('Сервер получил: ${clientMessage.text}');
+                  return ChatMessage(
+                    text: 'Ответ на: ${clientMessage.text}',
+                    sender: 'Сервер',
+                  );
+                });
+              },
+              requestParser: ChatMessage.fromJson,
+              responseParser: ChatMessage.fromJson,
+            );
 
         // Уведомляем о готовности сервера
         if (!serverReady.isCompleted) {
@@ -127,20 +127,19 @@ void main() {
     print('Начало теста двунаправленного стриминга');
 
     // Создаем двунаправленный канал на клиенте
-    final channel =
-        clientEndpoint.createBidirectionalChannel<ChatMessage, ChatMessage>(
-      serviceName: 'ChatService',
-      methodName: 'chatStream',
-      requestParser: ChatMessage.fromJson,
-      responseParser: ChatMessage.fromJson,
-    );
+    final channel = clientEndpoint
+        .bidirectionalMethod('ChatService', 'chatStream')
+        .createChannel<ChatMessage, ChatMessage>(
+          requestParser: ChatMessage.fromJson,
+          responseParser: ChatMessage.fromJson,
+        );
     print('Двунаправленный канал создан');
 
     // Список для сбора ответов
     final responses = <ChatMessage>[];
 
     // Подписываемся на входящие сообщения
-    final subscription = channel.listen(
+    final subscription = channel.incoming.listen(
       (message) {
         print('Клиент получил: ${message.text}');
         responses.add(message);
