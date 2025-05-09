@@ -22,7 +22,7 @@ final class BidirectionalRpcMethod<T extends RpcSerializableMessage>
     String? streamId,
   }) {
     // Генерируем ID стрима если не указан
-    final effectiveStreamId = streamId ?? generateUniqueId('stream');
+    final effectiveStreamId = streamId ?? RpcMethod.generateUniqueId('stream');
 
     // Создаем контроллер для исходящих сообщений
     final outgoingController = StreamController<Request>();

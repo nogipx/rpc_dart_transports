@@ -31,7 +31,7 @@ class TestResponse implements RpcSerializableMessage {
 
 // Контракт для тестов
 abstract base class TestContract
-    extends DeclarativeRpcServiceContract<RpcSerializableMessage> {
+    extends RpcServiceContract<RpcSerializableMessage> {
   RpcEndpoint? get endpoint;
 
   @override
@@ -90,7 +90,7 @@ base class ClientTestService extends TestContract {
   @override
   Future<TestResponse> multiply(TestRequest request) {
     return endpoint
-        .unaryMethod(serviceName, 'multiply')
+        .unary(serviceName, 'multiply')
         .call<TestRequest, TestResponse>(
           request,
           responseParser: TestResponse.fromJson,
@@ -100,7 +100,7 @@ base class ClientTestService extends TestContract {
   @override
   Stream<TestResponse> countTo(TestRequest request) {
     return endpoint
-        .serverStreamingMethod(serviceName, 'countTo')
+        .serverStreaming(serviceName, 'countTo')
         .openStream<TestRequest, TestResponse>(
           request,
           responseParser: TestResponse.fromJson,
@@ -110,7 +110,7 @@ base class ClientTestService extends TestContract {
 
 // Специальная реализация для тестирования произвольных методов
 base class CustomServiceContract
-    implements RpcServiceContract<RpcSerializableMessage> {
+    implements IRpcServiceContract<RpcSerializableMessage> {
   @override
   dynamic getArgumentParser(
       RpcMethodContract<RpcSerializableMessage, RpcSerializableMessage>
@@ -249,7 +249,7 @@ void main() {
       // Act & Assert - действие и проверка
       expect(
         () => clientEndpoint
-            .unaryMethod('NonexistentService', 'nonexistentMethod')
+            .unary('NonexistentService', 'nonexistentMethod')
             .call<TestRequest, TestResponse>(
               TestRequest(5),
               responseParser: TestResponse.fromJson,

@@ -1,7 +1,8 @@
 part of '_method.dart';
 
 /// Класс, представляющий реализацию RPC метода
-final class RpcMethodImplementation<Request, Response> {
+final class RpcMethodImplementation<Request extends RpcSerializableMessage,
+    Response extends RpcSerializableMessage> {
   /// Контракт метода
   final RpcMethodContract<Request, Response> contract;
 

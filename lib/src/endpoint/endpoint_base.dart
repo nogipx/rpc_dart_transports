@@ -82,7 +82,7 @@ final class _RpcEndpointBase implements _RpcEndpoint {
     Duration? timeout,
     Map<String, dynamic>? metadata,
   }) async {
-    final requestId = _generateUniqueId('request');
+    final requestId = RpcMethod.generateUniqueId('request');
     final completer = Completer<dynamic>();
     _pendingRequests[requestId] = completer;
 
@@ -128,7 +128,7 @@ final class _RpcEndpointBase implements _RpcEndpoint {
     String? streamId,
   }) {
     // Используем переданный streamId или генерируем новый
-    final actualStreamId = streamId ?? _generateUniqueId('stream');
+    final actualStreamId = streamId ?? RpcMethod.generateUniqueId('stream');
 
     // Если поток с таким ID уже существует, возвращаем его
     if (_streamControllers.containsKey(actualStreamId)) {
@@ -507,5 +507,29 @@ final class _RpcEndpointBase implements _RpcEndpoint {
     );
 
     await _sendMessage(message);
+  }
+
+  @override
+  BidirectionalRpcMethod<RpcSerializableMessage> bidirectional(
+      String serviceName, String methodName) {
+    throw UnimplementedError();
+  }
+
+  @override
+  ClientStreamingRpcMethod<RpcSerializableMessage> clientStreaming(
+      String serviceName, String methodName) {
+    throw UnimplementedError();
+  }
+
+  @override
+  ServerStreamingRpcMethod<RpcSerializableMessage> serverStreaming(
+      String serviceName, String methodName) {
+    throw UnimplementedError();
+  }
+
+  @override
+  UnaryRpcMethod<RpcSerializableMessage> unary(
+      String serviceName, String methodName) {
+    throw UnimplementedError();
   }
 }

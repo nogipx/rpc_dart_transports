@@ -25,6 +25,7 @@ dependencies:
 - **RpcEndpoint** - базовый API для регистрации и вызова методов
 - **RpcMiddleware** - промежуточная обработка запросов и ответов
 - **RpcServiceContract** - описание методов сервиса с типизацией
+- **RpcMethod** - представление методов RPC (унарные, стриминговые)
 
 ## Быстрый старт
 
@@ -106,127 +107,150 @@ stream.listen(
 
 ## Двунаправленный стриминг (Bidirectional)
 
-### С использованием контрактов (декларативный подход):
+```dart
+// Регистрация на сервере
+server.bidirectionalMethod('ChatService', 'chat')
+    .register<ChatMessage, ChatMessage>(
+      handler: (incomingStream, messageId) {
+        // Обрабатываем входящие сообщения и отправляем ответы
+        return incomingStream.map((message) {
+          print('Сервер получил: ${message.text}');
+          return ChatMessage(
+            text: 'Ответ на: ${message.text}',
+            sender: 'server',
+          );
+        });
+      },
+      requestParser: ChatMessage.fromJson,
+      responseParser: ChatMessage.fromJson,
+    );
+
+// Создание канала на клиенте
+final channel = client
+    .bidirectionalMethod('ChatService', 'chat')
+    .createChannel<ChatMessage, ChatMessage>(
+      requestParser: ChatMessage.fromJson,
+      responseParser: ChatMessage.fromJson,
+    );
+
+// Подписка на входящие сообщения
+channel.incoming.listen(
+  (message) => print('Клиент получил: ${message.text}'),
+  onDone: () => print('Канал закрыт'),
+);
+
+// Отправка сообщений
+channel.send(ChatMessage(text: 'Привет, сервер!', sender: 'client'));
+
+// Закрытие канала
+await channel.close();
+```
+
+## Контракты сервисов
+
+Контракты позволяют декларативно описать структуру сервиса с типизированными методами:
 
 ```dart
-// Определение контракта с двунаправленным методом
-abstract base class ChatServiceContract extends DeclarativeRpcServiceContract<ChatMessage> {
+// Определение контракта
+abstract base class CalculatorContract 
+    extends DeclarativeRpcServiceContract<RpcSerializableMessage> {
+  
   @override
-  final String serviceName = 'ChatService';
+  final String serviceName = 'CalculatorService';
+  
+  RpcEndpoint? get endpoint;
 
   @override
   void registerMethodsFromClass() {
-    addBidirectionalStreamingMethod<ChatMessage, ChatMessage>(
-      methodName: 'chat',
-      handler: chat,
-      argumentParser: ChatMessage.fromJson,
-      responseParser: ChatMessage.fromJson,
+    // Унарный метод
+    addUnaryMethod<CalculatorRequest, CalculatorResponse>(
+      methodName: 'add',
+      handler: add,
+      argumentParser: CalculatorRequest.fromJson,
+      responseParser: CalculatorResponse.fromJson,
+    );
+    
+    // Стриминговый метод
+    addServerStreamingMethod<SequenceRequest, SequenceData>(
+      methodName: 'generateSequence',
+      handler: generateSequence,
+      argumentParser: SequenceRequest.fromJson,
+      responseParser: SequenceData.fromJson,
     );
   }
-
-  // Метод принимает поток сообщений и возвращает поток ответов
-  Stream<ChatMessage> chat(Stream<ChatMessage> messages);
+  
+  // Объявление методов
+  Future<CalculatorResponse> add(CalculatorRequest request);
+  Stream<SequenceData> generateSequence(SequenceRequest request);
 }
 
-// Реализация на сервере
-final class ServerChatService extends ChatServiceContract {
+// Реализация контракта на сервере
+final class ServerCalculatorContract extends CalculatorContract {
   @override
-  Stream<ChatMessage> chat(Stream<ChatMessage> messages) async* {
-    // Обрабатываем каждое входящее сообщение
-    await for (final message in messages) {
-      print('Сервер получил: ${message.text}');
-      
-      // Отправляем ответ
-      yield ChatMessage(
-        'server',
-        'Ответ на: ${message.text}',
-        DateTime.now(),
-      );
+  RpcEndpoint? get endpoint => null;
+  
+  @override
+  Future<CalculatorResponse> add(CalculatorRequest request) async {
+    return CalculatorResponse(request.a + request.b);
+  }
+  
+  @override
+  Stream<SequenceData> generateSequence(SequenceRequest request) async* {
+    for (int i = 1; i <= request.count; i++) {
+      yield SequenceData(i);
+      await Future.delayed(Duration(milliseconds: 100));
     }
   }
 }
 
-// Реализация на клиенте
-final class ClientChatService extends ChatServiceContract {
-  final RpcEndpoint client;
+// Реализация контракта на клиенте
+final class ClientCalculatorContract extends CalculatorContract {
+  @override
+  final RpcEndpoint endpoint;
   
-  ClientChatService(this.client);
+  ClientCalculatorContract(this.endpoint);
   
   @override
-  Stream<ChatMessage> chat(Stream<ChatMessage> messages) {
-    return client.openBidirectionalStream<ChatMessage, ChatMessage>(
-      serviceName,
-      'chat',
-      messages,
-    );
+  Future<CalculatorResponse> add(CalculatorRequest request) {
+    return endpoint
+        .unaryMethod(serviceName, 'add')
+        .call<CalculatorRequest, CalculatorResponse>(
+          request,
+          responseParser: CalculatorResponse.fromJson,
+        );
+  }
+  
+  @override
+  Stream<SequenceData> generateSequence(SequenceRequest request) {
+    return endpoint
+        .serverStreamingMethod(serviceName, 'generateSequence')
+        .openStream<SequenceRequest, SequenceData>(
+          request,
+          responseParser: SequenceData.fromJson,
+        );
   }
 }
 
+// Регистрация контрактов
+serverEndpoint.registerServiceContract(ServerCalculatorContract());
+clientEndpoint.registerServiceContract(ClientCalculatorContract(clientEndpoint));
+
 // Использование
-final chatServer = ServerChatService();
-serverEndpoint.registerContract(chatServer);
-
-final chatClient = ClientChatService(clientEndpoint);
-
-// Создаем контроллер для отправки сообщений
-final messageController = StreamController<ChatMessage>();
-
-// Открываем двунаправленный стрим
-final responses = chatClient.chat(messageController.stream);
-
-// Подписываемся на ответы
-responses.listen((message) {
-  print('Клиент получил: ${message.text}');
-});
-
-// Отправляем сообщения
-messageController.add(ChatMessage('client', 'Привет!', DateTime.now()));
+final contract = ClientCalculatorContract(clientEndpoint);
+final result = await contract.add(CalculatorRequest(5, 10));
+print('Результат: ${result.result}'); // Результат: 15
 ```
 
-### Упрощенный подход с BidirectionalChannel
+## Дополнительные примеры
 
-```dart
-// Регистрируем обработчик на сервере
-serverEndpoint.registerBidirectionalHandler(
-  'EchoService',
-  'echo',
-  (incomingStream, messageId) {
-    print('[Сервер]: Принимаю входящие сообщения...');
-    
-    // Просто отправляем назад сообщения с префиксом
-    return incomingStream.map((data) {
-      print('[Сервер]: Получено: $data');
-      
-      if (data is String) {
-        return 'Эхо: $data';
-      } else if (data is Map<String, dynamic> && data['text'] != null) {
-        return 'Эхо: ${data['text']}';
-      } else {
-        return 'Получено неизвестное сообщение';
-      }
-    });
-  },
-);
+Больше примеров можно найти в директории `example/`:
 
-// Создаем двунаправленный канал на клиенте
-final channel = clientEndpoint.createBidirectionalChannel(
-  'EchoService',
-  'echo',
-);
-
-// Подписываемся на входящие сообщения
-channel.listen(
-  (message) => print('[Клиент]: Получил ответ: $message'),
-  onError: (e) => print('[Клиент]: Ошибка: $e'),
-  onDone: () => print('[Клиент]: Соединение закрыто'),
-);
-
-// Отправляем сообщения
-channel.send('Привет, сервер!');
-
-// Закрываем канал когда он больше не нужен
-await channel.close();
-```
+- Унарные вызовы
+- Серверный стриминг
+- Клиентский стриминг
+- Двунаправленный стриминг
+- Использование контрактов
+- WebSocket транспорт
 
 ## Типизированные контракты
 
@@ -437,3 +461,123 @@ class WebSocketTransport implements RpcTransport {
 - `metadata` - дополнительные метаданные
 - `serviceName` - имя сервиса
 - `methodName` - имя метода
+
+## Типизированные вызовы методов
+
+```dart
+// Типизированные сообщения
+class CalculatorRequest implements RpcSerializableMessage {
+  final int a;
+  final int b;
+
+  CalculatorRequest(this.a, this.b);
+
+  @override
+  Map<String, dynamic> toJson() => {'a': a, 'b': b};
+
+  static CalculatorRequest fromJson(Map<String, dynamic> json) {
+    return CalculatorRequest(
+      json['a'] as int, 
+      json['b'] as int,
+    );
+  }
+}
+
+class CalculatorResponse implements RpcSerializableMessage {
+  final int result;
+
+  CalculatorResponse(this.result);
+
+  @override
+  Map<String, dynamic> toJson() => {'result': result};
+
+  static CalculatorResponse fromJson(Map<String, dynamic> json) {
+    return CalculatorResponse(json['result'] as int);
+  }
+}
+
+// Регистрация унарного метода на сервере
+server.unaryMethod('CalculatorService', 'add')
+    .register<CalculatorRequest, CalculatorResponse>(
+      handler: (request) async {
+        return CalculatorResponse(request.a + request.b);
+      },
+      requestParser: CalculatorRequest.fromJson,
+      responseParser: CalculatorResponse.fromJson,
+    );
+
+// Вызов типизированного унарного метода с клиента
+final response = await client
+    .unaryMethod('CalculatorService', 'add')
+    .call<CalculatorRequest, CalculatorResponse>(
+      CalculatorRequest(5, 3),
+      responseParser: CalculatorResponse.fromJson,
+    );
+    
+print('Результат: ${response.result}'); // Результат: 8
+```
+
+## Стриминг данных (Server Streaming)
+
+```dart
+// Регистрация стрима на сервере
+server.serverStreamingMethod('NumberService', 'generateNumbers')
+    .register<NumberRequest, NumberResponse>(
+      handler: (request) async* {
+        for (var i = 1; i <= request.count; i++) {
+          yield NumberResponse(i);
+          await Future.delayed(Duration(milliseconds: 100));
+        }
+      },
+      requestParser: NumberRequest.fromJson,
+      responseParser: NumberResponse.fromJson,
+    );
+
+// Получение данных на клиенте
+final stream = client
+    .serverStreamingMethod('NumberService', 'generateNumbers')
+    .openStream<NumberRequest, NumberResponse>(
+      NumberRequest(5),
+      responseParser: NumberResponse.fromJson,
+    );
+
+stream.listen(
+  (data) => print('Получено: ${data.value}'),
+  onDone: () => print('Стрим завершен'),
+);
+```
+
+## Клиентский стриминг (Client Streaming)
+
+```dart
+// Регистрация обработчика на сервере
+server.clientStreamingMethod('SumService', 'calculateSum')
+    .register<NumberValue, SumResult>(
+      handler: (stream) async {
+        int sum = 0;
+        await for (final value in stream) {
+          sum += value.number;
+        }
+        return SumResult(sum);
+      },
+      requestParser: NumberValue.fromJson,
+      responseParser: SumResult.fromJson,
+    );
+
+// Использование на клиенте
+final (controller, resultFuture) = client
+    .clientStreamingMethod('SumService', 'calculateSum')
+    .openClientStream<NumberValue, SumResult>(
+      responseParser: SumResult.fromJson,
+    );
+
+// Отправляем числа
+controller.add(NumberValue(10));
+controller.add(NumberValue(20));
+controller.add(NumberValue(30));
+
+// Завершаем поток и получаем результат
+await controller.close();
+final result = await resultFuture;
+print('Сумма: ${result.total}'); // Сумма: 60
+```

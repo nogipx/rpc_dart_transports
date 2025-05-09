@@ -23,7 +23,7 @@ final class ClientStreamingRpcMethod<T extends RpcSerializableMessage>
     Request Function(Map<String, dynamic>)? requestParser,
     Response Function(Map<String, dynamic>)? responseParser,
   }) {
-    final effectiveStreamId = streamId ?? generateUniqueId('stream');
+    final effectiveStreamId = streamId ?? RpcMethod.generateUniqueId('stream');
 
     // Создаем контроллер для отправки данных
     final controller = StreamController<Request>();

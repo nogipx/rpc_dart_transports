@@ -10,28 +10,31 @@ final class ClientCalculatorContract extends CalculatorContract {
 
   @override
   Future<CalculatorResponse> add(CalculatorRequest request) {
-    return endpoint.invokeTyped<CalculatorRequest, CalculatorResponse>(
-      serviceName: serviceName,
-      methodName: 'add',
-      request: request,
-    );
+    return endpoint
+        .unary(serviceName, 'add')
+        .call<CalculatorRequest, CalculatorResponse>(
+          request,
+          responseParser: CalculatorResponse.fromJson,
+        );
   }
 
   @override
   Future<CalculatorResponse> multiply(CalculatorRequest request) {
-    return endpoint.invokeTyped<CalculatorRequest, CalculatorResponse>(
-      serviceName: serviceName,
-      methodName: 'multiply',
-      request: request,
-    );
+    return endpoint
+        .unary(serviceName, 'multiply')
+        .call<CalculatorRequest, CalculatorResponse>(
+          request,
+          responseParser: CalculatorResponse.fromJson,
+        );
   }
 
   @override
   Stream<SequenceData> generateSequence(SequenceRequest request) {
-    return endpoint.openTypedStream<SequenceRequest, SequenceData>(
-      serviceName,
-      'generateSequence',
-      request,
-    );
+    return endpoint
+        .serverStreaming(serviceName, 'generateSequence')
+        .openStream<SequenceRequest, SequenceData>(
+          request,
+          responseParser: SequenceData.fromJson,
+        );
   }
 }

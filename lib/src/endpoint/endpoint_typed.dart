@@ -6,7 +6,7 @@ class RpcEndpoint<T extends RpcSerializableMessage> implements _RpcEndpoint {
   final _RpcEndpointBase _delegate;
 
   /// Зарегистрированные контракты сервисов
-  final Map<String, RpcServiceContract<T>> _contracts = {};
+  final Map<String, IRpcServiceContract<T>> _contracts = {};
 
   /// Зарегистрированные реализации методов
   final Map<String, Map<String, RpcMethodImplementation>> _implementations = {};
@@ -114,19 +114,19 @@ class RpcEndpoint<T extends RpcSerializableMessage> implements _RpcEndpoint {
       );
 
   /// Регистрирует контракт сервиса
-  void registerServiceContract(RpcServiceContract<T> contract) {
+  void registerServiceContract(IRpcServiceContract<T> contract) {
     // Сохраняем контракт
     _contracts[contract.serviceName] = contract;
     _implementations.putIfAbsent(contract.serviceName, () => {});
 
     // Проверяем, является ли контракт декларативным
-    if (contract is DeclarativeRpcServiceContract<T>) {
+    if (contract is RpcServiceContract<T>) {
       _registerDeclarativeContract(contract);
     }
   }
 
   /// Регистрирует методы из декларативного контракта
-  void _registerDeclarativeContract(DeclarativeRpcServiceContract<T> contract) {
+  void _registerDeclarativeContract(RpcServiceContract<T> contract) {
     // Регистрируем методы из класса
     contract.registerMethodsFromClass();
 
@@ -140,28 +140,28 @@ class RpcEndpoint<T extends RpcSerializableMessage> implements _RpcEndpoint {
 
       if (methodType == RpcMethodType.unary) {
         // Унарный метод
-        unaryMethod(contract.serviceName, methodName).register(
+        unary(contract.serviceName, methodName).register(
           handler: handler,
           requestParser: argumentParser,
           responseParser: responseParser,
         );
       } else if (methodType == RpcMethodType.serverStreaming) {
         // Серверный стриминг
-        serverStreamingMethod(contract.serviceName, methodName).register(
+        serverStreaming(contract.serviceName, methodName).register(
           handler: handler,
           requestParser: argumentParser,
           responseParser: responseParser,
         );
       } else if (methodType == RpcMethodType.clientStreaming) {
         // Клиентский стриминг
-        clientStreamingMethod(contract.serviceName, methodName).register(
+        clientStreaming(contract.serviceName, methodName).register(
           handler: handler,
           requestParser: argumentParser,
           responseParser: responseParser,
         );
       } else if (methodType == RpcMethodType.bidirectional) {
         // Двунаправленный стриминг
-        bidirectionalMethod(contract.serviceName, methodName).register(
+        bidirectional(contract.serviceName, methodName).register(
           handler: handler,
           requestParser: argumentParser,
           responseParser: responseParser,
@@ -171,7 +171,7 @@ class RpcEndpoint<T extends RpcSerializableMessage> implements _RpcEndpoint {
   }
 
   /// Получает контракт сервиса по имени
-  RpcServiceContract<T>? getServiceContract(String serviceName) {
+  IRpcServiceContract<T>? getServiceContract(String serviceName) {
     return _contracts[serviceName];
   }
 
@@ -186,25 +186,34 @@ class RpcEndpoint<T extends RpcSerializableMessage> implements _RpcEndpoint {
   }
 
   /// Создает объект унарного метода для указанного сервиса и метода
-  UnaryRpcMethod<T> unaryMethod(String serviceName, String methodName) {
-    return UnaryRpcMethod<T>(this, serviceName, methodName);
-  }
+  @override
+  UnaryRpcMethod<T> unary(
+    String serviceName,
+    String methodName,
+  ) =>
+      UnaryRpcMethod<T>(this, serviceName, methodName);
 
   /// Создает объект серверного стриминг метода для указанного сервиса и метода
-  ServerStreamingRpcMethod<T> serverStreamingMethod(
-      String serviceName, String methodName) {
-    return ServerStreamingRpcMethod<T>(this, serviceName, methodName);
-  }
+  @override
+  ServerStreamingRpcMethod<T> serverStreaming(
+    String serviceName,
+    String methodName,
+  ) =>
+      ServerStreamingRpcMethod<T>(this, serviceName, methodName);
 
   /// Создает объект клиентского стриминг метода для указанного сервиса и метода
-  ClientStreamingRpcMethod<T> clientStreamingMethod(
-      String serviceName, String methodName) {
-    return ClientStreamingRpcMethod<T>(this, serviceName, methodName);
-  }
+  @override
+  ClientStreamingRpcMethod<T> clientStreaming(
+    String serviceName,
+    String methodName,
+  ) =>
+      ClientStreamingRpcMethod<T>(this, serviceName, methodName);
 
   /// Создает объект двунаправленного стриминг метода для указанного сервиса и метода
-  BidirectionalRpcMethod<T> bidirectionalMethod(
-      String serviceName, String methodName) {
-    return BidirectionalRpcMethod<T>(this, serviceName, methodName);
-  }
+  @override
+  BidirectionalRpcMethod<T> bidirectional(
+    String serviceName,
+    String methodName,
+  ) =>
+      BidirectionalRpcMethod<T>(this, serviceName, methodName);
 }

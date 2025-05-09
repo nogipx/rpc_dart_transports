@@ -20,7 +20,7 @@ final class ServerStreamingRpcMethod<T extends RpcSerializableMessage>
     String? streamId,
     Response Function(Map<String, dynamic>)? responseParser,
   }) {
-    final effectiveStreamId = streamId ?? generateUniqueId('stream');
+    final effectiveStreamId = streamId ?? RpcMethod.generateUniqueId('stream');
     final dynamicRequest = request is RpcMessage ? request.toJson() : request;
 
     final stream = endpoint.openStream(
@@ -77,7 +77,7 @@ final class ServerStreamingRpcMethod<T extends RpcSerializableMessage>
           final messageId = context.messageId;
 
           // Запускаем обработку стрима в фоновом режиме
-          _activateStreamHandler(
+          _activateStreamHandler<Request, Response>(
             messageId,
             typedRequest,
             implementation,
@@ -94,7 +94,8 @@ final class ServerStreamingRpcMethod<T extends RpcSerializableMessage>
   }
 
   /// Активирует обработчик стрима и связывает его с транспортом
-  void _activateStreamHandler<Request, Response>(
+  void _activateStreamHandler<Request extends RpcSerializableMessage,
+      Response extends RpcSerializableMessage>(
     String messageId,
     Request request,
     RpcMethodImplementation<Request, Response> implementation,

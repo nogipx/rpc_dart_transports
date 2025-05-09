@@ -68,7 +68,7 @@ class NotificationMessage implements RpcSerializableMessage {
 
 // Контракт сервиса пользователей
 abstract base class UserServiceContract
-    extends DeclarativeRpcServiceContract<RpcSerializableMessage> {
+    extends RpcServiceContract<RpcSerializableMessage> {
   RpcEndpoint? get client;
 
   @override
@@ -165,7 +165,7 @@ base class ClientUserService extends UserServiceContract {
   @override
   Future<UserResponse> registerUser(UserRequest request) {
     return client
-        .unaryMethod(serviceName, 'registerUser')
+        .unary(serviceName, 'registerUser')
         .call<UserRequest, UserResponse>(
           request,
           responseParser: UserResponse.fromJson,
@@ -175,7 +175,7 @@ base class ClientUserService extends UserServiceContract {
   @override
   Stream<NotificationMessage> subscribeToNotifications(UserRequest request) {
     return client
-        .serverStreamingMethod(serviceName, 'subscribeToNotifications')
+        .serverStreaming(serviceName, 'subscribeToNotifications')
         .openStream<UserRequest, NotificationMessage>(
           request,
           responseParser: NotificationMessage.fromJson,

@@ -1,18 +1,10 @@
 part of '_index.dart';
 
-final _random = Random();
-
-/// Генерирует уникальный ID запроса
-String _generateUniqueId([String? prefix]) {
-  // Текущее время в миллисекундах + случайное число
-  return '${prefix != null ? '${prefix}_' : ''}${DateTime.now().toUtc().toIso8601String()}_${_random.nextInt(1000000)}';
-}
-
 /// Абстрактный базовый класс для RPC-конечных точек
 ///
 /// Этот класс определяет общий публичный интерфейс для всех RPC-конечных точек.
 /// Для типизированной реализации используйте [RpcEndpoint].
-abstract interface class _RpcEndpoint {
+abstract interface class _RpcEndpoint<T extends RpcSerializableMessage> {
   /// Транспорт для отправки/получения сообщений
   RpcTransport get transport;
 
@@ -70,6 +62,30 @@ abstract interface class _RpcEndpoint {
     String? serviceName,
     String? methodName,
   });
+
+  /// Создает объект унарного метода для указанного сервиса и метода
+  UnaryRpcMethod<T> unary(
+    String serviceName,
+    String methodName,
+  );
+
+  /// Создает объект серверного стриминг метода для указанного сервиса и метода
+  ServerStreamingRpcMethod<T> serverStreaming(
+    String serviceName,
+    String methodName,
+  );
+
+  /// Создает объект клиентского стриминг метода для указанного сервиса и метода
+  ClientStreamingRpcMethod<T> clientStreaming(
+    String serviceName,
+    String methodName,
+  );
+
+  /// Создает объект двунаправленного стриминг метода для указанного сервиса и метода
+  BidirectionalRpcMethod<T> bidirectional(
+    String serviceName,
+    String methodName,
+  );
 
   /// Проверяет, активна ли конечная точка
   bool get isActive;

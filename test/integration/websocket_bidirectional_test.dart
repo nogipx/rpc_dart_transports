@@ -37,7 +37,7 @@ void main() {
 
         // Регистрируем обработчик двунаправленного стриминга на сервере
         serverEndpoint
-            .bidirectionalMethod('ChatService', 'chatStream')
+            .bidirectional('ChatService', 'chatStream')
             .register<ChatMessage, ChatMessage>(
               handler: (incomingStream, messageId) {
                 print('Сервер: запрос на создание двунаправленного стрима');
@@ -128,7 +128,7 @@ void main() {
 
     // Создаем двунаправленный канал на клиенте
     final channel = clientEndpoint
-        .bidirectionalMethod('ChatService', 'chatStream')
+        .bidirectional('ChatService', 'chatStream')
         .createChannel<ChatMessage, ChatMessage>(
           requestParser: ChatMessage.fromJson,
           responseParser: ChatMessage.fromJson,
