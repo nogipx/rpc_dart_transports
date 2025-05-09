@@ -89,10 +89,10 @@ void main() {
       // Arrange
       final transportWithoutDestination = MemoryTransport('noDestination');
       final testData = Uint8List.fromList([1, 2, 3]);
+      final result = await transportWithoutDestination.send(testData);
 
-      // Act & Assert
-      expect(
-          () => transportWithoutDestination.send(testData), throwsStateError);
+      // Assert
+      expect(result, RpcTransportActionStatus.connectionNotEstablished);
     });
 
     test('should throw error when sending after close', () async {
@@ -101,10 +101,11 @@ void main() {
 
       // Act
       await transport1.close();
+      final result = await transport1.send(testData);
 
       // Assert
       expect(transport1.isAvailable, isFalse);
-      expect(() => transport1.send(testData), throwsStateError);
+      expect(result, RpcTransportActionStatus.transportUnavailable);
     });
 
     test('should not receive data after close', () async {

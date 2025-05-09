@@ -2,7 +2,8 @@ import 'dart:async';
 import 'dart:isolate';
 import 'dart:typed_data';
 import 'dart:developer' as dev;
-import 'transport.dart';
+
+import '_index.dart';
 
 /// Реализация транспорта для коммуникации между Isolate через порты
 class IsolateTransport implements RpcTransport {
@@ -140,21 +141,22 @@ class IsolateTransport implements RpcTransport {
   }
 
   @override
-  Future<void> send(Uint8List data) async {
+  Future<RpcTransportActionStatus> send(Uint8List data) async {
     if (!isAvailable) {
-      throw StateError('Транспорт недоступен для отправки');
+      return RpcTransportActionStatus.transportUnavailable;
     }
 
     if (!_isInitialized) {
-      throw StateError('Транспорт не инициализирован для отправки');
+      return RpcTransportActionStatus.transportNotInitialized;
     }
 
     try {
       // Отправляем данные через SendPort
       _sendPort.send({'type': 'data', 'data': data});
+      return RpcTransportActionStatus.success;
     } catch (e) {
       _log('Ошибка при отправке данных: $e', e);
-      throw StateError('Ошибка при отправке данных: $e');
+      return RpcTransportActionStatus.unknownError;
     }
   }
 
@@ -194,17 +196,23 @@ class IsolateTransport implements RpcTransport {
   Stream<bool> get connectionState => _connectionStateController.stream;
 
   @override
-  Future<void> close() async {
+  Future<RpcTransportActionStatus> close() async {
     _isAvailable = false;
     _isInitialized = false;
 
-    await _portSubscription?.cancel();
-    _receivePort.close();
+    try {
+      await _portSubscription?.cancel();
+      _receivePort.close();
 
-    await _incomingController.close();
-    await _connectionStateController.close();
+      await _incomingController.close();
+      await _connectionStateController.close();
 
-    _log('Транспорт $id закрыт');
+      _log('Транспорт $id закрыт');
+      return RpcTransportActionStatus.success;
+    } catch (e) {
+      _log('Ошибка при закрытии транспорта: $e', e);
+      return RpcTransportActionStatus.unknownError;
+    }
   }
 
   @override

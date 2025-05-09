@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:typed_data';
-import 'transport.dart';
+import '_index.dart';
 
 /// Реализация транспорта, работающая в памяти
 ///
@@ -36,17 +36,28 @@ class MemoryTransport implements RpcTransport {
   }
 
   @override
-  Future<void> send(Uint8List data) async {
-    if (!isAvailable || _destination == null) {
-      print('Transport is not available or destination is null: $id');
-      return;
+  Future<RpcTransportActionStatus> send(Uint8List data) async {
+    if (!isAvailable) {
+      print('Transport is not available: $id');
+      return RpcTransportActionStatus.transportUnavailable;
     }
 
-    // Имитируем небольшую задержку при отправке сообщения
-    await Future.delayed(const Duration(milliseconds: 1));
+    if (_destination == null) {
+      print('Destination is null: $id');
+      return RpcTransportActionStatus.connectionNotEstablished;
+    }
 
-    // Отправляем данные в пункт назначения
-    _destination!._receiveData(data);
+    try {
+      // Имитируем небольшую задержку при отправке сообщения
+      await Future.delayed(const Duration(milliseconds: 1));
+
+      // Отправляем данные в пункт назначения
+      _destination!._receiveData(data);
+      return RpcTransportActionStatus.success;
+    } catch (e) {
+      print('Ошибка при отправке данных: $e');
+      return RpcTransportActionStatus.unknownError;
+    }
   }
 
   @override
@@ -62,9 +73,15 @@ class MemoryTransport implements RpcTransport {
   }
 
   @override
-  Future<void> close() async {
+  Future<RpcTransportActionStatus> close() async {
     _isAvailable = false;
-    await _incomingController.close();
+    try {
+      await _incomingController.close();
+      return RpcTransportActionStatus.success;
+    } catch (e) {
+      print('Ошибка при закрытии транспорта: $e');
+      return RpcTransportActionStatus.unknownError;
+    }
   }
 
   @override
