@@ -115,6 +115,12 @@ class RpcEndpoint<T extends RpcSerializableMessage> implements _RpcEndpoint {
 
   /// Регистрирует контракт сервиса
   void registerServiceContract(IRpcServiceContract<T> contract) {
+    // Проверяем, не зарегистрирован ли уже контракт с таким именем
+    if (_contracts.containsKey(contract.serviceName)) {
+      throw StateError(
+          'Контракт для сервиса ${contract.serviceName} уже зарегистрирован');
+    }
+
     // Сохраняем контракт
     _contracts[contract.serviceName] = contract;
     _implementations.putIfAbsent(contract.serviceName, () => {});

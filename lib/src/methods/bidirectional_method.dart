@@ -51,6 +51,10 @@ final class BidirectionalRpcMethod<T extends RpcSerializableMessage>
             // Пропускаем маркер завершения
             throw StateError('StreamEnd');
           }
+          // Проверяем маркер закрытия канала
+          if (data['_channelClosed'] == true) {
+            throw StateError('ChannelClosed');
+          }
           try {
             return responseParser(data);
           } catch (e) {
@@ -72,7 +76,9 @@ final class BidirectionalRpcMethod<T extends RpcSerializableMessage>
         }
       }).handleError((error) {
         // Игнорируем ошибки маркера завершения стрима
-        if (error is StateError && error.message == 'StreamEnd') {
+        if (error is StateError &&
+            (error.message == 'StreamEnd' ||
+                error.message == 'ChannelClosed')) {
           return;
         }
         // Другие ошибки пробрасываем дальше
@@ -87,7 +93,9 @@ final class BidirectionalRpcMethod<T extends RpcSerializableMessage>
       )
           .where((data) {
         // Фильтруем маркеры завершения стрима
-        if (data is Map<String, dynamic> && data['_clientStreamEnd'] == true) {
+        if (data is Map<String, dynamic> &&
+            (data['_clientStreamEnd'] == true ||
+                data['_channelClosed'] == true)) {
           return false;
         }
         return true;
@@ -194,13 +202,19 @@ final class BidirectionalRpcMethod<T extends RpcSerializableMessage>
                 if (data['_clientStreamEnd'] == true) {
                   throw StateError('StreamEnd');
                 }
+                // Проверяем маркер закрытия канала
+                if (data['_channelClosed'] == true) {
+                  throw StateError('ChannelClosed');
+                }
                 return requestParser(data);
               } else {
                 return data as Request;
               }
             }).handleError((error) {
               // Игнорируем ошибки маркера завершения
-              if (error is StateError && error.message == 'StreamEnd') {
+              if (error is StateError &&
+                  (error.message == 'StreamEnd' ||
+                      error.message == 'ChannelClosed')) {
                 return;
               }
               throw error;
@@ -214,7 +228,8 @@ final class BidirectionalRpcMethod<T extends RpcSerializableMessage>
             )
                 .where((data) {
               if (data is Map<String, dynamic> &&
-                  data['_clientStreamEnd'] == true) {
+                  (data['_clientStreamEnd'] == true ||
+                      data['_channelClosed'] == true)) {
                 return false;
               }
               return true;
