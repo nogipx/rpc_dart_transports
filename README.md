@@ -7,9 +7,8 @@
 - 🚀 **Платформонезависимость** - работает на всех платформах Dart/Flutter
 - 🔄 **Двунаправленная коммуникация** - поддержка двусторонней передачи данных
 - 🔐 **Типобезопасность** - строгая типизация API через контракты сервисов
-- 📦 **Декларативные сервисы** - четкое определение API через контракты
-- 🔁 **Различные типы RPC** - унарные вызовы, серверный и клиентский стриминг, bidirectional
-- 🧩 **Расширяемость** - поддержка плагинов, middleware и кастомных транспортов
+- 🔁 **Различные типы RPC** - унарные вызовы, серверный и клиентский стриминг, двунаправленный стриминг
+- 🧩 **Расширяемость** - поддержка middleware и кастомных транспортов
 
 ## Установка
 
@@ -20,12 +19,11 @@ dependencies:
 
 ## Архитектура
 
-- **RpcTransport** - обеспечивает передачу двоичных данных между узлами
+- **RpcTransport** - обеспечивает передачу данных между узлами
 - **RpcSerializer** - сериализует и десериализует сообщения
 - **RpcEndpoint** - базовый API для регистрации и вызова методов
 - **RpcMiddleware** - промежуточная обработка запросов и ответов
 - **RpcServiceContract** - описание методов сервиса с типизацией
-- **RpcMethod** - представление методов RPC (унарные, стриминговые)
 
 ## Быстрый старт
 
@@ -33,15 +31,23 @@ dependencies:
 import 'package:rpc_dart/rpc_dart.dart';
 
 void main() async {
-  // Настройка транспорта и сериализатора
+  // Настройка транспорта
   final clientTransport = MemoryTransport('client');
   final serverTransport = MemoryTransport('server');
   clientTransport.connect(serverTransport);
   serverTransport.connect(clientTransport);
   
-  final serializer = JsonSerializer();
-  final client = RpcEndpoint(clientTransport, serializer);
-  final server = RpcEndpoint(serverTransport, serializer);
+  // Создание эндпоинтов
+  final client = RpcEndpoint(
+    transport: clientTransport,
+    serializer: JsonSerializer(),
+    debugLabel: 'client',
+  );
+  final server = RpcEndpoint(
+    transport: serverTransport,
+    serializer: JsonSerializer(),
+    debugLabel: 'server',
+  );
   
   // Регистрация метода на сервере
   server.registerMethod(
@@ -62,70 +68,120 @@ void main() async {
   
   print('Результат: ${result['result']}'); // Результат: 8
   
-  // Освобождение ресурсов
   await client.close();
   await server.close();
 }
 ```
 
-## Стриминг данных
+## Типы вызовов
+
+### Унарные вызовы
+
+Стандартный вызов с одним запросом и одним ответом.
 
 ```dart
-// Регистрация стрима на сервере
-server.registerMethod(
-  'StreamService',
-  'generateNumbers',
-  (context) async {
-    final count = context.payload['count'] as int;
-    final messageId = context.messageId;
-    
-    // Запуск асинхронной генерации
-    Future.microtask(() async {
-      for (var i = 1; i <= count; i++) {
-        await server.sendStreamData(messageId, i);
-        await Future.delayed(Duration(milliseconds: 100));
-      }
-      await server.closeStream(messageId);
-    });
-    
-    return {'status': 'started'};
+// На сервере
+server.unary('CalculatorService', 'add').register<CalculatorRequest, CalculatorResponse>(
+  handler: (request) async {
+    return CalculatorResponse(request.a + request.b);
   },
+  requestParser: CalculatorRequest.fromJson,
+  responseParser: CalculatorResponse.fromJson,
 );
 
-// Получение данных на клиенте
-final stream = client.openStream(
-  'StreamService',
-  'generateNumbers',
-  request: {'count': 5},
-);
-
-stream.listen(
-  (data) => print('Получено: $data'),
-  onDone: () => print('Стрим завершен'),
-);
+// На клиенте
+final result = await client
+    .unary('CalculatorService', 'add')
+    .call<CalculatorRequest, CalculatorResponse>(
+      CalculatorRequest(5, 3),
+      responseParser: CalculatorResponse.fromJson,
+    );
 ```
 
-## Двунаправленный стриминг (Bidirectional)
+### Серверный стриминг
+
+Сервер возвращает поток данных в ответ на один запрос.
 
 ```dart
-// Регистрация на сервере
-server.bidirectional('ChatService', 'chat')
-    .register<ChatMessage, ChatMessage>(
-      handler: (incomingStream, messageId) {
-        // Обрабатываем входящие сообщения и отправляем ответы
-        return incomingStream.map((message) {
-          print('Сервер получил: ${message.text}');
-          return ChatMessage(
-            text: 'Ответ на: ${message.text}',
-            sender: 'server',
-          );
-        });
-      },
-      requestParser: ChatMessage.fromJson,
-      responseParser: ChatMessage.fromJson,
+// На сервере
+server.serverStreaming('CounterService', 'count').register<CountRequest, NumberMessage>(
+  handler: (request) async* {
+    for (int i = 1; i <= request.count; i++) {
+      yield NumberMessage(i);
+      await Future.delayed(Duration(milliseconds: 100));
+    }
+  },
+  requestParser: CountRequest.fromJson,
+  responseParser: NumberMessage.fromJson,
+);
+
+// На клиенте
+final stream = client
+    .serverStreaming('CounterService', 'count')
+    .openStream<CountRequest, NumberMessage>(
+      CountRequest(5),
+      responseParser: NumberMessage.fromJson,
     );
 
-// Создание канала на клиенте
+stream.listen((data) => print('Получено: ${data.value}'));
+```
+
+### Клиентский стриминг
+
+Клиент отправляет поток данных, сервер возвращает один ответ.
+
+```dart
+// На сервере
+server.clientStreaming('SumService', 'calculateSum').register<NumberMessage, SumResult>(
+  handler: (stream) async {
+    int sum = 0;
+    await for (final value in stream) {
+      sum += value.value;
+    }
+    return SumResult(sum);
+  },
+  requestParser: NumberMessage.fromJson,
+  responseParser: SumResult.fromJson,
+);
+
+// На клиенте
+final clientStream = client
+    .clientStreaming('SumService', 'calculateSum')
+    .openClientStream<NumberMessage, SumResult>(
+      responseParser: SumResult.fromJson,
+    );
+
+// Отправляем числа
+clientStream.controller.add(NumberMessage(10));
+clientStream.controller.add(NumberMessage(20));
+clientStream.controller.add(NumberMessage(30));
+
+// Завершаем поток и получаем результат
+clientStream.controller.close();
+final result = await clientStream.response;
+print('Сумма: ${result.total}'); // Сумма: 60
+```
+
+### Двунаправленный стриминг
+
+Клиент и сервер обмениваются потоками данных одновременно.
+
+```dart
+// На сервере
+server.bidirectional('ChatService', 'chat').register<ChatMessage, ChatMessage>(
+  handler: (incomingStream, messageId) {
+    return incomingStream.map((message) {
+      return ChatMessage(
+        text: 'Ответ на: ${message.text}',
+        sender: 'server',
+      );
+    });
+  },
+  requestParser: ChatMessage.fromJson,
+  responseParser: ChatMessage.fromJson,
+);
+
+// На клиенте
 final channel = client
     .bidirectional('ChatService', 'chat')
     .createChannel<ChatMessage, ChatMessage>(
@@ -135,34 +191,25 @@ final channel = client
 
 // Подписка на входящие сообщения
 channel.incoming.listen(
-  (message) => print('Клиент получил: ${message.text}'),
-  onDone: () => print('Канал закрыт'),
+  (message) => print('Получено: ${message.text}'),
 );
 
 // Отправка сообщений
-channel.send(ChatMessage(text: 'Привет, сервер!', sender: 'client'));
-
-// Закрытие канала
-await channel.close();
+channel.send(ChatMessage(text: 'Привет!', sender: 'client'));
 ```
 
 ## Контракты сервисов
 
-Контракты позволяют декларативно описать структуру сервиса с типизированными методами:
+Контракты позволяют декларативно описать структуру сервиса:
 
 ```dart
 // Определение контракта
-abstract base class CalculatorContract 
-    extends RpcServiceContract<RpcSerializableMessage> {
-  
+abstract base class CalculatorContract extends RpcServiceContract {
   @override
   final String serviceName = 'CalculatorService';
-  
-  RpcEndpoint? get endpoint;
 
   @override
   void registerMethodsFromClass() {
-    // Унарный метод
     addUnaryMethod<CalculatorRequest, CalculatorResponse>(
       methodName: 'add',
       handler: add,
@@ -170,45 +217,40 @@ abstract base class CalculatorContract
       responseParser: CalculatorResponse.fromJson,
     );
     
-    // Стриминговый метод
-    addServerStreamingMethod<SequenceRequest, SequenceData>(
+    addServerStreamingMethod<CountRequest, NumberMessage>(
       methodName: 'generateSequence',
       handler: generateSequence,
-      argumentParser: SequenceRequest.fromJson,
-      responseParser: SequenceData.fromJson,
+      argumentParser: CountRequest.fromJson,
+      responseParser: NumberMessage.fromJson,
     );
   }
   
-  // Объявление методов
+  // Абстрактные методы
   Future<CalculatorResponse> add(CalculatorRequest request);
-  Stream<SequenceData> generateSequence(SequenceRequest request);
+  Stream<NumberMessage> generateSequence(CountRequest request);
 }
 
-// Реализация контракта на сервере
-final class ServerCalculatorContract extends CalculatorContract {
-  @override
-  RpcEndpoint? get endpoint => null;
-  
+// Реализация на сервере
+final class ServerCalculator extends CalculatorContract {
   @override
   Future<CalculatorResponse> add(CalculatorRequest request) async {
     return CalculatorResponse(request.a + request.b);
   }
   
   @override
-  Stream<SequenceData> generateSequence(SequenceRequest request) async* {
+  Stream<NumberMessage> generateSequence(CountRequest request) async* {
     for (int i = 1; i <= request.count; i++) {
-      yield SequenceData(i);
+      yield NumberMessage(i);
       await Future.delayed(Duration(milliseconds: 100));
     }
   }
 }
 
-// Реализация контракта на клиенте
-final class ClientCalculatorContract extends CalculatorContract {
-  @override
+// Реализация на клиенте
+final class ClientCalculator extends CalculatorContract {
   final RpcEndpoint endpoint;
   
-  ClientCalculatorContract(this.endpoint);
+  ClientCalculator(this.endpoint);
   
   @override
   Future<CalculatorResponse> add(CalculatorRequest request) {
@@ -221,156 +263,95 @@ final class ClientCalculatorContract extends CalculatorContract {
   }
   
   @override
-  Stream<SequenceData> generateSequence(SequenceRequest request) {
+  Stream<NumberMessage> generateSequence(CountRequest request) {
     return endpoint
         .serverStreaming(serviceName, 'generateSequence')
-        .openStream<SequenceRequest, SequenceData>(
+        .openStream<CountRequest, NumberMessage>(
           request,
-          responseParser: SequenceData.fromJson,
+          responseParser: NumberMessage.fromJson,
         );
   }
 }
 
 // Регистрация контрактов
-serverEndpoint.registerServiceContract(ServerCalculatorContract());
-clientEndpoint.registerServiceContract(ClientCalculatorContract(clientEndpoint));
+final calculator = ClientCalculator(clientEndpoint);
+serverEndpoint.registerServiceContract(ServerCalculator());
+clientEndpoint.registerServiceContract(calculator);
 
-// Использование
-final contract = ClientCalculatorContract(clientEndpoint);
-final result = await contract.add(CalculatorRequest(5, 10));
+// Использование на клиенте
+final result = await calculator.add(CalculatorRequest(5, 10));
 print('Результат: ${result.result}'); // Результат: 15
-```
 
-## Дополнительные примеры
-
-Больше примеров можно найти в директории `example/`:
-
-- Унарные вызовы
-- Серверный стриминг
-- Клиентский стриминг
-- Двунаправленный стриминг
-- Использование контрактов
-- WebSocket транспорт
-
-## Типизированные контракты
-
-```dart
-// Сообщения
-class CalculatorRequest implements RpcSerializableMessage {
-  final int a;
-  final int b;
-
-  CalculatorRequest(this.a, this.b);
-
-  @override
-  Map<String, dynamic> toJson() => {'a': a, 'b': b};
-
-  static CalculatorRequest fromJson(Map<String, dynamic> json) {
-    return CalculatorRequest(json['a'] as int, json['b'] as int);
-  }
-}
-
-class CalculatorResponse implements RpcSerializableMessage {
-  final int result;
-
-  CalculatorResponse(this.result);
-
-  @override
-  Map<String, dynamic> toJson() => {'result': result};
-
-  static CalculatorResponse fromJson(Map<String, dynamic> json) {
-    return CalculatorResponse(json['result'] as int);
-  }
-}
-
-// Контракт сервиса
-abstract base class CalculatorContract extends RpcServiceContract {
-  @override
-  final String serviceName = 'CalculatorService';
-
-  @override
-  void registerMethodsFromClass() {
-    // Унарные методы
-    addUnaryMethod<CalculatorRequest, CalculatorResponse>(
-      methodName: 'add',
-      handler: add,
-      argumentParser: CalculatorRequest.fromJson,
-      responseParser: CalculatorResponse.fromJson,
-    );
-    
-    addUnaryMethod<CalculatorRequest, CalculatorResponse>(
-      methodName: 'multiply',
-      handler: multiply,
-      argumentParser: CalculatorRequest.fromJson,
-      responseParser: CalculatorResponse.fromJson,
-    );
-    
-    // Стриминговый метод
-    addServerStreamingMethod<SequenceRequest, SequenceResponse>(
-      methodName: 'generateSequence',
-      handler: generateSequence,
-      argumentParser: SequenceRequest.fromJson,
-      responseParser: SequenceResponse.fromJson,
-    );
-  }
-
-  // Абстрактные методы контракта
-  Future<CalculatorResponse> add(CalculatorRequest request);
-  Future<CalculatorResponse> multiply(CalculatorRequest request);
-  Stream<SequenceResponse> generateSequence(SequenceRequest request);
-}
+final numberStream = calculator.generateSequence(CountRequest(5));
+numberStream.listen((number) => print('Получено: ${number.value}'));
 ```
 
 ## Транспорты
 
-По умолчанию библиотека включает:
+Библиотека включает:
 
-- **MemoryTransport** - для обмена в пределах одного процесса
-- **IsolateTransport** - для обмена между изолятами
+- **MemoryTransport** - для обмена в рамках одного процесса
 - **WebSocketTransport** - для обмена через WebSocket соединения
+- **IsolateTransport** - для обмена между изолятами
 
-### Пример WebSocket транспорта
+Все транспорты реализуют общий интерфейс, что позволяет легко заменять их.
+
+## Middleware
+
+Middleware позволяют перехватывать и модифицировать запросы и ответы:
 
 ```dart
-// Клиентская часть
-final wsClientTransport = WebSocketTransport('client', 'ws://localhost:8080', 
-  autoConnect: true);
-final clientEndpoint = RpcEndpoint(wsClientTransport, JsonSerializer());
+// Встроенные middleware
+endpoint.addMiddleware(LoggingMiddleware(id: 'client'));
+endpoint.addMiddleware(TimingMiddleware());
 
-// Серверная часть (при наличии WebSocket сервера)
-final server = await HttpServer.bind('localhost', 8080);
-await for (var request in server) {
-  if (request.uri.path == '/ws') {
-    final socket = await WebSocketTransformer.upgrade(request);
-    final transport = WebSocketTransport.fromWebSocket('server', socket);
-    final endpoint = RpcEndpoint(transport, JsonSerializer());
-    
-    // Регистрация методов...
+// Собственные middleware
+class AuthMiddleware implements SimpleRpcMiddleware {
+  final String authToken;
+  
+  AuthMiddleware(this.authToken);
+  
+  @override
+  FutureOr<dynamic> onRequest(
+    String serviceName, 
+    String methodName, 
+    dynamic payload, 
+    RpcMethodContext context,
+    RpcDataDirection direction,
+  ) {
+    if (direction == RpcDataDirection.toRemote) {
+      final mutableContext = context as MutableRpcMethodContext;
+      mutableContext.metadata ??= {};
+      mutableContext.metadata!['auth_token'] = authToken;
+    }
+    return payload;
   }
 }
+
+endpoint.addMiddleware(AuthMiddleware('user-token-123'));
 ```
 
-## Middleware и расширения
+### Функциональные middleware с RpcMiddlewareWrapper
+
+Для быстрого создания middleware без реализации полного интерфейса:
 
 ```dart
-// Добавление логирования
-client.addMiddleware(DebugMiddleware(id: 'client'));
-
-// Добавление middleware для изменения запросов
-server.addMiddleware(
-  RpcMiddleware(
-    onRequest: (request) {
-      // Модифицируем запрос
-      final metadata = request.metadata ?? {};
-      metadata['timestamp'] = DateTime.now().toIso8601String();
-      return request.copyWith(metadata: metadata);
-    },
-    onResponse: (response) {
-      // Можем модифицировать ответ
-      return response;
-    },
-  ),
+final authMiddleware = RpcMiddlewareWrapper(
+  debugLabel: 'Auth',
+  onRequestHandler: (serviceName, methodName, payload, context, direction) {
+    if (direction == RpcDataDirection.toRemote) {
+      if (isProtectedMethod(serviceName, methodName)) {
+        final token = getAuthToken();
+        final mutableContext = context as MutableRpcMethodContext;
+        mutableContext.metadata ??= {};
+        mutableContext.metadata!['Authorization'] = 'Bearer $token';
+      }
+    }
+    return payload;
+  },
 );
+
+endpoint.addMiddleware(authMiddleware);
 ```
 
 ## Обработка ошибок
@@ -391,62 +372,12 @@ try {
 }
 ```
 
-## Контекст метода (RpcMethodContext)
+## Дополнительные примеры
 
-При обработке запросов каждый обработчик получает контекст с полями:
-- `messageId` - уникальный ID сообщения
-- `payload` - данные запроса
-- `metadata` - дополнительные метаданные
-- `serviceName` - имя сервиса
-- `methodName` - имя метода
+Больше примеров можно найти в директории `example/`:
 
-## Клиентский стриминг (Client Streaming)
-
-```dart
-// Регистрация обработчика на сервере
-server.clientStreaming('SumService', 'calculateSum')
-    .register<NumberValue, SumResult>(
-      handler: (stream) async {
-        int sum = 0;
-        await for (final value in stream) {
-          sum += value.number;
-        }
-        return SumResult(sum);
-      },
-      requestParser: NumberValue.fromJson,
-      responseParser: SumResult.fromJson,
-    );
-
-// Использование на клиенте
-final (controller, resultFuture) = client
-    .clientStreaming('SumService', 'calculateSum')
-    .openClientStream<NumberValue, SumResult>(
-      responseParser: SumResult.fromJson,
-    );
-
-// Отправляем числа
-controller.add(NumberValue(10));
-controller.add(NumberValue(20));
-controller.add(NumberValue(30));
-
-// Завершаем поток и получаем результат
-await controller.close();
-final result = await resultFuture;
-print('Сумма: ${result.total}'); // Сумма: 60
-```
-
-## Статусы транспорта
-
-RPC Dart предоставляет статусы выполнения операций транспорта:
-
-```dart
-enum RpcTransportActionStatus {
-  success,
-  transportUnavailable,
-  connectionClosed,
-  connectionNotEstablished,
-  unknownError,
-}
-```
-
-Это позволяет точно определить причину проблемы при отправке сообщений.
+- `calculator_example.dart` - Унарные вызовы
+- `stream_example.dart` - Серверный и клиентский стриминг
+- `bidirectional_example.dart` - Двунаправленный стриминг
+- `contracts_example.dart` - Использование контрактов
+- `websocket_example.dart` - WebSocket транспорт
