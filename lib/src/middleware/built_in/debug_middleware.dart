@@ -23,7 +23,7 @@ class DebugMiddleware implements RpcMiddleware {
 
   /// Внутренний метод для логирования
   void _log(String message) {
-    final logMessage = 'DebugMiddleware[$id]: $message';
+    final logMessage = 'DebugMiddleware[$id]: \n$message';
     _logger != null ? _logger!(logMessage) : print(logMessage);
   }
 
@@ -35,7 +35,7 @@ class DebugMiddleware implements RpcMiddleware {
     RpcMethodContext context,
     RpcDataDirection direction,
   ) {
-    var message = 'ЗАПРОС ${direction.symbol}: $serviceName.$methodName\n'
+    var message = '${direction.symbol} ЗАПРОС: $serviceName.$methodName\n'
         'ID: ${context.messageId}\n'
         'Payload: $payload';
 
@@ -56,7 +56,7 @@ class DebugMiddleware implements RpcMiddleware {
     RpcMethodContext context,
     RpcDataDirection direction,
   ) {
-    var message = 'ОТВЕТ ${direction.symbol}: $serviceName.$methodName\n'
+    var message = '${direction.symbol} ОТВЕТ: $serviceName.$methodName\n'
         'ID: ${context.messageId}\n'
         'Response: $response';
 
@@ -78,7 +78,7 @@ class DebugMiddleware implements RpcMiddleware {
     RpcMethodContext context,
     RpcDataDirection direction,
   ) {
-    var message = 'ОШИБКА ${direction.symbol}: $serviceName.$methodName\n'
+    var message = '${direction.symbol} ОШИБКА: $serviceName.$methodName\n'
         'ID: ${context.messageId}\n'
         'Error: $error';
 
@@ -108,7 +108,7 @@ class DebugMiddleware implements RpcMiddleware {
         : 'ПОЛУЧЕНИЕ ИЗ ПОТОКА';
 
     var message =
-        '$directionText ${direction.symbol}: $serviceName.$methodName\n'
+        '${direction.symbol} $directionText: $serviceName.$methodName\n'
         'StreamID: $streamId\n'
         'Data: $data';
 

@@ -2,25 +2,6 @@ import 'dart:async';
 
 import 'package:rpc_dart/rpc_dart.dart';
 
-class StringMessage implements RpcSerializableMessage {
-  final String text;
-
-  StringMessage({required this.text});
-
-  @override
-  Map<String, dynamic> toJson() {
-    return {'text': text};
-  }
-
-  @override
-  factory StringMessage.fromJson(Map<String, dynamic> json) {
-    return StringMessage(text: json['text']);
-  }
-
-  @override
-  String toString() => 'StringMessage(text: $text)';
-}
-
 /// Пример простого использования двунаправленного канала без контрактной системы
 void main() async {
   print('=== Простой пример двунаправленного канала ===\n');
@@ -53,8 +34,6 @@ void main() async {
   serverEndpoint.registerServiceContract(serverContract);
   clientEndpoint.registerServiceContract(clientContract);
 
-  print('Контракты зарегистрированы');
-
   // Регистрируем обработчик на сервере
   serverEndpoint
       .bidirectional(serviceName, methodName)
@@ -69,8 +48,6 @@ void main() async {
         responseParser: StringMessage.fromJson,
       );
 
-  print('Обработчик зарегистрирован');
-
   // Создаем двунаправленный канал на клиенте
   final channel = clientEndpoint
       .bidirectional(serviceName, methodName)
@@ -79,17 +56,12 @@ void main() async {
         responseParser: StringMessage.fromJson,
       );
 
-  print('Двунаправленный канал создан');
-
   // Подписываемся на входящие сообщения
   final subscription = channel.incoming.listen(
-    (message) => print('Клиент получил: $message'),
-    onError: (e) => print('Ошибка: $e'),
-    onDone: () => print('Соединение закрыто'),
+    (message) => print('\nКлиент получил: $message\n'),
+    onError: (e) => print('\nОшибка: $e\n'),
+    onDone: () => print('\nСоединение закрыто\n'),
   );
-
-  // Отправляем простые текстовые сообщения
-  print('\n--- Отправляем текстовые сообщения ---\n');
 
   channel.send(StringMessage(text: 'Привет, сервер!'));
   await Future.delayed(Duration(milliseconds: 300));
@@ -103,9 +75,6 @@ void main() async {
   // Ждем немного для получения ответов
   await Future.delayed(Duration(seconds: 1));
 
-  // Корректное закрытие ресурсов
-  print('\n--- Завершение работы ---');
-
   // Сначала закрываем канал
   await channel.close();
   // Затем отменяем подписку
@@ -118,6 +87,25 @@ void main() async {
   await serverEndpoint.close();
 
   print('\n--- Пример завершен ---');
+}
+
+class StringMessage implements RpcSerializableMessage {
+  final String text;
+
+  StringMessage({required this.text});
+
+  @override
+  Map<String, dynamic> toJson() {
+    return {'text': text};
+  }
+
+  @override
+  factory StringMessage.fromJson(Map<String, dynamic> json) {
+    return StringMessage(text: json['text']);
+  }
+
+  @override
+  String toString() => 'StringMessage(text: $text)';
 }
 
 /// Пустой контракт для регистрации сервиса

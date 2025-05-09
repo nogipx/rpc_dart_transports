@@ -36,7 +36,7 @@ class RpcMethodContext {
   }) : _metadata = metadata;
 
   /// Получает метаданные сообщения
-  Map<String, dynamic>? get metadata => _metadata;
+  Map<String, dynamic>? get metadata => UnmodifiableMapView(_metadata ?? {});
 
   /// Создает строковое представление контекста
   @override
@@ -47,7 +47,7 @@ class RpcMethodContext {
   MutableRpcMethodContext toMutable() {
     return MutableRpcMethodContext(
       messageId: messageId,
-      metadata: metadata,
+      metadata: Map<String, dynamic>.from(_metadata ?? {}),
       payload: payload,
       serviceName: serviceName,
       methodName: methodName,
