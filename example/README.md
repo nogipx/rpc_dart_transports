@@ -53,7 +53,7 @@ await for (final item in stream) {
 ```dart
 // Регистрация на сервере
 serverEndpoint
-    .bidirectionalMethod('ChatService', 'chatStream')
+    .bidirectional('ChatService', 'chatStream')
     .register<ChatMessage, ChatMessage>(
       handler: (incomingStream, messageId) {
         // Эхо-обработчик, возвращает сообщения с префиксом
@@ -67,7 +67,7 @@ serverEndpoint
 
 // Создание двунаправленного канала
 final channel = clientEndpoint
-    .bidirectionalMethod('ChatService', 'chatStream')
+    .bidirectional('ChatService', 'chatStream')
     .createChannel<ChatMessage, ChatMessage>(
       requestParser: ChatMessage.fromJson,
       responseParser: ChatMessage.fromJson,
@@ -89,7 +89,7 @@ channel.send(ChatMessage(text: 'Привет!', sender: 'Клиент'));
 ```dart
 // Регистрация на сервере
 serverEndpoint
-    .clientStreamingMethod('FileService', 'uploadFile')
+    .clientStreaming('FileService', 'uploadFile')
     .register<FileChunk, UploadResult>(
       handler: (stream) async {
         // Обработка потока чанков
@@ -105,7 +105,7 @@ serverEndpoint
 
 // Открытие клиентского стрима
 final (uploadController, resultFuture) = clientEndpoint
-    .clientStreamingMethod('FileService', 'uploadFile')
+    .clientStreaming('FileService', 'uploadFile')
     .openClientStream<FileChunk, UploadResult>(
       responseParser: UploadResult.fromJson,
     );
@@ -127,7 +127,7 @@ final result = await resultFuture;
 ```dart
 // Регистрация на сервере
 serverEndpoint
-    .bidirectionalMethod('EchoService', 'echo')
+    .bidirectional('EchoService', 'echo')
     .register<StringMessage, StringMessage>(
       handler: (incomingStream, messageId) {
         return incomingStream.map((data) {
@@ -140,7 +140,7 @@ serverEndpoint
 
 // Создание и использование канала на клиенте
 final channel = clientEndpoint
-    .bidirectionalMethod('EchoService', 'echo')
+    .bidirectional('EchoService', 'echo')
     .createChannel<StringMessage, StringMessage>(
       requestParser: StringMessage.fromJson,
       responseParser: StringMessage.fromJson,
@@ -154,6 +154,6 @@ channel.send(StringMessage(text: 'Привет!'));
 
 Есть два подхода к созданию контрактов:
 
-1. **Декларативный подход** - см. пример в директории `calculator`, где контракт создается с использованием абстрактного класса, наследующего от `DeclarativeRpcServiceContract`. Этот подход рекомендуется использовать для серьезных приложений.
+1. **Декларативный подход** - см. пример в директории `calculator`, где контракт создается с использованием абстрактного класса, наследующего от `RpcServiceContract`. Этот подход рекомендуется использовать для серьезных приложений.
 
 2. **Прямая регистрация методов** - см. примеры `upload_example.dart`, `chat_example.dart` и `bidirectional_simple_example.dart`, где регистрация методов производится напрямую через методы эндпоинта. Подходит для прототипирования и простых случаев. 
