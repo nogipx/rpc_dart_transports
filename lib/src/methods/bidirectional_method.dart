@@ -31,7 +31,7 @@ final class BidirectionalRpcMethod<T extends RpcSerializableMessage>
     endpoint.invoke(
       serviceName,
       methodName,
-      {'_bidirectional': true},
+      {'_bidirectional': true, '_streamId': effectiveStreamId},
       metadata: metadata,
     );
 
@@ -160,84 +160,108 @@ final class BidirectionalRpcMethod<T extends RpcSerializableMessage>
       serviceName,
       methodName,
       (context) async {
-        // Получаем ID сообщения
-        final messageId = context.messageId;
+        // Получаем данные запроса и проверяем маркер двунаправленного стрима
+        final requestData = context.payload;
+        final isBidirectional = requestData is Map<String, dynamic> &&
+            requestData['_bidirectional'] == true;
 
-        // Открываем входящий поток и преобразуем его к типу Request
-        Stream<Request> typedIncomingStream;
-        if (requestParser != null) {
-          typedIncomingStream = endpoint
-              .openStream(
-            serviceName,
-            methodName,
-            streamId: messageId,
-          )
-              .map((data) {
-            if (data is Map<String, dynamic>) {
-              // Проверяем маркер конца стрима
-              if (data['_clientStreamEnd'] == true) {
-                throw StateError('StreamEnd');
-              }
-              return requestParser(data);
-            } else {
-              return data as Request;
-            }
-          }).handleError((error) {
-            // Игнорируем ошибки маркера завершения
-            if (error is StateError && error.message == 'StreamEnd') {
-              return;
-            }
-            throw error;
-          });
+        // Получаем или создаем ID стрима, отличный от ID сообщения
+        String effectiveStreamId;
+        if (isBidirectional &&
+            requestData is Map<String, dynamic> &&
+            requestData['_streamId'] != null) {
+          // Если клиент указал ID стрима, используем его
+          effectiveStreamId = requestData['_streamId'] as String;
         } else {
-          typedIncomingStream = endpoint
-              .openStream(
-            serviceName,
-            methodName,
-            streamId: messageId,
-          )
-              .where((data) {
-            if (data is Map<String, dynamic> &&
-                data['_clientStreamEnd'] == true) {
-              return false;
-            }
-            return true;
-          }).cast<Request>();
+          // Иначе генерируем новый ID стрима (не используем messageId как streamId)
+          effectiveStreamId = RpcMethod.generateUniqueId('stream');
         }
 
-        // Создаем исходящий поток через обработчик
-        final outgoingStream = implementation.openBidirectionalStream(
-          typedIncomingStream,
-          messageId,
-        );
+        // Если это инициализация двунаправленного стрима
+        if (isBidirectional) {
+          // Открываем входящий поток и преобразуем его к типу Request
+          Stream<Request> typedIncomingStream;
+          if (requestParser != null) {
+            typedIncomingStream = endpoint
+                .openStream(
+              serviceName,
+              methodName,
+              streamId: effectiveStreamId,
+            )
+                .map((data) {
+              if (data is Map<String, dynamic>) {
+                // Проверяем маркер конца стрима
+                if (data['_clientStreamEnd'] == true) {
+                  throw StateError('StreamEnd');
+                }
+                return requestParser(data);
+              } else {
+                return data as Request;
+              }
+            }).handleError((error) {
+              // Игнорируем ошибки маркера завершения
+              if (error is StateError && error.message == 'StreamEnd') {
+                return;
+              }
+              throw error;
+            });
+          } else {
+            typedIncomingStream = endpoint
+                .openStream(
+              serviceName,
+              methodName,
+              streamId: effectiveStreamId,
+            )
+                .where((data) {
+              if (data is Map<String, dynamic> &&
+                  data['_clientStreamEnd'] == true) {
+                return false;
+              }
+              return true;
+            }).cast<Request>();
+          }
 
-        // Подписываемся на исходящий поток и отправляем данные
-        outgoingStream.listen(
-          (data) {
-            endpoint.sendStreamData(
-              messageId,
-              data is RpcMessage ? data.toJson() : data,
-              serviceName: serviceName,
-              methodName: methodName,
-            );
-          },
-          onError: (error) {
-            endpoint.sendStreamError(
-              messageId,
-              error.toString(),
-            );
-          },
-          onDone: () {
-            endpoint.closeStream(
-              messageId,
-              serviceName: serviceName,
-              methodName: methodName,
-            );
-          },
-        );
+          // Создаем исходящий поток через обработчик
+          final outgoingStream = implementation.openBidirectionalStream(
+            typedIncomingStream,
+            effectiveStreamId,
+          );
 
-        // Возвращаем подтверждение установки соединения
-        return {'status': 'bidirectional_streaming'};
+          // Подписываемся на исходящий поток и отправляем данные
+          outgoingStream.listen(
+            (data) {
+              endpoint.sendStreamData(
+                effectiveStreamId,
+                data is RpcMessage ? data.toJson() : data,
+                serviceName: serviceName,
+                methodName: methodName,
+              );
+            },
+            onError: (error) {
+              endpoint.sendStreamError(
+                effectiveStreamId,
+                error.toString(),
+              );
+            },
+            onDone: () {
+              endpoint.closeStream(
+                effectiveStreamId,
+                serviceName: serviceName,
+                methodName: methodName,
+              );
+            },
+          );
+
+          // Возвращаем подтверждение установки соединения
+          return {
+            'status': 'bidirectional_streaming',
+            'streamId': effectiveStreamId
+          };
+        } else {
+          // Если это обычный запрос, обрабатываем по старой логике
+          // Это может быть нужно для совместимости или других целей
+          return {'error': 'Для этого метода требуется маркер _bidirectional'};
+        }
       },
     );
   }
