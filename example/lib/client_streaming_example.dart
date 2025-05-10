@@ -36,6 +36,7 @@ void main() async {
   print('Регистрируем контракты сервисов...');
   server.registerServiceContract(demoContract);
   server.registerServiceContract(streamContract);
+
   client.registerServiceContract(demoContract);
   client.registerServiceContract(streamContract);
 
@@ -116,7 +117,7 @@ void registerServerMethods(RpcEndpoint server) {
           });
         },
         requestParser: RpcInt.fromJson,
-        responseParser: (json) => _parseMap(json),
+        responseParser: RpcMap.fromJson,
       );
 
   // 2. Обработка сложных объектов
@@ -237,7 +238,7 @@ Future<void> demonstrateNumberAggregation(RpcEndpoint client) async {
   final stream = client
       .clientStreaming('DemoService', 'aggregateNumbers')
       .openClientStream<RpcInt, RpcMap>(
-        responseParser: (json) => _parseMap(json),
+        responseParser: RpcMap.fromJson,
       );
 
   print('Отправляем последовательность чисел...');
@@ -429,31 +430,6 @@ Future<void> demonstrateErrorHandling(RpcEndpoint client) async {
   }
 }
 
-// Вспомогательный метод для преобразования JSON в RpcMap
-RpcMap _parseMap(Map<String, dynamic> json) {
-  final map = json;
-  final result = <String, IRpcSerializableMessage>{};
-
-  map['value'].forEach((key, value) {
-    if (value is Map<String, dynamic> && value.containsKey('value')) {
-      final val = value['value'];
-      if (val is int) {
-        result[key] = RpcInt.fromJson(value);
-      } else if (val is double) {
-        result[key] = RpcDouble.fromJson(value);
-      } else if (val is String) {
-        result[key] = RpcString.fromJson(value);
-      } else if (val is bool) {
-        result[key] = RpcBool.fromJson(value);
-      } else if (val == null) {
-        result[key] = const RpcNull();
-      }
-    }
-  });
-
-  return RpcMap(result);
-}
-
 /// Простой класс объекта
 class Item implements IRpcSerializableMessage {
   final String name;
@@ -595,18 +571,5 @@ class ValidationResult implements IRpcSerializableMessage {
       processedCount: json['processedCount'] as int,
       errors: (json['errors'] as List<dynamic>).cast<String>(),
     );
-  }
-}
-
-/// Контракт сервиса для примера
-final class SimpleRpcServiceContract extends RpcServiceContract {
-  @override
-  final String serviceName;
-
-  SimpleRpcServiceContract(this.serviceName);
-
-  @override
-  void setup() {
-    // Методы регистрируются программно
   }
 }

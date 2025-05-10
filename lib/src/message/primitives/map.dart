@@ -15,10 +15,15 @@ class RpcMap extends DelegatingMap<String, IRpcSerializableMessage>
       if (value is IRpcSerializableMessage) {
         result[key] = value;
       } else {
-        throw ArgumentError(
-            'Значение для ключа "$key" должно быть типа IRpcSerializableMessage, '
-            'но получено ${value.runtimeType}. Используйте RpcInt, RpcString и другие '
-            'явные обёртки для примитивных типов.');
+        throw RpcUnsupportedOperationException(
+          operation: 'from',
+          type: 'RpcMap',
+          details: {
+            'hint': 'Value for key "$key" must be type IRpcSerializableMessage, '
+                'but got ${value.runtimeType}. Use RpcInt, RpcString and other '
+                'explicit wrappers for primitive types.',
+          },
+        );
       }
     });
 

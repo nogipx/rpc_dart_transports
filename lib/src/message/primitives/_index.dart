@@ -8,6 +8,8 @@ part 'null.dart';
 part 'num.dart';
 part 'string.dart';
 
+typedef RpcMessageProducer = String Function(String);
+
 /// Базовый класс для всех примитивных типов сообщений
 abstract class RpcPrimitiveMessage<T> implements IRpcSerializableMessage {
   final T value;
@@ -22,4 +24,31 @@ abstract class RpcPrimitiveMessage<T> implements IRpcSerializableMessage {
 
   @override
   int get hashCode => value.hashCode;
+
+  RpcUnsupportedOperationException _comparisonException({
+    required String type,
+    required String op,
+  }) =>
+      RpcUnsupportedOperationException(
+        operation: op,
+        type: type,
+        details: {
+          'hint': 'Operation "$op" of $type with primitive type is prohibited. '
+              'Use value for comparison.',
+        },
+      );
+
+  RpcUnsupportedOperationException _unsupportedOperand({
+    required String type,
+    required String op,
+    required Object other,
+  }) =>
+      // throw ArgumentError('Unsupported operand type: ${other.runtimeType}');
+      RpcUnsupportedOperationException(
+        type: type,
+        operation: op,
+        details: {
+          'hint': 'Unsupported operand type: ${other.runtimeType}',
+        },
+      );
 }

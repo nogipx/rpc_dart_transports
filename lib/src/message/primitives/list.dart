@@ -40,9 +40,14 @@ class RpcList<E> extends DelegatingList<E> implements IRpcSerializableMessage {
   static RpcList<T> from<T>(List<T> list) {
     if (T != IRpcSerializableMessage &&
         !list.every((element) => element is IRpcSerializableMessage)) {
-      throw ArgumentError(
-          'Все элементы списка должны реализовывать IRpcSerializableMessage. '
-          'Используйте RpcInt, RpcString и другие явные обёртки для примитивных типов.');
+      throw RpcUnsupportedOperationException(
+        operation: 'from',
+        type: 'RpcList',
+        details: {
+          'hint': 'All elements of the list must implement IRpcSerializableMessage. '
+              'Use RpcInt, RpcString and other explicit wrappers for primitive types.',
+        },
+      );
     }
     return RpcList<T>(List<T>.from(list));
   }
@@ -51,9 +56,14 @@ class RpcList<E> extends DelegatingList<E> implements IRpcSerializableMessage {
   Map<String, dynamic> toJson() {
     final convertedList = map((item) {
       if (item is! IRpcSerializableMessage) {
-        throw ArgumentError(
-            'Элемент $item не реализует IRpcSerializableMessage. '
-            'Используйте RpcInt, RpcString и другие явные обёртки для примитивных типов.');
+        throw RpcUnsupportedOperationException(
+          operation: 'toJson',
+          type: 'RpcList',
+          details: {
+            'hint': 'Element $item must implement IRpcSerializableMessage. '
+                'Use RpcInt, RpcString and other explicit wrappers for primitive types.',
+          },
+        );
       }
       return (item as IRpcSerializableMessage).toJson();
     }).toList();

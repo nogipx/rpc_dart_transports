@@ -102,6 +102,7 @@ final class _RpcEndpointCoreImpl<T extends IRpcSerializableMessage>
       method: methodName,
       payload: request,
       metadata: metadata,
+      debugLabel: debugLabel,
     );
 
     await _sendMessage(message);
@@ -154,6 +155,7 @@ final class _RpcEndpointCoreImpl<T extends IRpcSerializableMessage>
       method: methodName,
       payload: request,
       metadata: metadata,
+      debugLabel: debugLabel,
     );
 
     _sendMessage(message);
@@ -272,6 +274,7 @@ final class _RpcEndpointCoreImpl<T extends IRpcSerializableMessage>
           payload: processedResult,
           metadata: updatedContext.headerMetadata,
           trailerMetadata: updatedContext.trailerMetadata,
+          debugLabel: debugLabel,
         ),
       );
     } catch (e, stackTrace) {
@@ -388,6 +391,7 @@ final class _RpcEndpointCoreImpl<T extends IRpcSerializableMessage>
         id: message.id,
         payload: message.payload,
         metadata: message.metadata,
+        debugLabel: debugLabel,
       ),
     );
   }
@@ -403,6 +407,7 @@ final class _RpcEndpointCoreImpl<T extends IRpcSerializableMessage>
         payload: errorMessage,
         metadata: headerMetadata,
         trailerMetadata: trailerMetadata,
+        debugLabel: debugLabel,
       ),
     );
   }
@@ -476,6 +481,7 @@ final class _RpcEndpointCoreImpl<T extends IRpcSerializableMessage>
       method: methodName,
       payload: processedData,
       metadata: metadata,
+      debugLabel: debugLabel,
     );
 
     await _sendMessage(message);
@@ -497,6 +503,7 @@ final class _RpcEndpointCoreImpl<T extends IRpcSerializableMessage>
       id: streamId,
       payload: error,
       metadata: metadata,
+      debugLabel: debugLabel,
     );
 
     await _sendMessage(message);
@@ -530,6 +537,7 @@ final class _RpcEndpointCoreImpl<T extends IRpcSerializableMessage>
       service: serviceName,
       method: methodName,
       metadata: metadata,
+      debugLabel: debugLabel,
     );
 
     await _sendMessage(message);
