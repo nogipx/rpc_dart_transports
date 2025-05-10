@@ -1,12 +1,44 @@
 # Примеры использования RPC Dart
 
-В этой директории собраны примеры использования библиотеки RPC Dart для различных сценариев.
+В этой директории находятся примеры, демонстрирующие различные возможности библиотеки RPC Dart.
 
-## Структура примеров
+## Основные примеры
 
-- [calculator](./calculator) - Базовый пример с реализацией контракта калькулятора
-- [calculator_example.dart](./calculator_example.dart) - Демонстрация использования контракта калькулятора
-- [bidirectional_example.dart](./bidirectional_example.dart) - Простой пример двунаправленного стриминга без контрактов
+- [**unary_example.dart**](unary_example.dart) - демонстрация унарных вызовов (запрос → ответ)
+- [**server_streaming_example.dart**](server_streaming_example.dart) - демонстрация серверного стриминга (запрос → поток ответов)
+- [**client_streaming_example.dart**](client_streaming_example.dart) - демонстрация клиентского стриминга (поток запросов → ответ)
+- [**bidirectional_example.dart**](bidirectional_example.dart) - демонстрация двунаправленного стриминга (поток запросов → поток ответов)
+
+## Расширенные примеры
+
+- [**middleware_example.dart**](middleware_example.dart) - использование middleware для перехвата и модификации запросов/ответов
+- [**contracts_example.dart**](contracts_example.dart) - использование контрактов сервисов для типобезопасного API
+- [**calculator_example.dart**](calculator_example.dart) - пример полноценного сервиса калькулятора
+
+## Запуск примеров
+
+Для запуска любого примера выполните:
+
+```bash
+dart run example/<имя_файла>.dart
+```
+
+Например:
+
+```bash
+dart run example/unary_example.dart
+dart run example/middleware_example.dart
+```
+
+## Структура калькулятора
+
+Папка [calculator](calculator) содержит код, используемый в примере `calculator_example.dart`:
+
+- [**_index.dart**](calculator/_index.dart) - экспорты всех файлов
+- [**calculator_data.dart**](calculator/calculator_data.dart) - модели данных
+- [**calculator_contract.dart**](calculator/calculator_contract.dart) - определение контракта сервиса
+- [**calculator_client.dart**](calculator/calculator_client.dart) - клиентская реализация контракта
+- [**calculator_server.dart**](calculator/calculator_server.dart) - серверная реализация контракта
 
 ## Типы RPC вызовов
 
@@ -16,16 +48,6 @@
 2. **Серверный стриминг (Server Streaming)** - один запрос, поток ответов
 3. **Клиентский стриминг (Client Streaming)** - поток запросов, один ответ
 4. **Двунаправленный стриминг (Bidirectional Streaming)** - поток запросов, поток ответов
-
-## Запуск примеров
-
-Для запуска любого примера используйте:
-
-```bash
-dart run example/calculator_example.dart
-
-dart run example/bidirectional_example.dart
-```
 
 ## Описание примеров
 
