@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
+import 'typedefs.dart';
+
 /// Типы методов в контракте
 enum RpcMethodType {
   /// Обычный RPC-метод (запрос-ответ)
@@ -50,6 +52,38 @@ abstract interface class IRpcServiceContract<
   dynamic getArgumentParser(RpcMethodContract<T, T> method);
 
   dynamic getResponseParser(RpcMethodContract<T, T> method);
+
+  /// Добавляет унарный метод в контракт
+  void addUnaryMethod<Request extends T, Response extends T>({
+    required String methodName,
+    required RpcMethodUnaryHandler<Request, Response> handler,
+    required RpcMethodArgumentParser<Request> argumentParser,
+    required RpcMethodResponseParser<Response> responseParser,
+  });
+
+  /// Добавляет серверный стриминговый метод в контракт
+  void addServerStreamingMethod<Request extends T, Response extends T>({
+    required String methodName,
+    required RpcMethodServerStreamHandler<Request, Response> handler,
+    required RpcMethodArgumentParser<Request> argumentParser,
+    required RpcMethodResponseParser<Response> responseParser,
+  });
+
+  /// Добавляет клиентский стриминговый метод в контракт
+  void addClientStreamingMethod<Request extends T, Response extends T>({
+    required String methodName,
+    required RpcMethodClientStreamHandler<Request, Response> handler,
+    required RpcMethodArgumentParser<Request> argumentParser,
+    required RpcMethodResponseParser<Response> responseParser,
+  });
+
+  /// Добавляет двунаправленный стриминговый метод в контракт
+  void addBidirectionalStreamingMethod<Request extends T, Response extends T>({
+    required String methodName,
+    required RpcMethodBidirectionalHandler<Request, Response> handler,
+    required RpcMethodArgumentParser<Request> argumentParser,
+    required RpcMethodResponseParser<Response> responseParser,
+  });
 }
 
 /// Контракт метода сервиса

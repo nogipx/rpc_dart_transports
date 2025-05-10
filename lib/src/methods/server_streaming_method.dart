@@ -22,7 +22,7 @@ final class ServerStreamingRpcMethod<T extends IRpcSerializableMessage>
   /// [responseParser] - функция преобразования JSON в объект ответа (опционально)
   Stream<Response> openStream<Request extends T, Response extends T>({
     required Request request,
-    required Response Function(Map<String, dynamic>) responseParser,
+    required RpcMethodResponseParser<Response> responseParser,
     Map<String, dynamic>? metadata,
     String? streamId,
   }) {
@@ -52,19 +52,43 @@ final class ServerStreamingRpcMethod<T extends IRpcSerializableMessage>
   /// [requestParser] - функция преобразования JSON в объект запроса (опционально)
   /// [responseParser] - функция преобразования JSON в объект ответа (опционально)
   void register<Request extends T, Response extends T>({
-    required Stream<Response> Function(Request) handler,
-    required Request Function(Map<String, dynamic>) requestParser,
-    required Response Function(Map<String, dynamic>) responseParser,
+    required RpcMethodServerStreamHandler<Request, Response> handler,
+    required RpcMethodArgumentParser<Request> requestParser,
+    required RpcMethodResponseParser<Response> responseParser,
   }) {
+    // Получаем контракт сервиса
+    final serviceContract = _endpoint.getServiceContract(serviceName);
+    if (serviceContract == null) {
+      throw Exception(
+          'Контракт сервиса $serviceName не найден. Необходимо сначала зарегистрировать контракт сервиса.');
+    }
+
+    // Проверяем, существует ли метод в контракте
+    final existingMethod =
+        serviceContract.findMethodTyped<Request, Response>(methodName);
+
+    // Если метод не найден в контракте, добавляем его
+    if (existingMethod == null) {
+      serviceContract.addServerStreamingMethod<Request, Response>(
+        methodName: methodName,
+        handler: handler,
+        argumentParser: requestParser,
+        responseParser: responseParser,
+      );
+    }
+
+    // Получаем актуальный контракт метода
     final contract =
         getMethodContract<Request, Response>(RpcMethodType.serverStreaming);
     final implementation =
         RpcMethodImplementation.serverStream(contract, handler);
 
+    // Регистрируем реализацию метода
     _registrar.registerMethodImplementation(
         serviceName, methodName, implementation);
 
-    // Регистрируем низкоуровневый обработчик
+    // Регистрируем низкоуровневый обработчик - это ключевой шаг для обеспечения
+    // связи между контрактом и обработчиком вызова
     _registrar.registerMethod(
       serviceName,
       methodName,
@@ -101,7 +125,7 @@ final class ServerStreamingRpcMethod<T extends IRpcSerializableMessage>
     String messageId,
     Request request,
     RpcMethodImplementation<Request, Response> implementation,
-    Response Function(Map<String, dynamic>)? responseParser,
+    RpcMethodResponseParser<Response> responseParser,
   ) {
     // Запускаем стрим от обработчика
     final stream = implementation.openStream(request);

@@ -24,8 +24,8 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
   /// Возвращает тюпл из потока для отправки и Future для получения результата
   ({StreamController<Request> controller, Future<Response> response})
       openClientStream<Request extends T, Response extends T>({
-    required Request Function(Map<String, dynamic>) requestParser,
-    required Response Function(Map<String, dynamic>) responseParser,
+    required RpcMethodArgumentParser<Request> requestParser,
+    required RpcMethodResponseParser<Response> responseParser,
     Map<String, dynamic>? metadata,
     String? streamId,
   }) {
@@ -97,19 +97,43 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
   /// [requestParser] - функция преобразования JSON в объект запроса (опционально)
   /// [responseParser] - функция преобразования JSON в объект ответа (опционально)
   void register<Request extends T, Response extends T>({
-    required Future<Response> Function(Stream<Request>) handler,
-    required Request Function(Map<String, dynamic>) requestParser,
-    required Response Function(Map<String, dynamic>) responseParser,
+    required RpcMethodClientStreamHandler<Request, Response> handler,
+    required RpcMethodArgumentParser<Request> requestParser,
+    required RpcMethodResponseParser<Response> responseParser,
   }) {
+    // Получаем контракт сервиса
+    final serviceContract = _endpoint.getServiceContract(serviceName);
+    if (serviceContract == null) {
+      throw Exception(
+          'Контракт сервиса $serviceName не найден. Необходимо сначала зарегистрировать контракт сервиса.');
+    }
+
+    // Проверяем, существует ли метод в контракте
+    final existingMethod =
+        serviceContract.findMethodTyped<Request, Response>(methodName);
+
+    // Если метод не найден в контракте, добавляем его
+    if (existingMethod == null) {
+      serviceContract.addClientStreamingMethod<Request, Response>(
+        methodName: methodName,
+        handler: handler,
+        argumentParser: requestParser,
+        responseParser: responseParser,
+      );
+    }
+
+    // Получаем актуальный контракт метода
     final contract =
         getMethodContract<Request, Response>(RpcMethodType.clientStreaming);
     final implementation =
         RpcMethodImplementation.clientStream(contract, handler);
 
+    // Регистрируем реализацию метода
     _registrar.registerMethodImplementation(
         serviceName, methodName, implementation);
 
-    // Регистрируем низкоуровневый обработчик
+    // Регистрируем низкоуровневый обработчик - это ключевой шаг для обеспечения
+    // связи между контрактом и обработчиком вызова
     _registrar.registerMethod(
       serviceName,
       methodName,

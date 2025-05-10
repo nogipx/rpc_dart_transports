@@ -157,29 +157,30 @@ class _RpcEndpointImpl<T extends IRpcSerializableMessage>
       final argumentParser = contract.getArgumentParser(method);
       final responseParser = contract.getResponseParser(method);
 
+      if (handler == null || argumentParser == null || responseParser == null) {
+        // Пропускаем методы без полной информации
+        continue;
+      }
+
       if (methodType == RpcMethodType.unary) {
-        // Унарный метод
         unary(contract.serviceName, methodName).register(
           handler: handler,
           requestParser: argumentParser,
           responseParser: responseParser,
         );
       } else if (methodType == RpcMethodType.serverStreaming) {
-        // Серверный стриминг
         serverStreaming(contract.serviceName, methodName).register(
           handler: handler,
           requestParser: argumentParser,
           responseParser: responseParser,
         );
       } else if (methodType == RpcMethodType.clientStreaming) {
-        // Клиентский стриминг
         clientStreaming(contract.serviceName, methodName).register(
           handler: handler,
           requestParser: argumentParser,
           responseParser: responseParser,
         );
       } else if (methodType == RpcMethodType.bidirectional) {
-        // Двунаправленный стриминг
         bidirectional(contract.serviceName, methodName).register(
           handler: handler,
           requestParser: argumentParser,

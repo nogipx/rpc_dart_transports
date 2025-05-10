@@ -14,6 +14,7 @@ final class SimpleRpcServiceContract
     extends RpcServiceContract<IRpcSerializableMessage> {
   @override
   final String serviceName;
+
   SimpleRpcServiceContract(this.serviceName);
 
   @override
@@ -82,6 +83,7 @@ abstract base class _RpcServiceContractBase<T extends IRpcSerializableMessage>
   }
 
   /// Добавляет унарный метод в контракт
+  @override
   void addUnaryMethod<Request extends T, Response extends T>({
     required String methodName,
     required RpcMethodUnaryHandler<Request, Response> handler,
@@ -101,9 +103,10 @@ abstract base class _RpcServiceContractBase<T extends IRpcSerializableMessage>
   }
 
   /// Добавляет серверный стриминговый метод в контракт
+  @override
   void addServerStreamingMethod<Request extends T, Response extends T>({
     required String methodName,
-    required RpcMethodStreamHandler<Request, Response> handler,
+    required RpcMethodServerStreamHandler<Request, Response> handler,
     required RpcMethodArgumentParser<Request> argumentParser,
     required RpcMethodResponseParser<Response> responseParser,
   }) {
@@ -120,9 +123,10 @@ abstract base class _RpcServiceContractBase<T extends IRpcSerializableMessage>
   }
 
   /// Добавляет клиентский стриминговый метод в контракт
+  @override
   void addClientStreamingMethod<Request extends T, Response extends T>({
     required String methodName,
-    required RpcMethodStreamHandler<Request, Response> handler,
+    required RpcMethodClientStreamHandler<Request, Response> handler,
     required RpcMethodArgumentParser<Request> argumentParser,
     required RpcMethodResponseParser<Response> responseParser,
   }) {
@@ -139,6 +143,7 @@ abstract base class _RpcServiceContractBase<T extends IRpcSerializableMessage>
   }
 
   /// Добавляет двунаправленный стриминговый метод в контракт
+  @override
   void addBidirectionalStreamingMethod<Request extends T, Response extends T>({
     required String methodName,
     required RpcMethodBidirectionalHandler<Request, Response> handler,

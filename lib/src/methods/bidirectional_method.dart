@@ -22,8 +22,8 @@ final class BidirectionalRpcMethod<T extends IRpcSerializableMessage>
   /// [streamId] - необязательный идентификатор стрима (генерируется автоматически)
   BidirectionalChannel<Request, Response>
       createChannel<Request extends T, Response extends T>({
-    required Request Function(Map<String, dynamic>) requestParser,
-    required Response Function(Map<String, dynamic>) responseParser,
+    required RpcMethodArgumentParser<Request> requestParser,
+    required RpcMethodResponseParser<Response> responseParser,
     Map<String, dynamic>? metadata,
     String? streamId,
   }) {
@@ -128,30 +128,43 @@ final class BidirectionalRpcMethod<T extends IRpcSerializableMessage>
   /// [requestParser] - функция для преобразования JSON в объект запроса (опционально)
   /// [responseParser] - функция для преобразования JSON в объект ответа (опционально)
   void register<Request extends T, Response extends T>({
-    required Stream<Response> Function(Stream<Request>, String) handler,
-    required Request Function(Map<String, dynamic>) requestParser,
-    required Response Function(Map<String, dynamic>) responseParser,
+    required RpcMethodBidirectionalHandler<Request, Response> handler,
+    required RpcMethodArgumentParser<Request> requestParser,
+    required RpcMethodResponseParser<Response> responseParser,
   }) {
-    // Пытаемся получить контракт, но не требуем его обязательного наличия
-    RpcMethodContract<Request, Response> contract;
-    try {
-      contract =
-          getMethodContract<Request, Response>(RpcMethodType.bidirectional);
-    } catch (e) {
-      // Создаем временный контракт
-      contract = RpcMethodContract<Request, Response>(
+    // Получаем контракт сервиса
+    final serviceContract = _endpoint.getServiceContract(serviceName);
+    if (serviceContract == null) {
+      throw Exception(
+          'Контракт сервиса $serviceName не найден. Необходимо сначала зарегистрировать контракт сервиса.');
+    }
+
+    // Проверяем, существует ли метод в контракте
+    final existingMethod =
+        serviceContract.findMethodTyped<Request, Response>(methodName);
+
+    // Если метод не найден в контракте, добавляем его
+    if (existingMethod == null) {
+      serviceContract.addBidirectionalStreamingMethod<Request, Response>(
         methodName: methodName,
-        methodType: RpcMethodType.bidirectional,
+        handler: handler,
+        argumentParser: requestParser,
+        responseParser: responseParser,
       );
     }
 
+    // Получаем актуальный контракт метода
+    final contract =
+        getMethodContract<Request, Response>(RpcMethodType.bidirectional);
     final implementation =
         RpcMethodImplementation.bidirectional(contract, handler);
 
+    // Регистрируем реализацию метода
     _registrar.registerMethodImplementation(
         serviceName, methodName, implementation);
 
-    // Регистрируем обработчик метода
+    // Регистрируем низкоуровневый обработчик - это ключевой шаг для обеспечения
+    // связи между контрактом и обработчиком вызова
     _registrar.registerMethod(
       serviceName,
       methodName,

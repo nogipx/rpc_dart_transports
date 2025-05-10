@@ -14,22 +14,21 @@ final class RpcMethodImplementation<Request extends IRpcSerializableMessage,
   final RpcMethodType type;
 
   /// Обработчик унарного метода
-  final Future<Response> Function(Request)? _unaryHandler;
+  final RpcMethodUnaryHandler<Request, Response>? _unaryHandler;
 
   /// Обработчик серверного стрима
-  final Stream<Response> Function(Request)? _serverStreamHandler;
+  final RpcMethodServerStreamHandler<Request, Response>? _serverStreamHandler;
 
   /// Обработчик клиентского стрима
-  final Future<Response> Function(Stream<Request>)? _clientStreamHandler;
+  final RpcMethodClientStreamHandler<Request, Response>? _clientStreamHandler;
 
   /// Обработчик двунаправленного стрима
-  final Stream<Response> Function(Stream<Request>, String)?
-      _bidirectionalHandler;
+  final RpcMethodBidirectionalHandler<Request, Response>? _bidirectionalHandler;
 
   /// Создает реализацию унарного метода
   RpcMethodImplementation.unary(
     this.contract,
-    Future<Response> Function(Request) handler,
+    RpcMethodUnaryHandler<Request, Response> handler,
   )   : type = RpcMethodType.unary,
         _unaryHandler = handler,
         _serverStreamHandler = null,
@@ -39,7 +38,7 @@ final class RpcMethodImplementation<Request extends IRpcSerializableMessage,
   /// Создает реализацию серверного стрима
   RpcMethodImplementation.serverStream(
     this.contract,
-    Stream<Response> Function(Request) handler,
+    RpcMethodServerStreamHandler<Request, Response> handler,
   )   : type = RpcMethodType.serverStreaming,
         _unaryHandler = null,
         _serverStreamHandler = handler,
@@ -49,7 +48,7 @@ final class RpcMethodImplementation<Request extends IRpcSerializableMessage,
   /// Создает реализацию клиентского стрима
   RpcMethodImplementation.clientStream(
     this.contract,
-    Future<Response> Function(Stream<Request>) handler,
+    RpcMethodClientStreamHandler<Request, Response> handler,
   )   : type = RpcMethodType.clientStreaming,
         _unaryHandler = null,
         _serverStreamHandler = null,
@@ -59,7 +58,7 @@ final class RpcMethodImplementation<Request extends IRpcSerializableMessage,
   /// Создает реализацию двунаправленного стрима
   RpcMethodImplementation.bidirectional(
     this.contract,
-    Stream<Response> Function(Stream<Request>, String) handler,
+    RpcMethodBidirectionalHandler<Request, Response> handler,
   )   : type = RpcMethodType.bidirectional,
         _unaryHandler = null,
         _serverStreamHandler = null,
@@ -95,7 +94,9 @@ final class RpcMethodImplementation<Request extends IRpcSerializableMessage,
 
   /// Открывает двунаправленный стрим
   Stream<Response> openBidirectionalStream(
-      Stream<Request> requestsStream, String messageId) {
+    Stream<Request> requestsStream,
+    String messageId,
+  ) {
     if (type == RpcMethodType.bidirectional && _bidirectionalHandler != null) {
       return _bidirectionalHandler!(requestsStream, messageId);
     }
