@@ -3,7 +3,10 @@
 test:
     fvm dart test
 
-pubget:
+gen:
+    fvm dart pub global run packo runner -r
+
+get:
     fvm dart pub global run packo pubget -r
 
 prepare:
@@ -13,6 +16,12 @@ prepare:
     fvm dart pub global run coverage:format_coverage --lcov --in=coverage --out=coverage/lcov.info --report-on=lib
     genhtml coverage/lcov.info -o coverage/html
     open coverage/html/index.html
+
+compile:
+    cd example && rm pubspec.lock
+    cd example && fvm dart pub get
+    cd example && fvm dart compile exe bin/main.dart -o ../rpc_dart_example
+    cd example && chmod +x ../rpc_dart_example
 
 dry:
     fvm dart pub publish --dry-run

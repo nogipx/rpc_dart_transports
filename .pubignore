@@ -12,3 +12,4 @@ LICENSES/
 *.bin
 bin/
 build/
+rpc_dart_example

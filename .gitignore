@@ -15,3 +15,4 @@ coverage/
 *.bin
 bin/licensify
 build/
+rpc_dart_example

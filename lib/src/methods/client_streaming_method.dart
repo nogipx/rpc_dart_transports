@@ -169,12 +169,8 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
               return;
             }
 
-            // Преобразуем данные и добавляем в контроллер
-            if (data is Map<String, dynamic>) {
-              controller.add(requestParser(data));
-            } else {
-              controller.add(data as Request);
-            }
+            final parsedData = requestParser(data);
+            controller.add(parsedData);
           },
           onError: (error) {
             controller.addError(error);
