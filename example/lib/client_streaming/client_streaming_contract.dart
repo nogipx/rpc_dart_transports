@@ -72,7 +72,9 @@ final class ServerStreamService extends StreamServiceContract {
         }
       }
 
-      print('Сервер: завершена обработка $blockCount блоков, общий размер: $totalSize байт');
+      print(
+        'Сервер: завершена обработка $blockCount блоков, общий размер: $totalSize байт',
+      );
 
       // Формируем отчет о загрузке файла
       final result = DataBlockResult(

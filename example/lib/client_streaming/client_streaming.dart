@@ -77,9 +77,18 @@ Future<void> demonstrateDataBlocks(ClientStreamService streamService) async {
       data: List.generate(500, (i) => i % 256), // Первый чанк файла
       metadata: 'my_document.pdf', // Имя файла в метаданных первого чанка
     ),
-    DataBlock(index: 2, data: List.generate(800, (i) => i % 256)), // Второй чанк
-    DataBlock(index: 3, data: List.generate(1200, (i) => i % 256)), // Третий чанк
-    DataBlock(index: 4, data: List.generate(300, (i) => i % 256)), // Последний чанк
+    DataBlock(
+      index: 2,
+      data: List.generate(800, (i) => i % 256),
+    ), // Второй чанк
+    DataBlock(
+      index: 3,
+      data: List.generate(1200, (i) => i % 256),
+    ), // Третий чанк
+    DataBlock(
+      index: 4,
+      data: List.generate(300, (i) => i % 256),
+    ), // Последний чанк
   ];
 
   try {
@@ -98,7 +107,9 @@ Future<void> demonstrateDataBlocks(ClientStreamService streamService) async {
     // Получаем управление стримом
     final controller = processStream.controller;
     if (controller == null) {
-      throw RpcInvalidArgumentException('Сервер не предоставил контроллер для потока');
+      throw RpcInvalidArgumentException(
+        'Сервер не предоставил контроллер для потока',
+      );
     }
     var totalSent = 0;
 

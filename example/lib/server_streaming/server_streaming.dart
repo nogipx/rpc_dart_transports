@@ -69,7 +69,9 @@ void registerTaskService(RpcEndpoint server) {
       .serverStreaming('TaskService', 'startTask')
       .register<TaskRequest, ProgressMessage>(
         handler: (request) async* {
-          print('Сервер: Начинаем задачу "${request.taskName}" (ID: ${request.taskId})');
+          print(
+            'Сервер: Начинаем задачу "${request.taskName}" (ID: ${request.taskId})',
+          );
 
           final int steps = request.steps;
           final List<String> stages = [
@@ -115,7 +117,9 @@ void registerTaskService(RpcEndpoint server) {
 
             // Разная задержка для разных этапов
             final delay =
-                status == 'analyzing' ? Duration(milliseconds: 1000) : Duration(milliseconds: 500);
+                status == 'analyzing'
+                    ? Duration(milliseconds: 1000)
+                    : Duration(milliseconds: 500);
             await Future.delayed(delay);
 
             yield ProgressMessage(
@@ -165,7 +169,9 @@ Future<void> demonstrateTaskProgress(RpcEndpoint client) async {
     final statusIcon = _getStatusIcon(progress.status);
 
     // Очищаем предыдущую строку и выводим новый прогресс
-    print('│ $statusIcon $progressBar ${progress.progress.toString().padLeft(3)}% │');
+    print(
+      '│ $statusIcon $progressBar ${progress.progress.toString().padLeft(3)}% │',
+    );
 
     if (progress.status == 'completed') {
       print('└────────────────────────────────────────────────────┘');

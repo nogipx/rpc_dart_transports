@@ -36,7 +36,12 @@ final class ServerBasicServiceContract extends BasicServiceContract {
     final quotient = value1 / value2;
 
     // Возвращаем результат
-    return ComputeResult(sum: sum, difference: difference, product: product, quotient: quotient);
+    return ComputeResult(
+      sum: sum,
+      difference: difference,
+      product: product,
+      quotient: quotient,
+    );
   }
 }
 

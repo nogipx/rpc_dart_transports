@@ -6,7 +6,9 @@ part 'server_streaming_models.g.dart';
 
 /// Запрос на выполнение задачи
 @freezed
-abstract class TaskRequest with _$TaskRequest implements IRpcSerializableMessage {
+abstract class TaskRequest
+    with _$TaskRequest
+    implements IRpcSerializableMessage {
   const TaskRequest._();
 
   @Implements<IRpcSerializableMessage>()
@@ -16,12 +18,15 @@ abstract class TaskRequest with _$TaskRequest implements IRpcSerializableMessage
     @Default(5) int steps,
   }) = _TaskRequest;
 
-  factory TaskRequest.fromJson(Map<String, dynamic> json) => _$TaskRequestFromJson(json);
+  factory TaskRequest.fromJson(Map<String, dynamic> json) =>
+      _$TaskRequestFromJson(json);
 }
 
 /// Сообщение о прогрессе выполнения задачи
 @freezed
-abstract class ProgressMessage with _$ProgressMessage implements IRpcSerializableMessage {
+abstract class ProgressMessage
+    with _$ProgressMessage
+    implements IRpcSerializableMessage {
   const ProgressMessage._();
 
   @Implements<IRpcSerializableMessage>()
@@ -32,5 +37,6 @@ abstract class ProgressMessage with _$ProgressMessage implements IRpcSerializabl
     @Default('') String message,
   }) = _ProgressMessage;
 
-  factory ProgressMessage.fromJson(Map<String, dynamic> json) => _$ProgressMessageFromJson(json);
+  factory ProgressMessage.fromJson(Map<String, dynamic> json) =>
+      _$ProgressMessageFromJson(json);
 }

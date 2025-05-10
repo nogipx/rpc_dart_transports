@@ -90,7 +90,10 @@ Future<void> demonstrateChatExample(ClientChatService chatService) async {
   // Подписываемся на входящие сообщения
   final subscription = channel.incoming.listen(
     (message) {
-      final timestamp = message.timestamp != null ? '${message.timestamp!.substring(11, 19)} ' : '';
+      final timestamp =
+          message.timestamp != null
+              ? '${message.timestamp!.substring(11, 19)} '
+              : '';
 
       String formattedMessage;
 

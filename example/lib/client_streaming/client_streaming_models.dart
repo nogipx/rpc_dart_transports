@@ -16,12 +16,15 @@ abstract class DataBlock with _$DataBlock implements IRpcSerializableMessage {
     @Default('') String metadata,
   }) = _DataBlock;
 
-  factory DataBlock.fromJson(Map<String, dynamic> json) => _$DataBlockFromJson(json);
+  factory DataBlock.fromJson(Map<String, dynamic> json) =>
+      _$DataBlockFromJson(json);
 }
 
 /// Модель результата обработки блоков данных
 @freezed
-abstract class DataBlockResult with _$DataBlockResult implements IRpcSerializableMessage {
+abstract class DataBlockResult
+    with _$DataBlockResult
+    implements IRpcSerializableMessage {
   const DataBlockResult._();
 
   @Implements<IRpcSerializableMessage>()
@@ -32,5 +35,6 @@ abstract class DataBlockResult with _$DataBlockResult implements IRpcSerializabl
     @Default('') String processingTime,
   }) = _DataBlockResult;
 
-  factory DataBlockResult.fromJson(Map<String, dynamic> json) => _$DataBlockResultFromJson(json);
+  factory DataBlockResult.fromJson(Map<String, dynamic> json) =>
+      _$DataBlockResultFromJson(json);
 }

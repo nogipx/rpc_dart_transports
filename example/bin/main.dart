@@ -1,7 +1,9 @@
 // Экспортируем нужные классы
 import 'package:example/unary/unary.dart' as unary;
-import 'package:example/client_streaming/client_streaming.dart' as client_streaming;
-import 'package:example/server_streaming/server_streaming.dart' as server_streaming;
+import 'package:example/client_streaming/client_streaming.dart'
+    as client_streaming;
+import 'package:example/server_streaming/server_streaming.dart'
+    as server_streaming;
 import 'package:example/bidirectional/bidirectional.dart' as bidirectional;
 import 'package:args/args.dart';
 
@@ -19,7 +21,9 @@ void printExamples() {
   print('1. unary - Унарный RPC: один запрос -> один ответ');
   print('2. client - Клиентский стриминг: поток запросов -> один ответ');
   print('3. server - Серверный стриминг: один запрос -> поток ответов');
-  print('4. bidirectional - Двунаправленный стриминг: поток запросов <-> поток ответов');
+  print(
+    '4. bidirectional - Двунаправленный стриминг: поток запросов <-> поток ответов',
+  );
   print('');
 }
 
@@ -31,10 +35,29 @@ Future<void> main(List<String> args) async {
           'example',
           abbr: 'e',
           help: 'Пример для запуска (unary, client, server, bidirectional)',
-          allowed: ['unary', 'client', 'server', 'bidirectional', '1', '2', '3', '4'],
+          allowed: [
+            'unary',
+            'client',
+            'server',
+            'bidirectional',
+            '1',
+            '2',
+            '3',
+            '4',
+          ],
         )
-        ..addFlag('debug', abbr: 'd', help: 'Включить режим отладки', defaultsTo: true)
-        ..addFlag('help', abbr: 'h', help: 'Показать справку', negatable: false);
+        ..addFlag(
+          'debug',
+          abbr: 'd',
+          help: 'Включить режим отладки',
+          defaultsTo: true,
+        )
+        ..addFlag(
+          'help',
+          abbr: 'h',
+          help: 'Показать справку',
+          negatable: false,
+        );
 
   ArgResults argResults;
 

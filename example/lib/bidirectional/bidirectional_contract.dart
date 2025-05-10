@@ -23,13 +23,19 @@ abstract base class ChatServiceContract extends RpcServiceContract {
   }
 
   /// Обработчик сообщений чата
-  Stream<ChatMessage> chatHandler(Stream<ChatMessage> requests, String messageId);
+  Stream<ChatMessage> chatHandler(
+    Stream<ChatMessage> requests,
+    String messageId,
+  );
 }
 
 /// Серверная реализация ChatService
 final class ServerChatService extends ChatServiceContract {
   @override
-  Stream<ChatMessage> chatHandler(Stream<ChatMessage> requests, String messageId) {
+  Stream<ChatMessage> chatHandler(
+    Stream<ChatMessage> requests,
+    String messageId,
+  ) {
     // Реализация метода для чата с обработкой сообщений и автоматическими ответами
     final controller = StreamController<ChatMessage>();
 
@@ -145,7 +151,10 @@ final class ClientChatService extends ChatServiceContract {
   ClientChatService(this._endpoint);
 
   @override
-  Stream<ChatMessage> chatHandler(Stream<ChatMessage> requests, String messageId) {
+  Stream<ChatMessage> chatHandler(
+    Stream<ChatMessage> requests,
+    String messageId,
+  ) {
     throw UnimplementedError('Клиентской реализации не требуется обработчик');
   }
 
@@ -153,6 +162,8 @@ final class ClientChatService extends ChatServiceContract {
   Future<BidirectionalChannel<ChatMessage, ChatMessage>> chat() async {
     return _endpoint
         .bidirectional(serviceName, chatMethod)
-        .createChannel<ChatMessage, ChatMessage>(responseParser: ChatMessage.fromJson);
+        .createChannel<ChatMessage, ChatMessage>(
+          responseParser: ChatMessage.fromJson,
+        );
   }
 }

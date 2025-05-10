@@ -21,7 +21,9 @@ enum MessageType {
 
 /// Модель сообщения чата
 @freezed
-abstract class ChatMessage with _$ChatMessage implements IRpcSerializableMessage {
+abstract class ChatMessage
+    with _$ChatMessage
+    implements IRpcSerializableMessage {
   const ChatMessage._();
 
   @Implements<IRpcSerializableMessage>()
@@ -32,12 +34,15 @@ abstract class ChatMessage with _$ChatMessage implements IRpcSerializableMessage
     String? timestamp,
   }) = _ChatMessage;
 
-  factory ChatMessage.fromJson(Map<String, dynamic> json) => _$ChatMessageFromJson(json);
+  factory ChatMessage.fromJson(Map<String, dynamic> json) =>
+      _$ChatMessageFromJson(json);
 }
 
 /// Класс для простых данных сообщения
 @freezed
-abstract class SimpleMessageData with _$SimpleMessageData implements IRpcSerializableMessage {
+abstract class SimpleMessageData
+    with _$SimpleMessageData
+    implements IRpcSerializableMessage {
   const SimpleMessageData._();
 
   @Implements<IRpcSerializableMessage>()
@@ -58,9 +63,13 @@ abstract class ConfigData with _$ConfigData implements IRpcSerializableMessage {
   const ConfigData._();
 
   @Implements<IRpcSerializableMessage>()
-  const factory ConfigData({@Default(false) bool enabled, @Default(0) int timeout}) = _ConfigData;
+  const factory ConfigData({
+    @Default(false) bool enabled,
+    @Default(0) int timeout,
+  }) = _ConfigData;
 
-  factory ConfigData.fromJson(Map<String, dynamic> json) => _$ConfigDataFromJson(json);
+  factory ConfigData.fromJson(Map<String, dynamic> json) =>
+      _$ConfigDataFromJson(json);
 }
 
 /// Класс для списка элементов
@@ -71,7 +80,8 @@ abstract class ItemList with _$ItemList implements IRpcSerializableMessage {
   @Implements<IRpcSerializableMessage>()
   const factory ItemList({@Default([]) List<String> items}) = _ItemList;
 
-  factory ItemList.fromJson(Map<String, dynamic> json) => _$ItemListFromJson(json);
+  factory ItemList.fromJson(Map<String, dynamic> json) =>
+      _$ItemListFromJson(json);
 }
 
 /// Класс для данных с вложенной структурой
@@ -86,5 +96,6 @@ abstract class NestedData with _$NestedData implements IRpcSerializableMessage {
     String? timestamp,
   }) = _NestedData;
 
-  factory NestedData.fromJson(Map<String, dynamic> json) => _$NestedDataFromJson(json);
+  factory NestedData.fromJson(Map<String, dynamic> json) =>
+      _$NestedDataFromJson(json);
 }

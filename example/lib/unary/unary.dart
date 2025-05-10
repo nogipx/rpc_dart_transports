@@ -64,7 +64,9 @@ Future<void> main({bool debug = false}) async {
 }
 
 /// Демонстрирует базовые математические операции
-Future<void> demonstrateBasicOperations(ClientBasicServiceContract service) async {
+Future<void> demonstrateBasicOperations(
+  ClientBasicServiceContract service,
+) async {
   final value1 = 10;
   final value2 = 5;
 
