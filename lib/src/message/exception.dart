@@ -1,7 +1,26 @@
+enum RpcExceptionCode {
+  invalidArgument,
+  notFound,
+  internal,
+  timeout,
+  unsupportedOperation,
+  custom,
+  unknown;
+
+  static RpcExceptionCode fromString(String value) {
+    for (final code in RpcExceptionCode.values) {
+      if (code.name == value) {
+        return code;
+      }
+    }
+    return unknown;
+  }
+}
+
 /// Базовый класс для всех исключений RPC
 class RpcException implements Exception {
   /// Код ошибки
-  final String code;
+  final RpcExceptionCode code;
 
   /// Сообщение об ошибке
   final String message;
@@ -35,21 +54,34 @@ class RpcException implements Exception {
 
   /// Создает [RpcException] из JSON-объекта
   factory RpcException.fromJson(Map<String, dynamic> json) {
-    final code = json['code'] as String;
+    final code = RpcExceptionCode.fromString(json['code'] as String? ?? '');
     final message = json['message'] as String;
     final details = json['details'] as Map<String, dynamic>?;
 
     // Проверяем код и создаем соответствующий подкласс
     switch (code) {
-      case 'INVALID_ARGUMENT':
-        return RpcInvalidArgumentException(message, details);
-      case 'NOT_FOUND':
-        return RpcNotFoundException(message, details);
-      case 'INTERNAL':
-        return RpcInternalException(message, details);
-      case 'TIMEOUT':
-        return RpcTimeoutException(message, details);
-      case 'UNSUPPORTED_OPERATION':
+      case RpcExceptionCode.invalidArgument:
+        return RpcInvalidArgumentException(message, details: details);
+      case RpcExceptionCode.notFound:
+        return RpcNotFoundException(message, details: details);
+      case RpcExceptionCode.internal:
+        return RpcInternalException(message, details: details);
+      case RpcExceptionCode.timeout:
+        return RpcTimeoutException(message, details: details);
+      case RpcExceptionCode.custom:
+        return RpcCustomException(
+          customMessage: json['customMessage'] as String? ??
+              details?['customMessage'] as String? ??
+              '',
+          debugLabel: json['debugLabel'] as String? ??
+              details?['debugLabel'] as String? ??
+              '',
+          error: json['error'] as Object?,
+          stackTrace:
+              StackTrace.fromString(json['stackTrace'] as String? ?? ''),
+          details: details,
+        );
+      case RpcExceptionCode.unsupportedOperation:
         final operation = json['operation'] as String? ?? message;
         final type =
             json['type'] as String? ?? details?['type'] as String? ?? 'Unknown';
@@ -59,7 +91,11 @@ class RpcException implements Exception {
           details: details,
         );
       default:
-        return RpcException(code: code, message: message, details: details);
+        return RpcException(
+          code: code,
+          message: message,
+          details: details,
+        );
     }
   }
 }
@@ -68,9 +104,9 @@ class RpcException implements Exception {
 class RpcInvalidArgumentException extends RpcException {
   /// Создает исключение о неверных аргументах
   const RpcInvalidArgumentException(String message,
-      [Map<String, dynamic>? details])
+      {Map<String, dynamic>? details})
       : super(
-          code: 'INVALID_ARGUMENT',
+          code: RpcExceptionCode.invalidArgument,
           message: message,
           details: details,
         );
@@ -79,9 +115,9 @@ class RpcInvalidArgumentException extends RpcException {
 /// Исключение, выбрасываемое когда запрашиваемый ресурс не найден
 class RpcNotFoundException extends RpcException {
   /// Создает исключение о том, что ресурс не найден
-  const RpcNotFoundException(String message, [Map<String, dynamic>? details])
+  const RpcNotFoundException(String message, {Map<String, dynamic>? details})
       : super(
-          code: 'NOT_FOUND',
+          code: RpcExceptionCode.notFound,
           message: message,
           details: details,
         );
@@ -90,9 +126,9 @@ class RpcNotFoundException extends RpcException {
 /// Исключение, выбрасываемое при внутренней ошибке системы
 class RpcInternalException extends RpcException {
   /// Создает исключение о внутренней ошибке
-  const RpcInternalException(String message, [Map<String, dynamic>? details])
+  const RpcInternalException(String message, {Map<String, dynamic>? details})
       : super(
-          code: 'INTERNAL',
+          code: RpcExceptionCode.internal,
           message: message,
           details: details,
         );
@@ -101,9 +137,9 @@ class RpcInternalException extends RpcException {
 /// Исключение, выбрасываемое при превышении времени ожидания
 class RpcTimeoutException extends RpcException {
   /// Создает исключение о превышении времени ожидания
-  const RpcTimeoutException(String message, [Map<String, dynamic>? details])
+  const RpcTimeoutException(String message, {Map<String, dynamic>? details})
       : super(
-          code: 'TIMEOUT',
+          code: RpcExceptionCode.timeout,
           message: message,
           details: details,
         );
@@ -123,8 +159,54 @@ class RpcUnsupportedOperationException extends RpcException {
     required this.type,
     Map<String, dynamic>? details,
   }) : super(
-          code: 'UNSUPPORTED_OPERATION',
+          code: RpcExceptionCode.unsupportedOperation,
           message: 'Operation "$operation" is not supported for type "$type"',
           details: details,
+        );
+}
+
+/// Исключение, связанное с критическими ошибками
+class RpcCustomException extends RpcException {
+  /// Метка для отладки
+  final String? debugLabel;
+
+  /// Ошибка, которая возникла при критической ошибке
+  final Object? error;
+
+  /// Стек-трейс, который возник при критической ошибке
+  final StackTrace? stackTrace;
+
+  /// Сообщение, которое будет отображено в исключении
+  final String customMessage;
+
+  /// Создает исключение о критической ошибке
+  RpcCustomException({
+    required this.customMessage,
+    this.debugLabel,
+    this.error,
+    this.stackTrace,
+    Map<String, dynamic>? details,
+  }) : super(
+          code: RpcExceptionCode.custom,
+          message: () {
+            var result = '';
+            if (debugLabel != null) {
+              result += '($debugLabel) ';
+            }
+            result += 'Custom exception. $customMessage \n';
+            if (error != null) {
+              result += 'Error: $error \n';
+            }
+            if (stackTrace != null) {
+              result += 'StackTrace: $stackTrace';
+            }
+            return result;
+          }(),
+          details: {
+            'customMessage': customMessage,
+            'debugLabel': debugLabel,
+            'error': error,
+            'stackTrace': stackTrace?.toString(),
+          },
         );
 }

@@ -1,7 +1,9 @@
 import 'package:rpc_dart/rpc_dart.dart';
 
+import 'server_streaming_models.dart';
+
 /// Пример использования серверного стриминга (один запрос -> поток ответов)
-void main() async {
+Future<void> main() async {
   print('=== Пример серверного стриминга ===\n');
 
   // Создаем транспорты в памяти
@@ -68,8 +70,7 @@ void registerServerMethods(RpcEndpoint server) {
       .serverStreaming('NumberService', 'generateSequence')
       .register<RpcInt, RpcNum>(
         handler: (request) async* {
-          print(
-              'Сервер начал генерацию последовательности до ${request.value}');
+          print('Сервер начал генерацию последовательности до ${request.value}');
 
           for (int i = 1; i <= request.value; i++) {
             await Future.delayed(Duration(milliseconds: 300));
@@ -113,8 +114,7 @@ void registerServerMethods(RpcEndpoint server) {
       .serverStreaming('ErrorService', 'riskyOperation')
       .register<RpcBool, ResultMessage>(
         handler: (request) async* {
-          print(
-              'Сервер начал рискованную операцию (shouldFail=${request.value})');
+          print('Сервер начал рискованную операцию (shouldFail=${request.value})');
 
           for (int i = 1; i <= 5; i++) {
             // Имитация сбоя на 3-м шаге, если shouldFail = true
@@ -141,10 +141,7 @@ Future<void> demonstrateNumberSequence(RpcEndpoint client) async {
 
   final stream = client
       .serverStreaming('NumberService', 'generateSequence')
-      .openStream<RpcInt, RpcNum>(
-        request: request,
-        responseParser: RpcNum.fromJson,
-      );
+      .openStream<RpcInt, RpcNum>(request: request, responseParser: RpcNum.fromJson);
 
   print('Получаем числа:');
 
@@ -226,97 +223,5 @@ Future<void> demonstrateErrorHandling(RpcEndpoint client) async {
     print('Этот код не должен выполниться');
   } catch (e) {
     print('  Перехвачена ошибка: $e');
-  }
-}
-
-/// Запрос на выполнение задачи
-class TaskRequest implements IRpcSerializableMessage {
-  final String taskId;
-  final String taskName;
-  final int steps;
-
-  TaskRequest({
-    required this.taskId,
-    required this.taskName,
-    required this.steps,
-  });
-
-  @override
-  Map<String, dynamic> toJson() => {
-        'taskId': taskId,
-        'taskName': taskName,
-        'steps': steps,
-      };
-
-  static TaskRequest fromJson(Map<String, dynamic> json) {
-    return TaskRequest(
-      taskId: json['taskId'] as String,
-      taskName: json['taskName'] as String,
-      steps: json['steps'] as int,
-    );
-  }
-}
-
-/// Сообщение о прогрессе
-class ProgressMessage implements IRpcSerializableMessage {
-  final String taskId;
-  final int progress;
-  final String status;
-  final String message;
-
-  ProgressMessage({
-    required this.taskId,
-    required this.progress,
-    required this.status,
-    required this.message,
-  });
-
-  @override
-  Map<String, dynamic> toJson() => {
-        'taskId': taskId,
-        'progress': progress,
-        'status': status,
-        'message': message,
-      };
-
-  static ProgressMessage fromJson(Map<String, dynamic> json) {
-    return ProgressMessage(
-      taskId: json['taskId'] as String,
-      progress: json['progress'] as int,
-      status: json['status'] as String,
-      message: json['message'] as String,
-    );
-  }
-}
-
-// /// Запрос для операции с риском ошибки
-// class RiskyRequest implements IRpcSerializableMessage {
-//   final bool shouldFail;
-
-//   RiskyRequest({required this.shouldFail});
-
-//   @override
-//   Map<String, dynamic> toJson() => {'shouldFail': shouldFail};
-
-//   static RiskyRequest fromJson(Map<String, dynamic> json) {
-//     return RiskyRequest(shouldFail: json['shouldFail'] as bool);
-//   }
-// }
-
-/// Сообщение с результатом
-class ResultMessage implements IRpcSerializableMessage {
-  final int step;
-  final String data;
-
-  ResultMessage({required this.step, required this.data});
-
-  @override
-  Map<String, dynamic> toJson() => {'step': step, 'data': data};
-
-  static ResultMessage fromJson(Map<String, dynamic> json) {
-    return ResultMessage(
-      step: json['step'] as int,
-      data: json['data'] as String,
-    );
   }
 }

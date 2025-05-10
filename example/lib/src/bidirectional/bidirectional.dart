@@ -2,6 +2,9 @@ import 'dart:async';
 
 import 'package:rpc_dart/rpc_dart.dart';
 
+import 'bidirectional_contract.dart';
+import 'bidirectional_models.dart';
+
 /// Имена сервиса и методов
 const serviceName = 'DemoService';
 const simpleBidiMethod = 'simpleBidi';
@@ -9,7 +12,7 @@ const complexBidiMethod = 'complexBidi';
 
 /// Пример использования двунаправленного (bidirectional) стрима
 /// Демонстрирует обмен данными в обе стороны между клиентом и сервером
-void main() async {
+Future<void> main() async {
   print('=== Пример двунаправленной коммуникации ===\n');
 
   // Создаем и настраиваем эндпоинты
@@ -17,14 +20,18 @@ void main() async {
   final serverEndpoint = endpoints.server;
   final clientEndpoint = endpoints.client;
 
-  // Регистрируем обработчики RPC
-  registerHandlers(serverEndpoint, clientEndpoint);
+  // Создаем и регистрируем серверные и клиентские реализации контрактов
+  final serverContract = ServerDemoServiceContract();
+  final clientContract = ClientDemoServiceContract(clientEndpoint);
+
+  serverEndpoint.registerServiceContract(serverContract);
+  clientEndpoint.registerServiceContract(clientContract);
 
   // Демонстрация простого двунаправленного стрима
-  await demonstrateSimpleBidirectional(clientEndpoint);
+  await demonstrateSimpleBidirectional(clientContract);
 
   // Демонстрация двунаправленного стрима с комплексными данными
-  await demonstrateComplexBidirectional(clientEndpoint);
+  await demonstrateComplexBidirectional(clientContract);
 
   // Закрываем соединения
   await cleanupResources(clientEndpoint, serverEndpoint);
@@ -54,10 +61,6 @@ void main() async {
     debugLabel: "client",
   );
 
-  // Регистрируем контракт сервиса на обоих эндпоинтах
-  serverEndpoint.registerServiceContract(SimpleRpcServiceContract(serviceName));
-  clientEndpoint.registerServiceContract(SimpleRpcServiceContract(serviceName));
-
   // Добавляем middleware для отладки
   serverEndpoint.addMiddleware(DebugMiddleware(id: "server"));
   clientEndpoint.addMiddleware(DebugMiddleware(id: "client"));
@@ -65,79 +68,12 @@ void main() async {
   return (server: serverEndpoint, client: clientEndpoint);
 }
 
-/// Регистрируем обработчики RPC на сервере и клиенте
-void registerHandlers(RpcEndpoint serverEndpoint, RpcEndpoint clientEndpoint) {
-  // Регистрация обработчиков для простого двунаправленного стрима
-  serverEndpoint
-      .bidirectional(serviceName, simpleBidiMethod)
-      .register<RpcString, RpcString>(
-        handler: (incomingStream, messageId) {
-          // Для каждого входящего сообщения отправляем ответ
-          return incomingStream.map((data) {
-            print('Сервер получил: ${data.value}');
-            return RpcString('Ответ: ${data.value}');
-          });
-        },
-        requestParser: RpcString.fromJson,
-        responseParser: RpcString.fromJson,
-      );
-  clientEndpoint
-      .bidirectional(serviceName, simpleBidiMethod)
-      .register<RpcString, RpcString>(
-        handler: (incomingStream, messageId) => incomingStream,
-        requestParser: RpcString.fromJson,
-        responseParser: RpcString.fromJson,
-      );
-
-  // Регистрация обработчиков для комплексных данных
-  serverEndpoint
-      .bidirectional(serviceName, complexBidiMethod)
-      .register<RpcMap, RpcMap>(
-        handler: (requests, messageId) {
-          return requests.map((data) {
-            final result = <String, IRpcSerializableMessage>{};
-
-            // Обрабатываем каждое поле входящих данных
-            data.forEach((key, value) {
-              if (value is RpcString) {
-                result[key] = RpcString('${value.value} (обработано)');
-              } else if (value is RpcInt) {
-                result[key] = RpcInt(value.value * 2);
-              } else if (value is RpcBool) {
-                result[key] = RpcBool(!value.value);
-              } else {
-                result[key] = value;
-              }
-            });
-
-            // Добавляем таймстамп обработки
-            result['timestamp'] = RpcString(DateTime.now().toIso8601String());
-
-            return RpcMap(result);
-          });
-        },
-        requestParser: RpcMap.fromJson,
-        responseParser: RpcMap.fromJson,
-      );
-  clientEndpoint
-      .bidirectional(serviceName, complexBidiMethod)
-      .register<RpcMap, RpcMap>(
-        handler: (requests, messageId) => requests,
-        requestParser: RpcMap.fromJson,
-        responseParser: RpcMap.fromJson,
-      );
-}
-
 /// Демонстрация простого двунаправленного стрима со строками
-Future<void> demonstrateSimpleBidirectional(RpcEndpoint clientEndpoint) async {
+Future<void> demonstrateSimpleBidirectional(ClientDemoServiceContract demoService) async {
   print('\n=== Демонстрация простого двунаправленного стрима ===\n');
 
-  // Создаем двунаправленный канал на клиенте
-  final channel = clientEndpoint
-      .bidirectional(serviceName, simpleBidiMethod)
-      .createChannel<RpcString, RpcString>(
-        responseParser: RpcString.fromJson,
-      );
+  // Открываем двунаправленный канал
+  final channel = await demoService.simpleBidirectional();
 
   // Подписываемся на входящие сообщения
   final subscription = channel.incoming.listen(
@@ -166,60 +102,51 @@ Future<void> demonstrateSimpleBidirectional(RpcEndpoint clientEndpoint) async {
 }
 
 /// Демонстрация двунаправленного стрима с комплексными данными
-Future<void> demonstrateComplexBidirectional(RpcEndpoint clientEndpoint) async {
-  print(
-      '\n=== Демонстрация двунаправленного стрима с комплексными данными ===\n');
+Future<void> demonstrateComplexBidirectional(ClientDemoServiceContract demoService) async {
+  print('\n=== Демонстрация двунаправленного стрима с комплексными данными ===\n');
 
-  // Создаем двунаправленный канал для сложных данных
-  final channel = clientEndpoint
-      .bidirectional(serviceName, complexBidiMethod)
-      .createChannel<RpcMap, RpcMap>(
-        responseParser: RpcMap.fromJson,
-      );
+  // Открываем двунаправленный канал
+  final channel = await demoService.complexBidirectional();
 
   // Подписываемся на входящие сообщения
   final subscription = channel.incoming.listen(
     (response) {
       print('\nКлиент получил ответ:');
-      response.forEach((key, value) {
-        if (value is RpcString) {
-          print('  $key: ${value.value}');
-        } else if (value is RpcInt) {
-          print('  $key: ${value.value}');
-        } else if (value is RpcBool) {
-          print('  $key: ${value.value}');
-        } else {
-          print('  $key: ${value.runtimeType}');
+      if (response is SimpleMessageData) {
+        print('  Тип: SimpleMessageData');
+        print('  text: ${response.text}');
+        print('  number: ${response.number}');
+        print('  flag: ${response.flag}');
+        if (response.timestamp != null) {
+          print('  timestamp: ${response.timestamp}');
         }
-      });
+      } else if (response is NestedData) {
+        print('  Тип: NestedData');
+        print('  config: enabled=${response.config.enabled}, timeout=${response.config.timeout}');
+        print('  items: [${response.items.items.join(', ')}]');
+        if (response.timestamp != null) {
+          print('  timestamp: ${response.timestamp}');
+        }
+      } else {
+        print('  Неизвестный тип: ${response.runtimeType}');
+      }
     },
     onError: (e) => print('Ошибка: $e'),
     onDone: () => print('Стрим закрыт'),
   );
 
   // Отправляем простую структуру данных
-  final simpleData = RpcMap({
-    'text': RpcString('Тестовая строка'),
-    'number': RpcInt(42),
-    'flag': RpcBool(true),
-  });
+  final simpleData = SimpleMessageData(text: 'Тестовая строка', number: 42, flag: true);
 
   print('\nКлиент: отправка простых данных');
   channel.send(simpleData);
   await Future.delayed(Duration(milliseconds: 500));
 
   // Отправляем структуру с вложенными данными
-  final nestedData = RpcMap({
-    'config': RpcMap({
-      'enabled': RpcBool(true),
-      'timeout': RpcInt(1000),
-    }),
-    'items': RpcList<RpcString>([
-      RpcString('элемент1'),
-      RpcString('элемент2'),
-      RpcString('элемент3'),
-    ]),
-  });
+  final nestedData = NestedData(
+    config: ConfigData(enabled: true, timeout: 1000),
+    items: ItemList(['элемент1', 'элемент2', 'элемент3']),
+  );
 
   print('\nКлиент: отправка данных с вложенной структурой');
   channel.send(nestedData);
@@ -233,8 +160,7 @@ Future<void> demonstrateComplexBidirectional(RpcEndpoint clientEndpoint) async {
 }
 
 /// Закрываем все ресурсы
-Future<void> cleanupResources(
-    RpcEndpoint clientEndpoint, RpcEndpoint serverEndpoint) async {
+Future<void> cleanupResources(RpcEndpoint clientEndpoint, RpcEndpoint serverEndpoint) async {
   print('\nЗакрытие соединений...');
   await clientEndpoint.close();
   await Future.delayed(Duration(milliseconds: 100));

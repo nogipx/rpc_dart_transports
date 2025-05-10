@@ -21,7 +21,7 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
   /// [responseParser] - функция преобразования JSON в объект ответа (опционально)
   ///
   /// Возвращает тюпл из потока для отправки и Future для получения результата
-  ({StreamController<Request> controller, Future<Response> response})
+  RpcClientStreamResult<Request, Response>
       openClientStream<Request extends T, Response extends T>({
     required RpcMethodResponseParser<Response> responseParser,
     Map<String, dynamic>? metadata,
@@ -44,49 +44,55 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
       metadata: metadata,
       streamId: effectiveStreamId,
     )
-        .listen((data) {
-      // Финальный ответ приходит как последнее сообщение стрима
-      if (!completer.isCompleted) {
-        if (data is Map<String, dynamic>) {
-          completer.complete(responseParser(data));
-        } else {
-          completer.complete(data as Response);
+        .listen(
+      (data) {
+        // Финальный ответ приходит как последнее сообщение стрима
+        if (!completer.isCompleted) {
+          final result = responseParser(data);
+          completer.complete(result);
         }
-      }
-    }, onError: (error) {
-      if (!completer.isCompleted) {
-        completer.completeError(error);
-      }
-    });
+      },
+      onError: (error) {
+        if (!completer.isCompleted) {
+          completer.completeError(error);
+        }
+      },
+    );
 
     // Подписываемся на контроллер и отправляем данные
-    controller.stream.listen((data) {
-      final processedData = data is RpcMessage ? data.toJson() : data;
+    controller.stream.listen(
+      (data) {
+        final processedData = data is RpcMessage ? data.toJson() : data;
 
-      _core.sendStreamData(
-        effectiveStreamId,
-        processedData,
-        serviceName: serviceName,
-        methodName: methodName,
-      );
-    }, onDone: () {
-      // Когда поток запросов закончен, отправляем маркер завершения
-      _core.sendStreamData(
-        effectiveStreamId,
-        {'_clientStreamEnd': true},
-        serviceName: serviceName,
-        methodName: methodName,
-      );
+        _core.sendStreamData(
+          effectiveStreamId,
+          processedData,
+          serviceName: serviceName,
+          methodName: methodName,
+        );
+      },
+      onDone: () {
+        // Когда поток запросов закончен, отправляем маркер завершения
+        _core.sendStreamData(
+          effectiveStreamId,
+          {'_clientStreamEnd': true},
+          serviceName: serviceName,
+          methodName: methodName,
+        );
 
-      // Закрываем клиентскую часть стрима
-      _core.closeStream(
-        effectiveStreamId,
-        serviceName: serviceName,
-        methodName: methodName,
-      );
-    });
+        // Закрываем клиентскую часть стрима
+        _core.closeStream(
+          effectiveStreamId,
+          serviceName: serviceName,
+          methodName: methodName,
+        );
+      },
+    );
 
-    return (controller: controller, response: completer.future);
+    return RpcClientStreamResult<Request, Response>(
+      controller: controller,
+      response: completer.future,
+    );
   }
 
   /// Регистрирует обработчик клиентского стриминг метода
@@ -102,8 +108,11 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
     // Получаем контракт сервиса
     final serviceContract = _endpoint.getServiceContract(serviceName);
     if (serviceContract == null) {
-      throw Exception(
-          'Контракт сервиса $serviceName не найден. Необходимо сначала зарегистрировать контракт сервиса.');
+      throw RpcCustomException(
+        customMessage:
+            'Контракт сервиса $serviceName не найден. Необходимо сначала зарегистрировать контракт сервиса.',
+        debugLabel: 'ClientStreamingRpcMethod',
+      );
     }
 
     // Проверяем, существует ли метод в контракте
@@ -150,37 +159,46 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
         );
 
         // Подписываемся на входящий поток
-        incomingStream.listen((data) {
-          // Проверяем маркер конца клиентского стрима
-          if (data is Map<String, dynamic> &&
-              data['_clientStreamEnd'] == true) {
-            // Получили маркер завершения, закрываем контроллер
-            controller.close();
-            return;
-          }
+        incomingStream.listen(
+          (data) {
+            // Проверяем маркер конца клиентского стрима
+            if (data is Map<String, dynamic> &&
+                data['_clientStreamEnd'] == true) {
+              // Получили маркер завершения, закрываем контроллер
+              controller.close();
+              return;
+            }
 
-          // Преобразуем данные и добавляем в контроллер
-          if (data is Map<String, dynamic>) {
-            controller.add(requestParser(data));
-          } else {
-            controller.add(data as Request);
-          }
-        }, onError: (error) {
-          controller.addError(error);
-        }, onDone: () {
-          // Поток закрыт, закрываем контроллер
-          if (!controller.isClosed) {
-            controller.close();
-          }
-        });
+            // Преобразуем данные и добавляем в контроллер
+            if (data is Map<String, dynamic>) {
+              controller.add(requestParser(data));
+            } else {
+              controller.add(data as Request);
+            }
+          },
+          onError: (error) {
+            controller.addError(error);
+          },
+          onDone: () {
+            // Поток закрыт, закрываем контроллер
+            if (!controller.isClosed) {
+              controller.close();
+            }
+          },
+        );
 
         try {
           // Вызываем обработчик с потоком запросов
-          final response =
-              await implementation.handleClientStream(controller.stream);
+          final response = await implementation.handleClientStream(
+            RpcClientStreamParams<Request, Response>(
+              stream: controller.stream,
+              metadata: context.metadata,
+              streamId: messageId,
+            ),
+          );
 
           // Преобразуем результат и отправляем как последнее сообщение стрима
-          final result = response is RpcMessage ? response.toJson() : response;
+          final result = response.toJson();
 
           _core.sendStreamData(
             messageId,

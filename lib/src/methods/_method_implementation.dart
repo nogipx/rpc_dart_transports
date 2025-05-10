@@ -71,7 +71,14 @@ final class RpcMethodImplementation<Request extends IRpcSerializableMessage,
       return await _unaryHandler!(request);
     }
 
-    throw StateError('Метод типа $type не поддерживает прямой вызов');
+    throw RpcUnsupportedOperationException(
+      operation: 'invoke',
+      type: type.name,
+      details: {
+        'contract': contract,
+        'message': 'Method type $type does not support unary invocation',
+      },
+    );
   }
 
   /// Открывает стрим ответов для указанного запроса
@@ -80,16 +87,43 @@ final class RpcMethodImplementation<Request extends IRpcSerializableMessage,
       return _serverStreamHandler!(request);
     }
 
-    throw StateError('Метод типа $type не поддерживает открытие стрима');
+    throw RpcUnsupportedOperationException(
+      operation: 'openStream',
+      type: type.name,
+      details: {
+        'contract': contract,
+        'message': 'Method type $type does not support server streaming',
+      },
+    );
   }
 
   /// Обрабатывает поток запросов и возвращает один ответ
-  Future<Response> handleClientStream(Stream<Request> requestsStream) async {
+  Future<Response> handleClientStream(
+    RpcClientStreamParams<Request, Response> params,
+  ) async {
     if (type == RpcMethodType.clientStreaming && _clientStreamHandler != null) {
-      return await _clientStreamHandler!(requestsStream);
+      final response = await _clientStreamHandler!(params);
+      if (response.response != null) {
+        return response.response!;
+      }
+
+      throw RpcInternalException(
+        'Не удалось получить ответ от клиента',
+        details: {
+          'type': type,
+          'contract': contract,
+        },
+      );
     }
 
-    throw StateError('Метод типа $type не поддерживает клиентский стриминг');
+    throw RpcUnsupportedOperationException(
+      operation: 'handleClientStream',
+      type: type.name,
+      details: {
+        'contract': contract,
+        'message': 'Method type $type does not support client streaming',
+      },
+    );
   }
 
   /// Открывает двунаправленный стрим
@@ -101,7 +135,13 @@ final class RpcMethodImplementation<Request extends IRpcSerializableMessage,
       return _bidirectionalHandler!(requestsStream, messageId);
     }
 
-    throw StateError(
-        'Метод типа $type не поддерживает двунаправленный стриминг');
+    throw RpcUnsupportedOperationException(
+      operation: 'openBidirectionalStream',
+      type: type.name,
+      details: {
+        'contract': contract,
+        'message': 'Method type $type does not support bidirectional streaming',
+      },
+    );
   }
 }
