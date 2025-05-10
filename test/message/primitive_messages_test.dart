@@ -88,8 +88,21 @@ void main() {
       expect(a >= b, isTrue);
       expect(a <= b, isFalse);
       expect(a == RpcInt(10), isTrue);
-      expect(a == 10, isTrue);
-      expect(a == 11, isFalse);
+
+      // Сравнение с примитивами через .value
+      expect(a.value > 3, isTrue);
+      expect(a.value < 20, isTrue);
+      expect(a.value >= 10, isTrue);
+      expect(a.value <= 10, isTrue);
+      expect(a.value == 10, isTrue);
+
+      // Проверка исключений при сравнении с примитивами
+      // ignore: unrelated_type_equality_checks
+      expect(() => a == 11, throwsA(isA<UnsupportedError>()));
+      expect(() => a > 3, throwsA(isA<UnsupportedError>()));
+      expect(() => a < 20, throwsA(isA<UnsupportedError>()));
+      expect(() => a >= 10, throwsA(isA<UnsupportedError>()));
+      expect(() => a <= 10, throwsA(isA<UnsupportedError>()));
     });
   });
 
@@ -174,9 +187,24 @@ void main() {
       expect(a < b, isFalse);
       expect(a >= b, isTrue);
       expect(a <= b, isFalse);
+
+      // Сравнение с примитивами через .value
+      expect(a.value > 2.0, isTrue);
+      expect(a.value < 10.0, isTrue);
+      expect(a.value >= 5.5, isTrue);
+      expect(a.value <= 5.5, isTrue);
+
       expect(a == RpcDouble(5.5), isTrue);
-      expect(a == 5.5, isTrue);
-      expect(a == 6.0, isFalse);
+      expect(a.value == 5.5, isTrue);
+      expect(a.value == 6.0, isFalse);
+
+      // Проверка исключений при сравнении с примитивами
+      // ignore: unrelated_type_equality_checks
+      expect(() => a == 5.5, throwsA(isA<UnsupportedError>()));
+      expect(() => a > 2.0, throwsA(isA<UnsupportedError>()));
+      expect(() => a < 10.0, throwsA(isA<UnsupportedError>()));
+      expect(() => a >= 5.5, throwsA(isA<UnsupportedError>()));
+      expect(() => a <= 5.5, throwsA(isA<UnsupportedError>()));
     });
   });
 
@@ -258,9 +286,24 @@ void main() {
       expect(a < b, isFalse);
       expect(a >= b, isTrue);
       expect(a <= b, isFalse);
+
+      // Сравнение с примитивами через .value
+      expect(a.value > 2, isTrue);
+      expect(a.value < 10, isTrue);
+      expect(a.value >= 7, isTrue);
+      expect(a.value <= 7, isTrue);
+
       expect(a == RpcNum(7), isTrue);
-      expect(a == 7, isTrue);
-      expect(a == 8, isFalse);
+      expect(a.value == 7, isTrue);
+      expect(a.value == 8, isFalse);
+
+      // Проверка исключений при сравнении с примитивами
+      // ignore: unrelated_type_equality_checks
+      expect(() => a == 7, throwsA(isA<UnsupportedError>()));
+      expect(() => a > 2, throwsA(isA<UnsupportedError>()));
+      expect(() => a < 10, throwsA(isA<UnsupportedError>()));
+      expect(() => a >= 7, throwsA(isA<UnsupportedError>()));
+      expect(() => a <= 7, throwsA(isA<UnsupportedError>()));
     });
   });
 

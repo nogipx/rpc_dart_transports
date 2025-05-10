@@ -50,13 +50,52 @@ class RpcNum extends RpcPrimitiveMessage<num> {
   RpcNum operator %(Object other) => RpcNum(value % _extractNum(other));
   RpcNum operator -() => RpcNum(-value);
 
-  bool operator <(Object other) => value < _extractNum(other);
-  bool operator >(Object other) => value > _extractNum(other);
-  bool operator <=(Object other) => value <= _extractNum(other);
-  bool operator >=(Object other) => value >= _extractNum(other);
+  bool operator <(Object other) {
+    if (other is RpcNum) return value < other.value;
+    if (other is num) {
+      throw UnsupportedError(
+          'Сравнение RpcNum с примитивным типом запрещено. Используйте value для сравнения значений.');
+    }
+    throw ArgumentError('Unsupported operand type: ${other.runtimeType}');
+  }
+
+  bool operator >(Object other) {
+    if (other is RpcNum) return value > other.value;
+    if (other is num) {
+      throw UnsupportedError(
+          'Сравнение RpcNum с примитивным типом запрещено. Используйте value для сравнения значений.');
+    }
+    throw ArgumentError('Unsupported operand type: ${other.runtimeType}');
+  }
+
+  bool operator <=(Object other) {
+    if (other is RpcNum) return value <= other.value;
+    if (other is num) {
+      throw UnsupportedError(
+          'Сравнение RpcNum с примитивным типом запрещено. Используйте value для сравнения значений.');
+    }
+    throw ArgumentError('Unsupported operand type: ${other.runtimeType}');
+  }
+
+  bool operator >=(Object other) {
+    if (other is RpcNum) return value >= other.value;
+    if (other is num) {
+      throw UnsupportedError(
+          'Сравнение RpcNum с примитивным типом запрещено. Используйте value для сравнения значений.');
+    }
+    throw ArgumentError('Unsupported operand type: ${other.runtimeType}');
+  }
+
   @override
-  bool operator ==(Object other) =>
-      other is RpcNum ? value == other.value : value == _extractNum(other);
+  bool operator ==(Object other) {
+    if (other is RpcNum) return value == other.value;
+    if (other is num) {
+      throw UnsupportedError(
+          'Сравнение RpcNum с примитивным типом запрещено. Используйте value для сравнения значений.');
+    }
+    return false;
+  }
+
   @override
   int get hashCode => value.hashCode;
 
@@ -101,13 +140,52 @@ class RpcInt extends RpcPrimitiveMessage<int> {
   RpcDouble operator /(Object other) => RpcDouble(value / _extractInt(other));
   RpcInt operator -() => RpcInt(-value);
 
-  bool operator <(Object other) => value < _extractInt(other);
-  bool operator >(Object other) => value > _extractInt(other);
-  bool operator <=(Object other) => value <= _extractInt(other);
-  bool operator >=(Object other) => value >= _extractInt(other);
+  bool operator <(Object other) {
+    if (other is RpcInt) return value < other.value;
+    if (other is num) {
+      throw UnsupportedError(
+          'Сравнение RpcInt с примитивным типом запрещено. Используйте value для сравнения значений.');
+    }
+    throw ArgumentError('Unsupported operand type: ${other.runtimeType}');
+  }
+
+  bool operator >(Object other) {
+    if (other is RpcInt) return value > other.value;
+    if (other is num) {
+      throw UnsupportedError(
+          'Сравнение RpcInt с примитивным типом запрещено. Используйте value для сравнения значений.');
+    }
+    throw ArgumentError('Unsupported operand type: ${other.runtimeType}');
+  }
+
+  bool operator <=(Object other) {
+    if (other is RpcInt) return value <= other.value;
+    if (other is num) {
+      throw UnsupportedError(
+          'Сравнение RpcInt с примитивным типом запрещено. Используйте value для сравнения значений.');
+    }
+    throw ArgumentError('Unsupported operand type: ${other.runtimeType}');
+  }
+
+  bool operator >=(Object other) {
+    if (other is RpcInt) return value >= other.value;
+    if (other is num) {
+      throw UnsupportedError(
+          'Сравнение RpcInt с примитивным типом запрещено. Используйте value для сравнения значений.');
+    }
+    throw ArgumentError('Unsupported operand type: ${other.runtimeType}');
+  }
+
   @override
-  bool operator ==(Object other) =>
-      other is RpcInt ? value == other.value : value == _extractInt(other);
+  bool operator ==(Object other) {
+    if (other is RpcInt) return value == other.value;
+    if (other is num) {
+      throw UnsupportedError(
+          'Сравнение RpcInt с примитивным типом запрещено. Используйте value для сравнения значений.');
+    }
+    return false;
+  }
+
   @override
   int get hashCode => value.hashCode;
 
@@ -157,14 +235,52 @@ class RpcDouble extends RpcPrimitiveMessage<double> {
       RpcDouble(value % _extractDouble(other));
   RpcDouble operator -() => RpcDouble(-value);
 
-  bool operator <(Object other) => value < _extractDouble(other);
-  bool operator >(Object other) => value > _extractDouble(other);
-  bool operator <=(Object other) => value <= _extractDouble(other);
-  bool operator >=(Object other) => value >= _extractDouble(other);
+  bool operator <(Object other) {
+    if (other is RpcDouble) return value < other.value;
+    if (other is num) {
+      throw UnsupportedError(
+          'Сравнение RpcDouble с примитивным типом запрещено. Используйте value для сравнения значений.');
+    }
+    throw ArgumentError('Unsupported operand type: ${other.runtimeType}');
+  }
+
+  bool operator >(Object other) {
+    if (other is RpcDouble) return value > other.value;
+    if (other is num) {
+      throw UnsupportedError(
+          'Сравнение RpcDouble с примитивным типом запрещено. Используйте value для сравнения значений.');
+    }
+    throw ArgumentError('Unsupported operand type: ${other.runtimeType}');
+  }
+
+  bool operator <=(Object other) {
+    if (other is RpcDouble) return value <= other.value;
+    if (other is num) {
+      throw UnsupportedError(
+          'Сравнение RpcDouble с примитивным типом запрещено. Используйте value для сравнения значений.');
+    }
+    throw ArgumentError('Unsupported operand type: ${other.runtimeType}');
+  }
+
+  bool operator >=(Object other) {
+    if (other is RpcDouble) return value >= other.value;
+    if (other is num) {
+      throw UnsupportedError(
+          'Сравнение RpcDouble с примитивным типом запрещено. Используйте value для сравнения значений.');
+    }
+    throw ArgumentError('Unsupported operand type: ${other.runtimeType}');
+  }
+
   @override
-  bool operator ==(Object other) => other is RpcDouble
-      ? value == other.value
-      : value == _extractDouble(other);
+  bool operator ==(Object other) {
+    if (other is RpcDouble) return value == other.value;
+    if (other is num) {
+      throw UnsupportedError(
+          'Сравнение RpcDouble с примитивным типом запрещено. Используйте value для сравнения значений.');
+    }
+    return false;
+  }
+
   @override
   int get hashCode => value.hashCode;
 
