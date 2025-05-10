@@ -7,7 +7,6 @@ version: 0.1.0
 repository: https://github.com/nogipx/rpc_dart.git
 homepage: https://github.com/nogipx/rpc_dart
 issue_tracker: https://github.com/nogipx/rpc_dart/issues
-documentation: https://github.com/nogipx/rpc_dart/wiki
 
 topics:
   - rpc
@@ -32,10 +31,6 @@ dev_dependencies:
   test: ^1.21.0
 
 funding:
-  - https://buymeacoffee.com/nogipx
+  - https://liberapay.com/nogipx
 
-example: example/bidirectional_example.dart
-
-# Не публикуем избыточные файлы
-false_secrets:
-  - /example/**
+example: example/README.md

@@ -2,94 +2,132 @@
 
 В этой директории находятся примеры, демонстрирующие различные возможности библиотеки RPC Dart.
 
-## Основные примеры
+## Типы примеров
 
-- [**unary_example.dart**](unary_example.dart) - демонстрация унарных вызовов (запрос → ответ)
-- [**server_streaming_example.dart**](server_streaming_example.dart) - демонстрация серверного стриминга (запрос → поток ответов)
-- [**client_streaming_example.dart**](client_streaming_example.dart) - демонстрация клиентского стриминга (поток запросов → ответ)
-- [**bidirectional_example.dart**](bidirectional_example.dart) - демонстрация двунаправленного стриминга (поток запросов → поток ответов)
+Библиотека демонстрирует четыре основных типа RPC взаимодействий:
 
-## Расширенные примеры
-
-- [**middleware_example.dart**](middleware_example.dart) - использование middleware для перехвата и модификации запросов/ответов
-- [**contracts_example.dart**](contracts_example.dart) - использование контрактов сервисов для типобезопасного API
-- [**calculator_example.dart**](calculator_example.dart) - пример полноценного сервиса калькулятора
+1. **Унарный (Unary)** - один запрос → один ответ (example: калькулятор)
+2. **Клиентский стриминг (Client Streaming)** - поток запросов → один ответ (example: загрузка файла частями)
+3. **Серверный стриминг (Server Streaming)** - один запрос → поток ответов (example: мониторинг задачи)
+4. **Двунаправленный стриминг (Bidirectional)** - поток запросов ↔ поток ответов (example: чат)
 
 ## Запуск примеров
 
-Для запуска любого примера выполните:
+### Через бинарный файл (рекомендуется)
+
+Для запуска примеров можно использовать скомпилированный бинарный файл, который принимает аргументы командной строки:
 
 ```bash
-dart run example/<имя_файла>.dart
+# Компиляция бинарного файла
+dart compile exe bin/main.dart -o bin/examples
+
+# Запуск конкретного примера
+./bin/examples -e unary      # Унарный RPC пример
+./bin/examples -e client     # Клиентский стриминг пример
+./bin/examples -e server     # Серверный стриминг пример
+./bin/examples -e bidirectional  # Двунаправленный стриминг пример
+
+# Также можно указать номер примера
+./bin/examples -e 1  # Унарный пример
+./bin/examples -e 2  # Клиентский стриминг
+# и т.д.
+
+# Отключение режима отладки (подробных логов)
+./bin/examples -e unary --no-debug
+
+# Получение справки
+./bin/examples --help
 ```
 
-Например:
+### Через Dart CLI
 
 ```bash
-dart run example/unary_example.dart
-dart run example/middleware_example.dart
+# Запуск через Dart
+dart run bin/main.dart -e unary
 ```
-
-## Типы RPC вызовов
-
-Библиотека RPC Dart поддерживает четыре типа RPC вызовов:
-
-1. **Унарный (Unary)** - один запрос, один ответ
-2. **Серверный стриминг (Server Streaming)** - один запрос, поток ответов
-3. **Клиентский стриминг (Client Streaming)** - поток запросов, один ответ
-4. **Двунаправленный стриминг (Bidirectional Streaming)** - поток запросов, поток ответов
 
 ## Описание примеров
 
-### Калькулятор
+### Унарный пример (калькулятор)
 
-Демонстрирует использование унарных методов и серверного стриминга через контракт сервиса.
+Демонстрирует простой запрос-ответ с базовыми математическими операциями.
 
 ```dart
-// Клиентский вызов унарного метода
-final response = await clientContract.add(CalculatorRequest(5, 3));
+// Пример вызова метода
+final result = await clientContract.compute(ComputeRequest(value1: 10, value2: 5));
+print(result.sum);  // 15
+```
 
-// Клиентский вызов стримингового метода
-final stream = clientContract.generateSequence(SequenceRequest(5));
-await for (final item in stream) {
-  print(item.count);
+### Клиентский стриминг (загрузка файла)
+
+Демонстрирует отправку потока данных клиентом и получение одного итогового ответа.
+
+```dart
+// Отправка блоков данных
+final processStream = await streamService.processDataBlocks(...);
+final controller = processStream.controller;
+
+// Отправка нескольких блоков
+controller.add(DataBlock(data: [...], index: 1));
+controller.add(DataBlock(data: [...], index: 2));
+await controller.close();
+
+// Получение итогового результата
+final result = await processStream.response;
+```
+
+### Серверный стриминг (мониторинг прогресса)
+
+Демонстрирует отправку одного запроса и получение потока обновлений от сервера.
+
+```dart
+// Запуск задачи
+final request = TaskRequest(taskId: '...', taskName: 'Анализ данных');
+final stream = client.serverStreaming('TaskService', 'startTask')
+    .openStream<TaskRequest, ProgressMessage>(request);
+
+// Обработка потока обновлений
+await for (final progress in stream) {
+  print('Прогресс: ${progress.progress}%: ${progress.message}');
 }
 ```
 
-### Простой двунаправленный стрим
+### Двунаправленный стриминг (чат)
 
-Демонстрирует минимальную реализацию двунаправленного стриминга без использования контрактов.
+Демонстрирует двунаправленную коммуникацию между клиентом и сервером.
 
 ```dart
-// Регистрация на сервере
-serverEndpoint
-    .bidirectional('EchoService', 'echo')
-    .register<StringMessage, StringMessage>(
-      handler: (incomingStream, messageId) {
-        return incomingStream.map((data) {
-          return StringMessage(text: 'Эхо: ${data.text}');
-        });
-      },
-      requestParser: StringMessage.fromJson,
-      responseParser: StringMessage.fromJson,
-    );
+// Открытие канала
+final channel = await chatService.chat();
 
-// Создание и использование канала на клиенте
-final channel = clientEndpoint
-    .bidirectional('EchoService', 'echo')
-    .createChannel<StringMessage, StringMessage>(
-      requestParser: StringMessage.fromJson,
-      responseParser: StringMessage.fromJson,
-    );
+// Отслеживание входящих сообщений
+channel.incoming.listen((message) {
+  print('${message.sender}: ${message.text}');
+});
 
 // Отправка сообщений
-channel.send(StringMessage(text: 'Привет!'));
+channel.send(ChatMessage(sender: 'User', text: 'Привет!'));
 ```
 
 ## Реализация своих контрактов
 
 Есть два подхода к созданию контрактов:
 
-1. **Декларативный подход** - см. пример в директории `calculator`, где контракт создается с использованием абстрактного класса, наследующего от `RpcServiceContract`. Этот подход рекомендуется использовать для серьезных приложений.
+1. **Декларативный подход** - контракт создается с использованием абстрактного класса, наследующего от `RpcServiceContract`. Этот подход рекомендуется использовать для серьезных приложений, как показано в примерах.
 
-2. **Прямая регистрация методов** - см. примеры `upload_example.dart`, `chat_example.dart` и `bidirectional_simple_example.dart`, где регистрация методов производится напрямую через методы эндпоинта. Подходит для прототипирования и простых случаев. 
+2. **Прямая регистрация методов** - регистрация методов производится напрямую через методы эндпоинта. Подходит для прототипирования и простых случаев.
+
+## Структура проекта
+
+```
+example/
+  ├── bin/                    # Исполняемые файлы
+  │   ├── main.dart           # Основной файл запуска примеров
+  │   └── examples            # Скомпилированный бинарный файл
+  ├── lib/                    # Библиотечный код
+  │   ├── unary/              # Пример унарного RPC
+  │   ├── client_streaming/   # Пример клиентского стриминга
+  │   ├── server_streaming/   # Пример серверного стриминга
+  │   └── bidirectional/      # Пример двунаправленного стриминга
+  └── README.md               # Этот файл
+``` 

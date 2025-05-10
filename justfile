@@ -20,8 +20,8 @@ prepare:
 compile:
     cd example && rm pubspec.lock
     cd example && fvm dart pub get
-    cd example && fvm dart compile exe bin/main.dart -o ../rpc_dart_example
-    cd example && chmod +x ../rpc_dart_example
+    cd example && fvm dart compile exe bin/main.dart -o bin/examples
+    cd example && chmod +x bin/examples
 
 dry:
     fvm dart pub publish --dry-run

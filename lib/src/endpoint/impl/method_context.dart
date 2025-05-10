@@ -6,9 +6,6 @@ part of '../_index.dart';
 
 /// Интерфейс для контекстов, поддерживающих обновление метаданных
 abstract class MetadataUpdatable {
-  /// Обновляет метаданные контекста
-  void updateMetadata(Map<String, dynamic> newMetadata);
-
   /// Обновляет заголовочные метаданные
   void setHeaderMetadata(Map<String, dynamic> newMetadata);
 
@@ -133,13 +130,6 @@ class MutableRpcMethodContext extends RpcMethodContext
           serviceName: serviceName,
           methodName: methodName,
         );
-
-  /// Обновляет метаданные (устаревший метод, используйте setHeaderMetadata)
-  @override
-  void updateMetadata(Map<String, dynamic> newMetadata) {
-    _mutableMetadata = Map<String, dynamic>.from(newMetadata);
-    _mutableHeaderMetadata = Map<String, dynamic>.from(newMetadata);
-  }
 
   /// Обновляет заголовочные метаданные
   @override
