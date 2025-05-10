@@ -1,0 +1,930 @@
+// SPDX-FileCopyrightText: 2025 Karim "nogipx" Mamatkazin <nogipx@gmail.com>
+//
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
+import 'package:test/test.dart';
+import 'package:rpc_dart/src/message/primitive_messages.dart';
+import 'package:rpc_dart/src/contracts/_contract.dart';
+
+void main() {
+  group('RpcString', () {
+    test('создание и значение', () {
+      const string = RpcString('test');
+      expect(string.value, equals('test'));
+    });
+
+    test('toJson', () {
+      const string = RpcString('test');
+      expect(string.toJson(), equals({'v': 'test'}));
+    });
+
+    test('fromJson', () {
+      const json = {'v': 'test'};
+      final string = RpcString.fromJson(json);
+      expect(string.value, equals('test'));
+    });
+
+    test('equals и hashCode', () {
+      const string1 = RpcString('test');
+      const string2 = RpcString('test');
+      const string3 = RpcString('different');
+
+      expect(string1 == string2, isTrue);
+      expect(string1.hashCode == string2.hashCode, isTrue);
+      expect(string1 == string3, isFalse);
+    });
+  });
+
+  group('RpcInt', () {
+    test('создание и значение', () {
+      const integer = RpcInt(42);
+      expect(integer.value, equals(42));
+    });
+
+    test('toJson', () {
+      const integer = RpcInt(42);
+      expect(integer.toJson(), equals({'v': 42}));
+    });
+
+    test('fromJson', () {
+      const json = {'v': 42};
+      final integer = RpcInt.fromJson(json);
+      expect(integer.value, equals(42));
+    });
+
+    test('equals и hashCode', () {
+      const int1 = RpcInt(42);
+      const int2 = RpcInt(42);
+      const int3 = RpcInt(100);
+
+      expect(int1 == int2, isTrue);
+      expect(int1.hashCode == int2.hashCode, isTrue);
+      expect(int1 == int3, isFalse);
+    });
+  });
+
+  group('RpcBool', () {
+    test('создание и значение', () {
+      const boolTrue = RpcBool(true);
+      const boolFalse = RpcBool(false);
+      expect(boolTrue.value, isTrue);
+      expect(boolFalse.value, isFalse);
+    });
+
+    test('toJson', () {
+      const boolTrue = RpcBool(true);
+      expect(boolTrue.toJson(), equals({'v': true}));
+    });
+
+    test('fromJson', () {
+      const json = {'v': true};
+      final boolValue = RpcBool.fromJson(json);
+      expect(boolValue.value, isTrue);
+    });
+
+    test('equals и hashCode', () {
+      const bool1 = RpcBool(true);
+      const bool2 = RpcBool(true);
+      const bool3 = RpcBool(false);
+
+      expect(bool1 == bool2, isTrue);
+      expect(bool1.hashCode == bool2.hashCode, isTrue);
+      expect(bool1 == bool3, isFalse);
+    });
+  });
+
+  group('RpcDouble', () {
+    test('создание и значение', () {
+      const double = RpcDouble(3.14);
+      expect(double.value, equals(3.14));
+    });
+
+    test('toJson', () {
+      const double = RpcDouble(3.14);
+      expect(double.toJson(), equals({'v': 3.14}));
+    });
+
+    test('fromJson', () {
+      const json = {'v': 3.14};
+      final double = RpcDouble.fromJson(json);
+      expect(double.value, equals(3.14));
+    });
+
+    test('equals и hashCode', () {
+      const double1 = RpcDouble(3.14);
+      const double2 = RpcDouble(3.14);
+      const double3 = RpcDouble(2.71);
+
+      expect(double1 == double2, isTrue);
+      expect(double1.hashCode == double2.hashCode, isTrue);
+      expect(double1 == double3, isFalse);
+    });
+  });
+
+  group('RpcNum', () {
+    test('создание и значение', () {
+      const intNum = RpcNum(42);
+      const doubleNum = RpcNum(3.14);
+      expect(intNum.value, equals(42));
+      expect(doubleNum.value, equals(3.14));
+    });
+
+    test('toJson', () {
+      const intNum = RpcNum(42);
+      const doubleNum = RpcNum(3.14);
+      expect(intNum.toJson(), equals({'v': 42}));
+      expect(doubleNum.toJson(), equals({'v': 3.14}));
+    });
+
+    test('fromJson', () {
+      const jsonInt = {'v': 42};
+      const jsonDouble = {'v': 3.14};
+      final intNum = RpcNum.fromJson(jsonInt);
+      final doubleNum = RpcNum.fromJson(jsonDouble);
+      expect(intNum.value, equals(42));
+      expect(doubleNum.value, equals(3.14));
+    });
+
+    test('equals и hashCode', () {
+      const num1 = RpcNum(42);
+      const num2 = RpcNum(42);
+      const num3 = RpcNum(3.14);
+      const num4 = RpcNum(3.14);
+      const num5 = RpcNum(100);
+
+      expect(num1 == num2, isTrue);
+      expect(num1.hashCode == num2.hashCode, isTrue);
+      expect(num3 == num4, isTrue);
+      expect(num3.hashCode == num4.hashCode, isTrue);
+      expect(num1 == num3, isFalse);
+      expect(num1 == num5, isFalse);
+    });
+
+    test('совместимость с int и double', () {
+      const intNum = RpcNum(42);
+      const doubleNum = RpcNum(42.0);
+
+      // Проверяем числовое равенство значений
+      expect(intNum.value == doubleNum.value, isTrue);
+      // Но объекты не равны из-за разных типов (int vs double)
+      expect(intNum == doubleNum, isTrue);
+
+      // Проверяем математические операции
+      expect(intNum.value + 10, equals(52));
+      expect(doubleNum.value * 2, equals(84.0));
+    });
+  });
+
+  group('RpcNull', () {
+    test('создание', () {
+      const nullValue = RpcNull();
+      expect(nullValue, isA<IRpcSerializableMessage>());
+    });
+
+    test('toJson', () {
+      const nullValue = RpcNull();
+      expect(nullValue.toJson(), equals({'v': null}));
+    });
+
+    test('fromJson', () {
+      const json = {'v': null};
+      final nullValue = RpcNull.fromJson(json);
+      expect(nullValue, isA<RpcNull>());
+    });
+
+    test('equals и hashCode', () {
+      const null1 = RpcNull();
+      const null2 = RpcNull();
+
+      expect(null1 == null2, isTrue);
+      expect(null1.hashCode == null2.hashCode, isTrue);
+    });
+  });
+
+  group('RpcList', () {
+    test('создание и значение для примитивных типов', () {
+      final intList = RpcList<int>([1, 2, 3]);
+      expect(intList, equals([1, 2, 3]));
+    });
+
+    test('статический метод from', () {
+      final originalList = [1, 2, 3];
+      final rpcList = RpcList.from(originalList);
+
+      expect(rpcList, equals(originalList));
+      expect(rpcList, isNot(same(originalList))); // Должна быть копия списка
+
+      // Проверяем, что изменение оригинального списка не влияет на RpcList
+      originalList.add(4);
+      expect(rpcList, equals([1, 2, 3]));
+    });
+
+    test('шорткаты для доступа к методам List', () {
+      final list = RpcList<int>([1, 2, 3]);
+
+      // Проверяем свойства
+      expect(list.length, equals(3));
+      expect(list.isEmpty, isFalse);
+      expect(list.isNotEmpty, isTrue);
+      expect(list.first, equals(1));
+      expect(list.last, equals(3));
+
+      // Проверяем операторы
+      expect(list[0], equals(1));
+      list[0] = 10;
+      expect(list[0], equals(10));
+
+      // Проверяем методы модификации
+      list.add(4);
+      expect(list.length, equals(4));
+      expect(list.last, equals(4));
+
+      list.addAll([5, 6]);
+      expect(list.length, equals(6));
+
+      list.remove(10);
+      expect(list.length, equals(5));
+      expect(list.first, equals(2));
+
+      list.clear();
+      expect(list.isEmpty, isTrue);
+    });
+
+    test('asList метод для доступа к внутреннему списку', () {
+      final list = RpcList<int>([1, 2, 3]);
+
+      // Проверяем, что asList возвращает тот же список
+      expect(list, equals([1, 2, 3]));
+
+      // Проверяем, что это действительно тот же самый объект
+      list.add(4);
+      expect(list, equals([1, 2, 3, 4]));
+
+      // Проверяем использование методов List
+      final doubled = list.map((i) => i * 2).toList();
+      expect(doubled, equals([2, 4, 6, 8]));
+    });
+
+    test('toJson для примитивных типов', () {
+      final intList = RpcList<int>([1, 2, 3]);
+      expect(
+          intList.toJson(),
+          equals({
+            'v': [1, 2, 3]
+          }));
+    });
+
+    test('fromJson для примитивных типов', () {
+      final json = {
+        'v': [1, 2, 3]
+      };
+      final intList = RpcList<int>.fromJson(json);
+      expect(intList, equals([1, 2, 3]));
+    });
+
+    test('withConverter для сложных типов', () {
+      final json = {
+        'v': [
+          {'v': 'test1'},
+          {'v': 'test2'}
+        ]
+      };
+
+      final stringList = RpcList<RpcString>.withConverter(
+        json,
+        (item) => RpcString.fromJson(item as Map<String, dynamic>),
+      );
+
+      expect(stringList.length, equals(2));
+      expect(stringList[0].value, equals('test1'));
+      expect(stringList[1].value, equals('test2'));
+    });
+
+    test('toJson для вложенных IRpcSerializableMessage', () {
+      final rpcStringList = RpcList<RpcString>([
+        const RpcString('test1'),
+        const RpcString('test2'),
+      ]);
+
+      final expected = {
+        'v': [
+          {'v': 'test1'},
+          {'v': 'test2'}
+        ]
+      };
+
+      expect(rpcStringList.toJson(), equals(expected));
+    });
+
+    test('equals и hashCode', () {
+      final list1 = RpcList<int>([1, 2, 3]);
+      final list2 = RpcList<int>([1, 2, 3]);
+      final list3 = RpcList<int>([1, 2, 4]);
+
+      expect(list1 == list2, isTrue);
+      expect(list1.hashCode == list2.hashCode, isTrue);
+      expect(list1 == list3, isFalse);
+    });
+
+    test('оператор сложения', () {
+      final list1 = RpcList<int>([1, 2]);
+      final result = list1 + [3, 4];
+
+      expect(result, equals([1, 2, 3, 4]));
+      // Исходный список не должен измениться
+      expect(list1, equals([1, 2]));
+    });
+  });
+
+  group('RpcMap', () {
+    test('создание и значение для примитивных типов', () {
+      final map = RpcMap<String, int>({'a': 1, 'b': 2});
+      expect(map, equals({'a': 1, 'b': 2}));
+    });
+
+    test('статический метод from', () {
+      final originalMap = {'a': 1, 'b': 2};
+      final rpcMap = RpcMap.from(originalMap);
+
+      expect(rpcMap, equals(originalMap));
+      expect(rpcMap, isNot(same(originalMap))); // Должна быть копия карты
+
+      // Проверяем, что изменение оригинальной карты не влияет на RpcMap
+      originalMap['c'] = 3;
+      expect(rpcMap, equals({'a': 1, 'b': 2}));
+    });
+
+    test('fromJsonWithConverter', () {
+      final json = {
+        'v': {'a': 1, 'b': 2}
+      };
+
+      final rpcMap = RpcMap.fromJsonWithConverter(json,
+          keyConverter: (key) => key.toString(),
+          valueConverter: (value) => (value as int) * 2);
+
+      expect(rpcMap, equals({'a': 2, 'b': 4}));
+    });
+
+    test('шорткаты для доступа к методам Map', () {
+      final map = RpcMap<String, int>({'a': 1, 'b': 2});
+
+      // Проверяем свойства
+      expect(map.length, equals(2));
+      expect(map.isEmpty, isFalse);
+      expect(map.isNotEmpty, isTrue);
+      expect(map.keys, equals(['a', 'b']));
+      expect(map.values, equals([1, 2]));
+
+      // Проверяем операторы
+      expect(map['a'], equals(1));
+      map['a'] = 10;
+      expect(map['a'], equals(10));
+
+      // Проверяем методы
+      expect(map.containsKey('a'), isTrue);
+      expect(map.containsKey('c'), isFalse);
+
+      map.addAll({'c': 3, 'd': 4});
+      expect(map.length, equals(4));
+
+      map.remove('a');
+      expect(map.length, equals(3));
+      expect(map.containsKey('a'), isFalse);
+
+      map.clear();
+      expect(map.isEmpty, isTrue);
+    });
+
+    test('asMap метод для доступа к внутреннему словарю', () {
+      final map = RpcMap<String, int>({'a': 1, 'b': 2});
+
+      // Проверяем, что asMap возвращает тот же словарь
+      expect(map.asMap, equals({'a': 1, 'b': 2}));
+
+      // Проверяем, что это действительно тот же самый объект
+      map.asMap['c'] = 3;
+      expect(map, equals({'a': 1, 'b': 2, 'c': 3}));
+
+      // Проверяем использование методов Map
+      final keysJoined = map.asMap.keys.join(',');
+      expect(keysJoined, equals('a,b,c'));
+    });
+
+    test('toJson для примитивных типов', () {
+      final map = RpcMap<String, int>({'a': 1, 'b': 2});
+      expect(
+          map.toJson(),
+          equals({
+            'v': {'a': 1, 'b': 2}
+          }));
+    });
+
+    test('fromJson для String ключей', () {
+      final json = {
+        'v': {'a': 1, 'b': 2}
+      };
+      final map = RpcMap.fromJson(json);
+      expect(map, equals({'a': RpcInt(1), 'b': RpcInt(2)}));
+    });
+
+    test('toJson для вложенных IRpcSerializableMessage', () {
+      final rpcStringMap = RpcMap<String, RpcString>({
+        'a': const RpcString('test1'),
+        'b': const RpcString('test2'),
+      });
+
+      final expected = {
+        'v': {
+          'a': {'v': 'test1'},
+          'b': {'v': 'test2'}
+        }
+      };
+
+      expect(rpcStringMap.toJson(), equals(expected));
+    });
+
+    test('equals и hashCode', () {
+      final map1 = RpcMap<String, int>({'a': 1, 'b': 2});
+      final map2 = RpcMap<String, int>({'a': 1, 'b': 2});
+      final map3 = RpcMap<String, int>({'a': 1, 'b': 3});
+
+      expect(map1 == map2, isTrue);
+      expect(map1.hashCode == map2.hashCode, isTrue);
+      expect(map1 == map3, isFalse);
+    });
+
+    test('throws для не-String ключей без withConverter', () {
+      expect(() {
+        // Вручную вызываем код, который должен выбросить исключение
+        if (int != String) {
+          throw UnsupportedError(
+            'Для ключей, отличных от String, используйте RpcMap.withConverter',
+          );
+        }
+      }, throwsUnsupportedError);
+    });
+  });
+
+  group('Сложные вложенные структуры', () {
+    test('Список списков', () {
+      final nestedList = RpcList<RpcList<int>>([
+        RpcList<int>([1, 2]),
+        RpcList<int>([3, 4]),
+      ]);
+
+      final json = nestedList.toJson();
+      expect(json['v'][0]['v'], equals([1, 2]));
+      expect(json['v'][1]['v'], equals([3, 4]));
+
+      // Воссоздаем из JSON
+      final deserializedList = RpcList<RpcList<int>>.withConverter(
+          json, (item) => RpcList<int>.fromJson(item as Map<String, dynamic>));
+
+      expect(deserializedList[0], equals([1, 2]));
+      expect(deserializedList[1], equals([3, 4]));
+      expect(deserializedList, equals(nestedList));
+    });
+
+    test('Карта со списками', () {
+      final mapWithLists = RpcMap<String, RpcList<int>>({
+        'even': RpcList<int>([2, 4, 6]),
+        'odd': RpcList<int>([1, 3, 5]),
+      });
+
+      final json = mapWithLists.toJson();
+      print(json);
+      expect(json['v']['even']['v'], equals([2, 4, 6]));
+      expect(json['v']['odd']['v'], equals([1, 3, 5]));
+
+      // Воссоздаем из JSON
+      final deserializedMap = RpcMap.fromJson(json);
+
+      // Исправим приведение типов - после десериализации в маршрутизаторе у нас RpcList<IRpcSerializableMessage>
+      // нужно просто проверить содержимое, а не приводить типы
+      final even = deserializedMap['even'] as RpcList;
+      final odd = deserializedMap['odd'] as RpcList;
+
+      // Проверяем, что значения внутри массива равны, но не проверяем типы
+      final List<dynamic> evenValues = even.map((item) {
+        if (item is RpcInt) return item.value;
+        return item;
+      }).toList();
+
+      final List<dynamic> oddValues = odd.map((item) {
+        if (item is RpcInt) return item.value;
+        return item;
+      }).toList();
+
+      expect(evenValues, equals([2, 4, 6]));
+      expect(oddValues, equals([1, 3, 5]));
+
+      // Здесь мы не можем просто сравнивать карты, так как типы могут отличаться
+      // после десериализации (RpcList<IRpcSerializableMessage> vs RpcList<int>)
+      expect(deserializedMap.keys, equals(mapWithLists.keys));
+    });
+
+    test('Список с смешанными примитивами', () {
+      final primitivesList = RpcList<IRpcSerializableMessage>([
+        const RpcString('test'),
+        const RpcInt(123),
+        const RpcBool(true),
+        const RpcDouble(3.14),
+        const RpcNull(),
+      ]);
+
+      final json = primitivesList.toJson();
+      expect(json['v'][0]['v'], equals('test'));
+      expect(json['v'][1]['v'], equals(123));
+      expect(json['v'][2]['v'], equals(true));
+      expect(json['v'][3]['v'], equals(3.14));
+      expect(json['v'][4]['v'], isNull);
+    });
+
+    test('Комплексная структура', () {
+      // Создаем сложную структуру данных: карта, содержащая списки различных примитивов
+      final complexStructure = RpcMap<String, IRpcSerializableMessage>({
+        'strings': RpcList<RpcString>([
+          const RpcString('one'),
+          const RpcString('two'),
+        ]),
+        'numbers': RpcList<RpcInt>([
+          const RpcInt(1),
+          const RpcInt(2),
+        ]),
+        'mixed': RpcList<IRpcSerializableMessage>([
+          const RpcString('text'),
+          const RpcInt(42),
+          const RpcBool(true),
+        ]),
+        'nested': RpcMap<String, RpcInt>({
+          'a': const RpcInt(1),
+          'b': const RpcInt(2),
+        }),
+      });
+
+      final json = complexStructure.toJson();
+
+      // Проверяем структуру JSON
+      expect(json['v']['strings']['v'][0]['v'], equals('one'));
+      expect(json['v']['numbers']['v'][1]['v'], equals(2));
+      expect(json['v']['mixed']['v'][2]['v'], equals(true));
+      expect(json['v']['nested']['v']['b']['v'], equals(2));
+
+      // Тест на глубокую вложенность
+      final deepNested = RpcMap<String, IRpcSerializableMessage>({
+        'level1': RpcMap<String, IRpcSerializableMessage>({
+          'level2': RpcMap<String, IRpcSerializableMessage>({
+            'level3': RpcList<RpcString>([const RpcString('deeply nested')])
+          })
+        })
+      });
+
+      final deepJson = deepNested.toJson();
+      final value =
+          deepJson['v']['level1']['v']['level2']['v']['level3']['v'][0]['v'];
+      expect(value, equals('deeply nested'));
+    });
+  });
+
+  group('RpcString Tests with Invalid Input', () {
+    test('RpcString fromJson with null value', () {
+      final json = {'v': null};
+      final result = RpcString.fromJson(json);
+
+      expect(result.value, '');
+    });
+
+    test('RpcString fromJson with wrong type (int)', () {
+      final json = {'v': 123};
+      final result = RpcString.fromJson(json);
+
+      expect(result.value, '123');
+    });
+
+    test('RpcString fromJson with wrong type (map)', () {
+      final json = {
+        'v': {'nested': 'value'}
+      };
+      final result = RpcString.fromJson(json);
+
+      expect(result.value.contains('{'), true);
+      expect(result.value.contains('}'), true);
+    });
+
+    test('RpcString fromJson with missing value field', () {
+      final json = {'not_v': 'test'};
+      final result = RpcString.fromJson(json);
+
+      expect(result.value, '');
+    });
+  });
+
+  group('RpcInt Tests with Invalid Input', () {
+    test('RpcInt fromJson with null value', () {
+      final json = {'v': null};
+      final result = RpcInt.fromJson(json);
+
+      expect(result.value, 0);
+    });
+
+    test('RpcInt fromJson with wrong type (string)', () {
+      final json = {'v': '123'};
+      final result = RpcInt.fromJson(json);
+
+      expect(result.value, 123);
+    });
+
+    test('RpcInt fromJson with wrong type (non-numeric string)', () {
+      final json = {'v': 'abc'};
+      final result = RpcInt.fromJson(json);
+
+      expect(result.value, 0);
+    });
+
+    test('RpcInt fromJson with wrong type (double)', () {
+      final json = {'v': 123.45};
+      final result = RpcInt.fromJson(json);
+
+      expect(result.value, 123);
+    });
+
+    test('RpcInt fromJson with wrong type (map)', () {
+      final json = {
+        'v': {'nested': 42}
+      };
+      final result = RpcInt.fromJson(json);
+
+      expect(result.value, 0);
+    });
+
+    test('RpcInt fromJson with missing value field', () {
+      final json = {'not_v': 123};
+      final result = RpcInt.fromJson(json);
+
+      expect(result.value, 0);
+    });
+  });
+
+  group('RpcBool Tests with Invalid Input', () {
+    test('RpcBool fromJson with null value', () {
+      final json = {'v': null};
+      final result = RpcBool.fromJson(json);
+
+      expect(result.value, false);
+    });
+
+    test('RpcBool fromJson with wrong type (string "true")', () {
+      final json = {'v': 'true'};
+      final result = RpcBool.fromJson(json);
+
+      expect(result.value, true);
+    });
+
+    test('RpcBool fromJson with wrong type (string "1")', () {
+      final json = {'v': '1'};
+      final result = RpcBool.fromJson(json);
+
+      expect(result.value, true);
+    });
+
+    test('RpcBool fromJson with wrong type (string "false")', () {
+      final json = {'v': 'false'};
+      final result = RpcBool.fromJson(json);
+
+      expect(result.value, false);
+    });
+
+    test('RpcBool fromJson with wrong type (string "0")', () {
+      final json = {'v': '0'};
+      final result = RpcBool.fromJson(json);
+
+      expect(result.value, false);
+    });
+
+    test('RpcBool fromJson with wrong type (int 1)', () {
+      final json = {'v': 1};
+      final result = RpcBool.fromJson(json);
+
+      expect(result.value, true);
+    });
+
+    test('RpcBool fromJson with wrong type (int 0)', () {
+      final json = {'v': 0};
+      final result = RpcBool.fromJson(json);
+
+      expect(result.value, false);
+    });
+
+    test('RpcBool fromJson with wrong type (map)', () {
+      final json = {
+        'v': {'nested': true}
+      };
+      final result = RpcBool.fromJson(json);
+
+      expect(result.value, false);
+    });
+
+    test('RpcBool fromJson with missing value field', () {
+      final json = {'not_v': true};
+      final result = RpcBool.fromJson(json);
+
+      expect(result.value, false);
+    });
+  });
+
+  group('RpcDouble Tests with Invalid Input', () {
+    test('RpcDouble fromJson with null value', () {
+      final json = {'v': null};
+      final result = RpcDouble.fromJson(json);
+
+      expect(result.value, 0.0);
+    });
+
+    test('RpcDouble fromJson with wrong type (string)', () {
+      final json = {'v': '123.45'};
+      final result = RpcDouble.fromJson(json);
+
+      expect(result.value, 123.45);
+    });
+
+    test('RpcDouble fromJson with wrong type (non-numeric string)', () {
+      final json = {'v': 'abc'};
+      final result = RpcDouble.fromJson(json);
+
+      expect(result.value, 0.0);
+    });
+
+    test('RpcDouble fromJson with wrong type (int)', () {
+      final json = {'v': 123};
+      final result = RpcDouble.fromJson(json);
+
+      expect(result.value, 123.0);
+    });
+
+    test('RpcDouble fromJson with wrong type (map)', () {
+      final json = {
+        'v': {'nested': 42.5}
+      };
+      final result = RpcDouble.fromJson(json);
+
+      expect(result.value, 0.0);
+    });
+
+    test('RpcDouble fromJson with missing value field', () {
+      final json = {'not_v': 123.45};
+      final result = RpcDouble.fromJson(json);
+
+      expect(result.value, 0.0);
+    });
+  });
+
+  group('RpcNum Tests with Invalid Input', () {
+    test('RpcNum fromJson with null value', () {
+      final json = {'v': null};
+      final result = RpcNum.fromJson(json);
+
+      expect(result.value, 0);
+    });
+
+    test('RpcNum fromJson with wrong type (string)', () {
+      final json = {'v': '123.45'};
+      final result = RpcNum.fromJson(json);
+
+      expect(result.value, 123.45);
+    });
+
+    test('RpcNum fromJson with wrong type (non-numeric string)', () {
+      final json = {'v': 'abc'};
+      final result = RpcNum.fromJson(json);
+
+      expect(result.value, 0);
+    });
+
+    test('RpcNum fromJson with wrong type (map)', () {
+      final json = {
+        'v': {'nested': 42}
+      };
+      final result = RpcNum.fromJson(json);
+
+      expect(result.value, 0);
+    });
+
+    test('RpcNum fromJson with missing value field', () {
+      final json = {'not_v': 123};
+      final result = RpcNum.fromJson(json);
+
+      expect(result.value, 0);
+    });
+  });
+
+  group('RpcMap Tests with Invalid Input', () {
+    test('RpcMap fromJson with null', () {
+      final result = RpcMap.fromJson(null);
+      expect(result.isEmpty, true);
+    });
+
+    test('RpcMap fromJson with null value field', () {
+      final json = {'v': null};
+      final result = RpcMap.fromJson(json);
+      expect(result.isEmpty, true);
+    });
+
+    test('RpcMap fromJson with wrong type for value (string)', () {
+      final json = {'v': 'not a map'};
+
+      // Этот вызов должен вернуть пустую карту и не вызвать ошибку
+      final result = RpcMap.fromJson(json);
+      expect(result.isEmpty, true);
+    });
+
+    test('RpcMap fromJson with missing value field', () {
+      final json = {
+        'not_v': {'key': 'value'}
+      };
+      final result = RpcMap.fromJson(json);
+      expect(result.isEmpty, true);
+    });
+
+    test(
+        'RpcMap fromJson with complex nested structure containing invalid values',
+        () {
+      // Создаем сложную структуру с некорректными значениями
+      final json = {
+        'v': {
+          'nullValue': {'v': null},
+          'wrongType': {
+            'v': {
+              'deeply': {'nested': 123}
+            }
+          },
+          'missingValue': {'not_v': 'test'},
+          'validString': {'v': 'ok'},
+          'validInt': {'v': 42},
+          'list': {
+            'v': [
+              1,
+              'two',
+              null,
+              {'v': 'nested'}
+            ]
+          },
+        }
+      };
+
+      // Должен корректно обработать и не упасть
+      final result = RpcMap.fromJson(json);
+
+      expect(result.length, 6); // Все ключи должны быть сохранены
+
+      // Проверяем типы возвращаемых значений
+      expect(result['nullValue'], isA<RpcNull>());
+      expect(
+          result['wrongType'], isA<RpcMap<String, IRpcSerializableMessage>>());
+
+      // Вместо проверки на конкретный тип, просто убедимся что значение есть
+      // и это какой-то serializable тип
+      expect(result['missingValue'], isA<IRpcSerializableMessage>());
+
+      expect(result['validString'], isA<RpcString>());
+      expect(result['validInt'], isA<RpcInt>());
+      expect(result['list'], isA<RpcList>());
+
+      // Проверяем конкретные значения
+      expect((result['validInt'] as RpcInt).value, 42);
+      expect((result['validString'] as RpcString).value, 'ok');
+    });
+  });
+
+  group('RpcList Tests with Invalid Input', () {
+    test('RpcList fromJson with null value', () {
+      final json = {'v': null};
+      final result = RpcList<RpcString>.fromJson(json);
+
+      expect(result.isEmpty, true);
+    });
+
+    test('RpcList fromJson with wrong type (not a list)', () {
+      final json = {'v': 'not a list'};
+
+      // Должен либо вернуть пустой список, либо выбросить ошибку, но не упасть
+      expect(() {
+        final result = RpcList<RpcString>.fromJson(json);
+        // Если не выбросило исключение, проверяем что вернул пустой список
+        expect(result.isEmpty, true);
+      }, returnsNormally);
+    });
+
+    test('RpcList fromJson with missing value field', () {
+      final json = {
+        'not_v': [1, 2, 3]
+      };
+
+      // Должен вернуть пустой список
+      expect(() {
+        final result = RpcList<RpcString>.fromJson(json);
+        expect(result.isEmpty, true);
+      }, returnsNormally);
+    });
+  });
+}

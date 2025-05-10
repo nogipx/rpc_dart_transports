@@ -37,6 +37,8 @@ void main() {
 
         // Добавляем middleware для логирования
         serverEndpoint.addMiddleware(DebugMiddleware(id: 'server'));
+        serverEndpoint
+            .registerServiceContract(SimpleRpcServiceContract('ChatService'));
 
         // Регистрируем обработчик двунаправленного стриминга на сервере
         serverEndpoint
