@@ -11,36 +11,36 @@ import 'package:rpc_dart/rpc_dart.dart'
 
 /// Middleware для добавления метаданных к запросам и ответам
 class MetadataMiddleware implements SimpleRpcMiddleware {
-  /// Метаданные, которые будут добавлены к исходящим запросам
-  final Map<String, dynamic> _requestMetadata;
+  /// Метаданные, которые будут добавлены к заголовкам запросов
+  final Map<String, dynamic> _headerMetadata;
 
-  /// Метаданные, которые будут добавлены к ответам
-  final Map<String, dynamic> _responseMetadata;
+  /// Метаданные, которые будут добавлены к трейлерам ответов
+  final Map<String, dynamic> _trailerMetadata;
 
   /// Создает middleware для работы с метаданными
   ///
-  /// [requestMetadata] - метаданные для исходящих запросов
-  /// [responseMetadata] - метаданные для ответов
+  /// [headerMetadata] - метаданные для заголовков запросов
+  /// [trailerMetadata] - метаданные для трейлеров ответов
   MetadataMiddleware({
-    Map<String, dynamic>? requestMetadata,
-    Map<String, dynamic>? responseMetadata,
-  })  : _requestMetadata = requestMetadata ?? {},
-        _responseMetadata = responseMetadata ?? {};
+    Map<String, dynamic>? headerMetadata,
+    Map<String, dynamic>? trailerMetadata,
+  })  : _headerMetadata = headerMetadata ?? {},
+        _trailerMetadata = trailerMetadata ?? {};
 
-  /// Добавляет метаданные к запросу
+  /// Добавляет метаданные к заголовкам запросов
   ///
   /// [key] - ключ метаданных
   /// [value] - значение метаданных
-  void addRequestMetadata(String key, dynamic value) {
-    _requestMetadata[key] = value;
+  void addHeaderMetadata(String key, dynamic value) {
+    _headerMetadata[key] = value;
   }
 
-  /// Добавляет метаданные к ответу
+  /// Добавляет метаданные к трейлерам ответов
   ///
   /// [key] - ключ метаданных
   /// [value] - значение метаданных
-  void addResponseMetadata(String key, dynamic value) {
-    _responseMetadata[key] = value;
+  void addTrailerMetadata(String key, dynamic value) {
+    _trailerMetadata[key] = value;
   }
 
   @override
@@ -51,29 +51,26 @@ class MetadataMiddleware implements SimpleRpcMiddleware {
     RpcMethodContext context,
     RpcDataDirection direction,
   ) {
-    // Если у нас есть метаданные в контексте, добавляем к ним новые
-    final metadata = context.metadata ?? {};
+    if (direction == RpcDataDirection.toRemote) {
+      // Если у нас есть метаданные в контексте, добавляем к ним новые
+      final metadata = Map<String, dynamic>.from(context.headerMetadata ?? {});
 
-    // Добавляем метаданные запроса
-    for (final entry in _requestMetadata.entries) {
-      metadata[entry.key] = entry.value;
-    }
+      // Добавляем метаданные запроса
+      for (final entry in _headerMetadata.entries) {
+        metadata[entry.key] = entry.value;
+      }
 
-    // Для мутабельного контекста пытаемся обновить метаданные
-    // Здесь используем проверку на наличие метода toMutable()
-    // Если он есть и возвращает мутабельный контекст, используем его
-    if (context is MutableRpcMethodContext) {
-      // Если контекст уже мутабельный, работаем с ним напрямую
-      context.updateMetadata(metadata);
-    } else {
-      try {
-        // Пробуем получить мутабельную копию и работать с ней
-        // Но это уже вторичный сценарий, который может не сработать
-        final mutable = context.toMutable();
-        mutable.updateMetadata(metadata);
-      } catch (e) {
-        // Если метода toMutable нет, просто игнорируем ошибку
-        // Метаданные не будут обновлены
+      // Для мутабельного контекста обновляем метаданные
+      if (context is MutableRpcMethodContext) {
+        context.setHeaderMetadata(metadata);
+      } else {
+        try {
+          // Пробуем получить мутабельную копию
+          final mutable = context.toMutable();
+          mutable.setHeaderMetadata(metadata);
+        } catch (e) {
+          // Если метода toMutable нет, просто игнорируем ошибку
+        }
       }
     }
 
@@ -88,17 +85,35 @@ class MetadataMiddleware implements SimpleRpcMiddleware {
     RpcMethodContext context,
     RpcDataDirection direction,
   ) {
-    // Для responses метаданные можно добавить только к объектам, которые
-    // их поддерживают (например, RpcMessage)
-    if (response is Map<String, dynamic>) {
-      // Если ответ - это Map, добавляем метаданные
-      final metadata = (response['metadata'] as Map<String, dynamic>?) ?? {};
+    if (direction == RpcDataDirection.toRemote) {
+      // Для ответов, идущих к клиенту, добавляем трейлеры
+      if (context is MutableRpcMethodContext) {
+        final trailerMetadata =
+            Map<String, dynamic>.from(context.trailerMetadata ?? {});
 
-      for (final entry in _responseMetadata.entries) {
-        metadata[entry.key] = entry.value;
+        // Добавляем наши трейлерные метаданные
+        for (final entry in _trailerMetadata.entries) {
+          trailerMetadata[entry.key] = entry.value;
+        }
+
+        context.setTrailerMetadata(trailerMetadata);
+      } else {
+        try {
+          // Пробуем получить мутабельную копию
+          final mutable = context.toMutable();
+          final trailerMetadata =
+              Map<String, dynamic>.from(mutable.trailerMetadata ?? {});
+
+          // Добавляем наши трейлерные метаданные
+          for (final entry in _trailerMetadata.entries) {
+            trailerMetadata[entry.key] = entry.value;
+          }
+
+          mutable.setTrailerMetadata(trailerMetadata);
+        } catch (e) {
+          // Если метода toMutable нет, просто игнорируем ошибку
+        }
       }
-
-      response['metadata'] = metadata;
     }
 
     return Future.value(response);
@@ -113,7 +128,19 @@ class MetadataMiddleware implements SimpleRpcMiddleware {
     RpcMethodContext context,
     RpcDataDirection direction,
   ) {
-    // Для ошибок не добавляем метаданные
+    // Для ошибок также можем добавить трейлеры (если направление к клиенту)
+    if (direction == RpcDataDirection.toRemote &&
+        context is MutableRpcMethodContext) {
+      final trailerMetadata =
+          Map<String, dynamic>.from(context.trailerMetadata ?? {});
+
+      // Добавляем метаданные об ошибке
+      trailerMetadata['error'] = true;
+      trailerMetadata['error_type'] = error.runtimeType.toString();
+
+      context.setTrailerMetadata(trailerMetadata);
+    }
+
     return Future.value(error);
   }
 

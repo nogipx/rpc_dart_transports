@@ -21,8 +21,11 @@ final class RpcMessage {
   /// Полезная нагрузка сообщения
   final dynamic payload;
 
-  /// Метаданные сообщения
+  /// Метаданные сообщения (заголовки)
   final Map<String, dynamic>? metadata;
+
+  /// Трейлерные метаданные сообщения (отправляются в конце)
+  final Map<String, dynamic>? trailerMetadata;
 
   /// Создает новое сообщение
   const RpcMessage({
@@ -32,6 +35,7 @@ final class RpcMessage {
     this.method,
     this.payload,
     this.metadata,
+    this.trailerMetadata,
   });
 
   /// Создает сообщение из JSON-объекта
@@ -43,6 +47,7 @@ final class RpcMessage {
       method: json['method'] as String?,
       payload: json['payload'],
       metadata: json['metadata'] as Map<String, dynamic>?,
+      trailerMetadata: json['trailerMetadata'] as Map<String, dynamic>?,
     );
   }
 
@@ -55,11 +60,13 @@ final class RpcMessage {
       if (method != null) 'method': method,
       if (payload != null) 'payload': payload,
       if (metadata != null) 'metadata': metadata,
+      if (trailerMetadata != null) 'trailerMetadata': trailerMetadata,
     };
   }
 
   @override
   String toString() {
-    return 'Message{type: $type, id: $id, service: $service, method: $method}';
+    return 'Message{type: $type, id: $id, service: $service, method: $method, '
+        'hasMetadata: ${metadata != null}, hasTrailerMetadata: ${trailerMetadata != null}}';
   }
 }

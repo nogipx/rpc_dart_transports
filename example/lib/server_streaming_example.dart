@@ -37,9 +37,6 @@ void main() async {
     // Демонстрация прогресса задачи
     await demonstrateTaskProgress(client);
 
-    // Демонстрация типизированного серверного стриминга
-    await demonstrateTypedServerStreaming(client);
-
     // Демонстрация обработки ошибок
     await demonstrateErrorHandling(client);
   } catch (e) {
@@ -183,12 +180,6 @@ Future<void> demonstrateTaskProgress(RpcEndpoint client) async {
     final icon = progress.status == 'completed' ? '✅' : '⏳';
     print('  $icon ${progress.progress}%: ${progress.message}');
   }
-}
-
-/// Демонстрация типизированного серверного стриминга с автоматической сериализацией
-Future<void> demonstrateTypedServerStreaming(RpcEndpoint client) async {
-  // Этот пример аналогичен предыдущим, но показывает возможность
-  // регистрации обработчика через RpcServiceContract (см. calculator_example.dart)
 }
 
 /// Демонстрация обработки ошибок

@@ -16,13 +16,11 @@ final class BidirectionalRpcMethod<T extends IRpcSerializableMessage>
 
   /// Создает типизированный двунаправленный канал связи
   ///
-  /// [requestParser] - функция для преобразования JSON в объект запроса (опционально)
   /// [responseParser] - функция для преобразования JSON в объект ответа (опционально)
   /// [metadata] - дополнительные метаданные (опционально)
   /// [streamId] - необязательный идентификатор стрима (генерируется автоматически)
   BidirectionalChannel<Request, Response>
       createChannel<Request extends T, Response extends T>({
-    required RpcMethodArgumentParser<Request> requestParser,
     required RpcMethodResponseParser<Response> responseParser,
     Map<String, dynamic>? metadata,
     String? streamId,

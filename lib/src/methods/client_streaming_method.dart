@@ -18,13 +18,11 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
   ///
   /// [metadata] - метаданные (опционально)
   /// [streamId] - ID потока (опционально, генерируется автоматически)
-  /// [requestParser] - функция преобразования объекта запроса в JSON (опционально)
   /// [responseParser] - функция преобразования JSON в объект ответа (опционально)
   ///
   /// Возвращает тюпл из потока для отправки и Future для получения результата
   ({StreamController<Request> controller, Future<Response> response})
       openClientStream<Request extends T, Response extends T>({
-    required RpcMethodArgumentParser<Request> requestParser,
     required RpcMethodResponseParser<Response> responseParser,
     Map<String, dynamic>? metadata,
     String? streamId,

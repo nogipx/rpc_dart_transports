@@ -30,16 +30,6 @@ dart run example/unary_example.dart
 dart run example/middleware_example.dart
 ```
 
-## Структура калькулятора
-
-Папка [calculator](calculator) содержит код, используемый в примере `calculator_example.dart`:
-
-- [**_index.dart**](calculator/_index.dart) - экспорты всех файлов
-- [**calculator_data.dart**](calculator/calculator_data.dart) - модели данных
-- [**calculator_contract.dart**](calculator/calculator_contract.dart) - определение контракта сервиса
-- [**calculator_client.dart**](calculator/calculator_client.dart) - клиентская реализация контракта
-- [**calculator_server.dart**](calculator/calculator_server.dart) - серверная реализация контракта
-
 ## Типы RPC вызовов
 
 Библиотека RPC Dart поддерживает четыре типа RPC вызовов:

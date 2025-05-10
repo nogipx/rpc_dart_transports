@@ -2,6 +2,6 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
+export 'primitives/_index.dart';
 export 'message_types.dart';
 export 'message.dart';
-export 'primitive_messages.dart';

@@ -138,7 +138,6 @@ void main() {
     final channel = clientEndpoint
         .bidirectional('ChatService', 'chatStream')
         .createChannel<ChatMessage, ChatMessage>(
-          requestParser: ChatMessage.fromJson,
           responseParser: ChatMessage.fromJson,
         );
     print('Двунаправленный канал создан');

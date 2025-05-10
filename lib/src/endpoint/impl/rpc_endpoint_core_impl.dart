@@ -201,22 +201,18 @@ final class _RpcEndpointCoreImpl<T extends IRpcSerializableMessage>
 
     if (serviceName == null || methodName == null) {
       await _sendErrorMessage(
-          message.id, 'Имя сервиса или метода не указано', message.metadata);
+        message.id,
+        'Не указаны serviceName или methodName',
+        message.metadata,
+      );
       return;
     }
 
-    final serviceHandlers = _methodHandlers[serviceName];
-    if (serviceHandlers == null) {
-      await _sendErrorMessage(
-          message.id, 'Сервис не найден: $serviceName', message.metadata);
-      return;
-    }
-
-    final methodHandler = serviceHandlers[methodName];
+    final methodHandler = _methodHandlers[serviceName]?[methodName];
     if (methodHandler == null) {
       await _sendErrorMessage(
         message.id,
-        'Метод не найден: $methodName в сервисе $serviceName',
+        'Метод не найден: $serviceName.$methodName',
         message.metadata,
       );
       return;
@@ -229,6 +225,7 @@ final class _RpcEndpointCoreImpl<T extends IRpcSerializableMessage>
       final context = RpcMethodContext(
         messageId: message.id,
         metadata: message.metadata,
+        headerMetadata: message.metadata,
         payload: message.payload,
         serviceName: serviceName,
         methodName: methodName,
@@ -247,6 +244,7 @@ final class _RpcEndpointCoreImpl<T extends IRpcSerializableMessage>
       final updatedContext = MutableRpcMethodContext(
         messageId: message.id,
         metadata: message.metadata,
+        headerMetadata: context.headerMetadata,
         payload: processedPayload,
         serviceName: serviceName,
         methodName: methodName,
@@ -263,7 +261,7 @@ final class _RpcEndpointCoreImpl<T extends IRpcSerializableMessage>
         serviceName,
         methodName,
         result,
-        context,
+        updatedContext,
         RpcDataDirection.toRemote,
       );
 
@@ -272,30 +270,42 @@ final class _RpcEndpointCoreImpl<T extends IRpcSerializableMessage>
           type: RpcMessageType.response,
           id: message.id,
           payload: processedResult,
-          metadata: updatedContext.metadata,
+          metadata: updatedContext.headerMetadata,
+          trailerMetadata: updatedContext.trailerMetadata,
         ),
       );
     } catch (e, stackTrace) {
+      // Создаем контекст для ошибки
+      final errorContext = RpcMethodContext(
+        messageId: message.id,
+        metadata: message.metadata,
+        headerMetadata: message.metadata,
+        payload: message.payload,
+        serviceName: serviceName,
+        methodName: methodName,
+      );
+
       // Применяем middleware для обработки ошибки
       final processedError = await _middlewareChain.executeError(
         serviceName,
         methodName,
         e,
         stackTrace,
-        RpcMethodContext(
-          messageId: message.id,
-          metadata: message.metadata,
-          payload: message.payload,
-          serviceName: serviceName,
-          methodName: methodName,
-        ),
+        errorContext,
         direction,
       );
+
+      // Если errorContext был преобразован в мутабельный внутри middleware,
+      // нам нужно получить актуальные метаданные
+      final mutableErrorContext = errorContext is MutableRpcMethodContext
+          ? errorContext
+          : errorContext.toMutable();
 
       await _sendErrorMessage(
         message.id,
         processedError.toString(),
-        message.metadata,
+        mutableErrorContext.headerMetadata,
+        mutableErrorContext.trailerMetadata,
       );
     }
   }
@@ -383,17 +393,16 @@ final class _RpcEndpointCoreImpl<T extends IRpcSerializableMessage>
   }
 
   /// Отправляет сообщение об ошибке
-  Future<void> _sendErrorMessage(
-    String requestId,
-    String errorMessage,
-    Map<String, dynamic>? metadata,
-  ) async {
+  Future<void> _sendErrorMessage(String requestId, String errorMessage,
+      Map<String, dynamic>? headerMetadata,
+      [Map<String, dynamic>? trailerMetadata]) async {
     await _sendMessage(
       RpcMessage(
         type: RpcMessageType.error,
         id: requestId,
         payload: errorMessage,
-        metadata: metadata,
+        metadata: headerMetadata,
+        trailerMetadata: trailerMetadata,
       ),
     );
   }

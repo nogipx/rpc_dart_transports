@@ -2,9 +2,8 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
+import 'package:rpc_dart/rpc_dart.dart';
 import 'package:test/test.dart';
-import 'package:rpc_dart/src/message/primitive_messages.dart';
-import 'package:rpc_dart/src/contracts/_contract.dart';
 
 void main() {
   group('RpcString', () {
@@ -60,6 +59,37 @@ void main() {
       expect(int1 == int2, isTrue);
       expect(int1.hashCode == int2.hashCode, isTrue);
       expect(int1 == int3, isFalse);
+    });
+
+    test('арифметические операторы', () {
+      final a = RpcInt(10);
+      final b = RpcInt(3);
+      expect(a + b, RpcInt(13));
+      expect(a - b, RpcInt(7));
+      expect(a * b, RpcInt(30));
+      expect(a ~/ b, RpcInt(3));
+      expect(a % b, RpcInt(1));
+      expect(a / b, RpcDouble(10 / 3));
+      expect(-a, RpcInt(-10));
+      // С обычными числами
+      expect(a + 2, RpcInt(12));
+      expect(a - 2, RpcInt(8));
+      expect(a * 2, RpcInt(20));
+      expect(a ~/ 2, RpcInt(5));
+      expect(a % 4, RpcInt(2));
+      expect(a / 2, RpcDouble(5.0));
+    });
+
+    test('сравнения', () {
+      final a = RpcInt(10);
+      final b = RpcInt(3);
+      expect(a > b, isTrue);
+      expect(a < b, isFalse);
+      expect(a >= b, isTrue);
+      expect(a <= b, isFalse);
+      expect(a == RpcInt(10), isTrue);
+      expect(a == 10, isTrue);
+      expect(a == 11, isFalse);
     });
   });
 
@@ -119,6 +149,35 @@ void main() {
       expect(double1.hashCode == double2.hashCode, isTrue);
       expect(double1 == double3, isFalse);
     });
+
+    test('арифметические операторы', () {
+      final a = RpcDouble(5.5);
+      final b = RpcDouble(2.0);
+      expect(a + b, RpcDouble(7.5));
+      expect(a - b, RpcDouble(3.5));
+      expect(a * b, RpcDouble(11.0));
+      expect(a / b, RpcDouble(2.75));
+      expect(a % b, RpcDouble(1.5));
+      expect(-a, RpcDouble(-5.5));
+      // С обычными числами
+      expect(a + 1, RpcDouble(6.5));
+      expect(a - 1, RpcDouble(4.5));
+      expect(a * 2, RpcDouble(11.0));
+      expect(a / 2, RpcDouble(2.75));
+      expect(a % 2, RpcDouble(1.5));
+    });
+
+    test('сравнения', () {
+      final a = RpcDouble(5.5);
+      final b = RpcDouble(2.0);
+      expect(a > b, isTrue);
+      expect(a < b, isFalse);
+      expect(a >= b, isTrue);
+      expect(a <= b, isFalse);
+      expect(a == RpcDouble(5.5), isTrue);
+      expect(a == 5.5, isTrue);
+      expect(a == 6.0, isFalse);
+    });
   });
 
   group('RpcNum', () {
@@ -173,6 +232,36 @@ void main() {
       expect(intNum.value + 10, equals(52));
       expect(doubleNum.value * 2, equals(84.0));
     });
+
+    test('арифметические операторы', () {
+      final a = RpcNum(7);
+      final b = RpcNum(2.5);
+      expect(a + b, RpcNum(9.5));
+      expect(a - b, RpcNum(4.5));
+      expect(a * b, RpcNum(17.5));
+      expect(a / b, RpcNum(2.8));
+      expect(() => a ~/ b, throwsA(isA<UnsupportedError>()));
+      expect(a % b, RpcNum(7 % 2.5));
+      expect(-a, RpcNum(-7));
+      // С обычными числами
+      expect(a + 1, RpcNum(8));
+      expect(a - 1, RpcNum(6));
+      expect(a * 2, RpcNum(14));
+      expect(a / 2, RpcNum(3.5));
+      expect(a % 2, RpcNum(1));
+    });
+
+    test('сравнения', () {
+      final a = RpcNum(7);
+      final b = RpcNum(2.5);
+      expect(a > b, isTrue);
+      expect(a < b, isFalse);
+      expect(a >= b, isTrue);
+      expect(a <= b, isFalse);
+      expect(a == RpcNum(7), isTrue);
+      expect(a == 7, isTrue);
+      expect(a == 8, isFalse);
+    });
   });
 
   group('RpcNull', () {
@@ -203,83 +292,94 @@ void main() {
 
   group('RpcList', () {
     test('создание и значение для примитивных типов', () {
-      final intList = RpcList<int>([1, 2, 3]);
-      expect(intList, equals([1, 2, 3]));
+      final intList = RpcList<RpcInt>([RpcInt(1), RpcInt(2), RpcInt(3)]);
+      expect(intList.map((i) => i.value).toList(), equals([1, 2, 3]));
     });
 
     test('статический метод from', () {
-      final originalList = [1, 2, 3];
+      final originalList = [RpcInt(1), RpcInt(2), RpcInt(3)];
       final rpcList = RpcList.from(originalList);
 
-      expect(rpcList, equals(originalList));
+      expect(rpcList.map((i) => i.value).toList(), equals([1, 2, 3]));
       expect(rpcList, isNot(same(originalList))); // Должна быть копия списка
 
       // Проверяем, что изменение оригинального списка не влияет на RpcList
-      originalList.add(4);
-      expect(rpcList, equals([1, 2, 3]));
+      originalList.add(RpcInt(4));
+      expect(rpcList.map((i) => i.value).toList(), equals([1, 2, 3]));
     });
 
     test('шорткаты для доступа к методам List', () {
-      final list = RpcList<int>([1, 2, 3]);
+      final list = RpcList<RpcInt>([RpcInt(1), RpcInt(2), RpcInt(3)]);
 
       // Проверяем свойства
       expect(list.length, equals(3));
       expect(list.isEmpty, isFalse);
       expect(list.isNotEmpty, isTrue);
-      expect(list.first, equals(1));
-      expect(list.last, equals(3));
+      expect(list.first.value, equals(1));
+      expect(list.last.value, equals(3));
 
       // Проверяем операторы
-      expect(list[0], equals(1));
-      list[0] = 10;
-      expect(list[0], equals(10));
+      expect(list[0].value, equals(1));
+      list[0] = RpcInt(10);
+      expect(list[0].value, equals(10));
 
       // Проверяем методы модификации
-      list.add(4);
+      list.add(RpcInt(4));
       expect(list.length, equals(4));
-      expect(list.last, equals(4));
+      expect(list.last.value, equals(4));
 
-      list.addAll([5, 6]);
+      list.addAll([RpcInt(5), RpcInt(6)]);
       expect(list.length, equals(6));
 
-      list.remove(10);
+      list.remove(RpcInt(10));
       expect(list.length, equals(5));
-      expect(list.first, equals(2));
+      expect(list.first.value, equals(2));
 
       list.clear();
       expect(list.isEmpty, isTrue);
     });
 
     test('asList метод для доступа к внутреннему списку', () {
-      final list = RpcList<int>([1, 2, 3]);
+      final list = RpcList<RpcInt>([RpcInt(1), RpcInt(2), RpcInt(3)]);
 
       // Проверяем, что asList возвращает тот же список
-      expect(list, equals([1, 2, 3]));
+      expect(list.map((i) => i.value).toList(), equals([1, 2, 3]));
 
       // Проверяем, что это действительно тот же самый объект
-      list.add(4);
-      expect(list, equals([1, 2, 3, 4]));
+      list.add(RpcInt(4));
+      expect(list.map((i) => i.value).toList(), equals([1, 2, 3, 4]));
 
       // Проверяем использование методов List
-      final doubled = list.map((i) => i * 2).toList();
-      expect(doubled, equals([2, 4, 6, 8]));
+      final doubled = list.map((i) => RpcInt(i.value * 2)).toList();
+      expect(doubled.map((i) => i.value).toList(), equals([2, 4, 6, 8]));
     });
 
     test('toJson для примитивных типов', () {
-      final intList = RpcList<int>([1, 2, 3]);
+      final intList = RpcList<RpcInt>([RpcInt(1), RpcInt(2), RpcInt(3)]);
       expect(
           intList.toJson(),
           equals({
-            'v': [1, 2, 3]
+            'v': [
+              {'v': 1},
+              {'v': 2},
+              {'v': 3}
+            ]
           }));
     });
 
     test('fromJson для примитивных типов', () {
       final json = {
-        'v': [1, 2, 3]
+        'v': [
+          {'v': 1},
+          {'v': 2},
+          {'v': 3}
+        ]
       };
-      final intList = RpcList<int>.fromJson(json);
-      expect(intList, equals([1, 2, 3]));
+      final intList = RpcList<RpcInt>.withConverter(
+        json,
+        (item) => RpcInt.fromJson(item as Map<String, dynamic>),
+      );
+      expect(intList.map((i) => i.value).toList(), equals([1, 2, 3]));
     });
 
     test('withConverter для сложных типов', () {
@@ -317,9 +417,9 @@ void main() {
     });
 
     test('equals и hashCode', () {
-      final list1 = RpcList<int>([1, 2, 3]);
-      final list2 = RpcList<int>([1, 2, 3]);
-      final list3 = RpcList<int>([1, 2, 4]);
+      final list1 = RpcList<RpcInt>([RpcInt(1), RpcInt(2), RpcInt(3)]);
+      final list2 = RpcList<RpcInt>([RpcInt(1), RpcInt(2), RpcInt(3)]);
+      final list3 = RpcList<RpcInt>([RpcInt(1), RpcInt(2), RpcInt(4)]);
 
       expect(list1 == list2, isTrue);
       expect(list1.hashCode == list2.hashCode, isTrue);
@@ -327,31 +427,37 @@ void main() {
     });
 
     test('оператор сложения', () {
-      final list1 = RpcList<int>([1, 2]);
-      final result = list1 + [3, 4];
+      final list1 = RpcList<RpcInt>([RpcInt(1), RpcInt(2)]);
+      final result = list1 + [RpcInt(3), RpcInt(4)];
 
-      expect(result, equals([1, 2, 3, 4]));
+      expect(result.map((i) => i.value).toList(), equals([1, 2, 3, 4]));
       // Исходный список не должен измениться
-      expect(list1, equals([1, 2]));
+      expect(list1.map((i) => i.value).toList(), equals([1, 2]));
     });
   });
 
   group('RpcMap', () {
     test('создание и значение для примитивных типов', () {
-      final map = RpcMap<String, int>({'a': 1, 'b': 2});
-      expect(map, equals({'a': 1, 'b': 2}));
+      final map = RpcMap({'a': RpcInt(1), 'b': RpcInt(2)});
+      expect(map['a'], RpcInt(1));
+      expect(map['b'], RpcInt(2));
+      expect((map['a'] as RpcInt).value, 1);
+      expect((map['b'] as RpcInt).value, 2);
     });
 
     test('статический метод from', () {
-      final originalMap = {'a': 1, 'b': 2};
+      final originalMap = {'a': RpcInt(1), 'b': RpcInt(2)};
       final rpcMap = RpcMap.from(originalMap);
 
-      expect(rpcMap, equals(originalMap));
+      expect(rpcMap['a'], RpcInt(1));
+      expect(rpcMap['b'], RpcInt(2));
+      expect((rpcMap['a'] as RpcInt).value, 1);
+      expect((rpcMap['b'] as RpcInt).value, 2);
       expect(rpcMap, isNot(same(originalMap))); // Должна быть копия карты
 
       // Проверяем, что изменение оригинальной карты не влияет на RpcMap
-      originalMap['c'] = 3;
-      expect(rpcMap, equals({'a': 1, 'b': 2}));
+      originalMap['c'] = RpcInt(3);
+      expect(rpcMap['c'], isNull);
     });
 
     test('fromJsonWithConverter', () {
@@ -359,33 +465,40 @@ void main() {
         'v': {'a': 1, 'b': 2}
       };
 
-      final rpcMap = RpcMap.fromJsonWithConverter(json,
-          keyConverter: (key) => key.toString(),
-          valueConverter: (value) => (value as int) * 2);
+      final rpcMap = RpcMap.fromJsonWithConverter(
+        json,
+        keyConverter: (key) => key.toString(),
+        valueConverter: (value) => RpcInt((value as int) * 2),
+      );
 
-      expect(rpcMap, equals({'a': 2, 'b': 4}));
+      expect(rpcMap['a'], RpcInt(2));
+      expect(rpcMap['b'], RpcInt(4));
+      expect((rpcMap['a'] as RpcInt).value, 2);
+      expect((rpcMap['b'] as RpcInt).value, 4);
     });
 
     test('шорткаты для доступа к методам Map', () {
-      final map = RpcMap<String, int>({'a': 1, 'b': 2});
+      final map = RpcMap({'a': RpcInt(1), 'b': RpcInt(2)});
 
       // Проверяем свойства
       expect(map.length, equals(2));
       expect(map.isEmpty, isFalse);
       expect(map.isNotEmpty, isTrue);
       expect(map.keys, equals(['a', 'b']));
-      expect(map.values, equals([1, 2]));
+      expect(
+          map.values.map((v) => (v as RpcInt).value).toList(), equals([1, 2]));
 
       // Проверяем операторы
-      expect(map['a'], equals(1));
-      map['a'] = 10;
-      expect(map['a'], equals(10));
+      expect(map['a'], RpcInt(1));
+      map['a'] = RpcInt(10);
+      expect(map['a'], RpcInt(10));
+      expect((map['a'] as RpcInt).value, 10);
 
       // Проверяем методы
       expect(map.containsKey('a'), isTrue);
       expect(map.containsKey('c'), isFalse);
 
-      map.addAll({'c': 3, 'd': 4});
+      map.addAll({'c': RpcInt(3), 'd': RpcInt(4)});
       expect(map.length, equals(4));
 
       map.remove('a');
@@ -397,14 +510,18 @@ void main() {
     });
 
     test('asMap метод для доступа к внутреннему словарю', () {
-      final map = RpcMap<String, int>({'a': 1, 'b': 2});
+      final map = RpcMap({'a': RpcInt(1), 'b': RpcInt(2)});
 
       // Проверяем, что asMap возвращает тот же словарь
-      expect(map.asMap, equals({'a': 1, 'b': 2}));
+      expect(map.asMap['a'], RpcInt(1));
+      expect(map.asMap['b'], RpcInt(2));
+      expect((map.asMap['a'] as RpcInt).value, 1);
+      expect((map.asMap['b'] as RpcInt).value, 2);
 
       // Проверяем, что это действительно тот же самый объект
-      map.asMap['c'] = 3;
-      expect(map, equals({'a': 1, 'b': 2, 'c': 3}));
+      map.asMap['c'] = RpcInt(3);
+      expect(map['c'], RpcInt(3));
+      expect((map['c'] as RpcInt).value, 3);
 
       // Проверяем использование методов Map
       final keysJoined = map.asMap.keys.join(',');
@@ -412,11 +529,14 @@ void main() {
     });
 
     test('toJson для примитивных типов', () {
-      final map = RpcMap<String, int>({'a': 1, 'b': 2});
+      final map = RpcMap({'a': RpcInt(1), 'b': RpcInt(2)});
       expect(
           map.toJson(),
           equals({
-            'v': {'a': 1, 'b': 2}
+            'v': {
+              'a': {'v': 1},
+              'b': {'v': 2}
+            }
           }));
     });
 
@@ -425,11 +545,14 @@ void main() {
         'v': {'a': 1, 'b': 2}
       };
       final map = RpcMap.fromJson(json);
-      expect(map, equals({'a': RpcInt(1), 'b': RpcInt(2)}));
+      expect(map['a'], RpcInt(1));
+      expect(map['b'], RpcInt(2));
+      expect((map['a'] as RpcInt).value, 1);
+      expect((map['b'] as RpcInt).value, 2);
     });
 
     test('toJson для вложенных IRpcSerializableMessage', () {
-      final rpcStringMap = RpcMap<String, RpcString>({
+      final rpcStringMap = RpcMap({
         'a': const RpcString('test1'),
         'b': const RpcString('test2'),
       });
@@ -445,13 +568,17 @@ void main() {
     });
 
     test('equals и hashCode', () {
-      final map1 = RpcMap<String, int>({'a': 1, 'b': 2});
-      final map2 = RpcMap<String, int>({'a': 1, 'b': 2});
-      final map3 = RpcMap<String, int>({'a': 1, 'b': 3});
+      final map1 = RpcMap({'a': RpcInt(1), 'b': RpcInt(2)});
+      final map2 = RpcMap({'a': RpcInt(1), 'b': RpcInt(2)});
+      final map3 = RpcMap({'a': RpcInt(1), 'b': RpcInt(3)});
 
       expect(map1 == map2, isTrue);
       expect(map1.hashCode == map2.hashCode, isTrue);
       expect(map1 == map3, isFalse);
+      // Дополнительно сравниваем значения
+      expect((map1['a'] as RpcInt).value, 1);
+      expect((map1['b'] as RpcInt).value, 2);
+      expect((map3['b'] as RpcInt).value, 3);
     });
 
     test('throws для не-String ключей без withConverter', () {
@@ -468,34 +595,61 @@ void main() {
 
   group('Сложные вложенные структуры', () {
     test('Список списков', () {
-      final nestedList = RpcList<RpcList<int>>([
-        RpcList<int>([1, 2]),
-        RpcList<int>([3, 4]),
+      final nestedList = RpcList<RpcList<RpcInt>>([
+        RpcList<RpcInt>([RpcInt(1), RpcInt(2)]),
+        RpcList<RpcInt>([RpcInt(3), RpcInt(4)]),
       ]);
 
       final json = nestedList.toJson();
-      expect(json['v'][0]['v'], equals([1, 2]));
-      expect(json['v'][1]['v'], equals([3, 4]));
+      expect(
+          json['v'][0]['v'],
+          equals([
+            {'v': 1},
+            {'v': 2}
+          ]));
+      expect(
+          json['v'][1]['v'],
+          equals([
+            {'v': 3},
+            {'v': 4}
+          ]));
 
       // Воссоздаем из JSON
-      final deserializedList = RpcList<RpcList<int>>.withConverter(
-          json, (item) => RpcList<int>.fromJson(item as Map<String, dynamic>));
+      final deserializedList =
+          RpcList<RpcList<RpcInt>>.withConverter(json, (item) {
+        final subList = (item as Map<String, dynamic>)['v'] as List;
+        return RpcList<RpcInt>(subList
+            .map((subItem) => RpcInt.fromJson(subItem as Map<String, dynamic>))
+            .toList());
+      });
 
-      expect(deserializedList[0], equals([1, 2]));
-      expect(deserializedList[1], equals([3, 4]));
+      expect(deserializedList[0].map((i) => i.value).toList(), equals([1, 2]));
+      expect(deserializedList[1].map((i) => i.value).toList(), equals([3, 4]));
       expect(deserializedList, equals(nestedList));
     });
 
     test('Карта со списками', () {
-      final mapWithLists = RpcMap<String, RpcList<int>>({
-        'even': RpcList<int>([2, 4, 6]),
-        'odd': RpcList<int>([1, 3, 5]),
+      final mapWithLists = RpcMap({
+        'even': RpcList<RpcInt>([RpcInt(2), RpcInt(4), RpcInt(6)]),
+        'odd': RpcList<RpcInt>([RpcInt(1), RpcInt(3), RpcInt(5)]),
       });
 
       final json = mapWithLists.toJson();
       print(json);
-      expect(json['v']['even']['v'], equals([2, 4, 6]));
-      expect(json['v']['odd']['v'], equals([1, 3, 5]));
+      expect(
+          json['v']['even']['v'],
+          equals([
+            {'v': 2},
+            {'v': 4},
+            {'v': 6}
+          ]));
+      expect(
+          json['v']['odd']['v'],
+          equals([
+            {'v': 1},
+            {'v': 3},
+            {'v': 5}
+          ]));
 
       // Воссоздаем из JSON
       final deserializedMap = RpcMap.fromJson(json);
@@ -543,7 +697,7 @@ void main() {
 
     test('Комплексная структура', () {
       // Создаем сложную структуру данных: карта, содержащая списки различных примитивов
-      final complexStructure = RpcMap<String, IRpcSerializableMessage>({
+      final complexStructure = RpcMap({
         'strings': RpcList<RpcString>([
           const RpcString('one'),
           const RpcString('two'),
@@ -557,7 +711,7 @@ void main() {
           const RpcInt(42),
           const RpcBool(true),
         ]),
-        'nested': RpcMap<String, RpcInt>({
+        'nested': RpcMap({
           'a': const RpcInt(1),
           'b': const RpcInt(2),
         }),
@@ -572,9 +726,9 @@ void main() {
       expect(json['v']['nested']['v']['b']['v'], equals(2));
 
       // Тест на глубокую вложенность
-      final deepNested = RpcMap<String, IRpcSerializableMessage>({
-        'level1': RpcMap<String, IRpcSerializableMessage>({
-          'level2': RpcMap<String, IRpcSerializableMessage>({
+      final deepNested = RpcMap({
+        'level1': RpcMap({
+          'level2': RpcMap({
             'level3': RpcList<RpcString>([const RpcString('deeply nested')])
           })
         })
@@ -879,8 +1033,7 @@ void main() {
 
       // Проверяем типы возвращаемых значений
       expect(result['nullValue'], isA<RpcNull>());
-      expect(
-          result['wrongType'], isA<RpcMap<String, IRpcSerializableMessage>>());
+      expect(result['wrongType'], isA<RpcMap>());
 
       // Вместо проверки на конкретный тип, просто убедимся что значение есть
       // и это какой-то serializable тип
