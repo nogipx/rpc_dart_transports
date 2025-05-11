@@ -3,8 +3,6 @@ pubspec.lock
 .fvm/
 coverage/
 *.pem
-*.licensify
 *.bin
-bin/licensify
-build/
-rpc_dart_example
+**/bin/
+**/build/

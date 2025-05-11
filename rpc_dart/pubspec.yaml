@@ -1,0 +1,36 @@
+name: rpc_dart
+description: >-
+  Легковесная и мощная реализация gRPC-подобного протокола для Dart. 
+  Поддерживает двунаправленный стриминг, клиентский и серверный стриминг, 
+  унарные запросы и полностью настраиваемый транспорт обмена данными.
+version: 0.1.1
+repository: https://github.com/nogipx/rpc_dart.git
+homepage: https://github.com/nogipx/rpc_dart
+issue_tracker: https://github.com/nogipx/rpc_dart/issues
+
+topics:
+  - rpc
+  - streaming
+  - grpc
+  - bidirectional
+  - communication
+
+platforms:
+  android:
+  ios:
+  linux:
+  macos:
+  web:
+  windows:
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dev_dependencies:
+  lints: ^2.0.0
+  test: ^1.21.0
+
+funding:
+  - https://liberapay.com/nogipx
+
+example: example/README.md
