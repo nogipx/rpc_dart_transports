@@ -44,19 +44,26 @@ class IsolateTransport implements RpcTransport {
   /// Подписка на сообщения из ReceivePort
   StreamSubscription<dynamic>? _portSubscription;
 
+  /// Таймаут по умолчанию для операций
+  final Duration _defaultTimeout;
+
   /// Создает новый транспорт для коммуникации между изолятами
   ///
   /// [id] - уникальный идентификатор транспорта
   /// [_sendPort] - порт для отправки сообщений
   /// [receivePort] - порт для получения сообщений (по умолчанию создается новый)
+  /// [logEnabled] - включить логирование
+  /// [timeout] - таймаут по умолчанию для операций
   IsolateTransport({
     required this.id,
     required SendPort sendPort,
     ReceivePort? receivePort,
     bool logEnabled = false,
+    Duration timeout = const Duration(seconds: 30),
   })  : _sendPort = sendPort,
         _receivePort = receivePort ?? ReceivePort(),
-        _logEnabled = logEnabled {
+        _logEnabled = logEnabled,
+        _defaultTimeout = timeout {
     _initialize();
   }
 
@@ -145,7 +152,10 @@ class IsolateTransport implements RpcTransport {
   }
 
   @override
-  Future<RpcTransportActionStatus> send(Uint8List data) async {
+  Future<RpcTransportActionStatus> send(Uint8List data,
+      {Duration? timeout}) async {
+    final effectiveTimeout = timeout ?? _defaultTimeout;
+
     if (!isAvailable) {
       return RpcTransportActionStatus.transportUnavailable;
     }
@@ -155,10 +165,18 @@ class IsolateTransport implements RpcTransport {
     }
 
     try {
-      // Отправляем данные через SendPort
-      _sendPort.send({'type': 'data', 'data': data});
-      return RpcTransportActionStatus.success;
+      // Отправляем данные через SendPort с таймаутом
+      return await Future.sync(() {
+        _sendPort.send({'type': 'data', 'data': data});
+        return RpcTransportActionStatus.success;
+      }).timeout(
+        effectiveTimeout,
+        onTimeout: () => RpcTransportActionStatus.timeoutError,
+      );
     } catch (e) {
+      if (e is TimeoutException) {
+        return RpcTransportActionStatus.timeoutError;
+      }
       _log('Ошибка при отправке данных: $e', e);
       return RpcTransportActionStatus.unknownError;
     }

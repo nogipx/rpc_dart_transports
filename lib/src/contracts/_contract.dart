@@ -39,19 +39,46 @@ abstract interface class IRpcServiceContract<
   /// Список всех доступных методов
   List<RpcMethodContract<T, T>> get methods;
 
-  /// Находит метод по имени и типу
+  /// Находит метод по имени
+  ///
+  /// Возвращает контракт метода или null, если метод не найден
+  ///
+  /// ПРИМЕЧАНИЕ: Для безопасной типизации метода используйте метод
+  /// [getMethodHandler], [getMethodArgumentParser] и [getMethodResponseParser]
+  /// вместо прямого приведения типов.
   RpcMethodContract<Request, Response>?
-      findMethodTyped<Request extends T, Response extends T>(String methodName);
+      findMethod<Request extends T, Response extends T>(
+    String methodName,
+  );
+
+  /// Получает обработчик для метода с конкретными типами
+  ///
+  /// [methodName] - имя метода
+  /// Возвращает типизированный обработчик или null, если метод не найден или не соответствует типам
+  dynamic getMethodHandler<Request extends T, Response extends T>(
+    String methodName,
+  );
+
+  /// Получает функцию парсинга аргументов для метода с конкретными типами
+  ///
+  /// [methodName] - имя метода
+  /// Возвращает типизированную функцию парсинга или null, если метод не найден или не соответствует типам
+  RpcMethodArgumentParser<Request>? getMethodArgumentParser<Request extends T>(
+    String methodName,
+  );
+
+  /// Получает функцию парсинга ответов для метода с конкретными типами
+  ///
+  /// [methodName] - имя метода
+  /// Возвращает типизированную функцию парсинга или null, если метод не найден или не соответствует типам
+  RpcMethodResponseParser<Response>?
+      getMethodResponseParser<Response extends T>(
+    String methodName,
+  );
 
   /// Метод для регистрации методов в контракте.
   /// Необходимо переопределить в классе-наследнике.
   void setup();
-
-  dynamic getHandler(RpcMethodContract<T, T> method);
-
-  dynamic getArgumentParser(RpcMethodContract<T, T> method);
-
-  dynamic getResponseParser(RpcMethodContract<T, T> method);
 
   /// Добавляет унарный метод в контракт
   void addUnaryMethod<Request extends T, Response extends T>({
@@ -95,16 +122,22 @@ final class RpcMethodContract<Request extends IRpcSerializableMessage,
   /// Тип метода
   final RpcMethodType methodType;
 
+  /// Дополнительные метаданные метода
+  final Map<String, dynamic>? metadata;
+
   /// Конструктор
   const RpcMethodContract({
     required this.methodName,
     required this.methodType,
+    this.metadata,
   });
 
   /// Проверяет, что объект соответствует типу запроса
   bool validateRequest(dynamic request) {
-    // Если generic-тип Request является dynamic, то все валидно
-    if (identical(Request, dynamic)) return true;
+    // Если объект null, проверяем является ли тип nullable
+    if (request == null) {
+      return false; // Не разрешаем null
+    }
 
     // Проверка типа в рантайме
     return request is Request;
@@ -112,8 +145,10 @@ final class RpcMethodContract<Request extends IRpcSerializableMessage,
 
   /// Проверяет, что объект соответствует типу ответа
   bool validateResponse(dynamic response) {
-    // Если generic-тип Response является dynamic, то все валидно
-    if (identical(Response, dynamic)) return true;
+    // Если объект null, проверяем является ли тип nullable
+    if (response == null) {
+      return false; // Не разрешаем null
+    }
 
     // Проверка типа в рантайме
     return response is Response;
@@ -122,4 +157,16 @@ final class RpcMethodContract<Request extends IRpcSerializableMessage,
   @override
   String toString() =>
       'MethodContract<$Request, $Response>($methodName, $methodType)';
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+
+    return other is RpcMethodContract &&
+        other.methodName == methodName &&
+        other.methodType == methodType;
+  }
+
+  @override
+  int get hashCode => methodName.hashCode ^ methodType.hashCode;
 }

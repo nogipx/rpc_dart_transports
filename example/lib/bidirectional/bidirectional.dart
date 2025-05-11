@@ -64,12 +64,10 @@ Future<void> main({bool debug = false}) async {
   // Создаем эндпоинты с метками для отладки
   final serverEndpoint = RpcEndpoint(
     transport: serverTransport,
-    serializer: JsonSerializer(),
     debugLabel: "server",
   );
   final clientEndpoint = RpcEndpoint(
     transport: clientTransport,
-    serializer: JsonSerializer(),
     debugLabel: "client",
   );
 

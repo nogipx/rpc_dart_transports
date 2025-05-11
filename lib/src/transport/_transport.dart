@@ -21,6 +21,9 @@ enum RpcTransportActionStatus {
   /// Соединение не установлено
   connectionNotEstablished,
 
+  /// Истек таймаут операции
+  timeoutError,
+
   /// Неизвестная ошибка при выполнении операции
   unknownError;
 
@@ -36,10 +39,12 @@ abstract interface class RpcTransport {
   /// Отправляет сообщение через транспорт
   ///
   /// [data] - данные для отправки
+  /// [timeout] - опционально: таймаут операции
   /// Возвращает Future с результатом операции:
   /// - TransportOperationResult.success если отправка прошла успешно
+  /// - TransportOperationResult.timeoutError если истек таймаут операции
   /// - другие значения enum в случае различных ошибок
-  Future<RpcTransportActionStatus> send(Uint8List data);
+  Future<RpcTransportActionStatus> send(Uint8List data, {Duration? timeout});
 
   /// Получает поток сообщений из транспорта
   ///

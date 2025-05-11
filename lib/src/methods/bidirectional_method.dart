@@ -139,7 +139,7 @@ final class BidirectionalRpcMethod<T extends IRpcSerializableMessage>
 
     // Проверяем, существует ли метод в контракте
     final existingMethod =
-        serviceContract.findMethodTyped<Request, Response>(methodName);
+        serviceContract.findMethod<Request, Response>(methodName);
 
     // Если метод не найден в контракте, добавляем его
     if (existingMethod == null) {

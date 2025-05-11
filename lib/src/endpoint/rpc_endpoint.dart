@@ -19,7 +19,7 @@ class RpcEndpoint<T extends IRpcSerializableMessage> extends _RpcEndpointImpl<T>
   /// [debugLabel] - опциональная метка для отладки и логирования
   RpcEndpoint({
     required super.transport,
-    required super.serializer,
+    super.serializer = const MsgPackSerializer(),
     super.debugLabel,
   });
 

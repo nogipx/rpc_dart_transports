@@ -40,8 +40,7 @@ abstract base class RpcMethod<T extends IRpcSerializableMessage> {
     }
 
     // Ищем контракт метода
-    final methodContract =
-        contract.findMethodTyped<Request, Response>(methodName);
+    final methodContract = contract.findMethod<Request, Response>(methodName);
     if (methodContract == null) {
       // Если метод не найден, создаем временный контракт на основе параметров
       return RpcMethodContract<Request, Response>(

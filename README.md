@@ -47,13 +47,13 @@ void main() async {
   // Создание RPC эндпоинтов
   final client = RpcEndpoint(
     transport: clientTransport,
-    serializer: JsonSerializer(),
+    
     debugLabel: 'client',
   );
   
   final server = RpcEndpoint(
     transport: serverTransport,
-    serializer: JsonSerializer(),
+    
     debugLabel: 'server',
   );
   

@@ -132,8 +132,9 @@ class _RpcEndpointImpl<T extends IRpcSerializableMessage>
   ) {
     // Проверяем, не зарегистрирован ли уже контракт с таким именем
     if (_contracts.containsKey(contract.serviceName)) {
-      throw StateError(
-          'Контракт для сервиса ${contract.serviceName} уже зарегистрирован');
+      throw RpcInternalException(
+        'Контракт для сервиса ${contract.serviceName} уже зарегистрирован',
+      );
     }
 
     _registerContract(contract);
@@ -153,39 +154,45 @@ class _RpcEndpointImpl<T extends IRpcSerializableMessage>
     for (final method in contract.methods) {
       final methodType = method.methodType;
       final methodName = method.methodName;
-      final handler = contract.getHandler(method);
-      final argumentParser = contract.getArgumentParser(method);
-      final responseParser = contract.getResponseParser(method);
+      final handler = contract.getMethodHandler(methodName);
+      final argumentParser = contract.getMethodArgumentParser(methodName);
+      final responseParser = contract.getMethodResponseParser(methodName);
 
       if (handler == null || argumentParser == null || responseParser == null) {
         // Пропускаем методы без полной информации
         continue;
       }
 
-      if (methodType == RpcMethodType.unary) {
-        unary(contract.serviceName, methodName).register(
-          handler: handler,
-          requestParser: argumentParser,
-          responseParser: responseParser,
-        );
-      } else if (methodType == RpcMethodType.serverStreaming) {
-        serverStreaming(contract.serviceName, methodName).register(
-          handler: handler,
-          requestParser: argumentParser,
-          responseParser: responseParser,
-        );
-      } else if (methodType == RpcMethodType.clientStreaming) {
-        clientStreaming(contract.serviceName, methodName).register(
-          handler: handler,
-          requestParser: argumentParser,
-          responseParser: responseParser,
-        );
-      } else if (methodType == RpcMethodType.bidirectional) {
-        bidirectional(contract.serviceName, methodName).register(
-          handler: handler,
-          requestParser: argumentParser,
-          responseParser: responseParser,
-        );
+      try {
+        // Типобезопасная регистрация каждого типа метода
+        if (methodType == RpcMethodType.unary) {
+          unary(contract.serviceName, methodName).register(
+            handler: handler,
+            requestParser: argumentParser,
+            responseParser: responseParser,
+          );
+        } else if (methodType == RpcMethodType.serverStreaming) {
+          serverStreaming(contract.serviceName, methodName).register(
+            handler: handler,
+            requestParser: argumentParser,
+            responseParser: responseParser,
+          );
+        } else if (methodType == RpcMethodType.clientStreaming) {
+          clientStreaming(contract.serviceName, methodName).register(
+            handler: handler,
+            requestParser: argumentParser,
+            responseParser: responseParser,
+          );
+        } else if (methodType == RpcMethodType.bidirectional) {
+          bidirectional(contract.serviceName, methodName).register(
+            handler: handler,
+            requestParser: argumentParser,
+            responseParser: responseParser,
+          );
+        }
+      } catch (e) {
+        print('Ошибка при регистрации метода $methodName: $e');
+        continue;
       }
     }
   }

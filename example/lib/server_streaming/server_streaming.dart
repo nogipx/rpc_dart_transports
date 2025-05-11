@@ -17,16 +17,8 @@ Future<void> main({bool debug = false}) async {
   print('Транспорты соединены');
 
   // Создаем эндпоинты с метками для отладки
-  final client = RpcEndpoint(
-    transport: clientTransport,
-    serializer: JsonSerializer(),
-    debugLabel: 'client',
-  );
-  final server = RpcEndpoint(
-    transport: serverTransport,
-    serializer: JsonSerializer(),
-    debugLabel: 'server',
-  );
+  final client = RpcEndpoint(transport: clientTransport, debugLabel: 'client');
+  final server = RpcEndpoint(transport: serverTransport, debugLabel: 'server');
   print('Эндпоинты созданы');
 
   if (debug) {

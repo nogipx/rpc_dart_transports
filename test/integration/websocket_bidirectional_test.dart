@@ -32,7 +32,6 @@ void main() {
         // Создаем серверный эндпоинт
         serverEndpoint = RpcEndpoint(
           transport: serverTransport,
-          serializer: JsonSerializer(),
         );
 
         // Добавляем middleware для логирования
@@ -81,7 +80,6 @@ void main() {
     // Создаем клиентский endpoint
     clientEndpoint = RpcEndpoint(
       transport: clientTransport,
-      serializer: JsonSerializer(),
     );
 
     // Добавляем middleware для логирования

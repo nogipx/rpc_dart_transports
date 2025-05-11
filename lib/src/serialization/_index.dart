@@ -4,3 +4,4 @@
 
 export 'json_serializer.dart';
 export 'serializer.dart';
+export 'msgpack_serializer.dart';

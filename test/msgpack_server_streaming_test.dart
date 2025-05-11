@@ -218,7 +218,7 @@ final class ClientTestStreamService extends TestServerStreamContract {
 }
 
 void main() {
-  group('Server Streaming Tests (with Contracts)', () {
+  group('MsgPack - Server Streaming Tests (with Contracts)', () {
     late MemoryTransport clientTransport;
     late MemoryTransport serverTransport;
     late RpcEndpoint clientEndpoint;
@@ -233,15 +233,15 @@ void main() {
       clientTransport.connect(serverTransport);
       serverTransport.connect(clientTransport);
 
-      // Создаем эндпоинты
+      // Создаем эндпоинты с MsgPackSerializer
       clientEndpoint = RpcEndpoint(
         transport: clientTransport,
-        serializer: JsonSerializer(),
+        serializer: const MsgPackSerializer(), // Используем MsgPack
         debugLabel: 'CLIENT',
       );
       serverEndpoint = RpcEndpoint(
         transport: serverTransport,
-        serializer: JsonSerializer(),
+        serializer: const MsgPackSerializer(), // Используем MsgPack
         debugLabel: 'SERVER',
       );
 
@@ -249,7 +249,7 @@ void main() {
       clientService = ClientTestStreamService(clientEndpoint);
       serverService = ServerTestStreamService();
 
-      // Регистрируем сервис на сервере
+      // Регистрируем сервис на сервере и на клиенте
       serverEndpoint.registerServiceContract(serverService);
       clientEndpoint.registerServiceContract(clientService);
 
@@ -365,7 +365,5 @@ void main() {
         expect(e.toString(), contains('Преднамеренная ошибка'));
       }
     });
-
-    // ... остальные тесты ...
   });
 }

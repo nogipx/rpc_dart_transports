@@ -4,7 +4,18 @@
 
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:rpc_dart/src/message/exception.dart';
+
 import 'serializer.dart';
+
+/// Исключение при сериализации/десериализации
+class RpcSerializationException extends RpcCustomException {
+  RpcSerializationException({
+    required super.customMessage,
+    super.error,
+    super.stackTrace,
+  });
+}
 
 /// Реализация сериализатора, использующего JSON
 class JsonSerializer implements RpcSerializer {
@@ -18,13 +29,36 @@ class JsonSerializer implements RpcSerializer {
 
   @override
   Uint8List serialize(dynamic message) {
-    final jsonString = _jsonCodec.encode(message);
-    return Uint8List.fromList(_utf8Codec.encode(jsonString));
+    return _utf8Codec.encode(_jsonCodec.encode(message));
   }
 
   @override
   dynamic deserialize(Uint8List data) {
-    final jsonString = _utf8Codec.decode(data);
-    return _jsonCodec.decode(jsonString);
+    try {
+      final jsonString = _utf8Codec.decode(data);
+      return _jsonCodec.decode(jsonString);
+    } on FormatException catch (e, stackTrace) {
+      throw RpcSerializationException(
+        customMessage: 'Ошибка формата JSON при десериализации',
+        error: e,
+        stackTrace: stackTrace,
+      );
+    } catch (e, stackTrace) {
+      if (e.toString().contains('UTF-8')) {
+        throw RpcSerializationException(
+          customMessage: 'Ошибка декодирования UTF-8 при десериализации',
+          error: e,
+          stackTrace: stackTrace,
+        );
+      }
+      throw RpcSerializationException(
+        customMessage: 'Ошибка при десериализации из JSON',
+        error: e,
+        stackTrace: stackTrace,
+      );
+    }
   }
+
+  @override
+  String get name => 'json';
 }

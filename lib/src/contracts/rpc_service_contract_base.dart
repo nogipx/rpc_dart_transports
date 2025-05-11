@@ -50,36 +50,54 @@ abstract base class _RpcServiceContractBase<T extends IRpcSerializableMessage>
   @override
   List<RpcMethodContract<T, T>> get methods => _methods;
 
-  @override
-  dynamic getHandler(
-    RpcMethodContract<T, T> method,
-  ) =>
-      _handlers[method.methodName];
-
-  @override
-  dynamic getArgumentParser(
-    RpcMethodContract<T, T> method,
-  ) =>
-      _argumentParsers[method.methodName];
-
-  @override
-  dynamic getResponseParser(
-    RpcMethodContract<T, T> method,
-  ) =>
-      _responseParsers[method.methodName];
-
   /// Находит метод по имени
   @override
   RpcMethodContract<Request, Response>?
-      findMethodTyped<Request extends T, Response extends T>(
-          String methodName) {
+      findMethod<Request extends T, Response extends T>(
+    String methodName,
+  ) {
     for (final method in methods) {
-      if (method.methodName == methodName &&
-          method is RpcMethodContract<Request, Response>) {
-        return method;
+      if (method.methodName == methodName) {
+        return method as RpcMethodContract<Request, Response>;
       }
     }
     return null;
+  }
+
+  /// Получает обработчик метода с типами Request и Response
+  @override
+  dynamic getMethodHandler<Request extends T, Response extends T>(
+    String methodName,
+  ) {
+    final method = findMethod<Request, Response>(methodName);
+    if (method == null) return null;
+
+    return _handlers[methodName];
+  }
+
+  /// Получает функцию парсинга аргументов для метода
+  @override
+  RpcMethodArgumentParser<Request>? getMethodArgumentParser<Request extends T>(
+    String methodName,
+  ) {
+    final method = findMethod<Request, T>(methodName);
+    if (method == null) return null;
+
+    final parser = _argumentParsers[methodName];
+    return parser as RpcMethodArgumentParser<Request>?;
+  }
+
+  /// Получает функцию парсинга ответов для метода
+  @override
+  RpcMethodResponseParser<Response>?
+      getMethodResponseParser<Response extends T>(
+    String methodName,
+  ) {
+    final method = findMethod<T, Response>(methodName);
+    if (method == null) return null;
+
+    final parser = _responseParsers[methodName];
+    return parser as RpcMethodResponseParser<Response>?;
   }
 
   /// Добавляет унарный метод в контракт

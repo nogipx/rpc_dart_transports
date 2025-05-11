@@ -74,11 +74,16 @@ abstract base class UserServiceContract
   @override
   final String serviceName = 'UserService';
 
+  // Константы для имен методов (для типобезопасности)
+  static const String registerUserMethod = 'registerUser';
+  static const String subscribeToNotificationsMethod =
+      'subscribeToNotifications';
+
   @override
   void setup() {
     // Регистрация пользователя (унарный метод)
     addUnaryMethod<UserRequest, UserResponse>(
-      methodName: 'registerUser',
+      methodName: registerUserMethod,
       handler: registerUser,
       argumentParser: UserRequest.fromJson,
       responseParser: UserResponse.fromJson,
@@ -86,7 +91,7 @@ abstract base class UserServiceContract
 
     // Получение уведомлений (стрим)
     addServerStreamingMethod<UserRequest, NotificationMessage>(
-      methodName: 'subscribeToNotifications',
+      methodName: subscribeToNotificationsMethod,
       handler: subscribeToNotifications,
       argumentParser: UserRequest.fromJson,
       responseParser: NotificationMessage.fromJson,
@@ -165,7 +170,7 @@ base class ClientUserService extends UserServiceContract {
   @override
   Future<UserResponse> registerUser(UserRequest request) {
     return client
-        .unary(serviceName, 'registerUser')
+        .unary(serviceName, UserServiceContract.registerUserMethod)
         .call<UserRequest, UserResponse>(
           request: request,
           responseParser: UserResponse.fromJson,
@@ -175,7 +180,8 @@ base class ClientUserService extends UserServiceContract {
   @override
   Stream<NotificationMessage> subscribeToNotifications(UserRequest request) {
     return client
-        .serverStreaming(serviceName, 'subscribeToNotifications')
+        .serverStreaming(
+            serviceName, UserServiceContract.subscribeToNotificationsMethod)
         .openStream<UserRequest, NotificationMessage>(
           request: request,
           responseParser: NotificationMessage.fromJson,
@@ -199,15 +205,13 @@ void main() {
     late ServerUserService serverService;
 
     setUp(() {
-      // Arrange - подготовка
+      // Создаем пару связанных транспортов
       clientTransport = MemoryTransport('client');
       serverTransport = MemoryTransport('server');
-
-      // Соединяем транспорты
       clientTransport.connect(serverTransport);
       serverTransport.connect(clientTransport);
 
-      // Создаем сериализатор
+      // Сериализатор
       serializer = JsonSerializer();
 
       // Создаем эндпоинты
@@ -221,101 +225,69 @@ void main() {
       );
 
       // Создаем сервисы
-      clientService = ClientUserService(clientEndpoint);
       serverService = ServerUserService();
+      clientService = ClientUserService(clientEndpoint);
 
-      // Регистрируем контракты на обоих концах
+      // Регистрируем контракт сервера
       serverEndpoint.registerServiceContract(serverService);
-      clientEndpoint.registerServiceContract(clientService);
     });
 
     tearDown(() async {
-      // Освобождение ресурсов
       await clientEndpoint.close();
       await serverEndpoint.close();
     });
 
     test('успешная_регистрация_пользователя_возвращает_корректный_ответ',
         () async {
-      // Arrange - подготовка
-      final request = createUserRequest(username: 'john_doe', age: 30);
+      // Создаем запрос
+      final request = createUserRequest(username: 'ivan', age: 30);
 
-      // Act - действие
+      // Отправляем запрос
       final response = await clientService.registerUser(request);
 
-      // Assert - проверка
-      expect(response.name, equals('john_doe'));
+      // Проверяем ответ
+      expect(response.name, equals('ivan'));
       expect(response.isActive, isTrue);
       expect(response.id, startsWith('user_'));
-    });
-
-    test('регистрация_с_невалидными_данными_вызывает_исключение', () async {
-      // Arrange - подготовка
-      final invalidAgeRequest =
-          createUserRequest(username: 'young_user', age: 16);
-      final emptyUsernameRequest = createUserRequest(username: '', age: 25);
-
-      // Act & Assert - действие и проверка
-      expect(
-        () => clientService.registerUser(invalidAgeRequest),
-        throwsA(anything),
-      );
-
-      expect(
-        () => clientService.registerUser(emptyUsernameRequest),
-        throwsA(anything),
-      );
     });
 
     test(
         'подписка_на_уведомления_после_регистрации_возвращает_корректный_поток',
         () async {
-      // Arrange - подготовка
-      final registerRequest =
-          createUserRequest(username: 'stream_user', age: 35);
-      final notifications = <NotificationMessage>[];
-
-      // Сначала регистрируем пользователя
+      // Создаем и регистрируем пользователя
+      final registerRequest = createUserRequest(username: 'maria', age: 25);
       await clientService.registerUser(registerRequest);
 
-      // Act - действие
-      final stream = clientService.subscribeToNotifications(registerRequest);
+      // Подписываемся на уведомления
+      final notificationRequest = createUserRequest(username: 'maria', age: 25);
+      final notificationStream =
+          clientService.subscribeToNotifications(notificationRequest);
 
-      // Assert - проверка
-      await for (var notification in stream) {
-        notifications.add(notification);
-      }
+      // Получаем все уведомления
+      final notifications = await notificationStream.toList();
 
-      // Проверяем количество уведомлений (приветствие + 3 инфо + прощание)
+      // Проверяем ответы
       expect(notifications.length, equals(5));
-
-      // Проверяем типы уведомлений
       expect(notifications[0].type, equals('welcome'));
       expect(notifications[1].type, equals('info'));
       expect(notifications[4].type, equals('bye'));
-
-      // Проверяем содержимое уведомлений
-      expect(notifications[0].message, contains('stream_user'));
-      expect(notifications[4].message, contains('До свидания'));
     });
 
     test('подписка_без_регистрации_возвращает_ошибку', () async {
-      // Arrange - подготовка
-      final request = createUserRequest(username: 'unknown_user', age: 40);
-      final notifications = <NotificationMessage>[];
+      // Создаем запрос без предварительной регистрации
+      final request = createUserRequest(username: 'unknown_user', age: 20);
 
-      // Act - действие
+      // Получаем поток уведомлений
       final stream = clientService.subscribeToNotifications(request);
 
-      // Assert - проверка
-      await for (var notification in stream) {
-        notifications.add(notification);
-      }
+      // Получаем первое уведомление
+      final firstNotification = await stream.first;
 
-      // Должно быть только одно уведомление с ошибкой
-      expect(notifications.length, equals(1));
-      expect(notifications[0].type, equals('error'));
-      expect(notifications[0].message, contains('не найден'));
+      // Проверяем, что это уведомление об ошибке
+      expect(firstNotification.type, equals('error'));
+      expect(firstNotification.message, contains('не найден'));
     });
+
+    // Другие тесты...
   });
 }

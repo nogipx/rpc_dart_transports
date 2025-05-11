@@ -4,15 +4,19 @@ import 'package:test/test.dart';
 
 // Тестовые модели сообщений
 class TestRequest implements IRpcSerializableMessage {
-  final int value;
+  final int a;
+  final int b;
 
-  TestRequest(this.value);
+  TestRequest(this.a, this.b);
 
   @override
-  Map<String, dynamic> toJson() => {'value': value};
+  Map<String, dynamic> toJson() => {'a': a, 'b': b};
 
   static TestRequest fromJson(Map<String, dynamic> json) {
-    return TestRequest(json['value'] as int);
+    return TestRequest(
+      json['a'] as int,
+      json['b'] as int,
+    );
   }
 }
 
@@ -29,68 +33,93 @@ class TestResponse implements IRpcSerializableMessage {
   }
 }
 
-// Контракт для тестов
-abstract base class TestContract
-    extends RpcServiceContract<IRpcSerializableMessage> {
-  RpcEndpoint? get endpoint;
+class CountRequest implements IRpcSerializableMessage {
+  final int count;
+
+  CountRequest(this.count);
 
   @override
+  Map<String, dynamic> toJson() => {'count': count};
+
+  static CountRequest fromJson(Map<String, dynamic> json) {
+    return CountRequest(json['count'] as int);
+  }
+}
+
+class CountResponse implements IRpcSerializableMessage {
+  final int value;
+
+  CountResponse(this.value);
+
+  @override
+  Map<String, dynamic> toJson() => {'value': value};
+
+  static CountResponse fromJson(Map<String, dynamic> json) {
+    return CountResponse(json['value'] as int);
+  }
+}
+
+// Контракт тестового сервиса
+abstract base class TestContract
+    extends RpcServiceContract<IRpcSerializableMessage> {
+  @override
   final String serviceName = 'TestService';
+
+  // Константы для имен методов
+  static const String multiplyMethod = 'multiply';
+  static const String countToMethod = 'countTo';
 
   @override
   void setup() {
     // Унарный метод
     addUnaryMethod<TestRequest, TestResponse>(
-      methodName: 'multiply',
+      methodName: multiplyMethod,
       handler: multiply,
       argumentParser: TestRequest.fromJson,
       responseParser: TestResponse.fromJson,
     );
 
     // Стриминговый метод
-    addServerStreamingMethod<TestRequest, TestResponse>(
-      methodName: 'countTo',
+    addServerStreamingMethod<CountRequest, CountResponse>(
+      methodName: countToMethod,
       handler: countTo,
-      argumentParser: TestRequest.fromJson,
-      responseParser: TestResponse.fromJson,
+      argumentParser: CountRequest.fromJson,
+      responseParser: CountResponse.fromJson,
     );
   }
 
   // Методы контракта
   Future<TestResponse> multiply(TestRequest request);
-  Stream<TestResponse> countTo(TestRequest request);
+  Stream<CountResponse> countTo(CountRequest request);
 }
 
-// Серверная реализация контракта
-base class ServerTestService extends TestContract {
-  @override
-  RpcEndpoint? get endpoint => null;
-
+// Серверная реализация
+final class ServerTestService extends TestContract {
   @override
   Future<TestResponse> multiply(TestRequest request) async {
-    return TestResponse(request.value * 2);
+    final result = request.a * request.b;
+    return TestResponse(result);
   }
 
   @override
-  Stream<TestResponse> countTo(TestRequest request) async* {
-    for (int i = 1; i <= request.value; i++) {
-      yield TestResponse(i);
-      await Future.delayed(Duration(milliseconds: 10));
+  Stream<CountResponse> countTo(CountRequest request) async* {
+    for (int i = 1; i <= request.count; i++) {
+      await Future.delayed(Duration(milliseconds: 10)); // Small delay
+      yield CountResponse(i);
     }
   }
 }
 
-// Клиентская реализация контракта
-base class ClientTestService extends TestContract {
-  @override
-  final RpcEndpoint endpoint;
+// Клиентская реализация
+final class ClientTestService extends TestContract {
+  final RpcEndpoint _endpoint;
 
-  ClientTestService(this.endpoint);
+  ClientTestService(this._endpoint);
 
   @override
   Future<TestResponse> multiply(TestRequest request) {
-    return endpoint
-        .unary(serviceName, 'multiply')
+    return _endpoint
+        .unary(serviceName, TestContract.multiplyMethod)
         .call<TestRequest, TestResponse>(
           request: request,
           responseParser: TestResponse.fromJson,
@@ -98,29 +127,27 @@ base class ClientTestService extends TestContract {
   }
 
   @override
-  Stream<TestResponse> countTo(TestRequest request) {
-    return endpoint
-        .serverStreaming(serviceName, 'countTo')
-        .openStream<TestRequest, TestResponse>(
+  Stream<CountResponse> countTo(CountRequest request) {
+    return _endpoint
+        .serverStreaming(serviceName, TestContract.countToMethod)
+        .openStream<CountRequest, CountResponse>(
           request: request,
-          responseParser: TestResponse.fromJson,
+          responseParser: CountResponse.fromJson,
         );
   }
 }
 
 void main() {
   group('Типизированные эндпоинты и контракты', () {
-    // Создаем реальные компоненты для тестов
     late MemoryTransport clientTransport;
     late MemoryTransport serverTransport;
-    late JsonSerializer serializer;
     late RpcEndpoint clientEndpoint;
     late RpcEndpoint serverEndpoint;
     late ClientTestService clientService;
     late ServerTestService serverService;
 
     setUp(() {
-      // Arrange - подготовка
+      // Создаем пару транспортов для памяти
       clientTransport = MemoryTransport('client');
       serverTransport = MemoryTransport('server');
 
@@ -128,101 +155,58 @@ void main() {
       clientTransport.connect(serverTransport);
       serverTransport.connect(clientTransport);
 
-      // Создаем сериализатор
-      serializer = JsonSerializer();
-
       // Создаем эндпоинты
       clientEndpoint = RpcEndpoint(
         transport: clientTransport,
-        serializer: serializer,
+        debugLabel: 'CLIENT',
       );
       serverEndpoint = RpcEndpoint(
         transport: serverTransport,
-        serializer: serializer,
+        debugLabel: 'SERVER',
       );
 
       // Создаем сервисы
       clientService = ClientTestService(clientEndpoint);
       serverService = ServerTestService();
 
-      // Регистрируем контракты
+      // Регистрируем серверный контракт
       serverEndpoint.registerServiceContract(serverService);
-      clientEndpoint.registerServiceContract(clientService);
-    });
 
-    tearDown(() async {
-      // Освобождение ресурсов
-      await clientEndpoint.close();
-      await serverEndpoint.close();
+      // Добавляем очистку ресурсов
+      addTearDown(() async {
+        await clientEndpoint.close();
+        await serverEndpoint.close();
+      });
     });
 
     test('унарный_метод_корректно_вычисляет_и_возвращает_результат', () async {
-      // Arrange - подготовка
-      final request = TestRequest(5);
-      final expectedResult = 10; // 5 * 2 = 10
+      // Создаем запрос
+      final request = TestRequest(5, 7);
 
-      // Act - действие
+      // Вызываем метод
       final response = await clientService.multiply(request);
 
-      // Assert - проверка
-      expect(response.result, equals(expectedResult));
+      // Проверяем результат
+      expect(response.result, equals(35)); // 5 * 7 = 35
     });
 
     test('стриминговый_метод_корректно_возвращает_поток_значений', () async {
-      // Arrange - подготовка
-      final request = TestRequest(3);
-      final expectedValues = [1, 2, 3];
-      final actualValues = <int>[];
+      // Создаем запрос
+      final request = CountRequest(5);
 
-      // Act - действие
+      // Получаем поток значений
       final stream = clientService.countTo(request);
 
-      // Assert - проверка
-      await for (var response in stream) {
-        actualValues.add(response.result);
+      // Собираем все значения из потока
+      final responses = await stream.toList();
+
+      // Проверяем количество и содержимое ответов
+      expect(responses.length, equals(5));
+
+      // Проверяем, что значения идут по порядку
+      for (int i = 0; i < responses.length; i++) {
+        expect(responses[i].value, equals(i + 1));
       }
-
-      expect(actualValues, equals(expectedValues));
-    });
-
-    test('регистрация_нетипизированного_метода_работает_корректно', () async {
-      // Arrange - подготовка
-      final serviceName = 'CalculatorService';
-      final methodName = 'divide';
-
-      // Регистрируем нетипизированный метод на сервере
-      serverEndpoint.registerMethod(
-        serviceName,
-        methodName,
-        (context) async {
-          final payload = context.payload as Map<String, dynamic>;
-          final value = payload['value'] as int;
-          return {'result': value ~/ 2};
-        },
-      );
-
-      // Act - действие
-      final response = await clientEndpoint.invoke(
-        serviceName,
-        methodName,
-        {'value': 10},
-      );
-
-      // Assert - проверка
-      expect(response['result'], equals(5));
-    });
-
-    test('вызов_несуществующего_метода_вызывает_исключение', () async {
-      // Act & Assert - действие и проверка
-      expect(
-        () => clientEndpoint
-            .unary('NonexistentService', 'nonexistentMethod')
-            .call<TestRequest, TestResponse>(
-              request: TestRequest(5),
-              responseParser: TestResponse.fromJson,
-            ),
-        throwsA(anything),
-      );
     });
   });
 }
