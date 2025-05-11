@@ -19,6 +19,11 @@ class RpcSerializationException extends RpcCustomException {
 
 /// Реализация сериализатора, использующего JSON
 class JsonSerializer implements RpcSerializer {
+  /// Создает новый экземпляр JSON сериализатора
+  ///
+  /// JSON сериализатор преобразует объекты Dart в JSON и обратно.
+  /// Используется для сериализации сообщений RPC в удобочитаемый текстовый формат.
+  /// Подходит для отладки и случаев, когда размер сообщений не критичен.
   const JsonSerializer();
 
   /// Стандартный кодек JSON

@@ -4,3 +4,4 @@
 
 export '_transport.dart';
 export 'memory_transport.dart';
+export 'proxy_transport.dart';

@@ -19,77 +19,77 @@ abstract interface class _IRpcEndpointCore<T extends IRpcSerializableMessage> {
   void addMiddleware(IRpcMiddleware middleware);
 
   /// Регистрирует обработчик метода
-  void registerMethod(
-    String serviceName,
-    String methodName,
-    Future<dynamic> Function(RpcMethodContext) handler,
-  );
+  void registerMethod({
+    required String serviceName,
+    required String methodName,
+    required Future<dynamic> Function(RpcMethodContext) handler,
+  });
 
   /// Вызывает удаленный метод и возвращает результат
-  Future<dynamic> invoke(
-    String serviceName,
-    String methodName,
-    dynamic request, {
+  Future<dynamic> invoke({
+    required String serviceName,
+    required String methodName,
+    required dynamic request,
     Duration? timeout,
     Map<String, dynamic>? metadata,
   });
 
   /// Открывает поток данных от удаленной стороны
-  Stream<dynamic> openStream(
-    String serviceName,
-    String methodName, {
+  Stream<dynamic> openStream({
+    required String serviceName,
+    required String methodName,
     dynamic request,
     Map<String, dynamic>? metadata,
     String? streamId,
   });
 
   /// Отправляет данные в поток
-  Future<void> sendStreamData(
-    String streamId,
-    dynamic data, {
+  Future<void> sendStreamData({
+    required String streamId,
+    required dynamic data,
     Map<String, dynamic>? metadata,
     String? serviceName,
     String? methodName,
   });
 
   /// Отправляет сигнал об ошибке в поток
-  Future<void> sendStreamError(
-    String streamId,
-    String error, {
+  Future<void> sendStreamError({
+    required String streamId,
+    required String errorMessage,
     Map<String, dynamic>? metadata,
   });
 
   /// Закрывает поток
-  Future<void> closeStream(
-    String streamId, {
+  Future<void> closeStream({
+    required String streamId,
     Map<String, dynamic>? metadata,
     String? serviceName,
     String? methodName,
   });
 
   /// Создает объект унарного метода для указанного сервиса и метода
-  UnaryRpcMethod<T> unary(
-    String serviceName,
-    String methodName,
-  );
+  UnaryRequestRpcMethod<T> unaryRequest({
+    required String serviceName,
+    required String methodName,
+  });
 
   /// Создает объект серверного стриминг метода для указанного сервиса и метода
-  ServerStreamingRpcMethod<T> serverStreaming(
-    String serviceName,
-    String methodName,
-  );
+  ServerStreamingRpcMethod<T> serverStreaming({
+    required String serviceName,
+    required String methodName,
+  });
 
   /// Создает объект клиентского стриминг метода для указанного сервиса и метода
-  ClientStreamingRpcMethod<T> clientStreaming(
-    String serviceName,
-    String methodName,
-  );
+  ClientStreamingRpcMethod<T> clientStreaming({
+    required String serviceName,
+    required String methodName,
+  });
 
   /// Создает объект двунаправленного стриминг метода для указанного сервиса и метода
-  BidirectionalRpcMethod<T> bidirectional(
-    String serviceName,
-    String methodName,
-  );
+  BidirectionalStreamingRpcMethod<T> bidirectionalStreaming({
+    required String serviceName,
+    required String methodName,
+  });
 
   /// Проверяет, активна ли конечная точка
   bool get isActive;

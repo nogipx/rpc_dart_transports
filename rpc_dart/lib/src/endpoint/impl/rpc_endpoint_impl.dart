@@ -59,31 +59,31 @@ class _RpcEndpointImpl<T extends IRpcSerializableMessage>
   Future<void> close() => _delegate.close();
 
   @override
-  Future<void> closeStream(
-    String streamId, {
+  Future<void> closeStream({
+    required String streamId,
     Map<String, dynamic>? metadata,
     String? serviceName,
     String? methodName,
   }) =>
       _delegate.closeStream(
-        streamId,
+        streamId: streamId,
         metadata: metadata,
         serviceName: serviceName,
         methodName: methodName,
       );
 
   @override
-  Future<dynamic> invoke(
-    String serviceName,
-    String methodName,
-    dynamic request, {
+  Future<dynamic> invoke({
+    required String serviceName,
+    required String methodName,
+    required dynamic request,
     Duration? timeout,
     Map<String, dynamic>? metadata,
   }) =>
       _delegate.invoke(
-        serviceName,
-        methodName,
-        request,
+        serviceName: serviceName,
+        methodName: methodName,
+        request: request,
         timeout: timeout,
         metadata: metadata,
       );
@@ -92,54 +92,68 @@ class _RpcEndpointImpl<T extends IRpcSerializableMessage>
   bool get isActive => _delegate.isActive;
 
   @override
-  Stream<dynamic> openStream(
-    String serviceName,
-    String methodName, {
+  Stream<dynamic> openStream({
+    required String serviceName,
+    required String methodName,
     dynamic request,
     Map<String, dynamic>? metadata,
     String? streamId,
   }) =>
       _delegate.openStream(
-        serviceName,
-        methodName,
+        serviceName: serviceName,
+        methodName: methodName,
         request: request,
         metadata: metadata,
         streamId: streamId,
       );
 
   @override
-  void registerMethod(
-    String serviceName,
-    String methodName,
-    Future<dynamic> Function(RpcMethodContext context) handler,
-  ) =>
-      _delegate.registerMethod(serviceName, methodName, handler);
+  void registerMethod({
+    required String serviceName,
+    required String methodName,
+    required Future<dynamic> Function(RpcMethodContext context) handler,
+  }) =>
+      _delegate.registerMethod(
+        serviceName: serviceName,
+        methodName: methodName,
+        handler: handler,
+      );
+
+  void registerMethodImplementation({
+    required String serviceName,
+    required String methodName,
+    required RpcMethodImplementation implementation,
+  }) {
+    _implementations
+        .putIfAbsent(serviceName, () => {})
+        .putIfAbsent(methodName, () => implementation);
+  }
 
   @override
-  Future<void> sendStreamData(
-    String streamId,
-    dynamic data, {
+  Future<void> sendStreamData({
+    required String streamId,
+    required dynamic data,
     Map<String, dynamic>? metadata,
     String? serviceName,
     String? methodName,
   }) =>
       _delegate.sendStreamData(
-        streamId,
-        data,
+        streamId: streamId,
+        data: data,
         metadata: metadata,
         serviceName: serviceName,
         methodName: methodName,
       );
 
   @override
-  Future<void> sendStreamError(
-    String streamId,
-    String errorMessage, {
+  Future<void> sendStreamError({
+    required String streamId,
+    required String errorMessage,
     Map<String, dynamic>? metadata,
   }) =>
       _delegate.sendStreamError(
-        streamId,
-        errorMessage,
+        streamId: streamId,
+        errorMessage: errorMessage,
         metadata: metadata,
       );
 
@@ -183,25 +197,37 @@ class _RpcEndpointImpl<T extends IRpcSerializableMessage>
       try {
         // Типобезопасная регистрация каждого типа метода
         if (methodType == RpcMethodType.unary) {
-          unary(contract.serviceName, methodName).register(
+          unaryRequest(
+            serviceName: contract.serviceName,
+            methodName: methodName,
+          ).register(
             handler: handler,
             requestParser: argumentParser,
             responseParser: responseParser,
           );
         } else if (methodType == RpcMethodType.serverStreaming) {
-          serverStreaming(contract.serviceName, methodName).register(
+          serverStreaming(
+            serviceName: contract.serviceName,
+            methodName: methodName,
+          ).register(
             handler: handler,
             requestParser: argumentParser,
             responseParser: responseParser,
           );
         } else if (methodType == RpcMethodType.clientStreaming) {
-          clientStreaming(contract.serviceName, methodName).register(
+          clientStreaming(
+            serviceName: contract.serviceName,
+            methodName: methodName,
+          ).register(
             handler: handler,
             requestParser: argumentParser,
             responseParser: responseParser,
           );
         } else if (methodType == RpcMethodType.bidirectional) {
-          bidirectional(contract.serviceName, methodName).register(
+          bidirectionalStreaming(
+            serviceName: contract.serviceName,
+            methodName: methodName,
+          ).register(
             handler: handler,
             requestParser: argumentParser,
             responseParser: responseParser,
@@ -222,45 +248,35 @@ class _RpcEndpointImpl<T extends IRpcSerializableMessage>
     return _contracts[serviceName];
   }
 
-  /// Регистрирует реализацию метода (для внутреннего использования)
-  void registerMethodImplementation(
-    String serviceName,
-    String methodName,
-    RpcMethodImplementation implementation,
-  ) {
-    _implementations.putIfAbsent(serviceName, () => {});
-    _implementations[serviceName]![methodName] = implementation;
-  }
-
   /// Создает объект унарного метода для указанного сервиса и метода
   @override
-  UnaryRpcMethod<T> unary(
-    String serviceName,
-    String methodName,
-  ) =>
-      UnaryRpcMethod<T>(this, serviceName, methodName);
+  UnaryRequestRpcMethod<T> unaryRequest({
+    required String serviceName,
+    required String methodName,
+  }) =>
+      UnaryRequestRpcMethod<T>(this, serviceName, methodName);
 
   /// Создает объект серверного стриминг метода для указанного сервиса и метода
   @override
-  ServerStreamingRpcMethod<T> serverStreaming(
-    String serviceName,
-    String methodName,
-  ) =>
+  ServerStreamingRpcMethod<T> serverStreaming({
+    required String serviceName,
+    required String methodName,
+  }) =>
       ServerStreamingRpcMethod<T>(this, serviceName, methodName);
 
   /// Создает объект клиентского стриминг метода для указанного сервиса и метода
   @override
-  ClientStreamingRpcMethod<T> clientStreaming(
-    String serviceName,
-    String methodName,
-  ) =>
+  ClientStreamingRpcMethod<T> clientStreaming({
+    required String serviceName,
+    required String methodName,
+  }) =>
       ClientStreamingRpcMethod<T>(this, serviceName, methodName);
 
   /// Создает объект двунаправленного стриминг метода для указанного сервиса и метода
   @override
-  BidirectionalRpcMethod<T> bidirectional(
-    String serviceName,
-    String methodName,
-  ) =>
-      BidirectionalRpcMethod<T>(this, serviceName, methodName);
+  BidirectionalStreamingRpcMethod<T> bidirectionalStreaming({
+    required String serviceName,
+    required String methodName,
+  }) =>
+      BidirectionalStreamingRpcMethod<T>(this, serviceName, methodName);
 }

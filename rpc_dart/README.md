@@ -5,7 +5,7 @@
 ## Особенности
 
 - 🚀 **Кроссплатформенность** - работает на всех платформах, где поддерживается Dart/Flutter
-- 🌐 **Независимость от транспорта** - поддержка различных транспортных протоколов (WebSocket, Memory, Isolate)
+- 🌐 **Независимость от транспорта** - поддержка различных транспортных протоколов (Memory, Proxy, WebSocket, Isolate)
 - 💪 **Типобезопасность** - строгая типизация контрактов и сообщений
 - 🔄 **Поддержка всех типов RPC** - унарные вызовы, серверный стриминг, клиентский стриминг, двунаправленный стриминг
 - 🧩 **Middleware** - расширение функциональности через промежуточные обработчики
@@ -349,48 +349,32 @@ clientTransport.connect(serverTransport);
 serverTransport.connect(clientTransport);
 ```
 
-### WebSocketTransport
+### ProxyTransport
 
-Используется для коммуникации через WebSocket (между клиентом и сервером):
-
-```dart
-// На сервере
-final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 8080);
-final wsServer = WebSocketTransport.createServerFromHttpServer(server);
-
-// На клиенте
-final wsClient = await WebSocketTransport.connect('ws://localhost:8080');
-```
-
-### IsolateTransport
-
-Используется для коммуникации между изолятами (параллельными потоками) в Dart:
+Используется для перенаправления сообщений через произвольные потоки:
 
 ```dart
-// В основном изоляте
-final mainTransport = IsolateTransport('main');
-
-// Создание и запуск изолята
-final receivePort = ReceivePort();
-await Isolate.spawn(
-  workerIsolate,
-  receivePort.sendPort,
+final clientTransport = ProxyTransport(
+  id: 'client',
+  incomingStream: incomingStream,
+  timeout: Duration(seconds: 10),
+  sendFunction: (data) async {
+    // Отправка данных через произвольный поток
+  },
 );
-
-final workerSendPort = await receivePort.first as SendPort;
-mainTransport.connectToIsolate(workerSendPort);
-
-// В рабочем изоляте
-void workerIsolate(SendPort mainSendPort) {
-  final receivePort = ReceivePort();
-  mainSendPort.send(receivePort.sendPort);
-  
-  final workerTransport = IsolateTransport('worker');
-  workerTransport.connectToIsolate(mainSendPort, receivePort);
-  
-  // ...
-}
+final serverTransport = ProxyTransport(
+  id: 'server',
+  incomingStream: incomingStream,
+  timeout: Duration(seconds: 10),
+  sendFunction: (data) async {
+    // Отправка данных через произвольный поток
+  },
+);
 ```
+
+### rpc_dart_transports
+
+Для других реализаций транспорта см. библиотеку [rpc_dart_transports](https://pub.dev/packages/rpc_dart_transports).
 
 ## Примеры
 

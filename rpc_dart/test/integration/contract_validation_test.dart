@@ -170,7 +170,10 @@ base class ClientUserService extends UserServiceContract {
   @override
   Future<UserResponse> registerUser(UserRequest request) {
     return client
-        .unary(serviceName, UserServiceContract.registerUserMethod)
+        .unaryRequest(
+          serviceName: serviceName,
+          methodName: UserServiceContract.registerUserMethod,
+        )
         .call<UserRequest, UserResponse>(
           request: request,
           responseParser: UserResponse.fromJson,
@@ -181,8 +184,10 @@ base class ClientUserService extends UserServiceContract {
   Stream<NotificationMessage> subscribeToNotifications(UserRequest request) {
     return client
         .serverStreaming(
-            serviceName, UserServiceContract.subscribeToNotificationsMethod)
-        .openStream<UserRequest, NotificationMessage>(
+          serviceName: serviceName,
+          methodName: UserServiceContract.subscribeToNotificationsMethod,
+        )
+        .call<UserRequest, NotificationMessage>(
           request: request,
           responseParser: NotificationMessage.fromJson,
         );

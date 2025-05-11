@@ -47,9 +47,9 @@ void main() {
 
       // Регистрируем метод на сервере
       serverEndpoint.registerMethod(
-        serviceName,
-        methodName,
-        (context) async {
+        serviceName: serviceName,
+        methodName: methodName,
+        handler: (context) async {
           final payload = context.payload as Map<String, dynamic>;
           final a = payload['a'] as int;
           final b = payload['b'] as int;
@@ -59,9 +59,9 @@ void main() {
 
       // Act - действие
       final response = await clientEndpoint.invoke(
-        serviceName,
-        methodName,
-        {'a': 5, 'b': 3},
+        serviceName: serviceName,
+        methodName: methodName,
+        request: {'a': 5, 'b': 3},
       );
 
       // Assert - проверка
@@ -77,9 +77,9 @@ void main() {
 
       // Регистрируем метод на сервере
       serverEndpoint.registerMethod(
-        serviceName,
-        methodName,
-        (context) async {
+        serviceName: serviceName,
+        methodName: methodName,
+        handler: (context) async {
           final payload = context.payload as Map<String, dynamic>;
           final count = payload['count'] as int;
 
@@ -90,12 +90,15 @@ void main() {
           Future.microtask(() async {
             for (var i = 1; i <= count; i++) {
               // Отправляем данные в поток
-              await serverEndpoint.sendStreamData(messageId, i);
+              await serverEndpoint.sendStreamData(
+                streamId: messageId,
+                data: i,
+              );
               await Future.delayed(Duration(milliseconds: 10));
             }
 
             // Сигнализируем о завершении потока
-            await serverEndpoint.closeStream(messageId);
+            await serverEndpoint.closeStream(streamId: messageId);
           });
 
           // Возвращаем подтверждение активации стрима
@@ -105,8 +108,8 @@ void main() {
 
       // Act - действие
       final stream = clientEndpoint.openStream(
-        serviceName,
-        methodName,
+        serviceName: serviceName,
+        methodName: methodName,
         request: {'count': 5},
       );
 
@@ -126,9 +129,9 @@ void main() {
 
       // Регистрируем метод на сервере
       serverEndpoint.registerMethod(
-        serviceName,
-        methodName,
-        (context) async {
+        serviceName: serviceName,
+        methodName: methodName,
+        handler: (context) async {
           final payload = context.payload as Map<String, dynamic>;
           final a = payload['a'] as int;
           final b = payload['b'] as int;
@@ -144,9 +147,9 @@ void main() {
       // Act & Assert - действие и проверка
       expect(
         () => clientEndpoint.invoke(
-          serviceName,
-          methodName,
-          {'a': 10, 'b': 0},
+          serviceName: serviceName,
+          methodName: methodName,
+          request: {'a': 10, 'b': 0},
         ),
         throwsA(anything),
       );
@@ -156,9 +159,9 @@ void main() {
       // Act & Assert - действие и проверка
       expect(
         () => clientEndpoint.invoke(
-          'NonexistentService',
-          'nonexistentMethod',
-          {'data': 123},
+          serviceName: 'NonexistentService',
+          methodName: 'nonexistentMethod',
+          request: {'data': 123},
         ),
         throwsA(anything),
       );
@@ -176,9 +179,9 @@ void main() {
 
       // Регистрируем метод на сервере
       serverEndpoint.registerMethod(
-        serviceName,
-        methodName,
-        (context) async {
+        serviceName: serviceName,
+        methodName: methodName,
+        handler: (context) async {
           // Возвращаем те же метаданные
           return context.metadata;
         },
@@ -186,9 +189,9 @@ void main() {
 
       // Act - действие
       final response = await clientEndpoint.invoke(
-        serviceName,
-        methodName,
-        {'dummy': 'data'},
+        serviceName: serviceName,
+        methodName: methodName,
+        request: {'dummy': 'data'},
         metadata: metadata,
       );
 

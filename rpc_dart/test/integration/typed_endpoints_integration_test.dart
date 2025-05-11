@@ -119,7 +119,10 @@ final class ClientTestService extends TestContract {
   @override
   Future<TestResponse> multiply(TestRequest request) {
     return _endpoint
-        .unary(serviceName, TestContract.multiplyMethod)
+        .unaryRequest(
+          serviceName: serviceName,
+          methodName: TestContract.multiplyMethod,
+        )
         .call<TestRequest, TestResponse>(
           request: request,
           responseParser: TestResponse.fromJson,
@@ -129,8 +132,11 @@ final class ClientTestService extends TestContract {
   @override
   Stream<CountResponse> countTo(CountRequest request) {
     return _endpoint
-        .serverStreaming(serviceName, TestContract.countToMethod)
-        .openStream<CountRequest, CountResponse>(
+        .serverStreaming(
+          serviceName: serviceName,
+          methodName: TestContract.countToMethod,
+        )
+        .call<CountRequest, CountResponse>(
           request: request,
           responseParser: CountResponse.fromJson,
         );

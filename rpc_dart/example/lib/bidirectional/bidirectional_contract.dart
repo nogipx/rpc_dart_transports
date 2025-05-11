@@ -161,9 +161,10 @@ final class ClientChatService extends ChatServiceContract {
   /// Открывает двунаправленный канал связи для чата
   Future<BidirectionalChannel<ChatMessage, ChatMessage>> chat() async {
     return _endpoint
-        .bidirectional(serviceName, chatMethod)
-        .createChannel<ChatMessage, ChatMessage>(
-          responseParser: ChatMessage.fromJson,
-        );
+        .bidirectionalStreaming(
+          serviceName: serviceName,
+          methodName: chatMethod,
+        )
+        .call<ChatMessage, ChatMessage>(responseParser: ChatMessage.fromJson);
   }
 }

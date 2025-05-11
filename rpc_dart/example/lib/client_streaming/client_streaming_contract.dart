@@ -110,8 +110,11 @@ final class ClientStreamService extends StreamServiceContract {
   Future<RpcClientStreamResult<DataBlock, DataBlockResult>> processDataBlocks(
     RpcClientStreamParams<DataBlock, DataBlockResult> params,
   ) async => _endpoint
-      .clientStreaming(serviceName, StreamServiceContract.nameProcessDataBlocks)
-      .openClientStream<DataBlock, DataBlockResult>(
+      .clientStreaming(
+        serviceName: serviceName,
+        methodName: StreamServiceContract.nameProcessDataBlocks,
+      )
+      .call<DataBlock, DataBlockResult>(
         responseParser: DataBlockResult.fromJson,
         metadata: params.metadata,
         streamId: params.streamId,

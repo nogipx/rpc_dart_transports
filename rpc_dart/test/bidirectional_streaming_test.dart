@@ -25,42 +25,50 @@ void main() {
       );
 
       // Регистрируем обработчик для стрима на сервере
-      serverEndpoint.registerMethod('TestService', 'bidirectionalStream',
-          (context) async {
-        // Получаем ID сообщения
-        final messageId = context.messageId;
+      serverEndpoint.registerMethod(
+          serviceName: 'TestService',
+          methodName: 'bidirectionalStream',
+          handler: (context) async {
+            // Получаем ID сообщения
+            final messageId = context.messageId;
 
-        // Слушаем входящие сообщения и отправляем ответы
-        serverEndpoint
-            .openStream('TestService', 'bidirectionalStream',
-                streamId: messageId)
-            .listen((data) {
-          // Проверяем на маркер конца
-          if (data is Map<String, dynamic> &&
-              data['_clientStreamEnd'] == true) {
-            return;
-          }
-
-          // Отправляем ответное сообщение (число умноженное на 10)
-          if (data is int) {
-            serverEndpoint.sendStreamData(
-              messageId,
-              data * 10,
+            // Слушаем входящие сообщения и отправляем ответы
+            serverEndpoint
+                .openStream(
               serviceName: 'TestService',
               methodName: 'bidirectionalStream',
-            );
-          }
-        });
+              streamId: messageId,
+            )
+                .listen((data) {
+              // Проверяем на маркер конца
+              if (data is Map<String, dynamic> &&
+                  data['_clientStreamEnd'] == true) {
+                return;
+              }
 
-        // Возвращаем статус для начала двунаправленного стрима
-        return {'status': 'bidirectional_streaming_started'};
-      });
+              // Отправляем ответное сообщение (число умноженное на 10)
+              if (data is int) {
+                serverEndpoint.sendStreamData(
+                  streamId: messageId,
+                  data: data * 10,
+                  serviceName: 'TestService',
+                  methodName: 'bidirectionalStream',
+                );
+              }
+            });
+
+            // Возвращаем статус для начала двунаправленного стрима
+            return {'status': 'bidirectional_streaming_started'};
+          });
 
       // Регистрируем такой же метод на клиенте, чтобы можно было открыть стрим
-      clientEndpoint.registerMethod('TestService', 'bidirectionalStream',
-          (context) async {
-        return {'status': 'bidirectional_streaming_started'};
-      });
+      clientEndpoint.registerMethod(
+        serviceName: 'TestService',
+        methodName: 'bidirectionalStream',
+        handler: (context) async {
+          return {'status': 'bidirectional_streaming_started'};
+        },
+      );
 
       // Создаем поток для входящих сообщений от сервера
       final receivedMessages = <int>[];
@@ -71,13 +79,20 @@ void main() {
           'test-stream-${DateTime.now().millisecondsSinceEpoch}';
 
       // Отправляем запрос на создание стрима
-      await clientEndpoint.invoke('TestService', 'bidirectionalStream', {},
-          metadata: {'streamId': clientStreamId});
+      await clientEndpoint.invoke(
+        serviceName: 'TestService',
+        methodName: 'bidirectionalStream',
+        request: {},
+        metadata: {'streamId': clientStreamId},
+      );
 
       // Слушаем ответы от сервера
       clientEndpoint
-          .openStream('TestService', 'bidirectionalStream',
-              streamId: clientStreamId)
+          .openStream(
+        serviceName: 'TestService',
+        methodName: 'bidirectionalStream',
+        streamId: clientStreamId,
+      )
           .listen((data) {
         if (data is int) {
           receivedMessages.add(data);
@@ -90,24 +105,24 @@ void main() {
       // Отправляем числа с небольшими паузами
       await Future.delayed(Duration(milliseconds: 50));
       clientEndpoint.sendStreamData(
-        clientStreamId,
-        1,
+        streamId: clientStreamId,
+        data: 1,
         serviceName: 'TestService',
         methodName: 'bidirectionalStream',
       );
 
       await Future.delayed(Duration(milliseconds: 50));
       clientEndpoint.sendStreamData(
-        clientStreamId,
-        2,
+        streamId: clientStreamId,
+        data: 2,
         serviceName: 'TestService',
         methodName: 'bidirectionalStream',
       );
 
       await Future.delayed(Duration(milliseconds: 50));
       clientEndpoint.sendStreamData(
-        clientStreamId,
-        3,
+        streamId: clientStreamId,
+        data: 3,
         serviceName: 'TestService',
         methodName: 'bidirectionalStream',
       );
@@ -118,8 +133,8 @@ void main() {
 
       // Закрываем стрим
       clientEndpoint.sendStreamData(
-        clientStreamId,
-        {'_clientStreamEnd': true},
+        streamId: clientStreamId,
+        data: {'_clientStreamEnd': true},
         serviceName: 'TestService',
         methodName: 'bidirectionalStream',
       );
@@ -157,47 +172,55 @@ void main() {
 
       // Регистрируем обработчик на сервере, который будет выдавать ошибку для определенных значений
       serverEndpoint.registerMethod(
-          'TestService', 'bidirectionalStreamWithError', (context) async {
-        // Получаем ID сообщения
-        final messageId = context.messageId;
+          serviceName: 'TestService',
+          methodName: 'bidirectionalStreamWithError',
+          handler: (context) async {
+            // Получаем ID сообщения
+            final messageId = context.messageId;
 
-        // Слушаем входящие сообщения и отправляем ответы
-        serverEndpoint
-            .openStream('TestService', 'bidirectionalStreamWithError',
-                streamId: messageId)
-            .listen((data) {
-          // Проверяем на маркер конца
-          if (data is Map<String, dynamic> &&
-              data['_clientStreamEnd'] == true) {
-            return;
-          }
-
-          // Генерируем ошибку для определенного значения
-          if (data is int && data == 999) {
-            serverEndpoint.sendStreamError(
-              messageId,
-              'Тестовая ошибка для значения 999',
-            );
-          } else if (data is int) {
-            // Обычный ответ для других значений
-            serverEndpoint.sendStreamData(
-              messageId,
-              data * 10,
+            // Слушаем входящие сообщения и отправляем ответы
+            serverEndpoint
+                .openStream(
               serviceName: 'TestService',
               methodName: 'bidirectionalStreamWithError',
-            );
-          }
-        });
+              streamId: messageId,
+            )
+                .listen((data) {
+              // Проверяем на маркер конца
+              if (data is Map<String, dynamic> &&
+                  data['_clientStreamEnd'] == true) {
+                return;
+              }
 
-        // Возвращаем статус для начала двунаправленного стрима
-        return {'status': 'bidirectional_streaming_started'};
-      });
+              // Генерируем ошибку для определенного значения
+              if (data is int && data == 999) {
+                serverEndpoint.sendStreamError(
+                  streamId: messageId,
+                  errorMessage: 'Тестовая ошибка для значения 999',
+                );
+              } else if (data is int) {
+                // Обычный ответ для других значений
+                serverEndpoint.sendStreamData(
+                  streamId: messageId,
+                  data: data * 10,
+                  serviceName: 'TestService',
+                  methodName: 'bidirectionalStreamWithError',
+                );
+              }
+            });
+
+            // Возвращаем статус для начала двунаправленного стрима
+            return {'status': 'bidirectional_streaming_started'};
+          });
 
       // Регистрируем такой же метод на клиенте, чтобы можно было открыть стрим
       clientEndpoint.registerMethod(
-          'TestService', 'bidirectionalStreamWithError', (context) async {
-        return {'status': 'bidirectional_streaming_started'};
-      });
+        serviceName: 'TestService',
+        methodName: 'bidirectionalStreamWithError',
+        handler: (context) async {
+          return {'status': 'bidirectional_streaming_started'};
+        },
+      );
 
       // Переменные для теста
       var errorReceived = false;
@@ -209,13 +232,19 @@ void main() {
 
       // Отправляем запрос на создание стрима
       await clientEndpoint.invoke(
-          'TestService', 'bidirectionalStreamWithError', {},
-          metadata: {'streamId': clientStreamId});
+        serviceName: 'TestService',
+        methodName: 'bidirectionalStreamWithError',
+        request: {},
+        metadata: {'streamId': clientStreamId},
+      );
 
       // Слушаем ответы от сервера, ожидая ошибку
       clientEndpoint
-          .openStream('TestService', 'bidirectionalStreamWithError',
-              streamId: clientStreamId)
+          .openStream(
+        serviceName: 'TestService',
+        methodName: 'bidirectionalStreamWithError',
+        streamId: clientStreamId,
+      )
           .listen((data) {}, onError: (error) {
         errorReceived = true;
         completer.complete();
@@ -224,8 +253,8 @@ void main() {
       // Отправляем значение, которое вызовет ошибку
       await Future.delayed(Duration(milliseconds: 50));
       clientEndpoint.sendStreamData(
-        clientStreamId,
-        999, // Это вызовет ошибку
+        streamId: clientStreamId,
+        data: 999, // Это вызовет ошибку
         serviceName: 'TestService',
         methodName: 'bidirectionalStreamWithError',
       );
@@ -236,8 +265,8 @@ void main() {
 
       // Закрываем стрим
       clientEndpoint.sendStreamData(
-        clientStreamId,
-        {'_clientStreamEnd': true},
+        streamId: clientStreamId,
+        data: {'_clientStreamEnd': true},
         serviceName: 'TestService',
         methodName: 'bidirectionalStreamWithError',
       );

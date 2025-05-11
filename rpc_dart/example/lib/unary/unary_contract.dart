@@ -54,7 +54,7 @@ final class ClientBasicServiceContract extends BasicServiceContract {
   @override
   Future<ComputeResult> compute(ComputeRequest request) async {
     return _endpoint
-        .unary(serviceName, 'compute')
+        .unaryRequest(serviceName: serviceName, methodName: 'compute')
         .call<ComputeRequest, ComputeResult>(
           request: request,
           responseParser: ComputeResult.fromJson,

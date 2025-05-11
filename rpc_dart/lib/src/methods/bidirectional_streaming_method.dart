@@ -5,10 +5,10 @@
 part of '_method.dart';
 
 /// Класс для работы с RPC методом типа "двунаправленный стриминг" (поток запросов - поток ответов)
-final class BidirectionalRpcMethod<T extends IRpcSerializableMessage>
+final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
     extends RpcMethod<T> {
   /// Создает новый объект двунаправленного стриминг RPC метода
-  const BidirectionalRpcMethod(
+  const BidirectionalStreamingRpcMethod(
     IRpcEndpoint<T> endpoint,
     String serviceName,
     String methodName,
@@ -20,7 +20,7 @@ final class BidirectionalRpcMethod<T extends IRpcSerializableMessage>
   /// [metadata] - дополнительные метаданные (опционально)
   /// [streamId] - необязательный идентификатор стрима (генерируется автоматически)
   BidirectionalChannel<Request, Response>
-      createChannel<Request extends T, Response extends T>({
+      call<Request extends T, Response extends T>({
     required RpcMethodResponseParser<Response> responseParser,
     Map<String, dynamic>? metadata,
     String? streamId,
@@ -34,9 +34,9 @@ final class BidirectionalRpcMethod<T extends IRpcSerializableMessage>
 
     // Инициируем соединение
     _core.invoke(
-      serviceName,
-      methodName,
-      {'_bidirectional': true, '_streamId': effectiveStreamId},
+      serviceName: serviceName,
+      methodName: methodName,
+      request: {'_bidirectional': true, '_streamId': effectiveStreamId},
       metadata: metadata,
     );
 
@@ -44,8 +44,8 @@ final class BidirectionalRpcMethod<T extends IRpcSerializableMessage>
     Stream<Response> typedIncomingStream;
     typedIncomingStream = _core
         .openStream(
-      serviceName,
-      methodName,
+      serviceName: serviceName,
+      methodName: methodName,
       streamId: effectiveStreamId,
     )
         .map((data) {
@@ -64,8 +64,8 @@ final class BidirectionalRpcMethod<T extends IRpcSerializableMessage>
         } catch (e) {
           // В случае ошибки преобразования, логируем через метаданные для middleware
           _core.sendStreamData(
-            effectiveStreamId,
-            null,
+            streamId: effectiveStreamId,
+            data: null,
             metadata: {
               '_error': 'Ошибка преобразования: $e',
               '_level': 'warning'
@@ -92,8 +92,8 @@ final class BidirectionalRpcMethod<T extends IRpcSerializableMessage>
     outgoingController.stream.listen(
       (data) {
         _core.sendStreamData(
-          effectiveStreamId,
-          data is RpcMessage ? data.toJson() : data,
+          streamId: effectiveStreamId,
+          data: data is RpcMessage ? data.toJson() : data,
           serviceName: serviceName,
           methodName: methodName,
         );
@@ -101,8 +101,8 @@ final class BidirectionalRpcMethod<T extends IRpcSerializableMessage>
       onDone: () {
         // Маркер завершения для клиентского стрима
         _core.sendStreamData(
-          effectiveStreamId,
-          {'_clientStreamEnd': true},
+          streamId: effectiveStreamId,
+          data: {'_clientStreamEnd': true},
           serviceName: serviceName,
           methodName: methodName,
         );
@@ -154,19 +154,23 @@ final class BidirectionalRpcMethod<T extends IRpcSerializableMessage>
     // Получаем актуальный контракт метода
     final contract =
         getMethodContract<Request, Response>(RpcMethodType.bidirectional);
+
     final implementation =
-        RpcMethodImplementation.bidirectional(contract, handler);
+        RpcMethodImplementation.bidirectionalStreaming(contract, handler);
 
     // Регистрируем реализацию метода
     _registrar.registerMethodImplementation(
-        serviceName, methodName, implementation);
+      serviceName: serviceName,
+      methodName: methodName,
+      implementation: implementation,
+    );
 
     // Регистрируем низкоуровневый обработчик - это ключевой шаг для обеспечения
     // связи между контрактом и обработчиком вызова
     _registrar.registerMethod(
-      serviceName,
-      methodName,
-      (context) async {
+      serviceName: serviceName,
+      methodName: methodName,
+      handler: (context) async {
         // Получаем данные запроса и проверяем маркер двунаправленного стрима
         final requestData = context.payload;
         final isBidirectional = requestData is Map<String, dynamic> &&
@@ -188,8 +192,8 @@ final class BidirectionalRpcMethod<T extends IRpcSerializableMessage>
           Stream<Request> typedIncomingStream;
           typedIncomingStream = _core
               .openStream(
-            serviceName,
-            methodName,
+            serviceName: serviceName,
+            methodName: methodName,
             streamId: effectiveStreamId,
           )
               .map((data) {
@@ -226,21 +230,21 @@ final class BidirectionalRpcMethod<T extends IRpcSerializableMessage>
           outgoingStream.listen(
             (data) {
               _core.sendStreamData(
-                effectiveStreamId,
-                data is RpcMessage ? data.toJson() : data,
+                streamId: effectiveStreamId,
+                data: data is RpcMessage ? data.toJson() : data,
                 serviceName: serviceName,
                 methodName: methodName,
               );
             },
             onError: (error) {
               _core.sendStreamError(
-                effectiveStreamId,
-                error.toString(),
+                streamId: effectiveStreamId,
+                errorMessage: error.toString(),
               );
             },
             onDone: () {
               _core.closeStream(
-                effectiveStreamId,
+                streamId: effectiveStreamId,
                 serviceName: serviceName,
                 methodName: methodName,
               );
@@ -311,15 +315,15 @@ final class BidirectionalChannel<Request extends IRpcSerializableMessage,
 
     // Отправляем маркер завершения канала
     await _core.sendStreamData(
-      streamId,
-      {'_channelClosed': true},
+      streamId: streamId,
+      data: {'_channelClosed': true},
       serviceName: serviceName,
       methodName: methodName,
     );
 
     // Закрываем канал
     await _core.closeStream(
-      streamId,
+      streamId: streamId,
       serviceName: serviceName,
       methodName: methodName,
     );

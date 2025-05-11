@@ -20,19 +20,28 @@ abstract interface class IRpcEndpoint<T extends IRpcSerializableMessage> {
   String? get debugLabel;
 
   /// Создает объект унарного метода
-  UnaryRpcMethod<T> unary(String serviceName, String methodName);
+  UnaryRequestRpcMethod<T> unaryRequest({
+    required String serviceName,
+    required String methodName,
+  });
 
   /// Создает объект метода с серверным стримингом
-  ServerStreamingRpcMethod<T> serverStreaming(
-      String serviceName, String methodName);
+  ServerStreamingRpcMethod<T> serverStreaming({
+    required String serviceName,
+    required String methodName,
+  });
 
   /// Создает объект метода с клиентским стримингом
-  ClientStreamingRpcMethod<T> clientStreaming(
-      String serviceName, String methodName);
+  ClientStreamingRpcMethod<T> clientStreaming({
+    required String serviceName,
+    required String methodName,
+  });
 
   /// Создает объект метода с двунаправленным стримингом
-  BidirectionalRpcMethod<T> bidirectional(
-      String serviceName, String methodName);
+  BidirectionalStreamingRpcMethod<T> bidirectionalStreaming({
+    required String serviceName,
+    required String methodName,
+  });
 
   /// Добавляет middleware для обработки запросов и ответов
   ///

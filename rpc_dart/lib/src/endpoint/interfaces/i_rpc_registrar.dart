@@ -17,16 +17,16 @@ abstract interface class IRpcRegistrar<T extends IRpcSerializableMessage> {
   /// [serviceName] - имя сервиса
   /// [methodName] - имя метода
   /// [handler] - функция обработки запроса, которая принимает контекст вызова
-  void registerMethod(
-    String serviceName,
-    String methodName,
-    Future<dynamic> Function(RpcMethodContext) handler,
-  );
+  void registerMethod({
+    required String serviceName,
+    required String methodName,
+    required Future<dynamic> Function(RpcMethodContext) handler,
+  });
 
   /// Регистрирует реализацию метода (для внутреннего использования)
-  void registerMethodImplementation(
-    String serviceName,
-    String methodName,
-    RpcMethodImplementation implementation,
-  );
+  void registerMethodImplementation({
+    required String serviceName,
+    required String methodName,
+    required RpcMethodImplementation implementation,
+  });
 }

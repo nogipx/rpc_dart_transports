@@ -49,9 +49,9 @@ void main() {
 
       // Регистрируем обработчик метода на второй конечной точке
       endpoint2.registerMethod(
-        serviceName,
-        methodName,
-        (context) async {
+        serviceName: serviceName,
+        methodName: methodName,
+        handler: (context) async {
           final payload = context.payload as Map<String, dynamic>;
           final a = payload['a'] as int;
           final b = payload['b'] as int;
@@ -60,7 +60,11 @@ void main() {
       );
 
       // Act
-      final result = await endpoint1.invoke(serviceName, methodName, request);
+      final result = await endpoint1.invoke(
+        serviceName: serviceName,
+        methodName: methodName,
+        request: request,
+      );
 
       // Assert
       expect(result, equals(expectedResponse));
@@ -73,16 +77,20 @@ void main() {
 
       // Регистрируем обработчик, который всегда бросает ошибку
       endpoint2.registerMethod(
-        serviceName,
-        methodName,
-        (context) async {
+        serviceName: serviceName,
+        methodName: methodName,
+        handler: (context) async {
           throw 'Simulated error';
         },
       );
 
       // Act & Assert
       expect(
-        endpoint1.invoke(serviceName, methodName, {}),
+        endpoint1.invoke(
+          serviceName: serviceName,
+          methodName: methodName,
+          request: {},
+        ),
         throwsA(contains('Simulated error')),
       );
     });
@@ -91,28 +99,36 @@ void main() {
       // Arrange
       // Регистрируем метод на endpoint1
       endpoint1.registerMethod(
-        'Service1',
-        'method1',
-        (context) async {
+        serviceName: 'Service1',
+        methodName: 'method1',
+        handler: (context) async {
           return {'response': 'from endpoint1'};
         },
       );
 
       // Регистрируем метод на endpoint2
       endpoint2.registerMethod(
-        'Service2',
-        'method2',
-        (context) async {
+        serviceName: 'Service2',
+        methodName: 'method2',
+        handler: (context) async {
           return {'response': 'from endpoint2'};
         },
       );
 
       // Act
       // Вызываем метод с endpoint1 на endpoint2
-      final result1 = await endpoint1.invoke('Service2', 'method2', {});
+      final result1 = await endpoint1.invoke(
+        serviceName: 'Service2',
+        methodName: 'method2',
+        request: {},
+      );
 
       // Вызываем метод с endpoint2 на endpoint1
-      final result2 = await endpoint2.invoke('Service1', 'method1', {});
+      final result2 = await endpoint2.invoke(
+        serviceName: 'Service1',
+        methodName: 'method1',
+        request: {},
+      );
 
       // Assert
       expect(result1, equals({'response': 'from endpoint2'}));
@@ -130,9 +146,9 @@ void main() {
 
       // Регистрируем обработчик, который не будет отправлять данные
       endpoint2.registerMethod(
-        serviceName,
-        methodName,
-        (context) async {
+        serviceName: serviceName,
+        methodName: methodName,
+        handler: (context) async {
           final payload = context.payload as Map<String, dynamic>;
           final streamId = payload['streamId'] as String;
           expect(streamId, equals(customStreamId),
@@ -146,8 +162,8 @@ void main() {
       // Act
       // Открываем поток с явным указанием ID
       final stream = endpoint1.openStream(
-        serviceName,
-        methodName,
+        serviceName: serviceName,
+        methodName: methodName,
         request: {'streamId': customStreamId},
         streamId: customStreamId, // Важно - указываем явный streamId
       );

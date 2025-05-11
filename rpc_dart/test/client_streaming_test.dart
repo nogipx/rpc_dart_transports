@@ -99,8 +99,11 @@ void main() {
     test('should handle basic client streaming', () async {
       // Регистрируем обработчик для суммирования значений из стрима
       serverEndpoint
-          .clientStreaming('TestService', 'basicStream')
-          .register<TestData, TestResult>(
+          .clientStreaming(
+            serviceName: 'TestService',
+            methodName: 'basicStream',
+          )
+          .register(
             handler: (params) async {
               int sum = 0;
               final stream = params.stream?.cast<TestData>();
@@ -122,8 +125,11 @@ void main() {
 
       // Открываем клиентский стрим
       final streamResult = clientEndpoint
-          .clientStreaming('TestService', 'basicStream')
-          .openClientStream<TestData, TestResult>(
+          .clientStreaming(
+            serviceName: 'TestService',
+            methodName: 'basicStream',
+          )
+          .call<TestData, TestResult>(
             responseParser: TestResult.fromJson,
             streamId: 'basic-stream-test',
           );

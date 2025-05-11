@@ -5,10 +5,10 @@
 part of '_method.dart';
 
 /// Класс для работы с унарным RPC методом (один запрос - один ответ)
-final class UnaryRpcMethod<T extends IRpcSerializableMessage>
+final class UnaryRequestRpcMethod<T extends IRpcSerializableMessage>
     extends RpcMethod<T> {
   /// Создает новый объект унарного RPC метода
-  UnaryRpcMethod(
+  UnaryRequestRpcMethod(
     IRpcEndpoint<T> endpoint,
     String serviceName,
     String methodName,
@@ -27,9 +27,9 @@ final class UnaryRpcMethod<T extends IRpcSerializableMessage>
     Duration? timeout,
   }) async {
     final result = await _core.invoke(
-      serviceName,
-      methodName,
-      request is RpcMessage ? request.toJson() : request,
+      serviceName: serviceName,
+      methodName: methodName,
+      request: request is RpcMessage ? request.toJson() : request,
       metadata: metadata,
       timeout: timeout,
     );
@@ -80,14 +80,17 @@ final class UnaryRpcMethod<T extends IRpcSerializableMessage>
 
     // Регистрируем реализацию метода
     _registrar.registerMethodImplementation(
-        serviceName, methodName, implementation);
+      serviceName: serviceName,
+      methodName: methodName,
+      implementation: implementation,
+    );
 
     // Регистрируем низкоуровневый обработчик - это ключевой шаг для обеспечения
     // связи между контрактом и обработчиком вызова
     _registrar.registerMethod(
-      serviceName,
-      methodName,
-      (RpcMethodContext context) async {
+      serviceName: serviceName,
+      methodName: methodName,
+      handler: (RpcMethodContext context) async {
         try {
           // Если request - это Map и мы получили функцию fromJson, преобразуем объект
           final typedRequest = (context.payload is Map<String, dynamic>)

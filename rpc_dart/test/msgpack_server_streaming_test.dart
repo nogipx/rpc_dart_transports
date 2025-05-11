@@ -157,10 +157,10 @@ final class ClientTestStreamService extends TestServerStreamContract {
   Stream<TestStreamResponse> basicStream(TestRequest request) {
     return _endpoint
         .serverStreaming(
-          serviceName,
-          TestServerStreamContract.basicStreamMethod,
+          serviceName: serviceName,
+          methodName: TestServerStreamContract.basicStreamMethod,
         )
-        .openStream<TestRequest, TestStreamResponse>(
+        .call<TestRequest, TestStreamResponse>(
           request: request,
           responseParser: TestStreamResponse.fromJson,
         );
@@ -170,10 +170,10 @@ final class ClientTestStreamService extends TestServerStreamContract {
   Stream<TestStreamResponse> multipleStreams(TestRequest request) {
     return _endpoint
         .serverStreaming(
-          serviceName,
-          TestServerStreamContract.multipleStreamsMethod,
+          serviceName: serviceName,
+          methodName: TestServerStreamContract.multipleStreamsMethod,
         )
-        .openStream<TestRequest, TestStreamResponse>(
+        .call<TestRequest, TestStreamResponse>(
           request: request,
           responseParser: TestStreamResponse.fromJson,
         );
@@ -183,10 +183,10 @@ final class ClientTestStreamService extends TestServerStreamContract {
   Stream<TestStreamResponse> errorStream(TestRequest request) {
     return _endpoint
         .serverStreaming(
-          serviceName,
-          TestServerStreamContract.errorStreamMethod,
+          serviceName: serviceName,
+          methodName: TestServerStreamContract.errorStreamMethod,
         )
-        .openStream<TestRequest, TestStreamResponse>(
+        .call<TestRequest, TestStreamResponse>(
           request: request,
           responseParser: TestStreamResponse.fromJson,
         );
@@ -199,9 +199,9 @@ final class ClientTestStreamService extends TestServerStreamContract {
   ) async {
     // Открываем соединение и получаем ответ API
     final response = await _endpoint.invoke(
-      serviceName,
-      methodName,
-      request.toJson(),
+      serviceName: serviceName,
+      methodName: methodName,
+      request: request.toJson(),
     );
 
     // Получаем информацию о стриме
@@ -209,7 +209,11 @@ final class ClientTestStreamService extends TestServerStreamContract {
 
     // Открываем стрим и возвращаем его вместе с ответом API
     final stream = _endpoint
-        .openStream(serviceName, methodName, streamId: streamId)
+        .openStream(
+          serviceName: serviceName,
+          methodName: methodName,
+          streamId: streamId,
+        )
         .map((event) =>
             TestStreamResponse.fromJson(event as Map<String, dynamic>));
 

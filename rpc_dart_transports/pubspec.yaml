@@ -9,7 +9,7 @@ environment:
 # Add regular dependencies here.
 dependencies:
   rpc_dart: any
-  web_socket_client: ^0.2.0
+  web_socket_channel: ^2.4.0
 
 dependency_overrides:
   rpc_dart:
@@ -18,3 +18,5 @@ dependency_overrides:
 dev_dependencies:
   lints: ^5.0.0
   test: ^1.24.0
+  shelf: ^1.4.1
+  shelf_web_socket: ^1.0.4

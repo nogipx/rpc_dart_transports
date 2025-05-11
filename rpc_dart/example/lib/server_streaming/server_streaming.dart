@@ -58,7 +58,7 @@ void registerTaskService(RpcEndpoint server) {
 
   // Имитация прогресса задачи
   server
-      .serverStreaming('TaskService', 'startTask')
+      .serverStreaming(serviceName: 'TaskService', methodName: 'startTask')
       .register<TaskRequest, ProgressMessage>(
         handler: (request) async* {
           print(
@@ -145,8 +145,8 @@ Future<void> demonstrateTaskProgress(RpcEndpoint client) async {
 
   // Открываем стрим для получения обновлений о прогрессе
   final stream = client
-      .serverStreaming('TaskService', 'startTask')
-      .openStream<TaskRequest, ProgressMessage>(
+      .serverStreaming(serviceName: 'TaskService', methodName: 'startTask')
+      .call<TaskRequest, ProgressMessage>(
         request: request,
         responseParser: ProgressMessage.fromJson,
       );

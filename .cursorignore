@@ -1,0 +1,10 @@
+**/COPYRIGHT
+**/LICENSE
+**/LICENSES/
+**/REUSE.toml
+**/example/
+**/*.lock
+**/analysis_options.yaml
+.cursorignore
+**/.dart_tool/
+**/justfile

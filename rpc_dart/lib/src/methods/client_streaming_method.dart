@@ -22,7 +22,7 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
   ///
   /// Возвращает тюпл из потока для отправки и Future для получения результата
   RpcClientStreamResult<Request, Response>
-      openClientStream<Request extends T, Response extends T>({
+      call<Request extends T, Response extends T>({
     required RpcMethodResponseParser<Response> responseParser,
     Map<String, dynamic>? metadata,
     String? streamId,
@@ -39,8 +39,8 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
     // Открываем базовый стрим
     _core
         .openStream(
-      serviceName,
-      methodName,
+      serviceName: serviceName,
+      methodName: methodName,
       metadata: metadata,
       streamId: effectiveStreamId,
     )
@@ -65,8 +65,8 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
         final processedData = data is RpcMessage ? data.toJson() : data;
 
         _core.sendStreamData(
-          effectiveStreamId,
-          processedData,
+          streamId: effectiveStreamId,
+          data: processedData,
           serviceName: serviceName,
           methodName: methodName,
         );
@@ -74,15 +74,15 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
       onDone: () {
         // Когда поток запросов закончен, отправляем маркер завершения
         _core.sendStreamData(
-          effectiveStreamId,
-          {'_clientStreamEnd': true},
+          streamId: effectiveStreamId,
+          data: {'_clientStreamEnd': true},
           serviceName: serviceName,
           methodName: methodName,
         );
 
         // Закрываем клиентскую часть стрима
         _core.closeStream(
-          effectiveStreamId,
+          streamId: effectiveStreamId,
           serviceName: serviceName,
           methodName: methodName,
         );
@@ -133,18 +133,21 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
     final contract =
         getMethodContract<Request, Response>(RpcMethodType.clientStreaming);
     final implementation =
-        RpcMethodImplementation.clientStream(contract, handler);
+        RpcMethodImplementation.clientStreaming(contract, handler);
 
     // Регистрируем реализацию метода
     _registrar.registerMethodImplementation(
-        serviceName, methodName, implementation);
+      serviceName: serviceName,
+      methodName: methodName,
+      implementation: implementation,
+    );
 
     // Регистрируем низкоуровневый обработчик - это ключевой шаг для обеспечения
     // связи между контрактом и обработчиком вызова
     _registrar.registerMethod(
-      serviceName,
-      methodName,
-      (RpcMethodContext context) async {
+      serviceName: serviceName,
+      methodName: methodName,
+      handler: (RpcMethodContext context) async {
         // Получаем ID сообщения из контекста
         final messageId = context.messageId;
 
@@ -153,8 +156,8 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
 
         // Открываем входящий поток и преобразуем его к типу Request
         final incomingStream = _core.openStream(
-          serviceName,
-          methodName,
+          serviceName: serviceName,
+          methodName: methodName,
           streamId: messageId,
         );
 
@@ -197,15 +200,15 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
           final result = response.toJson();
 
           _core.sendStreamData(
-            messageId,
-            result,
+            streamId: messageId,
+            data: result,
             serviceName: serviceName,
             methodName: methodName,
           );
 
           // Закрываем стрим
           _core.closeStream(
-            messageId,
+            streamId: messageId,
             serviceName: serviceName,
             methodName: methodName,
           );
@@ -214,8 +217,15 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
           return {'status': 'streaming'};
         } catch (e) {
           // В случае ошибки, отправляем её и закрываем стрим
-          _core.sendStreamError(messageId, e.toString());
-          _core.closeStream(messageId);
+          _core.sendStreamError(
+            streamId: messageId,
+            errorMessage: e.toString(),
+          );
+          _core.closeStream(
+            streamId: messageId,
+            serviceName: serviceName,
+            methodName: methodName,
+          );
           rethrow;
         }
       },

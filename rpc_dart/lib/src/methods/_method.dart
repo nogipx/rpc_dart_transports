@@ -6,10 +6,10 @@ import 'dart:async';
 import 'package:rpc_dart/rpc_dart.dart';
 
 part '_method_implementation.dart';
-part 'bidirectional_method.dart';
+part 'bidirectional_streaming_method.dart';
 part 'client_streaming_method.dart';
 part 'server_streaming_method.dart';
-part 'unary_method.dart';
+part 'unary_request_method.dart';
 
 /// Базовый абстрактный класс для всех типов RPC методов
 abstract base class RpcMethod<T extends IRpcSerializableMessage> {

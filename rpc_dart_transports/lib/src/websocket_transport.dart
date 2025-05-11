@@ -7,9 +7,11 @@ import 'dart:typed_data';
 import 'dart:convert';
 
 import 'package:rpc_dart/rpc_dart.dart';
-import 'package:web_socket_client/web_socket_client.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
 
-/// Транспорт для обмена сообщениями через WebSocket с использованием web_socket_client
+typedef WebSocketChannelProvider = WebSocketChannel Function();
+
+/// Транспорт для обмена сообщениями через WebSocket
 class WebSocketTransport implements RpcTransport {
   /// Идентификатор транспорта
   @override
@@ -19,25 +21,16 @@ class WebSocketTransport implements RpcTransport {
   bool get isAvailable => _isAvailable;
 
   /// URI WebSocket сервера
-  final Uri uri;
+  final Uri? uri;
 
-  /// Опции для WebSocket соединения
-  final Duration? connectionTimeout;
-  final Backoff? backoff;
-  final String? binaryType;
-
-  /// Экземпляр WebSocket клиента
-  WebSocket? _socket;
+  /// Экземпляр WebSocket канала
+  WebSocketChannel? _channel;
 
   /// Контроллер потока входящих сообщений
-  final StreamController<Uint8List> _incomingController =
-      StreamController<Uint8List>.broadcast();
+  final StreamController<Uint8List> _incomingController = StreamController<Uint8List>.broadcast();
 
   /// Подписка на сообщения WebSocket
   StreamSubscription<dynamic>? _messagesSubscription;
-
-  /// Подписка на состояние WebSocket соединения
-  StreamSubscription<dynamic>? _connectionSubscription;
 
   /// Таймаут операций по умолчанию
   final Duration _defaultTimeout;
@@ -45,27 +38,41 @@ class WebSocketTransport implements RpcTransport {
   /// Флаг, указывающий на доступность транспорта
   bool _isAvailable = false;
 
+  /// Функция создания WebSocketChannel (может быть заменена для тестирования)
+  final WebSocketChannelProvider? _channelProvider;
+
   /// Создает новый транспорт WebSocket
   ///
   /// [id] - идентификатор транспорта
   /// [uri] - URI WebSocket сервера
   /// [autoConnect] - автоматически подключаться при создании
   /// [timeout] - таймаут для операций (по умолчанию 30 секунд)
-  /// [connectionTimeout] - таймаут для установки соединения
-  /// [backoff] - стратегия повторных попыток соединения
-  /// [binaryType] - тип бинарных данных ('blob' или 'arraybuffer')
-  WebSocketTransport(
-    this.id,
-    this.uri, {
-    bool autoConnect = true,
+  WebSocketTransport._({
+    required this.id,
+    this.uri,
+    bool autoConnect = false,
     Duration timeout = const Duration(seconds: 30),
-    this.connectionTimeout,
-    this.backoff,
-    this.binaryType,
-  }) : _defaultTimeout = timeout {
+    WebSocketChannelProvider? channelProvider,
+  })  : _defaultTimeout = timeout,
+        _channelProvider = channelProvider,
+        assert(uri != null || channelProvider != null, 'uri or channelProvider must be provided') {
     if (autoConnect) {
       connect();
     }
+  }
+
+  factory WebSocketTransport.fromUrl({
+    required String id,
+    required String url,
+    bool autoConnect = false,
+    Duration timeout = const Duration(seconds: 30),
+  }) {
+    return WebSocketTransport._(
+      id: id,
+      autoConnect: autoConnect,
+      timeout: timeout,
+      uri: Uri.parse(url),
+    );
   }
 
   /// Создает новый транспорт WebSocket из строкового URL
@@ -74,55 +81,39 @@ class WebSocketTransport implements RpcTransport {
   /// [url] - URL WebSocket сервера в строковом формате
   /// [autoConnect] - автоматически подключаться при создании
   /// [timeout] - таймаут для операций (по умолчанию 30 секунд)
-  /// [connectionTimeout] - таймаут для установки соединения
-  /// [backoff] - стратегия повторных попыток соединения
-  /// [binaryType] - тип бинарных данных ('blob' или 'arraybuffer')
-  factory WebSocketTransport.fromUrl(
-    String id,
-    String url, {
+  factory WebSocketTransport.customChannel({
+    required String id,
     bool autoConnect = true,
     Duration timeout = const Duration(seconds: 30),
-    Duration? connectionTimeout,
-    Backoff? backoff,
-    String? binaryType,
+    WebSocketChannelProvider? channelProvider,
   }) {
-    return WebSocketTransport(
-      id,
-      Uri.parse(url),
+    return WebSocketTransport._(
+      id: id,
       autoConnect: autoConnect,
       timeout: timeout,
-      connectionTimeout: connectionTimeout,
-      backoff: backoff,
-      binaryType: binaryType,
+      channelProvider: channelProvider,
     );
   }
 
   /// Подключается к WebSocket серверу
   ///
   /// Возвращает Future, который завершается, когда соединение установлено
-  Future<void> connect() async {
-    if (_isAvailable) return;
+  Future<RpcTransportActionStatus> connect() async {
+    if (_isAvailable) return RpcTransportActionStatus.success;
 
     try {
-      // Создаем новый экземпляр WebSocket
-      _socket = WebSocket(
-        uri,
-        timeout: connectionTimeout,
-        backoff: backoff,
-        binaryType: binaryType,
-      );
+      if (uri != null) {
+        _channel = WebSocketChannel.connect(uri!);
+      } else if (_channelProvider != null) {
+        _channel = _channelProvider!();
+      }
 
-      // Слушаем изменения состояния соединения
-      _connectionSubscription = _socket!.connection.listen((state) {
-        if (state is Connected || state is Reconnected) {
-          _isAvailable = true;
-        } else if (state is Disconnected) {
-          _isAvailable = false;
-        }
-      });
+      if (_channel == null) {
+        throw Exception('Ошибка при создании WebSocketChannel');
+      }
 
       // Слушаем входящие сообщения
-      _messagesSubscription = _socket!.messages.listen(
+      _messagesSubscription = _channel!.stream.listen(
         (dynamic data) {
           if (!_incomingController.isClosed) {
             if (data is String) {
@@ -140,25 +131,19 @@ class WebSocketTransport implements RpcTransport {
             _incomingController.addError(error);
           }
         },
+        onDone: () {
+          _isAvailable = false;
+          if (!_incomingController.isClosed) {
+            _incomingController.close();
+          }
+        },
       );
 
-      // Ждем пока соединение установится
-      final connectionState = await _socket!.connection
-          .firstWhere((state) =>
-              state is Connected ||
-              state is Reconnected ||
-              state is Disconnected)
-          .timeout(connectionTimeout ?? _defaultTimeout);
-
-      if (connectionState is Disconnected) {
-        throw Exception(
-            'Не удалось установить соединение: ${connectionState.error}');
-      }
-
       _isAvailable = true;
+      return RpcTransportActionStatus.success;
     } catch (e) {
       _isAvailable = false;
-      throw Exception('Ошибка при подключении к WebSocket: $e');
+      return RpcTransportActionStatus.unknownError;
     }
   }
 
@@ -168,27 +153,21 @@ class WebSocketTransport implements RpcTransport {
   }
 
   @override
-  Future<RpcTransportActionStatus> send(Uint8List data,
-      {Duration? timeout}) async {
+  Future<RpcTransportActionStatus> send(Uint8List data, {Duration? timeout}) async {
     if (!isAvailable) {
       return RpcTransportActionStatus.transportUnavailable;
     }
 
     final effectiveTimeout = timeout ?? _defaultTimeout;
-    final socket = _socket;
 
-    if (socket == null) {
+    // Используем WebSocketChannel
+    final channel = _channel;
+    if (channel == null) {
       return RpcTransportActionStatus.connectionNotEstablished;
     }
 
     try {
-      // Проверяем текущее состояние соединения
-      final currentState = socket.connection.state;
-      if (currentState is! Connected && currentState is! Reconnected) {
-        return RpcTransportActionStatus.connectionClosed;
-      }
-
-      await Future.delayed(Duration.zero, () => socket.send(data)).timeout(
+      await Future.delayed(Duration.zero, () => channel.sink.add(data)).timeout(
         effectiveTimeout,
         onTimeout: () => throw TimeoutException(
           'Истекло время ожидания отправки данных',
@@ -217,12 +196,9 @@ class WebSocketTransport implements RpcTransport {
       await _messagesSubscription?.cancel();
       _messagesSubscription = null;
 
-      await _connectionSubscription?.cancel();
-      _connectionSubscription = null;
-
       // Закрываем соединение
-      _socket?.close();
-      _socket = null;
+      _channel?.sink.close();
+      _channel = null;
 
       // Закрываем контроллер
       if (!_incomingController.isClosed) {

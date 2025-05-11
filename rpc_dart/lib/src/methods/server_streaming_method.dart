@@ -20,7 +20,7 @@ final class ServerStreamingRpcMethod<T extends IRpcSerializableMessage>
   /// [metadata] - метаданные (опционально)
   /// [streamId] - ID потока (опционально, генерируется автоматически)
   /// [responseParser] - функция преобразования JSON в объект ответа (опционально)
-  Stream<Response> openStream<Request extends T, Response extends T>({
+  Stream<Response> call<Request extends T, Response extends T>({
     required Request request,
     required RpcMethodResponseParser<Response> responseParser,
     Map<String, dynamic>? metadata,
@@ -31,8 +31,8 @@ final class ServerStreamingRpcMethod<T extends IRpcSerializableMessage>
     final dynamicRequest = request is RpcMessage ? request.toJson() : request;
 
     final stream = _core.openStream(
-      serviceName,
-      methodName,
+      serviceName: serviceName,
+      methodName: methodName,
       request: dynamicRequest,
       metadata: metadata,
       streamId: effectiveStreamId,
@@ -81,18 +81,21 @@ final class ServerStreamingRpcMethod<T extends IRpcSerializableMessage>
     final contract =
         getMethodContract<Request, Response>(RpcMethodType.serverStreaming);
     final implementation =
-        RpcMethodImplementation.serverStream(contract, handler);
+        RpcMethodImplementation.serverStreaming(contract, handler);
 
     // Регистрируем реализацию метода
     _registrar.registerMethodImplementation(
-        serviceName, methodName, implementation);
+      serviceName: serviceName,
+      methodName: methodName,
+      implementation: implementation,
+    );
 
     // Регистрируем низкоуровневый обработчик - это ключевой шаг для обеспечения
     // связи между контрактом и обработчиком вызова
     _registrar.registerMethod(
-      serviceName,
-      methodName,
-      (RpcMethodContext context) async {
+      serviceName: serviceName,
+      methodName: methodName,
+      handler: (RpcMethodContext context) async {
         try {
           // Конвертируем запрос в типизированный, если нужно
           final typedRequest = (context.payload is Map<String, dynamic>)
@@ -136,21 +139,21 @@ final class ServerStreamingRpcMethod<T extends IRpcSerializableMessage>
       final processedData = data is RpcMessage ? data.toJson() : data;
 
       _core.sendStreamData(
-        messageId,
-        processedData,
+        streamId: messageId,
+        data: processedData,
         serviceName: serviceName,
         methodName: methodName,
       );
     }, onError: (error) {
       // Отправляем ошибку
       _core.sendStreamError(
-        messageId,
-        error.toString(),
+        streamId: messageId,
+        errorMessage: error.toString(),
       );
     }, onDone: () {
       // Закрываем стрим с указанием serviceName и methodName для middleware
       _core.closeStream(
-        messageId,
+        streamId: messageId,
         serviceName: serviceName,
         methodName: methodName,
       );

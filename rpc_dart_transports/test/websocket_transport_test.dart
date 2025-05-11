@@ -23,8 +23,8 @@ void main() {
   test('Базовый тест подключения к WebSocket', () async {
     // Используем новый фабричный метод для создания транспорта из URL
     final clientTransport = WebSocketTransport.fromUrl(
-      'client',
-      testServer.wsUrl,
+      id: 'client',
+      url: testServer.wsUrl,
       autoConnect: true,
     );
 
@@ -52,16 +52,21 @@ void main() {
     final testData = Uint8List.fromList([1, 2, 3, 4, 5]);
     final result = await clientTransport.send(testData);
 
-    expect(result, equals(RpcTransportActionStatus.success),
-        reason: 'Отправка данных должна быть успешной');
+    expect(
+      result,
+      equals(RpcTransportActionStatus.success),
+      reason: 'Отправка данных должна быть успешной',
+    );
 
     // Получаем эхо от сервера
-    final response =
-        await responseCompleter.future.timeout(const Duration(seconds: 5));
+    final response = await responseCompleter.future.timeout(const Duration(seconds: 5));
 
     // Проверяем, что получили те же данные
-    expect(response, equals(testData),
-        reason: 'Полученные данные должны соответствовать отправленным');
+    expect(
+      response,
+      equals(testData),
+      reason: 'Полученные данные должны соответствовать отправленным',
+    );
 
     await subscription.cancel();
     await clientTransport.close();
@@ -69,9 +74,9 @@ void main() {
 
   test('Создание транспорта с URI', () async {
     final uri = Uri.parse(testServer.wsUrl);
-    final clientTransport = WebSocketTransport(
-      'client',
-      uri,
+    final clientTransport = WebSocketTransport.fromUrl(
+      id: 'client',
+      url: uri.toString(),
       autoConnect: true,
     );
 

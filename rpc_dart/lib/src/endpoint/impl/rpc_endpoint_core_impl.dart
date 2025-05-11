@@ -79,11 +79,11 @@ final class _RpcEndpointCoreImpl<T extends IRpcSerializableMessage>
   /// [methodName] - имя метода
   /// [handler] - функция обработки запроса, которая принимает контекст вызова
   @override
-  void registerMethod(
-    String serviceName,
-    String methodName,
-    Future<dynamic> Function(RpcMethodContext) handler,
-  ) {
+  void registerMethod({
+    required String serviceName,
+    required String methodName,
+    required Future<dynamic> Function(RpcMethodContext) handler,
+  }) {
     _methodHandlers.putIfAbsent(serviceName, () => {});
     _methodHandlers[serviceName]![methodName] = handler;
   }
@@ -96,10 +96,10 @@ final class _RpcEndpointCoreImpl<T extends IRpcSerializableMessage>
   /// [timeout] - таймаут ожидания ответа
   /// Возвращает Future с результатом вызова
   @override
-  Future<dynamic> invoke(
-    String serviceName,
-    String methodName,
-    dynamic request, {
+  Future<dynamic> invoke({
+    required String serviceName,
+    required String methodName,
+    required dynamic request,
     Duration? timeout,
     Map<String, dynamic>? metadata,
   }) async {
@@ -142,9 +142,9 @@ final class _RpcEndpointCoreImpl<T extends IRpcSerializableMessage>
   /// [streamId] - опциональный ID для потока, если не указан, будет сгенерирован
   /// Возвращает Stream с данными от удаленной стороны
   @override
-  Stream<dynamic> openStream(
-    String serviceName,
-    String methodName, {
+  Stream<dynamic> openStream({
+    required String serviceName,
+    required String methodName,
     dynamic request,
     Map<String, dynamic>? metadata,
     String? streamId,
@@ -409,9 +409,12 @@ final class _RpcEndpointCoreImpl<T extends IRpcSerializableMessage>
   }
 
   /// Отправляет сообщение об ошибке
-  Future<void> _sendErrorMessage(String requestId, String errorMessage,
-      Map<String, dynamic>? headerMetadata,
-      [Map<String, dynamic>? trailerMetadata]) async {
+  Future<void> _sendErrorMessage(
+    String requestId,
+    String errorMessage,
+    Map<String, dynamic>? headerMetadata, [
+    Map<String, dynamic>? trailerMetadata,
+  ]) async {
     await _sendMessage(
       RpcMessage(
         type: RpcMessageType.error,
@@ -467,9 +470,9 @@ final class _RpcEndpointCoreImpl<T extends IRpcSerializableMessage>
   /// [serviceName] - имя сервиса (опционально, для middleware)
   /// [methodName] - имя метода (опционально, для middleware)
   @override
-  Future<void> sendStreamData(
-    String streamId,
-    dynamic data, {
+  Future<void> sendStreamData({
+    required String streamId,
+    required dynamic data,
     Map<String, dynamic>? metadata,
     String? serviceName,
     String? methodName,
@@ -505,15 +508,15 @@ final class _RpcEndpointCoreImpl<T extends IRpcSerializableMessage>
   /// [error] - сообщение об ошибке
   /// [metadata] - дополнительные метаданные
   @override
-  Future<void> sendStreamError(
-    String streamId,
-    String error, {
+  Future<void> sendStreamError({
+    required String streamId,
+    required String errorMessage,
     Map<String, dynamic>? metadata,
   }) async {
     final message = RpcMessage(
       type: RpcMessageType.error,
       id: streamId,
-      payload: error,
+      payload: errorMessage,
       metadata: metadata,
       debugLabel: debugLabel,
     );
@@ -528,8 +531,8 @@ final class _RpcEndpointCoreImpl<T extends IRpcSerializableMessage>
   /// [serviceName] - имя сервиса (опционально, для middleware)
   /// [methodName] - имя метода (опционально, для middleware)
   @override
-  Future<void> closeStream(
-    String streamId, {
+  Future<void> closeStream({
+    required String streamId,
     Map<String, dynamic>? metadata,
     String? serviceName,
     String? methodName,
@@ -556,34 +559,34 @@ final class _RpcEndpointCoreImpl<T extends IRpcSerializableMessage>
   }
 
   @override
-  BidirectionalRpcMethod<T> bidirectional(
-    String serviceName,
-    String methodName,
-  ) {
+  BidirectionalStreamingRpcMethod<T> bidirectionalStreaming({
+    required String serviceName,
+    required String methodName,
+  }) {
     throw UnimplementedError();
   }
 
   @override
-  ClientStreamingRpcMethod<T> clientStreaming(
-    String serviceName,
-    String methodName,
-  ) {
+  ClientStreamingRpcMethod<T> clientStreaming({
+    required String serviceName,
+    required String methodName,
+  }) {
     throw UnimplementedError();
   }
 
   @override
-  ServerStreamingRpcMethod<T> serverStreaming(
-    String serviceName,
-    String methodName,
-  ) {
+  ServerStreamingRpcMethod<T> serverStreaming({
+    required String serviceName,
+    required String methodName,
+  }) {
     throw UnimplementedError();
   }
 
   @override
-  UnaryRpcMethod<T> unary(
-    String serviceName,
-    String methodName,
-  ) {
+  UnaryRequestRpcMethod<T> unaryRequest({
+    required String serviceName,
+    required String methodName,
+  }) {
     throw UnimplementedError();
   }
 }

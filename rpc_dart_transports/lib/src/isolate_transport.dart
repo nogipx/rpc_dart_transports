@@ -25,12 +25,10 @@ class IsolateTransport implements RpcTransport {
   final ReceivePort _receivePort;
 
   /// Контроллер для публикации входящих сообщений
-  final StreamController<Uint8List> _incomingController =
-      StreamController<Uint8List>.broadcast();
+  final StreamController<Uint8List> _incomingController = StreamController<Uint8List>.broadcast();
 
   /// Контроллер для отслеживания состояния соединения
-  final StreamController<bool> _connectionStateController =
-      StreamController<bool>.broadcast();
+  final StreamController<bool> _connectionStateController = StreamController<bool>.broadcast();
 
   /// Флаг доступности транспорта
   bool _isAvailable = true;
@@ -85,8 +83,7 @@ class IsolateTransport implements RpcTransport {
     _portSubscription = _receivePort.listen(_handleMessage);
 
     // Отправляем порт для получения сообщений другой стороне
-    _sendPort
-        .send({'type': 'port_init', 'id': id, 'port': _receivePort.sendPort});
+    _sendPort.send({'type': 'port_init', 'id': id, 'port': _receivePort.sendPort});
 
     // Устанавливаем таймаут для инициализации
     Timer(_connectionTimeout, () {
@@ -152,8 +149,7 @@ class IsolateTransport implements RpcTransport {
   }
 
   @override
-  Future<RpcTransportActionStatus> send(Uint8List data,
-      {Duration? timeout}) async {
+  Future<RpcTransportActionStatus> send(Uint8List data, {Duration? timeout}) async {
     final effectiveTimeout = timeout ?? _defaultTimeout;
 
     if (!isAvailable) {
@@ -245,8 +241,7 @@ class IsolateTransport implements RpcTransport {
   /// Возвращает Future с картой, содержащей два транспорта:
   /// - 'main': транспорт для использования в основном изоляте
   /// - 'worker': данные для создания транспорта в рабочем изоляте
-  static Future<Map<String, dynamic>> createIsolatePair(
-      String mainId, String workerId) async {
+  static Future<Map<String, dynamic>> createIsolatePair(String mainId, String workerId) async {
     final mainReceivePort = ReceivePort();
     final completer = Completer<SendPort>();
 
@@ -262,8 +257,7 @@ class IsolateTransport implements RpcTransport {
       _connectionTimeout,
       onTimeout: () {
         mainReceivePort.close();
-        throw TimeoutException(
-            'Тайм-аут при ожидании SendPort от worker isolate');
+        throw TimeoutException('Тайм-аут при ожидании SendPort от worker isolate');
       },
     );
 
@@ -280,6 +274,23 @@ class IsolateTransport implements RpcTransport {
     };
   }
 
+  /// Создает транспорт для worker isolate из данных, полученных от main isolate
+  static IsolateTransport createWorkerTransportFromJson(
+    Map<String, dynamic> initData,
+  ) {
+    final id = initData['id'] as String;
+    final sendPort = initData['port'] as SendPort;
+    return createWorkerTransport(id: id, sendPort: sendPort);
+  }
+
+  /// Создает транспорт для рабочего изолята
+  ///
+  /// [id] - уникальный идентификатор транспорта
+  /// [sendPort] - порт для отправки сообщений в основной изолят
+  ///
+  /// Этот метод используется в рабочем изоляте для создания транспорта,
+  /// который будет взаимодействовать с основным изолятом. Автоматически
+  /// отправляет порт для получения сообщений основному изоляту.
   static IsolateTransport createWorkerTransport({
     required String id,
     required SendPort sendPort,
@@ -292,14 +303,5 @@ class IsolateTransport implements RpcTransport {
       sendPort: sendPort,
       receivePort: receivePort,
     );
-  }
-
-  /// Создает транспорт для worker isolate из данных, полученных от main isolate
-  static IsolateTransport createWorkerTransportFromJson(
-    Map<String, dynamic> initData,
-  ) {
-    final id = initData['id'] as String;
-    final sendPort = initData['port'] as SendPort;
-    return createWorkerTransport(id: id, sendPort: sendPort);
   }
 }
