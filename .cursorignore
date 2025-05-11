@@ -2,7 +2,6 @@
 **/LICENSE
 **/LICENSES/
 **/REUSE.toml
-**/example/
 **/*.lock
 **/analysis_options.yaml
 .cursorignore

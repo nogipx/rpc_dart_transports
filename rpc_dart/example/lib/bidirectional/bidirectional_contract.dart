@@ -23,125 +23,99 @@ abstract base class ChatServiceContract extends RpcServiceContract {
   }
 
   /// Обработчик сообщений чата
-  Stream<ChatMessage> chatHandler(
-    Stream<ChatMessage> requests,
-    String messageId,
-  );
+  BidiStream<ChatMessage, ChatMessage> chatHandler();
 }
 
 /// Серверная реализация ChatService
 final class ServerChatService extends ChatServiceContract {
   @override
-  Stream<ChatMessage> chatHandler(
-    Stream<ChatMessage> requests,
-    String messageId,
-  ) {
-    // Реализация метода для чата с обработкой сообщений и автоматическими ответами
-    final controller = StreamController<ChatMessage>();
+  BidiStream<ChatMessage, ChatMessage> chatHandler() =>
+      BidiStreamGenerator<ChatMessage, ChatMessage>((incomingRequests) async* {
+        // Имитируем присоединение пользователя к чату
+        yield ChatMessage(
+          sender: 'Система',
+          text: 'Подключение установлено, добро пожаловать в чат!',
+          type: MessageType.system,
+          timestamp: DateTime.now().toIso8601String(),
+        );
 
-    // Имитируем присоединение пользователя к чату
-    controller.add(
-      ChatMessage(
-        sender: 'Система',
-        text: 'Подключение установлено, добро пожаловать в чат!',
-        type: MessageType.system,
-        timestamp: DateTime.now().toIso8601String(),
-      ),
-    );
+        // Список имен для чат-бота
+        final List<String> botNames = [
+          'Алиса',
+          'Бот',
+          'Консультант',
+          'Помощник',
+        ];
+        final Random random = Random();
+        final botName = botNames[random.nextInt(botNames.length)];
 
-    // Список имен для чат-бота
-    final List<String> botNames = ['Алиса', 'Бот', 'Консультант', 'Помощник'];
-    final Random random = Random();
-    final botName = botNames[random.nextInt(botNames.length)];
+        // Добавляем сообщение о подключении бота
+        yield ChatMessage(
+          sender: 'Система',
+          text: '$botName присоединился к чату',
+          type: MessageType.info,
+          timestamp: DateTime.now().toIso8601String(),
+        );
 
-    // Добавляем сообщение о подключении бота
-    controller.add(
-      ChatMessage(
-        sender: 'Система',
-        text: '$botName присоединился к чату',
-        type: MessageType.info,
-        timestamp: DateTime.now().toIso8601String(),
-      ),
-    );
+        // Базовые ответы для чат-бота
+        final responses = {
+          'привет': ['Привет!', 'Здравствуйте!', 'Добрый день!'],
+          'как дела': [
+            'Отлично, спасибо!',
+            'Всё хорошо, а у вас?',
+            'Прекрасно!',
+          ],
+          'пока': ['До свидания!', 'Пока!', 'До встречи!'],
+          'помощь': [
+            'Чем могу помочь?',
+            'Я к вашим услугам',
+            'Задайте ваш вопрос',
+          ],
+          'время': [
+            'Сейчас ${DateTime.now().hour}:${DateTime.now().minute}',
+            'Текущее время: ${DateTime.now().toIso8601String().substring(11, 16)}',
+          ],
+        };
 
-    // Базовые ответы для чат-бота
-    final responses = {
-      'привет': ['Привет!', 'Здравствуйте!', 'Добрый день!'],
-      'как дела': ['Отлично, спасибо!', 'Всё хорошо, а у вас?', 'Прекрасно!'],
-      'пока': ['До свидания!', 'Пока!', 'До встречи!'],
-      'помощь': ['Чем могу помочь?', 'Я к вашим услугам', 'Задайте ваш вопрос'],
-      'время': [
-        'Сейчас ${DateTime.now().hour}:${DateTime.now().minute}',
-        'Текущее время: ${DateTime.now().toIso8601String().substring(11, 16)}',
-      ],
-    };
+        // Задержка печати
+        final typingDelay = Duration(milliseconds: 500);
 
-    // Задержка печати
-    final typingDelay = Duration(milliseconds: 500);
+        // Обрабатываем входящие сообщения
+        await for (final message in incomingRequests) {
+          final text = message.text.toLowerCase();
+          if (text.isEmpty) continue;
 
-    // Подписываемся на входящие сообщения от клиента
-    requests.listen(
-      (message) async {
-        // Получено новое сообщение
-        final text = message.text.toLowerCase();
-
-        if (text.isEmpty) return;
-
-        // Имитация задержки печати
-        controller.add(
-          ChatMessage(
+          // Имитация задержки печати
+          yield ChatMessage(
             sender: botName,
             text: '...',
             type: MessageType.action,
             timestamp: DateTime.now().toIso8601String(),
-          ),
-        );
+          );
 
-        // Задержка перед ответом
-        await Future.delayed(typingDelay);
+          // Задержка перед ответом
+          await Future.delayed(typingDelay);
 
-        // Поиск подходящего ответа
-        String response = 'Извините, не понимаю вас.';
+          // Поиск подходящего ответа
+          String response = 'Извините, не понимаю вас.';
 
-        for (final key in responses.keys) {
-          if (text.contains(key)) {
-            final options = responses[key]!;
-            response = options[random.nextInt(options.length)];
-            break;
+          for (final key in responses.keys) {
+            if (text.contains(key)) {
+              final options = responses[key]!;
+              response = options[random.nextInt(options.length)];
+              break;
+            }
           }
-        }
 
-        // Отправляем ответ
-        controller.add(
-          ChatMessage(
+          // Отправляем ответ
+          yield ChatMessage(
             sender: botName,
             text: response,
             type: MessageType.text,
             timestamp: DateTime.now().toIso8601String(),
-          ),
-        );
-      },
-      onError: (e) {
-        print('Ошибка в обработчике чата: $e');
-        controller.addError(e);
-      },
-      onDone: () {
-        // Пользователь покинул чат
-        controller.add(
-          ChatMessage(
-            sender: 'Система',
-            text: 'Соединение закрыто',
-            type: MessageType.info,
-            timestamp: DateTime.now().toIso8601String(),
-          ),
-        );
-
-        controller.close();
-      },
-    );
-
-    return controller.stream;
-  }
+          );
+        }
+      }).create();
 }
 
 /// Клиентская реализация ChatService
@@ -151,15 +125,7 @@ final class ClientChatService extends ChatServiceContract {
   ClientChatService(this._endpoint);
 
   @override
-  Stream<ChatMessage> chatHandler(
-    Stream<ChatMessage> requests,
-    String messageId,
-  ) {
-    throw UnimplementedError('Клиентской реализации не требуется обработчик');
-  }
-
-  /// Открывает двунаправленный канал связи для чата
-  Future<BidirectionalChannel<ChatMessage, ChatMessage>> chat() async {
+  BidiStream<ChatMessage, ChatMessage> chatHandler() {
     return _endpoint
         .bidirectionalStreaming(
           serviceName: serviceName,

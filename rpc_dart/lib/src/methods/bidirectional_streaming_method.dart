@@ -19,8 +19,7 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
   /// [responseParser] - функция для преобразования JSON в объект ответа (опционально)
   /// [metadata] - дополнительные метаданные (опционально)
   /// [streamId] - необязательный идентификатор стрима (генерируется автоматически)
-  BidirectionalChannel<Request, Response>
-      call<Request extends T, Response extends T>({
+  BidiStream<Request, Response> call<Request extends T, Response extends T>({
     required RpcMethodResponseParser<Response> responseParser,
     Map<String, dynamic>? metadata,
     String? streamId,
@@ -109,14 +108,10 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
       },
     );
 
-    // Создаем и возвращаем канал
-    return BidirectionalChannel<Request, Response>(
-      endpoint: _endpoint,
-      serviceName: serviceName,
-      methodName: methodName,
-      streamId: effectiveStreamId,
-      outgoingController: outgoingController,
-      incomingStream: typedIncomingStream,
+    return BidiStream(
+      responseStream: typedIncomingStream,
+      sendFunction: (request) => outgoingController.add(request),
+      closeFunction: () => outgoingController.close(),
     );
   }
 
@@ -221,10 +216,7 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
           });
 
           // Создаем исходящий поток через обработчик
-          final outgoingStream = implementation.openBidirectionalStream(
-            typedIncomingStream,
-            effectiveStreamId,
-          );
+          final outgoingStream = implementation.openBidirectionalStream();
 
           // Подписываемся на исходящий поток и отправляем данные
           outgoingStream.listen(
@@ -263,76 +255,5 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
         }
       },
     );
-  }
-}
-
-/// Двунаправленный канал связи для типизированного обмена сообщениями
-final class BidirectionalChannel<Request extends IRpcSerializableMessage,
-    Response extends IRpcSerializableMessage> {
-  /// Endpoint для связи
-  final IRpcEndpoint<IRpcSerializableMessage> _endpoint;
-
-  /// Название сервиса
-  final String serviceName;
-
-  /// Название метода
-  final String methodName;
-
-  /// ID потока
-  final String streamId;
-
-  /// Контроллер для исходящих сообщений
-  final StreamController<Request> outgoingController;
-
-  /// Поток входящих сообщений
-  final Stream<Response> incomingStream;
-
-  /// Создает новый двунаправленный канал
-  BidirectionalChannel({
-    required IRpcEndpoint<IRpcSerializableMessage> endpoint,
-    required this.serviceName,
-    required this.methodName,
-    required this.streamId,
-    required this.outgoingController,
-    required this.incomingStream,
-  }) : _endpoint = endpoint;
-
-  /// Отправляет сообщение в канал
-  void send(Request message) {
-    if (outgoingController.isClosed) {
-      throw StateError('Канал закрыт для отправки');
-    }
-    outgoingController.add(message);
-  }
-
-  /// Получает поток входящих сообщений
-  Stream<Response> get incoming => incomingStream;
-
-  /// Закрывает канал
-  Future<void> close() async {
-    // Завершаем исходящий поток
-    await outgoingController.close();
-
-    // Отправляем маркер завершения канала
-    await _core.sendStreamData(
-      streamId: streamId,
-      data: {'_channelClosed': true},
-      serviceName: serviceName,
-      methodName: methodName,
-    );
-
-    // Закрываем канал
-    await _core.closeStream(
-      streamId: streamId,
-      serviceName: serviceName,
-      methodName: methodName,
-    );
-  }
-
-  IRpcEndpointCore get _core {
-    if (_endpoint is! IRpcEndpointCore) {
-      throw ArgumentError('Is not valid subtype');
-    }
-    return _endpoint as IRpcEndpointCore;
   }
 }

@@ -81,7 +81,7 @@ abstract interface class IRpcServiceContract<
   void setup();
 
   /// Добавляет унарный метод в контракт
-  void addUnaryMethod<Request extends T, Response extends T>({
+  void addUnaryRequestMethod<Request extends T, Response extends T>({
     required String methodName,
     required RpcMethodUnaryHandler<Request, Response> handler,
     required RpcMethodArgumentParser<Request> argumentParser,

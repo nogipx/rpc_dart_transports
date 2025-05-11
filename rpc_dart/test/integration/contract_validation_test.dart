@@ -82,7 +82,7 @@ abstract base class UserServiceContract
   @override
   void setup() {
     // Регистрация пользователя (унарный метод)
-    addUnaryMethod<UserRequest, UserResponse>(
+    addUnaryRequestMethod<UserRequest, UserResponse>(
       methodName: registerUserMethod,
       handler: registerUser,
       argumentParser: UserRequest.fromJson,

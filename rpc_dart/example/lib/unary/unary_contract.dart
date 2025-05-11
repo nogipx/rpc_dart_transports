@@ -10,7 +10,7 @@ abstract base class BasicServiceContract extends RpcServiceContract {
   @override
   void setup() {
     // Метод работы с примитивными числовыми значениями
-    addUnaryMethod<ComputeRequest, ComputeResult>(
+    addUnaryRequestMethod<ComputeRequest, ComputeResult>(
       methodName: 'compute',
       handler: compute,
       argumentParser: ComputeRequest.fromJson,

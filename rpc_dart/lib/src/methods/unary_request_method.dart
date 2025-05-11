@@ -66,7 +66,7 @@ final class UnaryRequestRpcMethod<T extends IRpcSerializableMessage>
 
     // Если метод не найден в контракте, добавляем его
     if (existingMethod == null) {
-      serviceContract.addUnaryMethod<Request, Response>(
+      serviceContract.addUnaryRequestMethod<Request, Response>(
         methodName: methodName,
         handler: handler,
         argumentParser: requestParser,

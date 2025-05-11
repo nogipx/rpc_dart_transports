@@ -83,17 +83,17 @@ Future<void> demonstrateChatExample(ClientChatService chatService) async {
   print('👤 Подключаемся к чату как "$userName"');
 
   // Открываем двунаправленный канал для чата
-  final channel = await chatService.chat();
+  final bidiStream = chatService.chatHandler();
 
   // Подписываемся на входящие сообщения
-  final subscription = channel.incoming.listen(
+  final subscription = bidiStream.listen(
     (message) {
       final timestamp =
           message.timestamp != null
               ? '${message.timestamp!.substring(11, 19)} '
               : '';
 
-      String formattedMessage;
+      String formattedMessage = ''; // Инициализируем переменную
 
       // Форматируем сообщение в зависимости от типа
       switch (message.type) {
@@ -112,6 +112,7 @@ Future<void> demonstrateChatExample(ClientChatService chatService) async {
           } else {
             formattedMessage = '${message.sender}: ${message.text}';
           }
+          break;
       }
 
       print(formattedMessage);
@@ -140,7 +141,8 @@ Future<void> demonstrateChatExample(ClientChatService chatService) async {
       timestamp: DateTime.now().toIso8601String(),
     );
 
-    channel.send(chatMessage);
+    // Используем метод send() класса BidiStream для отправки сообщений
+    bidiStream.send(chatMessage);
     print('📤 Отправлено: $text');
   }
 
@@ -148,7 +150,7 @@ Future<void> demonstrateChatExample(ClientChatService chatService) async {
   await Future.delayed(Duration(seconds: 3));
 
   // Закрываем канал и подписку
-  await channel.close();
+  await bidiStream.close();
   await subscription.cancel();
 
   print('\n=== Демонстрация чата завершена ===');

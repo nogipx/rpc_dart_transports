@@ -10,6 +10,7 @@ part 'bidirectional_streaming_method.dart';
 part 'client_streaming_method.dart';
 part 'server_streaming_method.dart';
 part 'unary_request_method.dart';
+part 'bidi_stream.dart';
 
 /// Базовый абстрактный класс для всех типов RPC методов
 abstract base class RpcMethod<T extends IRpcSerializableMessage> {

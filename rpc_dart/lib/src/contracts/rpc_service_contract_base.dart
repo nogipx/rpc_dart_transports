@@ -102,7 +102,7 @@ abstract base class _RpcServiceContractBase<T extends IRpcSerializableMessage>
 
   /// Добавляет унарный метод в контракт
   @override
-  void addUnaryMethod<Request extends T, Response extends T>({
+  void addUnaryRequestMethod<Request extends T, Response extends T>({
     required String methodName,
     required RpcMethodUnaryHandler<Request, Response> handler,
     required RpcMethodArgumentParser<Request> argumentParser,

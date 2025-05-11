@@ -72,7 +72,7 @@ abstract base class TestContract
   @override
   void setup() {
     // Унарный метод
-    addUnaryMethod<TestRequest, TestResponse>(
+    addUnaryRequestMethod<TestRequest, TestResponse>(
       methodName: multiplyMethod,
       handler: multiply,
       argumentParser: TestRequest.fromJson,

@@ -127,12 +127,9 @@ final class RpcMethodImplementation<Request extends IRpcSerializableMessage,
   }
 
   /// Открывает двунаправленный стрим
-  Stream<Response> openBidirectionalStream(
-    Stream<Request> requestsStream,
-    String messageId,
-  ) {
+  Stream<Response> openBidirectionalStream() {
     if (type == RpcMethodType.bidirectional && _bidirectionalHandler != null) {
-      return _bidirectionalHandler!(requestsStream, messageId);
+      return _bidirectionalHandler!();
     }
 
     throw RpcUnsupportedOperationException(
