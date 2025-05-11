@@ -8,4 +8,3 @@ coverage/
 bin/licensify
 build/
 rpc_dart_example
-**/examples
