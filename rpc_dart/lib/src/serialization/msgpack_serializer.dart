@@ -95,7 +95,18 @@ class MsgPackSerializer implements RpcSerializer {
   dynamic deserialize(Uint8List data) {
     try {
       final result = msgpack.deserialize(data);
-      return _convertToJsonCompetible(result);
+      // Преобразуем результат в формат, совместимый с JSON
+      final processedResult = _convertToJsonCompetible(result);
+
+      // Защита от null в качестве payload для стриминга
+      if (processedResult is Map<String, dynamic> &&
+          processedResult.containsKey('payload') &&
+          processedResult['payload'] == null) {
+        // Заменяем null на пустой объект для предотвращения ошибок при приведении типов
+        processedResult['payload'] = {};
+      }
+
+      return processedResult;
     } catch (e) {
       print('MsgPackSerializer: ошибка при десериализации = $e');
       rethrow;

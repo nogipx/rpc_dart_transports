@@ -4,6 +4,6 @@ pubspec.lock
 coverage/
 *.pem
 *.bin
-**/bin/
 **/build/
+**/examples
 .cursorignore

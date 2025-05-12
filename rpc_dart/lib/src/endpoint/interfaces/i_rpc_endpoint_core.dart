@@ -57,10 +57,14 @@ abstract interface class IRpcEndpointCore {
   /// [streamId] - идентификатор потока
   /// [errorMessage] - сообщение об ошибке
   /// [metadata] - дополнительные метаданные
+  /// [serviceName] - имя сервиса (опционально)
+  /// [methodName] - имя метода (опционально)
   Future<void> sendStreamError({
     required String streamId,
     required String errorMessage,
     Map<String, dynamic>? metadata,
+    String? serviceName,
+    String? methodName,
   });
 
   /// Закрывает поток данных

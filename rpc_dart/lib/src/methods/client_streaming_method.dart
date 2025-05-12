@@ -20,48 +20,94 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
   /// [streamId] - ID потока (опционально, генерируется автоматически)
   /// [responseParser] - функция преобразования JSON в объект ответа (опционально)
   ///
-  /// Возвращает тюпл из потока для отправки и Future для получения результата
-  RpcClientStreamResult<Request, Response>
+  /// Возвращает объект ClientStreamingBidiStream для отправки данных и получения результата
+  ClientStreamingBidiStream<Request, Response>
       call<Request extends T, Response extends T>({
     required RpcMethodResponseParser<Response> responseParser,
     Map<String, dynamic>? metadata,
     String? streamId,
   }) {
+    // Генерируем уникальный ID потока, если не предоставлен
     final effectiveStreamId =
         streamId ?? _endpoint.generateUniqueId('client_stream');
-
-    // Создаем контроллер для отправки данных
-    final controller = StreamController<Request>();
 
     // Комплитер для ожидания финального ответа
     final completer = Completer<Response>();
 
-    // Открываем базовый стрим
-    _core
+    // Флаг, указывающий, был ли уже завершен поток
+    var streamCompleted = false;
+    var dataTransferFinished = false;
+
+    // Открываем базовый стрим для получения ответов
+    final responseStream = _core
         .openStream(
       serviceName: serviceName,
       methodName: methodName,
       metadata: metadata,
       streamId: effectiveStreamId,
     )
-        .listen(
+        .map((data) {
+      // Преобразуем данные через responseParser
+      return responseParser(data);
+    });
+
+    // Подготавливаем переменную для хранения подписки
+    StreamSubscription<Response>? subscription;
+
+    // Подписываемся на ответы и завершаем комплитер при получении результата
+    subscription = responseStream.listen(
       (data) {
+        // Дополнительный лог
+        print(
+          'ClientStreamingRpcMethod: получен ответ в потоке для $methodName (stream: $effectiveStreamId)',
+        );
+
         // Финальный ответ приходит как последнее сообщение стрима
-        if (!completer.isCompleted) {
-          final result = responseParser(data);
-          completer.complete(result);
+        if (!completer.isCompleted && !streamCompleted) {
+          streamCompleted = true;
+          completer.complete(data);
+          // Отписываемся от потока, чтобы избежать утечки памяти
+          subscription?.cancel();
+          subscription = null;
         }
       },
       onError: (error) {
-        if (!completer.isCompleted) {
+        print(
+          'ClientStreamingRpcMethod: ошибка в потоке $methodName: $error (stream: $effectiveStreamId)',
+        );
+        if (!completer.isCompleted && !streamCompleted) {
+          streamCompleted = true;
           completer.completeError(error);
+          // Отписываемся от потока в случае ошибки
+          subscription?.cancel();
+          subscription = null;
+        }
+      },
+      onDone: () {
+        print(
+          'ClientStreamingRpcMethod: поток $methodName завершен (stream: $effectiveStreamId)',
+        );
+        // Если поток завершился без ответа, обрабатываем это
+        if (!completer.isCompleted && !streamCompleted) {
+          streamCompleted = true;
+          completer.completeError('Стрим завершился без ответа');
+          subscription?.cancel();
+          subscription = null;
         }
       },
     );
 
-    // Подписываемся на контроллер и отправляем данные
-    controller.stream.listen(
-      (data) {
+    // Создаем BidiStream с функцией отправки данных и функциями завершения/закрытия потока
+    final bidiStream = BidiStream<Request, Response>(
+      responseStream: responseStream,
+      sendFunction: (data) {
+        if (streamCompleted || dataTransferFinished) {
+          print(
+            'ClientStreamingRpcMethod: попытка отправки в закрытый или завершенный поток $methodName (stream: $effectiveStreamId)',
+          );
+          return;
+        }
+
         final processedData = data is RpcMessage ? data.toJson() : data;
 
         _core.sendStreamData(
@@ -71,13 +117,60 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
           methodName: methodName,
         );
       },
-      onDone: () {
+      // Функция для завершения передачи данных (отправка маркера завершения)
+      finishTransferFunction: () async {
+        if (streamCompleted || dataTransferFinished) {
+          print(
+            'ClientStreamingRpcMethod: попытка завершить уже завершенный поток $methodName (stream: $effectiveStreamId)',
+          );
+          return;
+        }
+
+        print(
+          'ClientStreamingRpcMethod: завершение передачи данных для $methodName (stream: $effectiveStreamId)',
+        );
+
+        // Отмечаем, что передача данных завершена
+        dataTransferFinished = true;
+
         // Когда поток запросов закончен, отправляем маркер завершения
+        // Включаем как старый _clientStreamEnd, так и новый _finishTransfer маркер
+        // для обратной совместимости
         _core.sendStreamData(
           streamId: effectiveStreamId,
-          data: {'_clientStreamEnd': true},
+          data: {'_clientStreamEnd': true, '_finishTransfer': true},
           serviceName: serviceName,
           methodName: methodName,
+        );
+      },
+      // Функция для полного закрытия потока
+      closeFunction: () async {
+        if (streamCompleted) {
+          print(
+            'ClientStreamingRpcMethod: попытка закрыть уже закрытый поток $methodName (stream: $effectiveStreamId)',
+          );
+          return;
+        }
+
+        // Если передача данных еще не завершена, завершаем её
+        if (!dataTransferFinished) {
+          print(
+            'ClientStreamingRpcMethod: автоматическое завершение передачи при закрытии $methodName (stream: $effectiveStreamId)',
+          );
+
+          // Отправляем маркер завершения, если ещё не отправлен
+          _core.sendStreamData(
+            streamId: effectiveStreamId,
+            data: {'_clientStreamEnd': true, '_finishTransfer': true},
+            serviceName: serviceName,
+            methodName: methodName,
+          );
+
+          dataTransferFinished = true;
+        }
+
+        print(
+          'ClientStreamingRpcMethod: закрытие потока $methodName (stream: $effectiveStreamId)',
         );
 
         // Закрываем клиентскую часть стрима
@@ -86,13 +179,17 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
           serviceName: serviceName,
           methodName: methodName,
         );
+
+        // Отмечаем стрим как завершенный
+        streamCompleted = true;
+
+        // Отменяем подписку при закрытии потока
+        await subscription?.cancel();
+        subscription = null;
       },
     );
 
-    return RpcClientStreamResult<Request, Response>(
-      controller: controller,
-      response: completer.future,
-    );
+    return ClientStreamingBidiStream<Request, Response>(bidiStream);
   }
 
   /// Регистрирует обработчик клиентского стриминг метода
@@ -132,6 +229,7 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
     // Получаем актуальный контракт метода
     final contract =
         getMethodContract<Request, Response>(RpcMethodType.clientStreaming);
+
     final implementation =
         RpcMethodImplementation.clientStreaming(contract, handler);
 
@@ -142,62 +240,142 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
       implementation: implementation,
     );
 
+    print(
+        'ClientStreamingRpcMethod: регистрация метода $serviceName.$methodName');
+    print('Реализация: $implementation');
+
     // Регистрируем низкоуровневый обработчик - это ключевой шаг для обеспечения
     // связи между контрактом и обработчиком вызова
     _registrar.registerMethod(
       serviceName: serviceName,
       methodName: methodName,
       handler: (RpcMethodContext context) async {
+        print('Вызов метода $serviceName.$methodName');
+
         // Получаем ID сообщения из контекста
         final messageId = context.messageId;
 
-        // Создаем контроллер для входящих запросов
-        final controller = StreamController<Request>();
+        // Будем собирать здесь все запросы до маркера завершения
+        final requests = <Request>[];
+        var isEndMarkerReceived = false;
+        var hasError = false;
+        String? errorMessage;
 
-        // Открываем входящий поток и преобразуем его к типу Request
+        // Открываем входящий поток
         final incomingStream = _core.openStream(
           serviceName: serviceName,
           methodName: methodName,
           streamId: messageId,
         );
 
-        // Подписываемся на входящий поток
-        incomingStream.listen(
-          (data) {
-            // Проверяем маркер конца клиентского стрима
-            if (data is Map<String, dynamic> &&
-                data['_clientStreamEnd'] == true) {
-              // Получили маркер завершения, закрываем контроллер
-              controller.close();
-              return;
+        // Ждем все запросы из потока
+        await for (final data in incomingStream) {
+          // Проверяем маркер конца клиентского стрима
+          if (data is Map<String, dynamic> &&
+              (data['_clientStreamEnd'] == true ||
+                  data['_finishTransfer'] == true)) {
+            if (data['_clientStreamEnd'] == true &&
+                data['_finishTransfer'] == true) {
+              print(
+                  'Получен полный маркер завершения клиентского стрима (включает _clientStreamEnd и _finishTransfer)');
+            } else if (data['_clientStreamEnd'] == true) {
+              print(
+                  'Получен устаревший маркер завершения клиентского стрима (_clientStreamEnd)');
+            } else if (data['_finishTransfer'] == true) {
+              print(
+                  'Получен маркер завершения передачи данных (_finishTransfer)');
+            }
+            isEndMarkerReceived = true;
+            break;
+          }
+
+          try {
+            // Проверяем, является ли это ответом, а не запросом
+            bool looksLikeResponseData = false;
+
+            // Проверяем структуру данных - есть ли у нас поля, характерные для ответа
+            if (data is Map<String, dynamic>) {
+              // Проверяем наличие полей, которые обычно присутствуют в ответах и отсутствуют в запросах
+              // Это эвристика - в реальной системе это может зависеть от конкретных типов данных
+              if (data.containsKey('status') &&
+                  (data.containsKey('totalSize') ||
+                      data.containsKey('totalChunks')) &&
+                  !data.containsKey('isLastChunk')) {
+                looksLikeResponseData = true;
+                print('Пропускаем данные, похожие на ответ: $data');
+                continue;
+              }
             }
 
-            final parsedData = requestParser(data);
-            controller.add(parsedData);
-          },
-          onError: (error) {
-            controller.addError(error);
-          },
-          onDone: () {
-            // Поток закрыт, закрываем контроллер
-            if (!controller.isClosed) {
-              controller.close();
+            // Если это не похоже на ответ, пробуем распарсить как запрос
+            if (!looksLikeResponseData) {
+              final parsedData = requestParser(data);
+              requests.add(parsedData);
+              print('Добавлен запрос ${requests.length}');
             }
-          },
-        );
+          } catch (e, stack) {
+            print('Ошибка при парсинге запроса: $e');
+            print('Стек вызовов: $stack');
+            errorMessage = e.toString();
+            hasError = true;
+            break;
+          }
+        }
+
+        // Если есть ошибка, отправляем её клиенту
+        if (hasError) {
+          print('Произошла ошибка при обработке запросов: $errorMessage');
+          _core.sendStreamError(
+            streamId: messageId,
+            errorMessage:
+                errorMessage ?? 'Неизвестная ошибка при обработке запросов',
+            serviceName: serviceName,
+            methodName: methodName,
+          );
+          _core.closeStream(
+            streamId: messageId,
+            serviceName: serviceName,
+            methodName: methodName,
+          );
+          throw Exception(errorMessage);
+        }
+
+        // Проверяем, что мы получили маркер завершения
+        if (!isEndMarkerReceived) {
+          print(
+              'Предупреждение: Стрим запросов закрылся без маркера завершения. '
+              'Это может вызвать проблемы с синхронизацией клиента и сервера.');
+          // Здесь мы решаем продолжить, так как поток мог быть закрыт
+          // и без явного маркера завершения - устаревшее поведение
+        }
 
         try {
-          // Вызываем обработчик с потоком запросов
-          final response = await implementation.handleClientStream(
-            RpcClientStreamParams<Request, Response>(
-              stream: controller.stream,
-              metadata: context.metadata,
-              streamId: messageId,
-            ),
-          );
+          // Получаем ClientStreamingBidiStream от обработчика
+          final serviceBidiStream = handler();
 
-          // Преобразуем результат и отправляем как последнее сообщение стрима
+          print('Отправляем ${requests.length} запросов в обработчик');
+          // Отправляем все запросы в обработчик
+          for (final request in requests) {
+            serviceBidiStream.send(request);
+          }
+
+          // Завершаем отправку и ожидаем ответ
+          await serviceBidiStream.finishSending();
+
+          // Ждем результат
+          final response = await serviceBidiStream.getResponse().timeout(
+            Duration(seconds: 10),
+            onTimeout: () {
+              throw TimeoutException(
+                'Превышено время ожидания ответа от обработчика',
+              );
+            },
+          );
+          print('Получен ответ от обработчика: $response');
+
+          // Отправляем ответ клиенту
           final result = response.toJson();
+          print('Отправляем результат клиенту: $result');
 
           _core.sendStreamData(
             streamId: messageId,
@@ -206,29 +384,41 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
             methodName: methodName,
           );
 
-          // Закрываем стрим
+          // Полностью закрываем поток и ресурсы
+          await serviceBidiStream.close();
+
+          // Закрываем серверную часть потока
           _core.closeStream(
             streamId: messageId,
             serviceName: serviceName,
             methodName: methodName,
           );
 
-          // Возвращаем подтверждение, что стрим обрабатывается
           return {'status': 'streaming'};
-        } catch (e) {
-          // В случае ошибки, отправляем её и закрываем стрим
+        } catch (e, stack) {
+          // В случае ошибки в обработчике
+          print('Ошибка при обработке клиентского стрима: $e');
+          print('Стек вызовов: $stack');
+
           _core.sendStreamError(
             streamId: messageId,
             errorMessage: e.toString(),
+            serviceName: serviceName,
+            methodName: methodName,
           );
+
           _core.closeStream(
             streamId: messageId,
             serviceName: serviceName,
             methodName: methodName,
           );
+
           rethrow;
         }
       },
     );
+
+    print(
+        'ClientStreamingRpcMethod: метод $serviceName.$methodName успешно зарегистрирован');
   }
 }

@@ -16,11 +16,13 @@ final class ServerStreamingRpcMethod<T extends IRpcSerializableMessage>
 
   /// Открывает поток данных от сервера
   ///
+  ///
   /// [request] - запрос для открытия потока
   /// [metadata] - метаданные (опционально)
   /// [streamId] - ID потока (опционально, генерируется автоматически)
   /// [responseParser] - функция преобразования JSON в объект ответа (опционально)
-  Stream<Response> call<Request extends T, Response extends T>({
+  ServerStreamingBidiStream<Request, Response>
+      call<Request extends T, Response extends T>({
     required Request request,
     required RpcMethodResponseParser<Response> responseParser,
     Map<String, dynamic>? metadata,
@@ -28,22 +30,53 @@ final class ServerStreamingRpcMethod<T extends IRpcSerializableMessage>
   }) {
     final effectiveStreamId =
         streamId ?? _endpoint.generateUniqueId('server_stream');
-    final dynamicRequest = request is RpcMessage ? request.toJson() : request;
 
-    final stream = _core.openStream(
+    // Создаем базовый стрим с передачей запроса
+    final responseStream = _core
+        .openStream(
       serviceName: serviceName,
       methodName: methodName,
-      request: dynamicRequest,
+      request: request, // Теперь передаем запрос сразу при открытии потока
       metadata: metadata,
       streamId: effectiveStreamId,
-    );
-
-    return stream.map((data) {
+    )
+        .map((data) {
       if (data is Map<String, dynamic>) {
         return responseParser(data);
       }
       return data as Response;
     });
+
+    // Создаем BidiStream
+    final bidiStream = BidiStream<Request, Response>(
+      responseStream: responseStream,
+      sendFunction: (actualRequest) {
+        // Преобразуем запрос в JSON, если это RpcMessage
+        final processedRequest = actualRequest is RpcMessage
+            ? actualRequest.toJson()
+            : actualRequest;
+
+        // Отправляем запрос в стрим
+        _core.sendStreamData(
+          streamId: effectiveStreamId,
+          data: processedRequest,
+          serviceName: serviceName,
+          methodName: methodName,
+        );
+      },
+      closeFunction: () async {
+        // Закрываем стрим со стороны клиента
+        _core.closeStream(
+          streamId: effectiveStreamId,
+          serviceName: serviceName,
+          methodName: methodName,
+        );
+      },
+    );
+
+    // Оборачиваем в ServerStreamingBidiStream и сразу возвращаем,
+    // больше не нужно вызывать sendRequest, так как запрос уже отправлен
+    return ServerStreamingBidiStream<Request, Response>(bidiStream);
   }
 
   /// Регистрирует обработчик серверного стриминг метода
@@ -131,10 +164,10 @@ final class ServerStreamingRpcMethod<T extends IRpcSerializableMessage>
     RpcMethodResponseParser<Response> responseParser,
   ) {
     // Запускаем стрим от обработчика
-    final stream = implementation.openStream(request);
+    final serverStreamBidi = implementation.openStream(request);
 
     // Подписываемся на события и пересылаем их через публичный API Endpoint
-    stream.listen((data) {
+    serverStreamBidi.listen((data) {
       // Преобразуем данные и отправляем их в поток
       final processedData = data is RpcMessage ? data.toJson() : data;
 
@@ -149,6 +182,8 @@ final class ServerStreamingRpcMethod<T extends IRpcSerializableMessage>
       _core.sendStreamError(
         streamId: messageId,
         errorMessage: error.toString(),
+        serviceName: serviceName,
+        methodName: methodName,
       );
     }, onDone: () {
       // Закрываем стрим с указанием serviceName и methodName для middleware

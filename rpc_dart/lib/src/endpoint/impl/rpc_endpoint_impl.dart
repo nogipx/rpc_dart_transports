@@ -150,11 +150,15 @@ class _RpcEndpointImpl<T extends IRpcSerializableMessage>
     required String streamId,
     required String errorMessage,
     Map<String, dynamic>? metadata,
+    String? serviceName,
+    String? methodName,
   }) =>
       _delegate.sendStreamError(
         streamId: streamId,
         errorMessage: errorMessage,
         metadata: metadata,
+        serviceName: serviceName,
+        methodName: methodName,
       );
 
   /// Регистрирует контракт сервиса

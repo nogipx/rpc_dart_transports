@@ -16,32 +16,14 @@ typedef RpcMethodUnaryHandler<Request extends IRpcSerializableMessage,
 /// Тип для стримингового метода
 typedef RpcMethodServerStreamHandler<Request extends IRpcSerializableMessage,
         Response extends IRpcSerializableMessage>
-    = Stream<Response> Function(Request);
+    = ServerStreamingBidiStream<Request, Response> Function(Request);
 
 // ---
 
 /// Тип для клиентского стримингового метода
 typedef RpcMethodClientStreamHandler<Request extends IRpcSerializableMessage,
         Response extends IRpcSerializableMessage>
-    = Future<RpcClientStreamResult<Request, Response>> Function(
-        RpcClientStreamParams<Request, Response>);
-
-final class RpcClientStreamResult<Request extends IRpcSerializableMessage,
-    Response extends IRpcSerializableMessage> {
-  final StreamController<Request>? controller;
-  final Future<Response>? response;
-
-  const RpcClientStreamResult({this.controller, this.response});
-}
-
-final class RpcClientStreamParams<Request extends IRpcSerializableMessage,
-    Response extends IRpcSerializableMessage> {
-  final Stream<Request>? stream;
-  final Map<String, dynamic>? metadata;
-  final String? streamId;
-
-  const RpcClientStreamParams({this.stream, this.metadata, this.streamId});
-}
+    = ClientStreamingBidiStream<Request, Response> Function();
 
 // ---
 

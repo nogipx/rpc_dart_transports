@@ -21,82 +21,73 @@ abstract final class StreamServiceContract extends RpcServiceContract {
   }
 
   // Абстрактный метод, который должен быть реализован
-  Future<RpcClientStreamResult<DataBlock, DataBlockResult>> processDataBlocks(
-    RpcClientStreamParams<DataBlock, DataBlockResult> params,
-  );
+  ClientStreamingBidiStream<DataBlock, DataBlockResult> processDataBlocks();
 }
 
 /// Серверная реализация StreamService
 final class ServerStreamService extends StreamServiceContract {
   @override
-  Future<RpcClientStreamResult<DataBlock, DataBlockResult>> processDataBlocks(
-    RpcClientStreamParams<DataBlock, DataBlockResult> params,
-  ) async {
-    print('Сервер: начата обработка блоков файла');
-    print('  ID потока: ${params.streamId}');
+  ClientStreamingBidiStream<DataBlock, DataBlockResult> processDataBlocks() {
+    print('Сервер: создание обработчика для блоков файла');
 
-    // Проверка валидности потока
-    final typedStream = params.stream?.cast<DataBlock>();
-    if (typedStream == null) {
-      print('  Ошибка: поток данных отсутствует');
-      throw RpcInvalidArgumentException(
-        'Ошибка: невозможно обработать входящий поток данных',
-        details: {'contract': serviceName, 'method': 'processDataBlocks'},
-      );
-    }
+    final bidiStream =
+        BidiStreamGenerator<DataBlock, DataBlockResult>((requests) async* {
+          print('Сервер: начата обработка блоков файла');
 
-    // Счетчики для обработки файла
-    int blockCount = 0; // Количество блоков
-    int totalSize = 0; // Общий размер файла в байтах
-    String? metadata; // Метаданные файла
+          // Счетчики для обработки файла
+          int blockCount = 0; // Количество блоков
+          int totalSize = 0; // Общий размер файла в байтах
+          String? metadata; // Метаданные файла
 
-    print('  Начинаем получение блоков файла...');
+          print('  Начинаем получение блоков файла...');
 
-    try {
-      // Получаем блоки данных из потока
-      await for (final block in typedStream) {
-        blockCount++;
-        totalSize += block.data.length;
+          try {
+            // Получаем блоки данных из потока
+            await for (final block in requests) {
+              blockCount++;
+              totalSize += block.data.length;
 
-        // Сохраняем метаданные из первого блока (например, имя файла)
-        if (metadata == null && block.metadata.isNotEmpty) {
-          metadata = block.metadata;
-        }
+              // Сохраняем метаданные из первого блока (например, имя файла)
+              if (metadata == null && block.metadata.isNotEmpty) {
+                metadata = block.metadata;
+              }
 
-        print('  Получен блок #${block.index}: ${block.data.length} байт');
+              print(
+                '  Получен блок #${block.index}: ${block.data.length} байт',
+              );
 
-        // Имитация обработки больших блоков данных (проверка на вирусы, расчет хеша и т.д.)
-        if (block.data.length > 1000) {
-          print('  Обработка большого блока данных...');
-          await Future.delayed(Duration(milliseconds: 50));
-        }
-      }
+              // Имитация обработки больших блоков данных (проверка на вирусы, расчет хеша и т.д.)
+              // Уменьшаем задержку, чтобы не срабатывал таймаут в примере
+              if (block.data.length > 1000) {
+                print('  Обработка большого блока данных...');
+                await Future.delayed(Duration(milliseconds: 10));
+              }
+            }
 
-      print(
-        'Сервер: завершена обработка $blockCount блоков, общий размер: $totalSize байт',
-      );
+            print(
+              'Сервер: завершена обработка $blockCount блоков, общий размер: $totalSize байт',
+            );
 
-      // Формируем отчет о загрузке файла
-      final result = DataBlockResult(
-        blockCount: blockCount,
-        totalSize: totalSize,
-        metadata: metadata ?? 'unknown',
-        processingTime: DateTime.now().toIso8601String(),
-      );
+            // Формируем отчет о загрузке файла
+            final result = DataBlockResult(
+              blockCount: blockCount,
+              totalSize: totalSize,
+              metadata: metadata ?? 'unknown',
+              processingTime: DateTime.now().toIso8601String(),
+            );
 
-      print('Сервер: отправка результата обработки: $result');
+            print('Сервер: отправка результата обработки: $result');
 
-      // Возвращаем результат обработки клиенту
-      final response = RpcClientStreamResult<DataBlock, DataBlockResult>(
-        response: Future.value(result),
-      );
+            // Возвращаем результат обработки клиенту
+            yield result;
+          } catch (e, stack) {
+            print('Произошла ошибка при обработке файла: $e');
+            print('Стек вызовов: $stack');
+            rethrow;
+          }
+        }).create();
 
-      return response;
-    } catch (e, stack) {
-      print('Произошла ошибка при обработке файла: $e');
-      print('Стек вызовов: $stack');
-      rethrow;
-    }
+    return ClientStreamingBidiStream<DataBlock, DataBlockResult>(bidiStream);
   }
 }
 
@@ -107,16 +98,13 @@ final class ClientStreamService extends StreamServiceContract {
   ClientStreamService(this._endpoint);
 
   @override
-  Future<RpcClientStreamResult<DataBlock, DataBlockResult>> processDataBlocks(
-    RpcClientStreamParams<DataBlock, DataBlockResult> params,
-  ) async => _endpoint
-      .clientStreaming(
-        serviceName: serviceName,
-        methodName: StreamServiceContract.nameProcessDataBlocks,
-      )
-      .call<DataBlock, DataBlockResult>(
-        responseParser: DataBlockResult.fromJson,
-        metadata: params.metadata,
-        streamId: params.streamId,
-      );
+  ClientStreamingBidiStream<DataBlock, DataBlockResult> processDataBlocks() =>
+      _endpoint
+          .clientStreaming(
+            serviceName: serviceName,
+            methodName: StreamServiceContract.nameProcessDataBlocks,
+          )
+          .call<DataBlock, DataBlockResult>(
+            responseParser: DataBlockResult.fromJson,
+          );
 }

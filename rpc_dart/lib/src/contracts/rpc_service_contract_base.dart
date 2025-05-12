@@ -121,6 +121,11 @@ abstract base class _RpcServiceContractBase<T extends IRpcSerializableMessage>
   }
 
   /// Добавляет серверный стриминговый метод в контракт
+  ///
+  /// [methodName] - название метода
+  /// [handler] - обработчик, возвращающий [ServerStreamingBidiStream]
+  /// [argumentParser] - функция преобразования JSON в объект запроса
+  /// [responseParser] - функция преобразования JSON в объект ответа
   @override
   void addServerStreamingMethod<Request extends T, Response extends T>({
     required String methodName,
@@ -141,6 +146,11 @@ abstract base class _RpcServiceContractBase<T extends IRpcSerializableMessage>
   }
 
   /// Добавляет клиентский стриминговый метод в контракт
+  ///
+  /// [methodName] - название метода
+  /// [handler] - обработчик, возвращающий [ClientStreamingBidiStream]
+  /// [argumentParser] - функция преобразования JSON в объект запроса
+  /// [responseParser] - функция преобразования JSON в объект ответа
   @override
   void addClientStreamingMethod<Request extends T, Response extends T>({
     required String methodName,

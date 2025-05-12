@@ -3,3 +3,4 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 export '_method.dart';
+export 'bidi_stream/_index.dart';

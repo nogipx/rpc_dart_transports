@@ -108,7 +108,7 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
       },
     );
 
-    return BidiStream(
+    return BidiStream<Request, Response>(
       responseStream: typedIncomingStream,
       sendFunction: (request) => outgoingController.add(request),
       closeFunction: () => outgoingController.close(),
@@ -166,92 +166,148 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
       serviceName: serviceName,
       methodName: methodName,
       handler: (context) async {
-        // Получаем данные запроса и проверяем маркер двунаправленного стрима
-        final requestData = context.payload;
-        final isBidirectional = requestData is Map<String, dynamic> &&
-            requestData['_bidirectional'] == true;
+        try {
+          // Получаем данные запроса и проверяем маркер двунаправленного стрима
+          final requestData = context.payload;
+          final isBidirectional = requestData is Map<String, dynamic> &&
+              requestData['_bidirectional'] == true;
 
-        // Получаем или создаем ID стрима, отличный от ID сообщения
-        String effectiveStreamId;
-        if (isBidirectional && requestData['_streamId'] != null) {
-          // Если клиент указал ID стрима, используем его
-          effectiveStreamId = requestData['_streamId'] as String;
-        } else {
-          // Иначе генерируем новый ID стрима (не используем messageId как streamId)
-          effectiveStreamId = _endpoint.generateUniqueId('stream');
-        }
+          // Получаем или создаем ID стрима, отличный от ID сообщения
+          String effectiveStreamId;
+          if (isBidirectional && requestData['_streamId'] != null) {
+            // Если клиент указал ID стрима, используем его
+            effectiveStreamId = requestData['_streamId'] as String;
+          } else {
+            // Иначе генерируем новый ID стрима (не используем messageId как streamId)
+            effectiveStreamId = _endpoint.generateUniqueId('stream');
+          }
 
-        // Если это инициализация двунаправленного стрима
-        if (isBidirectional) {
-          // Открываем входящий поток и преобразуем его к типу Request
-          Stream<Request> typedIncomingStream;
-          typedIncomingStream = _core
-              .openStream(
-            serviceName: serviceName,
-            methodName: methodName,
-            streamId: effectiveStreamId,
-          )
-              .map((data) {
-            if (data is Map<String, dynamic>) {
-              // Проверяем маркер конца стрима
-              if (data['_clientStreamEnd'] == true) {
-                throw StateError('StreamEnd');
-              }
-              // Проверяем маркер закрытия канала
-              if (data['_channelClosed'] == true) {
-                throw StateError('ChannelClosed');
-              }
-              return requestParser(data);
-            } else {
-              return data as Request;
-            }
-          }).handleError((error) {
-            // Игнорируем ошибки маркера завершения
-            if (error is StateError &&
-                (error.message == 'StreamEnd' ||
-                    error.message == 'ChannelClosed')) {
-              return;
-            }
-            throw error;
-          });
+          // Если это инициализация двунаправленного стрима
+          if (isBidirectional) {
+            print(
+                'Инициализация двунаправленного стрима со streamId: $effectiveStreamId');
 
-          // Создаем исходящий поток через обработчик
-          final outgoingStream = implementation.openBidirectionalStream();
+            // Создаем контроллер для входящих сообщений от клиента
+            final incomingController = StreamController<Request>();
 
-          // Подписываемся на исходящий поток и отправляем данные
-          outgoingStream.listen(
-            (data) {
-              _core.sendStreamData(
-                streamId: effectiveStreamId,
-                data: data is RpcMessage ? data.toJson() : data,
-                serviceName: serviceName,
-                methodName: methodName,
-              );
-            },
-            onError: (error) {
-              _core.sendStreamError(
-                streamId: effectiveStreamId,
-                errorMessage: error.toString(),
-              );
-            },
-            onDone: () {
-              _core.closeStream(
-                streamId: effectiveStreamId,
-                serviceName: serviceName,
-                methodName: methodName,
-              );
-            },
-          );
+            // Подписываемся на сообщения из транспорта для этого streamId и перенаправляем их в контроллер
+            final subscription = _core
+                .openStream(
+              serviceName: serviceName,
+              methodName: methodName,
+              streamId: effectiveStreamId,
+            )
+                .listen(
+              (data) {
+                print('Получено сообщение от клиента: $data');
+                // Проверяем маркер завершения стрима
+                if (data is Map<String, dynamic> &&
+                    data['_clientStreamEnd'] == true) {
+                  print('Получен маркер завершения стрима');
+                  // Закрываем контроллер, но не отменяем подписку - это важно
+                  incomingController.close();
+                  return;
+                }
 
-          // Возвращаем подтверждение установки соединения
+                try {
+                  // Преобразуем данные в объект Request
+                  final request = data is Map<String, dynamic>
+                      ? requestParser(data)
+                      : data as Request;
+
+                  print('Добавляем сообщение в стрим обработчика: $request');
+                  incomingController.add(request);
+                } catch (e) {
+                  print('Ошибка при обработке сообщения: $e');
+                  incomingController.addError(e);
+                }
+              },
+              onError: (error) {
+                print('Ошибка в потоке сообщений: $error');
+                // Не пробрасываем ошибку дальше - просто логируем
+                // Это предотвратит завершение стрима в случае временной ошибки
+              },
+              onDone: () {
+                print('Входящий поток закрыт');
+                // Закрываем контроллер, если он еще не закрыт
+                if (!incomingController.isClosed) {
+                  incomingController.close();
+                }
+              },
+            );
+
+            // Вместо создания отдельного outgoingStream, используем handleBidirectionalStream,
+            // который соединит входящий поток с обработчиком
+            final bidiStream = implementation
+                .handleBidirectionalStream(incomingController.stream);
+
+            // Подписываемся на ответы из bidiStream и отправляем их клиенту
+            bidiStream.listen(
+              (data) {
+                print('Отправка ответа клиенту: $data');
+                try {
+                  _core.sendStreamData(
+                    streamId: effectiveStreamId,
+                    data: data is RpcMessage ? data.toJson() : data,
+                    serviceName: serviceName,
+                    methodName: methodName,
+                  );
+                } catch (e) {
+                  print('Ошибка при отправке ответа клиенту: $e');
+                  // Не пробрасываем ошибку дальше
+                }
+              },
+              onError: (error) {
+                print('Ошибка в исходящем потоке: $error');
+                try {
+                  _core.sendStreamError(
+                    streamId: effectiveStreamId,
+                    errorMessage: error.toString(),
+                    serviceName: serviceName,
+                    methodName: methodName,
+                  );
+                } catch (e) {
+                  print('Ошибка при отправке сообщения об ошибке: $e');
+                }
+              },
+              onDone: () {
+                print('Исходящий поток завершен');
+                try {
+                  _core.closeStream(
+                    streamId: effectiveStreamId,
+                    serviceName: serviceName,
+                    methodName: methodName,
+                  );
+                } catch (e) {
+                  print('Ошибка при закрытии стрима: $e');
+                }
+
+                // При завершении outgoing потока отменяем подписку на входящие сообщения
+                // чтобы избежать утечек ресурсов
+                subscription.cancel().catchError((e) {
+                  print('Ошибка при отмене подписки на входящий поток: $e');
+                });
+              },
+            );
+
+            // Возвращаем подтверждение установки соединения
+            return {
+              'status': 'bidirectional_streaming',
+              'streamId': effectiveStreamId
+            };
+          } else {
+            // Если это обычный запрос, обрабатываем по старой логике
+            // Это может быть нужно для совместимости или других целей
+            return {
+              'error': 'Для этого метода требуется маркер _bidirectional'
+            };
+          }
+        } catch (e) {
+          print('Неожиданная ошибка при обработке двунаправленного стрима: $e');
           return {
-            'status': 'bidirectional_streaming',
-            'streamId': effectiveStreamId
+            'error': 'Unexpected error in bidirectional stream: $e',
+            'status': 'error'
           };
-        } else {
-          // Если это обычный запрос, обрабатываем по старой логике
-          // Это может быть нужно для совместимости или других целей
-          return {'error': 'Для этого метода требуется маркер _bidirectional'};
         }
       },
     );

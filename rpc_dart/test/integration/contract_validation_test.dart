@@ -100,7 +100,8 @@ abstract base class UserServiceContract
 
   // Методы контракта
   Future<UserResponse> registerUser(UserRequest request);
-  Stream<NotificationMessage> subscribeToNotifications(UserRequest request);
+  ServerStreamingBidiStream<UserRequest, NotificationMessage>
+      subscribeToNotifications(UserRequest request);
 }
 
 // Серверная реализация
@@ -132,31 +133,34 @@ base class ServerUserService extends UserServiceContract {
   }
 
   @override
-  Stream<NotificationMessage> subscribeToNotifications(
-      UserRequest request) async* {
-    // Проверяем, существует ли пользователь
-    bool userExists =
-        _users.values.any((user) => user.name == request.username);
+  ServerStreamingBidiStream<UserRequest, NotificationMessage>
+      subscribeToNotifications(UserRequest request) {
+    return BidiStreamGenerator<UserRequest, NotificationMessage>(
+        (Stream<UserRequest> requestStream) async* {
+      // Проверяем, существует ли пользователь
+      bool userExists =
+          _users.values.any((user) => user.name == request.username);
 
-    if (!userExists) {
-      // Уведомление об ошибке
-      yield NotificationMessage('error', 'Пользователь не найден');
-      return;
-    }
+      if (!userExists) {
+        // Уведомление об ошибке
+        yield NotificationMessage('error', 'Пользователь не найден');
+        return;
+      }
 
-    // Отправляем приветствие
-    yield NotificationMessage(
-        'welcome', 'Добро пожаловать, ${request.username}!');
-
-    // Отправляем несколько уведомлений
-    for (int i = 1; i <= 3; i++) {
-      await Future.delayed(Duration(milliseconds: 10));
+      // Отправляем приветствие
       yield NotificationMessage(
-          'info', 'Уведомление #$i для пользователя ${request.username}');
-    }
+          'welcome', 'Добро пожаловать, ${request.username}!');
 
-    // Отправляем завершающее уведомление
-    yield NotificationMessage('bye', 'До свидания, ${request.username}!');
+      // Отправляем несколько уведомлений
+      for (int i = 1; i <= 3; i++) {
+        await Future.delayed(Duration(milliseconds: 10));
+        yield NotificationMessage(
+            'info', 'Уведомление #$i для пользователя ${request.username}');
+      }
+
+      // Отправляем завершающее уведомление
+      yield NotificationMessage('bye', 'До свидания, ${request.username}!');
+    }).createServerStreaming();
   }
 }
 
@@ -181,7 +185,8 @@ base class ClientUserService extends UserServiceContract {
   }
 
   @override
-  Stream<NotificationMessage> subscribeToNotifications(UserRequest request) {
+  ServerStreamingBidiStream<UserRequest, NotificationMessage>
+      subscribeToNotifications(UserRequest request) {
     return client
         .serverStreaming(
           serviceName: serviceName,

@@ -5,7 +5,7 @@ import 'client_streaming_models.dart';
 
 /// Пример использования клиентского стриминга (поток запросов -> один ответ)
 /// Демонстрирует использование клиентского стриминга для загрузки файла частями
-Future<void> main({bool debug = false}) async {
+Future<void> main({bool debug = true}) async {
   print('=== Пример клиентского стриминга RPC ===\n');
 
   // Создаем транспорты в памяти для локального примера
@@ -18,121 +18,120 @@ Future<void> main({bool debug = false}) async {
   print('Транспорты соединены');
 
   // Создаем эндпоинты с метками для отладки
-  final client = RpcEndpoint(transport: clientTransport, debugLabel: 'client');
-  final server = RpcEndpoint(transport: serverTransport, debugLabel: 'server');
-  print('Эндпоинты созданы');
+  final clientEndpoint = RpcEndpoint(
+    transport: clientTransport,
+    debugLabel: 'client',
+  );
+  final serverEndpoint = RpcEndpoint(
+    transport: serverTransport,
+    debugLabel: 'server',
+  );
 
-  // Добавляем middleware для логирования
   if (debug) {
-    server.addMiddleware(DebugMiddleware(id: "server"));
-    client.addMiddleware(DebugMiddleware(id: "client"));
-  } else {
-    server.addMiddleware(LoggingMiddleware(id: "server"));
-    client.addMiddleware(LoggingMiddleware(id: 'client'));
+    // Добавляем отладочные middleware для логирования запросов и ответов
+    clientEndpoint.addMiddleware(DebugMiddleware());
+    serverEndpoint.addMiddleware(DebugMiddleware());
   }
 
+  print('Эндпоинты созданы');
+
+  // Регистрируем сервис стриминга на серверном эндпоинте
+  final serverService = ServerStreamService();
+  serverEndpoint.registerServiceContract(serverService);
+  print('Серверный сервис зарегистрирован');
+
+  // Создаем клиентский сервис
+  final streamService = ClientStreamService(clientEndpoint);
+  clientEndpoint.registerServiceContract(streamService);
+  print('Клиентский сервис зарегистрирован');
+
   try {
-    // Создаем серверные реализации сервисов
-    final streamService = ServerStreamService();
-    server.registerServiceContract(streamService);
-    print('Серверный сервис зарегистрирован');
-
-    // Создаем клиентские реализации сервисов
-    final clientStreamService = ClientStreamService(client);
-    client.registerServiceContract(clientStreamService);
-    print('Клиентский сервис зарегистрирован');
-
-    // Демонстрация загрузки файла
-    await demonstrateDataBlocks(clientStreamService);
-  } catch (e) {
+    // Демонстрируем загрузку файла частями
+    await demonstrateDataBlocksTransfer(streamService);
+  } catch (e, stack) {
     print('Произошла ошибка: $e');
+    print('Стек вызовов: $stack');
   } finally {
-    // Закрываем эндпоинты
-    await client.close();
-    await server.close();
-    print('\nЭндпоинты закрыты');
+    print('\nЗакрываем эндпоинты...');
+    await clientEndpoint.close();
+    await serverEndpoint.close();
+    print('Эндпоинты закрыты');
   }
 
   print('\n=== Пример завершен ===');
 }
 
-/// Демонстрация загрузки файла
-Future<void> demonstrateDataBlocks(ClientStreamService streamService) async {
+/// Демонстрирует загрузку файла блоками данных с использованием клиентского стриминга
+Future<void> demonstrateDataBlocksTransfer(
+  ClientStreamService streamService,
+) async {
   print('\n=== Демонстрация загрузки файла частями ===\n');
 
-  print('📁 Подготовка загрузки файла...');
-
-  // Имитируем разбиение файла на несколько частей (чанков)
-  final fileChunks = [
+  // Генерируем тестовые данные - блоки файла
+  print('📁 Подготовка тестовых данных...');
+  final blocks = <DataBlock>[
+    // Первый блок, 500 байт
     DataBlock(
       index: 1,
-      data: List.generate(500, (i) => i % 256), // Первый чанк файла
-      metadata: 'my_document.pdf', // Имя файла в метаданных первого чанка
+      data: List.generate(500, (i) => i % 256),
+      metadata: 'my_document.pdf',
     ),
-    DataBlock(
-      index: 2,
-      data: List.generate(800, (i) => i % 256),
-    ), // Второй чанк
+    // Второй блок, 800 байт
+    DataBlock(index: 2, data: List.generate(800, (i) => i % 256), metadata: ''),
+    // Третий блок, 1200 байт
     DataBlock(
       index: 3,
       data: List.generate(1200, (i) => i % 256),
-    ), // Третий чанк
-    DataBlock(
-      index: 4,
-      data: List.generate(300, (i) => i % 256),
-    ), // Последний чанк
+      metadata: '',
+    ),
+    // Четвертый блок, 300 байт
+    DataBlock(index: 4, data: List.generate(300, (i) => i % 256), metadata: ''),
   ];
 
-  try {
-    print('🔄 Открытие канала для отправки файла...');
+  // Открываем поток для отправки файла
+  print('🔄 Открытие канала для отправки файла...');
 
-    // Создаем клиентский стрим для отправки блоков данных
-    final processStream = await streamService.processDataBlocks(
-      RpcClientStreamParams<DataBlock, DataBlockResult>(
-        metadata: {},
-        streamId: 'file-upload-stream',
-      ),
+  // Создаем клиентский стрим для отправки блоков данных
+  final clientStreamBidi = streamService.processDataBlocks();
+
+  print('📤 Отправка файла частями...');
+
+  // Отправляем блоки данных
+  int totalSize = 0;
+  for (final block in blocks) {
+    clientStreamBidi.send(block);
+    totalSize += block.data.length;
+    print('  📦 Отправлен блок #${block.index}: ${block.data.length} байт');
+    await Future.delayed(Duration(milliseconds: 50));
+  }
+
+  print('✅ Завершение отправки файла ($totalSize байт)');
+
+  // Сигнализируем о завершении передачи данных
+  await clientStreamBidi.finishSending();
+
+  print('🔒 Канал отправки закрыт, ожидаем ответ сервера...');
+
+  try {
+    // Получаем результат обработки файла
+    // Увеличиваем таймаут до 5 секунд для избежания таймаута в примере
+    final result = await clientStreamBidi.getResponse().timeout(
+      Duration(seconds: 5),
+      onTimeout:
+          () => throw TimeoutException('Не удалось получить ответ от сервера'),
     );
 
-    print('📤 Отправка файла частями...');
-
-    // Получаем управление стримом
-    final controller = processStream.controller;
-    if (controller == null) {
-      throw RpcInvalidArgumentException(
-        'Сервер не предоставил контроллер для потока',
-      );
-    }
-    var totalSent = 0;
-
-    // Отправляем блоки данных последовательно
-    for (final chunk in fileChunks) {
-      controller.add(chunk);
-      totalSent += chunk.data.length;
-      print('  📦 Отправлен блок #${chunk.index}: ${chunk.data.length} байт');
-
-      // Имитация задержки сети
-      await Future.delayed(Duration(milliseconds: 100));
-    }
-
-    print('✅ Завершение отправки файла ($totalSent байт)');
-
-    // Закрываем поток отправки
-    await controller.close();
-    print('🔒 Канал отправки закрыт');
-
-    // Получаем результат обработки от сервера
-    final result = await processStream.response;
-    if (result != null) {
-      print('\n📥 Получен ответ сервера:');
-      print('  • Обработано блоков: ${result.blockCount}');
-      print('  • Общий размер: ${result.totalSize} байт');
-      print('  • Имя файла: ${result.metadata}');
-      print('  • Время обработки: ${result.processingTime}');
-    } else {
-      print('\n⚠️ Ответ от сервера не содержит данных');
-    }
+    print('\n📋 Результат загрузки и обработки файла:');
+    print('  • Обработано блоков: ${result.blockCount}');
+    print('  • Общий размер: ${result.totalSize} байт');
+    print('  • Файл: ${result.metadata}');
+    print('  • Время обработки: ${result.processingTime}');
+    print('✅ Файл успешно загружен и обработан!');
   } catch (e) {
     print('❌ Ошибка при отправке файла: $e');
+    rethrow;
+  } finally {
+    // Полностью закрываем поток и освобождаем ресурсы
+    await clientStreamBidi.close();
   }
 }

@@ -337,13 +337,19 @@ final class _RpcEndpointCoreImpl<T extends IRpcSerializableMessage>
   void _handleStreamData(RpcMessage message) {
     final controller = _streamControllers[message.id];
     if (controller != null && !controller.isClosed) {
+      // Обработка пустых данных для совместимости с MsgPack
+      dynamic payload = message.payload;
+      if (payload is Map && payload['_empty'] == true) {
+        payload = {}; // Преобразуем пустой маркер в пустой объект
+      }
+
       // Если известны имена сервиса и метода, применяем middleware
       if (message.service != null && message.method != null) {
         _middlewareChain
             .executeStreamData(
           message.service!,
           message.method!,
-          message.payload,
+          payload,
           message.id,
           RpcDataDirection.fromRemote, // Данные получены от удаленной стороны
         )
@@ -353,7 +359,7 @@ final class _RpcEndpointCoreImpl<T extends IRpcSerializableMessage>
           controller.addError(error);
         });
       } else {
-        controller.add(message.payload);
+        controller.add(payload);
       }
     }
   }
@@ -477,6 +483,8 @@ final class _RpcEndpointCoreImpl<T extends IRpcSerializableMessage>
     String? serviceName,
     String? methodName,
   }) async {
+    // Проверка на null и конвертация в пустой объект для совместимости с MsgPack
+    data ??= {'_empty': true};
     // Если указаны имена сервиса и метода, обрабатываем данные через middleware
     dynamic processedData = data;
     if (serviceName != null && methodName != null) {
@@ -507,15 +515,21 @@ final class _RpcEndpointCoreImpl<T extends IRpcSerializableMessage>
   /// [streamId] - ID потока
   /// [error] - сообщение об ошибке
   /// [metadata] - дополнительные метаданные
+  /// [serviceName] - имя сервиса (опционально, для middleware)
+  /// [methodName] - имя метода (опционально, для middleware)
   @override
   Future<void> sendStreamError({
     required String streamId,
     required String errorMessage,
     Map<String, dynamic>? metadata,
+    String? serviceName,
+    String? methodName,
   }) async {
     final message = RpcMessage(
       type: RpcMessageType.error,
       id: streamId,
+      service: serviceName,
+      method: methodName,
       payload: errorMessage,
       metadata: metadata,
       debugLabel: debugLabel,
