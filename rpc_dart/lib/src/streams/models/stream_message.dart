@@ -1,7 +1,8 @@
-import 'package:rpc_dart/rpc_dart.dart';
+part of '../_index.dart';
 
 /// Обертка для сообщений, передаваемых через стрим-менеджер
-class StreamMessage<T extends IRpcSerializableMessage> implements IRpcSerializableMessage {
+class StreamMessage<T extends IRpcSerializableMessage>
+    implements IRpcSerializableMessage {
   /// Оригинальное сообщение
   final T message;
 
@@ -15,8 +16,12 @@ class StreamMessage<T extends IRpcSerializableMessage> implements IRpcSerializab
   final Map<String, dynamic>? metadata;
 
   /// Создает новую обертку сообщения
-  StreamMessage({required this.message, required this.streamId, DateTime? timestamp, this.metadata})
-    : timestamp = timestamp ?? DateTime.now();
+  StreamMessage(
+      {required this.message,
+      required this.streamId,
+      DateTime? timestamp,
+      this.metadata})
+      : timestamp = timestamp ?? DateTime.now();
 
   @override
   Map<String, dynamic> toJson() {

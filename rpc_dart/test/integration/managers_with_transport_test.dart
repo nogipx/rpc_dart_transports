@@ -5,8 +5,6 @@ import 'dart:typed_data';
 import 'package:rpc_dart/rpc_dart.dart';
 import 'package:test/test.dart';
 
-import 'package:rpc_dart/src/managers/server_streams_manager.dart';
-
 // Простое сообщение для тестов
 class SimpleMessage implements IRpcSerializableMessage {
   final String text;

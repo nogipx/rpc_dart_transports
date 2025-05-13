@@ -1,8 +1,4 @@
-import 'dart:async';
-
-import 'package:rpc_dart/rpc_dart.dart';
-
-import 'stream_message.dart';
+part of '../_index.dart';
 
 /// Улучшенный менеджер двунаправленных стримов с поддержкой обертки сообщений
 ///
@@ -29,6 +25,9 @@ class BidirectionalStreamsManager<Request extends IRpcSerializableMessage,
   // Коллбэк для обработки входящих запросов от клиентов
   final void Function(StreamMessage<Request>)? onRequestReceived;
 
+  // Флаг, указывающий, что менеджер закрыт
+  bool _isDisposed = false;
+
   /// Конструктор улучшенного менеджера двунаправленных стримов
   ///
   /// [onRequestReceived] - опциональный коллбэк, который будет вызван при получении
@@ -40,60 +39,83 @@ class BidirectionalStreamsManager<Request extends IRpcSerializableMessage,
   /// Ответ автоматически оборачивается в StreamMessage с ID 'broadcast'
   /// и отправляется всем подключенным клиентам.
   void publishResponse(Response response, {Map<String, dynamic>? metadata}) {
-    if (!_mainOutputController.isClosed) {
-      final wrappedResponse = StreamMessage<Response>(
-        message: response,
-        streamId: 'broadcast',
-        metadata: metadata,
-      );
-      _mainOutputController.add(wrappedResponse);
-    }
+    if (_isDisposed || _mainOutputController.isClosed) return;
+
+    final wrappedResponse = StreamMessage<Response>(
+      message: response,
+      streamId: 'broadcast',
+      metadata: metadata,
+    );
+    _mainOutputController.add(wrappedResponse);
   }
 
   /// Публикация уже обернутого ответа
   ///
   /// Для случаев, когда ответ уже подготовлен как StreamMessage.
   void publishWrappedResponse(StreamMessage<Response> wrappedResponse) {
-    if (!_mainOutputController.isClosed) {
-      _mainOutputController.add(wrappedResponse);
-    }
+    if (_isDisposed || _mainOutputController.isClosed) return;
+
+    _mainOutputController.add(wrappedResponse);
   }
 
   /// Создание нового двунаправленного стрима для клиента
-  BidiStream<Request, Response> createClientBidiStream() {
+  ///
+  /// Возвращает объект, который реализует Stream<Response> и имеет метод send()
+  /// для отправки сообщений Request.
+  BidiStreamInterface<Request, Response> createClientBidiStream() {
+    if (_isDisposed) {
+      throw StateError('BidirectionalStreamsManager уже закрыт');
+    }
+
     final clientId = 'bidi_stream_${_streamCounter++}';
     final creationTime = DateTime.now();
 
-    // Создаем контроллеры для входящих и исходящих сообщений данного клиента
+    // Создаем стрим контроллеры для входящих и исходящих сообщений
     final clientOutputController = StreamController<Response>.broadcast();
     final clientInputController = StreamController<Request>();
 
     // Подписываемся на основной выходной стрим и передаем данные клиенту
     final outputSubscription = _mainOutputController.stream.listen(
       (wrappedResponse) {
-        if (!clientOutputController.isClosed) {
-          // Отправляем клиенту оригинальное сообщение (без обертки)
-          clientOutputController.add(wrappedResponse.message);
+        // Проверяем, подходит ли сообщение для этого клиента
+        if ((wrappedResponse.streamId == clientId ||
+                wrappedResponse.streamId == 'broadcast') &&
+            !clientOutputController.isClosed) {
+          try {
+            // Отправляем клиенту оригинальное сообщение (без обертки)
+            clientOutputController.add(wrappedResponse.message);
 
-          // Если это индивидуальное сообщение для этого клиента или broadcast
-          if (wrappedResponse.streamId == clientId ||
-              wrappedResponse.streamId == 'broadcast') {
             // Обновляем время активности
             final wrapper = _clientStreams[clientId];
             wrapper?.updateLastActivity();
+          } catch (e) {
+            streamLogger.error('Ошибка при отправке ответа клиенту', e);
           }
         }
       },
-      onError: (error) {
+      onError: (error, stackTrace) {
         if (!clientOutputController.isClosed) {
-          clientOutputController.addError(error);
+          try {
+            clientOutputController.addError(error, stackTrace);
+          } catch (e) {
+            streamLogger.error('Ошибка при передаче ошибки клиенту', e);
+          }
+        }
+      },
+      onDone: () {
+        if (!clientOutputController.isClosed) {
+          clientOutputController.close().catchError((e) {
+            streamLogger.error('Ошибка при закрытии outputController', e);
+          });
         }
       },
     );
 
-    // Создаем обертку для BidiStream
-    sendFunction(Request request) {
-      if (!clientInputController.isClosed) {
+    // Функция отправки сообщений от клиента
+    void sendFunction(Request request) {
+      if (_isDisposed || clientInputController.isClosed) return;
+
+      try {
         clientInputController.add(request);
 
         // Обновляем время активности
@@ -113,34 +135,42 @@ class BidirectionalStreamsManager<Request extends IRpcSerializableMessage,
           // Если есть коллбэк, передаем ему обернутый запрос
           onRequestReceived?.call(wrappedRequest);
         }
+      } catch (e) {
+        streamLogger.error('Ошибка при отправке запроса', e);
       }
     }
 
-    // Функция для завершения передачи
-    finishTransferFunction() async {
-      // Дополнительная логика может быть добавлена здесь
-    }
-
-    // Функция для закрытия стрима
-    closeFunction() async {
-      await outputSubscription.cancel();
-
-      if (!clientInputController.isClosed) {
-        await clientInputController.close();
+    // Функция закрытия клиентского стрима
+    Future<void> closeFunction() async {
+      try {
+        await outputSubscription.cancel();
+      } catch (e) {
+        streamLogger.error('Ошибка при отмене подписки', e);
       }
 
-      if (!clientOutputController.isClosed) {
-        await clientOutputController.close();
+      try {
+        if (!clientInputController.isClosed) {
+          await clientInputController.close();
+        }
+      } catch (e) {
+        streamLogger.error('Ошибка при закрытии inputController', e);
+      }
+
+      try {
+        if (!clientOutputController.isClosed) {
+          await clientOutputController.close();
+        }
+      } catch (e) {
+        streamLogger.error('Ошибка при закрытии outputController', e);
       }
 
       _clientStreams.remove(clientId);
     }
 
-    // Создаем BidiStream
-    final bidiStream = BidiStream<Request, Response>(
-      responseStream: clientOutputController.stream,
+    // Создаем двунаправленный стрим
+    final bidiStream = BidiStreamInterface<Request, Response>(
+      stream: clientOutputController.stream,
       sendFunction: sendFunction,
-      finishTransferFunction: finishTransferFunction,
       closeFunction: closeFunction,
     );
 
@@ -159,31 +189,34 @@ class BidirectionalStreamsManager<Request extends IRpcSerializableMessage,
 
   /// Получение потока всех входящих запросов от клиентов с метаданными
   Stream<StreamMessage<Request>> get allRequestsStream =>
-      _mainInputController.stream;
+      _isDisposed ? Stream.empty() : _mainInputController.stream;
 
   /// Отправка ответа конкретному клиенту
   ///
   /// Ответ автоматически оборачивается в StreamMessage с ID клиента.
   void sendResponseToClient(String clientId, Response response,
       {Map<String, dynamic>? metadata}) {
+    if (_isDisposed) return;
+
     final wrapper = _clientStreams[clientId];
     if (wrapper != null && !wrapper.outputController.isClosed) {
-      // Отправляем в основной поток для общего мониторинга/логирования
-      final wrappedResponse = StreamMessage<Response>(
-        message: response,
-        streamId: clientId,
-        metadata: metadata,
-      );
+      try {
+        // Отправляем в основной поток для общего мониторинга/логирования
+        final wrappedResponse = StreamMessage<Response>(
+          message: response,
+          streamId: clientId,
+          metadata: metadata,
+        );
 
-      if (!_mainOutputController.isClosed) {
-        _mainOutputController.add(wrappedResponse);
+        if (!_mainOutputController.isClosed) {
+          _mainOutputController.add(wrappedResponse);
+        }
+
+        // Обновляем время активности
+        wrapper.updateLastActivity();
+      } catch (e) {
+        streamLogger.error('Ошибка при отправке ответа клиенту $clientId', e);
       }
-
-      // Отправляем непосредственно клиенту
-      wrapper.outputController.add(response);
-
-      // Обновляем время активности
-      wrapper.updateLastActivity();
     }
   }
 
@@ -196,6 +229,8 @@ class BidirectionalStreamsManager<Request extends IRpcSerializableMessage,
     Response response, {
     Map<String, dynamic>? metadata,
   }) {
+    if (_isDisposed) return;
+
     for (final clientId in clientIds) {
       sendResponseToClient(clientId, response, metadata: metadata);
     }
@@ -210,6 +245,8 @@ class BidirectionalStreamsManager<Request extends IRpcSerializableMessage,
     Response response, {
     Map<String, dynamic>? metadata,
   }) {
+    if (_isDisposed) return;
+
     // Объединяем метаданные запроса с новыми метаданными
     final mergedMetadata = {...?request.metadata, ...?metadata};
 
@@ -244,6 +281,8 @@ class BidirectionalStreamsManager<Request extends IRpcSerializableMessage,
 
   /// Закрытие соединения с конкретным клиентом
   Future<void> closeClientStream(String clientId) async {
+    if (_isDisposed) return;
+
     final wrapper = _clientStreams.remove(clientId);
     if (wrapper != null) {
       await wrapper.dispose();
@@ -252,7 +291,10 @@ class BidirectionalStreamsManager<Request extends IRpcSerializableMessage,
 
   /// Закрытие всех клиентских соединений
   Future<void> closeAllClientStreams() async {
-    for (final clientId in _clientStreams.keys.toList()) {
+    if (_isDisposed) return;
+
+    final clientIds = _clientStreams.keys.toList();
+    for (final clientId in clientIds) {
       await closeClientStream(clientId);
     }
   }
@@ -262,6 +304,8 @@ class BidirectionalStreamsManager<Request extends IRpcSerializableMessage,
   /// Закрывает соединения с клиентами, которые не проявляли активность
   /// в течение указанного периода времени.
   Future<int> closeInactiveStreams(Duration inactivityThreshold) async {
+    if (_isDisposed) return 0;
+
     final inactiveIds = getInactiveClientIds(inactivityThreshold);
     for (final clientId in inactiveIds) {
       await closeClientStream(clientId);
@@ -271,16 +315,28 @@ class BidirectionalStreamsManager<Request extends IRpcSerializableMessage,
 
   /// Освобождение всех ресурсов
   Future<void> dispose() async {
+    if (_isDisposed) return;
+
+    _isDisposed = true;
+
     // Закрываем все клиентские стримы
     await closeAllClientStreams();
 
     // Закрываем основные контроллеры
-    if (!_mainInputController.isClosed) {
-      await _mainInputController.close();
+    try {
+      if (!_mainInputController.isClosed) {
+        await _mainInputController.close();
+      }
+    } catch (e) {
+      streamLogger.error('Ошибка при закрытии _mainInputController', e);
     }
 
-    if (!_mainOutputController.isClosed) {
-      await _mainOutputController.close();
+    try {
+      if (!_mainOutputController.isClosed) {
+        await _mainOutputController.close();
+      }
+    } catch (e) {
+      streamLogger.error('Ошибка при закрытии _mainOutputController', e);
     }
   }
 }
@@ -288,7 +344,7 @@ class BidirectionalStreamsManager<Request extends IRpcSerializableMessage,
 /// Внутренний класс для хранения информации о клиентском стриме
 class _EnhancedBidiStreamWrapper<Request extends IRpcSerializableMessage,
     Response extends IRpcSerializableMessage> {
-  final BidiStream<Request, Response> stream;
+  final BidiStreamInterface<Request, Response> stream;
   final StreamController<Request> inputController;
   final StreamController<Response> outputController;
   final StreamSubscription<StreamMessage<Response>> outputSubscription;
@@ -324,14 +380,26 @@ class _EnhancedBidiStreamWrapper<Request extends IRpcSerializableMessage,
 
   /// Закрытие и очистка ресурсов
   Future<void> dispose() async {
-    await outputSubscription.cancel();
-
-    if (!inputController.isClosed) {
-      await inputController.close();
+    try {
+      await outputSubscription.cancel();
+    } catch (e) {
+      streamLogger.error('Ошибка при отмене подписки', e);
     }
 
-    if (!outputController.isClosed) {
-      await outputController.close();
+    try {
+      if (!inputController.isClosed) {
+        await inputController.close();
+      }
+    } catch (e) {
+      streamLogger.error('Ошибка при закрытии inputController', e);
+    }
+
+    try {
+      if (!outputController.isClosed) {
+        await outputController.close();
+      }
+    } catch (e) {
+      streamLogger.error('Ошибка при закрытии outputController', e);
     }
   }
 }

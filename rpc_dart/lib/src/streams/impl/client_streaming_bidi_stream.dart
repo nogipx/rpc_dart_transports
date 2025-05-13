@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-part of '_index.dart';
+part of '../_index.dart';
 
 /// Обертка над BidiStream, специфичная для Client Streaming:
 /// клиент отправляет поток запросов, а сервер отправляет один ответ
@@ -46,8 +46,8 @@ final class ClientStreamingBidiStream<Request extends IRpcSerializableMessage,
   /// Можно отправлять любое количество запросов
   void send(Request request) {
     if (_isClosed || _isFinished) {
-      print('ClientStreamingBidiStream: попытка отправки в закрытый поток');
-      return;
+      throw StateError(
+          'Невозможно отправить запрос: поток закрыт или передача данных завершена');
     }
     _bidiStream.send(request);
   }
@@ -57,16 +57,14 @@ final class ClientStreamingBidiStream<Request extends IRpcSerializableMessage,
   /// Используйте этот метод перед getResponse() для получения результата
   Future<void> finishSending() async {
     if (_isClosed || _isFinished) {
-      print('ClientStreamingBidiStream: поток уже закрыт или завершен');
-      return;
+      return; // Поток уже закрыт или передача данных завершена
     }
 
     _isFinished = true;
 
     // Используем новый метод finishTransfer базового потока
     await _bidiStream.finishTransfer();
-    print(
-        'ClientStreamingBidiStream: отправка данных завершена, ожидаем ответ');
+    // Отправка данных завершена, ожидаем ответ от сервера
   }
 
   /// Получает ответ от сервера
@@ -74,9 +72,8 @@ final class ClientStreamingBidiStream<Request extends IRpcSerializableMessage,
   /// Рекомендуется вызывать после finishSending()
   Future<Response> getResponse() {
     if (!_isFinished && !_isClosed) {
-      print(
-          'ПРЕДУПРЕЖДЕНИЕ: Вызов getResponse() без предварительного вызова finishSending(). '
-          'Сервер может не знать, что все данные отправлены.');
+      // Предупреждение: вызов getResponse() без finishSending() может привести к тому,
+      // что сервер будет ожидать дополнительные данные и не отправит ответ
     }
     return _responseCompleter.future;
   }
@@ -93,8 +90,7 @@ final class ClientStreamingBidiStream<Request extends IRpcSerializableMessage,
   /// Закрывает стрим и очищает ресурсы
   Future<void> close() async {
     if (_isClosed) {
-      print('ClientStreamingBidiStream: попытка закрыть уже закрытый поток');
-      return;
+      return; // Поток уже закрыт
     }
 
     // Если отправка еще не завершена, завершаем её
@@ -110,7 +106,7 @@ final class ClientStreamingBidiStream<Request extends IRpcSerializableMessage,
         await _bidiStream.close();
       }
     } catch (e) {
-      print('Ошибка при закрытии базового потока: $e');
+      // Ошибка при закрытии игнорируется, так как мы в процессе очистки ресурсов
     } finally {
       // Всегда отменяем подписку при закрытии
       if (_subscription != null) {

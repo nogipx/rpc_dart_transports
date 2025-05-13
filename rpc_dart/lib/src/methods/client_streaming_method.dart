@@ -57,8 +57,8 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
     // Подписываемся на ответы и завершаем комплитер при получении результата
     subscription = responseStream.listen(
       (data) {
-        // Дополнительный лог
-        print(
+        // Логируем получение ответа
+        rpcMethodLogger.info(
           'ClientStreamingRpcMethod: получен ответ в потоке для $methodName (stream: $effectiveStreamId)',
         );
 
@@ -72,9 +72,9 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
         }
       },
       onError: (error) {
-        print(
-          'ClientStreamingRpcMethod: ошибка в потоке $methodName: $error (stream: $effectiveStreamId)',
-        );
+        rpcMethodLogger.error(
+            'ClientStreamingRpcMethod: ошибка в потоке $methodName (stream: $effectiveStreamId)',
+            error);
         if (!completer.isCompleted && !streamCompleted) {
           streamCompleted = true;
           completer.completeError(error);
@@ -84,7 +84,7 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
         }
       },
       onDone: () {
-        print(
+        rpcMethodLogger.debug(
           'ClientStreamingRpcMethod: поток $methodName завершен (stream: $effectiveStreamId)',
         );
         // Если поток завершился без ответа, обрабатываем это
@@ -102,10 +102,11 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
       responseStream: responseStream,
       sendFunction: (data) {
         if (streamCompleted || dataTransferFinished) {
-          print(
+          rpcMethodLogger.warning(
             'ClientStreamingRpcMethod: попытка отправки в закрытый или завершенный поток $methodName (stream: $effectiveStreamId)',
           );
-          return;
+          throw StateError(
+              'Невозможно отправить данные: поток закрыт или передача данных завершена');
         }
 
         final processedData = data is RpcMessage ? data.toJson() : data;
@@ -120,13 +121,13 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
       // Функция для завершения передачи данных (отправка маркера завершения)
       finishTransferFunction: () async {
         if (streamCompleted || dataTransferFinished) {
-          print(
+          rpcMethodLogger.warning(
             'ClientStreamingRpcMethod: попытка завершить уже завершенный поток $methodName (stream: $effectiveStreamId)',
           );
           return;
         }
 
-        print(
+        rpcMethodLogger.debug(
           'ClientStreamingRpcMethod: завершение передачи данных для $methodName (stream: $effectiveStreamId)',
         );
 
@@ -146,7 +147,7 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
       // Функция для полного закрытия потока
       closeFunction: () async {
         if (streamCompleted) {
-          print(
+          rpcMethodLogger.debug(
             'ClientStreamingRpcMethod: попытка закрыть уже закрытый поток $methodName (stream: $effectiveStreamId)',
           );
           return;
@@ -154,7 +155,7 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
 
         // Если передача данных еще не завершена, завершаем её
         if (!dataTransferFinished) {
-          print(
+          rpcMethodLogger.info(
             'ClientStreamingRpcMethod: автоматическое завершение передачи при закрытии $methodName (stream: $effectiveStreamId)',
           );
 
@@ -169,7 +170,7 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
           dataTransferFinished = true;
         }
 
-        print(
+        rpcMethodLogger.debug(
           'ClientStreamingRpcMethod: закрытие потока $methodName (stream: $effectiveStreamId)',
         );
 

@@ -3,8 +3,6 @@ import 'dart:async';
 import 'package:rpc_dart/rpc_dart.dart';
 import 'package:test/test.dart';
 
-import 'package:rpc_dart/src/managers/server_streams_manager.dart';
-
 // Тестовое сообщение для использования в тестах
 class TestMessage implements IRpcSerializableMessage {
   final String content;

@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-part of '_index.dart';
+part of '../_index.dart';
 
 /// Основной класс двунаправленного потока данных
 /// Это простая обёртка над потоком, которая поддерживает:
@@ -140,9 +140,12 @@ final class BidiStreamGenerator<Request extends IRpcSerializableMessage,
       finishTransferFunction: () async {
         // При завершении передачи данных не закрываем контроллер,
         // просто сигнализируем, что данных больше не будет
-        // Это позволяет генератору завершить обработку и вернуть ответ
-        // Примечание: Мы не отправляем маркер завершения здесь, так как это будет реализовано
-        // на более высоком уровне в классе ClientStreamingRpcMethod
+        // Специальный маркер завершения добавляется через sendFunction
+        // в реализациях методов высокого уровня (например, ClientStreamingRpcMethod)
+        if (!requestController.isClosed) {
+          // Если нужно добавить специальный маркер завершения непосредственно здесь,
+          // можно сделать это, но сейчас мы оставляем эту ответственность на более высоком уровне
+        }
       },
       closeFunction: () async {
         if (!requestController.isClosed) {
@@ -155,15 +158,18 @@ final class BidiStreamGenerator<Request extends IRpcSerializableMessage,
   /// Создает ServerStreamingBidiStream напрямую из генератора
   ///
   /// [initialRequest] - начальный запрос, который будет отправлен сразу после создания стрима
-  ServerStreamingBidiStream<Request, Response> createServerStreaming({
+  ServerStreamingBidiStream<Response, Request> createServerStreaming({
     Request? initialRequest,
   }) {
     // Сначала создаем обычный BidiStream
     final bidiStream = create();
 
     // Оборачиваем его в ServerStreamingBidiStream
-    final serverStreamBidi =
-        ServerStreamingBidiStream<Request, Response>(bidiStream);
+    final serverStreamBidi = ServerStreamingBidiStream<Response, Request>(
+      stream: bidiStream,
+      sendFunction: bidiStream.send,
+      closeFunction: bidiStream.close,
+    );
 
     // Если был передан начальный запрос, отправляем его
     if (initialRequest != null) {

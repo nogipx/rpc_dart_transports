@@ -84,14 +84,14 @@ abstract base class TaskServiceContract
   }
 
   // Метод, который должен быть реализован в конкретном классе
-  ServerStreamingBidiStream<TaskRequest, ProgressMessage> startTask(
+  ServerStreamingBidiStream<ProgressMessage, TaskRequest> startTask(
       TaskRequest request);
 }
 
 // Серверная реализация сервиса задач
 base class ServerTaskService extends TaskServiceContract {
   @override
-  ServerStreamingBidiStream<TaskRequest, ProgressMessage> startTask(
+  ServerStreamingBidiStream<ProgressMessage, TaskRequest> startTask(
       TaskRequest request) {
     print(
         'Server: Starting task ${request.taskName} with ID ${request.taskId}');
@@ -139,7 +139,7 @@ base class ClientTaskService extends TaskServiceContract {
   ClientTaskService(this.client);
 
   @override
-  ServerStreamingBidiStream<TaskRequest, ProgressMessage> startTask(
+  ServerStreamingBidiStream<ProgressMessage, TaskRequest> startTask(
       TaskRequest request) {
     print('Client: Sending task request: ${request.toJson()}');
     return client

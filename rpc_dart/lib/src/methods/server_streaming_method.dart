@@ -21,7 +21,7 @@ final class ServerStreamingRpcMethod<T extends IRpcSerializableMessage>
   /// [metadata] - метаданные (опционально)
   /// [streamId] - ID потока (опционально, генерируется автоматически)
   /// [responseParser] - функция преобразования JSON в объект ответа (опционально)
-  ServerStreamingBidiStream<Request, Response>
+  ServerStreamingBidiStream<Response, Request>
       call<Request extends T, Response extends T>({
     required Request request,
     required RpcMethodResponseParser<Response> responseParser,
@@ -76,7 +76,11 @@ final class ServerStreamingRpcMethod<T extends IRpcSerializableMessage>
 
     // Оборачиваем в ServerStreamingBidiStream и сразу возвращаем,
     // больше не нужно вызывать sendRequest, так как запрос уже отправлен
-    return ServerStreamingBidiStream<Request, Response>(bidiStream);
+    return ServerStreamingBidiStream<Response, Request>(
+      stream: bidiStream,
+      sendFunction: bidiStream.send,
+      closeFunction: bidiStream.close,
+    );
   }
 
   /// Регистрирует обработчик серверного стриминг метода

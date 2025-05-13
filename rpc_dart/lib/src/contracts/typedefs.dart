@@ -16,7 +16,7 @@ typedef RpcMethodUnaryHandler<Request extends IRpcSerializableMessage,
 /// Тип для стримингового метода
 typedef RpcMethodServerStreamHandler<Request extends IRpcSerializableMessage,
         Response extends IRpcSerializableMessage>
-    = ServerStreamingBidiStream<Request, Response> Function(Request);
+    = ServerStreamingBidiStream<Response, Request> Function(Request);
 
 // ---
 

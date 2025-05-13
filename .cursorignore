@@ -1,9 +1,0 @@
-**/COPYRIGHT
-**/LICENSE
-**/LICENSES/
-**/REUSE.toml
-**/*.lock
-**/analysis_options.yaml
-.cursorignore
-**/.dart_tool/
-**/justfile
