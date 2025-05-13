@@ -12,10 +12,10 @@ extension BidiStreamExtensions<Request extends IRpcSerializableMessage,
   /// [initialRequest] - начальный запрос для отправки (опционально)
   ///
   /// Если указан initialRequest, он будет отправлен сразу после создания стрима
-  ServerStreamingBidiStream<Response, Request> toServerStreaming({
+  ServerStreamingBidiStream<Request, Response> toServerStreaming({
     Request? initialRequest,
   }) {
-    final serverStreamBidi = ServerStreamingBidiStream<Response, Request>(
+    final serverStreamBidi = ServerStreamingBidiStream<Request, Response>(
       stream: this,
       sendFunction: send,
       closeFunction: close,

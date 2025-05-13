@@ -82,7 +82,7 @@ final class RpcMethodImplementation<Request extends IRpcSerializableMessage,
   }
 
   /// Открывает стрим ответов для указанного запроса
-  ServerStreamingBidiStream<Response, Request> openStream(Request request) {
+  ServerStreamingBidiStream<Request, Response> openStream(Request request) {
     if (type == RpcMethodType.serverStreaming && _serverStreamHandler != null) {
       try {
         return _serverStreamHandler!(request);

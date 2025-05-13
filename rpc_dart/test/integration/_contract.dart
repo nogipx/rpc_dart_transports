@@ -53,7 +53,7 @@ abstract base class TestRpcContract extends RpcServiceContract {
 
   ClientStreamingBidiStream<TestRequest, TestResponse> clientStreamOperation();
 
-  ServerStreamingBidiStream<TestStreamResponse, TestRequest>
+  ServerStreamingBidiStream<TestRequest, TestStreamResponse>
       serverStreamOperation(TestRequest request);
 
   // Изменяем тип возвращаемого значения на BidiStream
@@ -99,7 +99,7 @@ final class ServerTestRpcService extends TestRpcContract {
   }
 
   @override
-  ServerStreamingBidiStream<TestStreamResponse, TestRequest>
+  ServerStreamingBidiStream<TestRequest, TestStreamResponse>
       serverStreamOperation(TestRequest request) {
     final bidiStream =
         BidiStreamGenerator<TestRequest, TestStreamResponse>((requests) async* {
@@ -113,7 +113,7 @@ final class ServerTestRpcService extends TestRpcContract {
     }).create();
 
     final serverStreamBidi =
-        ServerStreamingBidiStream<TestStreamResponse, TestRequest>(
+        ServerStreamingBidiStream<TestRequest, TestStreamResponse>(
       stream: bidiStream,
       sendFunction: bidiStream.send,
       closeFunction: bidiStream.close,
@@ -162,7 +162,7 @@ final class ClientTestRpcService extends TestRpcContract {
   }
 
   @override
-  ServerStreamingBidiStream<TestStreamResponse, TestRequest>
+  ServerStreamingBidiStream<TestRequest, TestStreamResponse>
       serverStreamOperation(
     TestRequest request,
   ) {

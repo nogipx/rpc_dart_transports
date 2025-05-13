@@ -100,7 +100,7 @@ abstract base class UserServiceContract
 
   // Методы контракта
   Future<UserResponse> registerUser(UserRequest request);
-  ServerStreamingBidiStream<UserRequest, NotificationMessage>
+  ServerStreamingBidiStream<NotificationMessage, UserRequest>
       subscribeToNotifications(UserRequest request);
 }
 
@@ -133,7 +133,7 @@ base class ServerUserService extends UserServiceContract {
   }
 
   @override
-  ServerStreamingBidiStream<UserRequest, NotificationMessage>
+  ServerStreamingBidiStream<NotificationMessage, UserRequest>
       subscribeToNotifications(UserRequest request) {
     return BidiStreamGenerator<UserRequest, NotificationMessage>(
         (Stream<UserRequest> requestStream) async* {
@@ -185,7 +185,7 @@ base class ClientUserService extends UserServiceContract {
   }
 
   @override
-  ServerStreamingBidiStream<UserRequest, NotificationMessage>
+  ServerStreamingBidiStream<NotificationMessage, UserRequest>
       subscribeToNotifications(UserRequest request) {
     return client
         .serverStreaming(

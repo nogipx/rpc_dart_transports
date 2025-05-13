@@ -132,7 +132,7 @@ void registerTaskService(RpcEndpoint server) {
 
           // Оборачиваем BidiStream в ServerStreamingBidiStream
           final serverStream =
-              ServerStreamingBidiStream<ProgressMessage, TaskRequest>(
+              ServerStreamingBidiStream<TaskRequest, ProgressMessage>(
                 stream: bidiStream,
                 sendFunction: bidiStream.send,
                 closeFunction: bidiStream.close,

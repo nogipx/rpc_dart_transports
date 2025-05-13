@@ -8,12 +8,13 @@ part of '../_index.dart';
 ///
 /// Эта версия поддерживает автоматическое оборачивание сообщений в [StreamMessage]
 /// для включения метаданных о клиентском стриме.
-class ServerStreamsManager<T extends IRpcSerializableMessage> {
+class ServerStreamsManager<ResponseType extends IRpcSerializableMessage> {
   // Основной контроллер для публикации данных
-  final _mainController = StreamController<StreamMessage<T>>.broadcast();
+  final _mainController =
+      StreamController<StreamMessage<ResponseType>>.broadcast();
 
   // Хранилище активных клиентских стримов
-  final _clientStreams = <String, _ClientStreamWrapper<T>>{};
+  final _clientStreams = <String, _ClientStreamWrapper<ResponseType>>{};
 
   // Счетчик для генерации клиентских ID
   int _streamCounter = 0;
@@ -25,11 +26,11 @@ class ServerStreamsManager<T extends IRpcSerializableMessage> {
   ///
   /// Сообщение автоматически оборачивается в [StreamMessage] и
   /// отправляется всем клиентам.
-  void publish(T event, {Map<String, dynamic>? metadata}) {
+  void publish(ResponseType event, {Map<String, dynamic>? metadata}) {
     if (_isDisposed || _mainController.isClosed) return;
 
     // Отправляем в основной контроллер с общим ID для broadcast
-    final wrappedEvent = StreamMessage<T>(
+    final wrappedEvent = StreamMessage<ResponseType>(
       message: event,
       streamId: 'broadcast',
       metadata: metadata,
@@ -41,14 +42,14 @@ class ServerStreamsManager<T extends IRpcSerializableMessage> {
   ///
   /// Возвращаемый стрим имеет расширенный функционал [ServerStreamingBidiStream]
   /// для поддержки двунаправленного взаимодействия
-  ServerStreamingBidiStream<T, R>
-      createClientStream<R extends IRpcSerializableMessage>() {
+  ServerStreamingBidiStream<RequestType, ResponseType>
+      createClientStream<RequestType extends IRpcSerializableMessage>() {
     if (_isDisposed) {
       throw StateError('ServerStreamsManager уже закрыт');
     }
 
     final clientId = 'stream_${_streamCounter++}';
-    final clientController = StreamController<T>.broadcast();
+    final clientController = StreamController<ResponseType>.broadcast();
 
     // Подписываемся на основной стрим и передаем данные в клиентский контроллер
     final subscription = _mainController.stream.listen(
@@ -88,9 +89,18 @@ class ServerStreamsManager<T extends IRpcSerializableMessage> {
     );
 
     // Функция обработки запросов от клиента
-    void sendFunction(R request) {
-      // Если необходимо, можно добавить обработку запроса здесь
-      // Например, вызвать глобальный обработчик запросов или отправить событие
+    void sendFunction(RequestType request) {
+      // Создаем обернутое сообщение для запроса
+      // ignore: unused_local_variable
+      final wrappedRequest = StreamMessage<RequestType>(
+        message: request,
+        streamId: clientId,
+        timestamp: DateTime.now(),
+      );
+
+      // Логируем получение запроса от клиента
+      streamLogger
+          .debug('Получен запрос от клиента $clientId: ${request.runtimeType}');
 
       // Обновляем время последней активности
       final wrapper = _clientStreams[clientId];
@@ -106,7 +116,7 @@ class ServerStreamsManager<T extends IRpcSerializableMessage> {
     );
 
     // Создаем и возвращаем обертку с расширенным API
-    return ServerStreamingBidiStream<T, R>(
+    return ServerStreamingBidiStream<RequestType, ResponseType>(
       stream: clientController.stream,
       closeFunction: () => closeClientStream(clientId),
       sendFunction: sendFunction,
@@ -116,7 +126,7 @@ class ServerStreamsManager<T extends IRpcSerializableMessage> {
   /// Прямая публикация в конкретный стрим клиента
   ///
   /// Сообщение автоматически оборачивается в [StreamMessage] с ID клиента.
-  void publishToClient(String clientId, T event,
+  void publishToClient(String clientId, ResponseType event,
       {Map<String, dynamic>? metadata}) {
     if (_isDisposed) return;
 
@@ -124,7 +134,7 @@ class ServerStreamsManager<T extends IRpcSerializableMessage> {
     if (wrapper != null && !wrapper.controller.isClosed) {
       try {
         // Создаем обернутое сообщение
-        final wrappedEvent = StreamMessage<T>(
+        final wrappedEvent = StreamMessage<ResponseType>(
           message: event,
           streamId: clientId,
           metadata: metadata,
@@ -146,7 +156,7 @@ class ServerStreamsManager<T extends IRpcSerializableMessage> {
   /// Публикация обернутого сообщения
   ///
   /// Для случаев, когда сообщение уже оформлено как [StreamMessage]
-  void publishWrapped(StreamMessage<T> wrappedEvent) {
+  void publishWrapped(StreamMessage<ResponseType> wrappedEvent) {
     if (_isDisposed || _mainController.isClosed) return;
 
     _mainController.add(wrappedEvent);
@@ -162,7 +172,7 @@ class ServerStreamsManager<T extends IRpcSerializableMessage> {
 
   /// Получение информации о клиентском стриме
   // ignore: library_private_types_in_public_api
-  _ClientStreamWrapper<T>? getClientInfo(String clientId) {
+  _ClientStreamWrapper<ResponseType>? getClientInfo(String clientId) {
     return _clientStreams[clientId];
   }
 
@@ -232,9 +242,9 @@ class ServerStreamsManager<T extends IRpcSerializableMessage> {
 }
 
 /// Класс для хранения информации о клиентском стриме
-class _ClientStreamWrapper<T extends IRpcSerializableMessage> {
-  final StreamController<T> controller;
-  final StreamSubscription<StreamMessage<T>> subscription;
+class _ClientStreamWrapper<ResponseType extends IRpcSerializableMessage> {
+  final StreamController<ResponseType> controller;
+  final StreamSubscription<StreamMessage<ResponseType>> subscription;
   final String clientId;
   final DateTime createdAt;
 

@@ -5,11 +5,12 @@
 part of '_method.dart';
 
 /// Класс для работы с RPC методом типа "серверный стриминг" (один запрос - поток ответов)
-final class ServerStreamingRpcMethod<T extends IRpcSerializableMessage>
-    extends RpcMethod<T> {
+final class ServerStreamingRpcMethod<
+        MessageType extends IRpcSerializableMessage>
+    extends RpcMethod<MessageType> {
   /// Создает новый объект серверного стриминг RPC метода
   ServerStreamingRpcMethod(
-    IRpcEndpoint<T> endpoint,
+    IRpcEndpoint<MessageType> endpoint,
     String serviceName,
     String methodName,
   ) : super(endpoint, serviceName, methodName);
@@ -21,8 +22,8 @@ final class ServerStreamingRpcMethod<T extends IRpcSerializableMessage>
   /// [metadata] - метаданные (опционально)
   /// [streamId] - ID потока (опционально, генерируется автоматически)
   /// [responseParser] - функция преобразования JSON в объект ответа (опционально)
-  ServerStreamingBidiStream<Response, Request>
-      call<Request extends T, Response extends T>({
+  ServerStreamingBidiStream<Request, Response>
+      call<Request extends MessageType, Response extends MessageType>({
     required Request request,
     required RpcMethodResponseParser<Response> responseParser,
     Map<String, dynamic>? metadata,
@@ -76,7 +77,7 @@ final class ServerStreamingRpcMethod<T extends IRpcSerializableMessage>
 
     // Оборачиваем в ServerStreamingBidiStream и сразу возвращаем,
     // больше не нужно вызывать sendRequest, так как запрос уже отправлен
-    return ServerStreamingBidiStream<Response, Request>(
+    return ServerStreamingBidiStream<Request, Response>(
       stream: bidiStream,
       sendFunction: bidiStream.send,
       closeFunction: bidiStream.close,
@@ -88,7 +89,7 @@ final class ServerStreamingRpcMethod<T extends IRpcSerializableMessage>
   /// [handler] - функция обработки запроса, возвращающая поток ответов
   /// [requestParser] - функция преобразования JSON в объект запроса (опционально)
   /// [responseParser] - функция преобразования JSON в объект ответа (опционально)
-  void register<Request extends T, Response extends T>({
+  void register<Request extends MessageType, Response extends MessageType>({
     required RpcMethodServerStreamHandler<Request, Response> handler,
     required RpcMethodArgumentParser<Request> requestParser,
     required RpcMethodResponseParser<Response> responseParser,

@@ -158,14 +158,14 @@ final class BidiStreamGenerator<Request extends IRpcSerializableMessage,
   /// Создает ServerStreamingBidiStream напрямую из генератора
   ///
   /// [initialRequest] - начальный запрос, который будет отправлен сразу после создания стрима
-  ServerStreamingBidiStream<Response, Request> createServerStreaming({
+  ServerStreamingBidiStream<Request, Response> createServerStreaming({
     Request? initialRequest,
   }) {
     // Сначала создаем обычный BidiStream
     final bidiStream = create();
 
     // Оборачиваем его в ServerStreamingBidiStream
-    final serverStreamBidi = ServerStreamingBidiStream<Response, Request>(
+    final serverStreamBidi = ServerStreamingBidiStream<Request, Response>(
       stream: bidiStream,
       sendFunction: bidiStream.send,
       closeFunction: bidiStream.close,
