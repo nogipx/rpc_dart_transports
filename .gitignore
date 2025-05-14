@@ -6,4 +6,3 @@ coverage/
 *.bin
 **/build/
 **/examples
-.cursorignore

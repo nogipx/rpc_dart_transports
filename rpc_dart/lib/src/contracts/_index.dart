@@ -5,3 +5,5 @@
 export '_contract.dart';
 export 'rpc_service_contract_base.dart';
 export 'typedefs.dart';
+export 'rpc_composite_contract.dart';
+export 'rpc_contract_module.dart';
