@@ -69,10 +69,9 @@ class NotificationMessage implements IRpcSerializableMessage {
 // Контракт сервиса пользователей
 abstract base class UserServiceContract
     extends RpcServiceContract<IRpcSerializableMessage> {
-  RpcEndpoint? get client;
+  UserServiceContract() : super('UserService');
 
-  @override
-  final String serviceName = 'UserService';
+  RpcEndpoint? get client;
 
   // Константы для имен методов (для типобезопасности)
   static const String registerUserMethod = 'registerUser';
@@ -96,6 +95,7 @@ abstract base class UserServiceContract
       argumentParser: UserRequest.fromJson,
       responseParser: NotificationMessage.fromJson,
     );
+    super.setup();
   }
 
   // Методы контракта

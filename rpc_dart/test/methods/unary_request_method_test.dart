@@ -55,10 +55,9 @@ class CalculationResponse implements IRpcSerializableMessage {
 // Контракт сервиса калькулятора
 abstract base class CalculatorServiceContract
     extends RpcServiceContract<IRpcSerializableMessage> {
-  RpcEndpoint? get client;
+  CalculatorServiceContract() : super('CalculatorService');
 
-  @override
-  final String serviceName = 'CalculatorService';
+  RpcEndpoint? get client;
 
   // Константы для имен методов
   static const String calculateMethod = 'calculate';
@@ -72,6 +71,7 @@ abstract base class CalculatorServiceContract
       argumentParser: CalculationRequest.fromJson,
       responseParser: CalculationResponse.fromJson,
     );
+    super.setup();
   }
 
   // Унарный метод

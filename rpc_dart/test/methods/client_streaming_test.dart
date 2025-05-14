@@ -71,8 +71,7 @@ class UploadResult implements IRpcSerializableMessage {
 // Контракт сервиса для тестирования клиентского стриминга
 abstract base class FileServiceContract
     extends RpcServiceContract<IRpcSerializableMessage> {
-  @override
-  final String serviceName = 'FileService';
+  FileServiceContract() : super('FileService');
 
   // Константа для имени метода
   static const String uploadFileMethod = 'uploadFile';
@@ -87,6 +86,7 @@ abstract base class FileServiceContract
       argumentParser: FileChunk.fromJson,
       responseParser: UploadResult.fromJson,
     );
+    super.setup();
   }
 
   // Метод, который должен быть реализован в конкретном классе

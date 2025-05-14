@@ -4,8 +4,7 @@ import 'package:rpc_dart/rpc_dart.dart';
 
 // Универсальный контракт для тестирования всех типов методов
 abstract base class TestRpcContract extends RpcServiceContract {
-  @override
-  final String serviceName = 'TestRpcService';
+  TestRpcContract() : super('TestRpcService');
 
   // Имена методов
   static const String unaryMethod = 'unaryMethod';
@@ -46,6 +45,7 @@ abstract base class TestRpcContract extends RpcServiceContract {
       argumentParser: TestRequest.fromJson,
       responseParser: TestStreamResponse.fromJson,
     );
+    super.setup();
   }
 
   // Абстрактные методы для реализации

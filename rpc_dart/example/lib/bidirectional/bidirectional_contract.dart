@@ -8,8 +8,7 @@ import 'bidirectional_models.dart';
 
 /// Абстрактный контракт чат-сервиса
 abstract base class ChatServiceContract extends RpcServiceContract {
-  @override
-  String get serviceName => 'ChatService';
+  ChatServiceContract() : super('ChatService');
 
   @override
   void setup() {
@@ -20,6 +19,7 @@ abstract base class ChatServiceContract extends RpcServiceContract {
       argumentParser: ChatMessage.fromJson,
       responseParser: ChatMessage.fromJson,
     );
+    super.setup();
   }
 
   /// Обработчик сообщений чата

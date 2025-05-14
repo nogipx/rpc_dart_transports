@@ -4,8 +4,7 @@ import 'client_streaming_models.dart';
 
 /// Контракт стриминг-сервиса
 abstract final class StreamServiceContract extends RpcServiceContract {
-  @override
-  final String serviceName = 'StreamService';
+  StreamServiceContract() : super('StreamService');
 
   static const nameProcessDataBlocks = 'processDataBlocks';
 
@@ -18,6 +17,7 @@ abstract final class StreamServiceContract extends RpcServiceContract {
       argumentParser: DataBlock.fromJson,
       responseParser: DataBlockResult.fromJson,
     );
+    super.setup();
   }
 
   // Абстрактный метод, который должен быть реализован

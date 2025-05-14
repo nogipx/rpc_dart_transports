@@ -4,8 +4,7 @@ import 'unary_models.dart';
 
 /// Базовый контракт для базовых операций
 abstract base class BasicServiceContract extends RpcServiceContract {
-  @override
-  String get serviceName => 'BasicService';
+  BasicServiceContract() : super('BasicService');
 
   @override
   void setup() {
@@ -16,6 +15,7 @@ abstract base class BasicServiceContract extends RpcServiceContract {
       argumentParser: ComputeRequest.fromJson,
       responseParser: ComputeResult.fromJson,
     );
+    super.setup();
   }
 
   /// Абстрактный метод вычислений

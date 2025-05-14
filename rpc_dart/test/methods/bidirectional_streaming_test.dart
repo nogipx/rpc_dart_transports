@@ -34,10 +34,9 @@ class ChatMessage implements IRpcSerializableMessage {
 // Контракт чат-сервиса
 abstract base class ChatServiceContract
     extends RpcServiceContract<IRpcSerializableMessage> {
-  RpcEndpoint? get client;
+  ChatServiceContract() : super('ChatService');
 
-  @override
-  final String serviceName = 'ChatService';
+  RpcEndpoint? get client;
 
   // Константы для имен методов
   static const String chatSessionMethod = 'chatSession';
@@ -52,6 +51,7 @@ abstract base class ChatServiceContract
       argumentParser: ChatMessage.fromJson,
       responseParser: ChatMessage.fromJson,
     );
+    super.setup();
   }
 
   // Двунаправленный стрим-метод

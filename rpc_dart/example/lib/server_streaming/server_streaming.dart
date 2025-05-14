@@ -32,7 +32,13 @@ Future<void> main({bool debug = true}) async {
 
   try {
     // Регистрируем метод на сервере
-    registerTaskService(server);
+    // Создаем сервисный контракт для сервиса задач
+    final serverContract = ServerTaskService();
+    final clientContract = ClientTaskService(client);
+
+    // Регистрируем контракт на сервере
+    server.registerServiceContract(serverContract);
+    client.registerServiceContract(clientContract);
     print('Сервис задач зарегистрирован');
 
     // Демонстрация прогресса задачи
@@ -49,103 +55,132 @@ Future<void> main({bool debug = true}) async {
   print('\n=== Пример завершен ===');
 }
 
-/// Регистрация сервиса задач на сервере
-void registerTaskService(RpcEndpoint server) {
-  // Создаем сервисный контракт для сервиса задач
-  final taskServiceContract = SimpleRpcServiceContract('TaskService');
+abstract class TaskServiceContract extends RpcServiceContract {
+  TaskServiceContract() : super('TaskService');
 
-  // Регистрируем контракт на сервере
-  server.registerServiceContract(taskServiceContract);
+  static const String methodName = 'startTask';
 
-  // Имитация прогресса задачи
-  server
-      .serverStreaming(serviceName: 'TaskService', methodName: 'startTask')
-      .register<TaskRequest, ProgressMessage>(
-        handler: (request) {
-          print(
-            'Сервер: Начинаем задачу "${request.taskName}" (ID: ${request.taskId})',
+  @override
+  void setup() {
+    addServerStreamingMethod(
+      methodName: methodName,
+      handler: handler,
+      argumentParser: TaskRequest.fromJson,
+      responseParser: ProgressMessage.fromJson,
+    );
+    super.setup();
+  }
+
+  ServerStreamingBidiStream<TaskRequest, ProgressMessage> handler(
+    TaskRequest request,
+  );
+}
+
+class ServerTaskService extends TaskServiceContract {
+  @override
+  ServerStreamingBidiStream<TaskRequest, ProgressMessage> handler(
+    TaskRequest request,
+  ) {
+    print(
+      'Сервер: Начинаем задачу "${request.taskName}" (ID: ${request.taskId})',
+    );
+
+    final bidiStream =
+        BidiStreamGenerator<TaskRequest, ProgressMessage>((requests) async* {
+          final int steps = request.steps;
+          final List<String> stages = [
+            'initializing',
+            'in_progress',
+            'processing',
+            'analyzing',
+            'in_progress',
+          ];
+          final List<String> messages = [
+            'Инициализация анализа...',
+            'Загрузка набора данных...',
+            'Предварительная обработка...',
+            'Статистический анализ...',
+            'Обработка результатов...',
+            'Генерация отчетов...',
+            'Применение фильтров...',
+            'Оптимизация данных...',
+            'Финальная проверка...',
+            'Формирование результатов...',
+          ];
+
+          // Начальный статус
+          yield ProgressMessage(
+            taskId: request.taskId,
+            progress: 0,
+            status: 'initializing',
+            message: 'Задача запущена. Подготовка к выполнению...',
           );
 
-          final bidiStream =
-              BidiStreamGenerator<TaskRequest, ProgressMessage>((
-                requests,
-              ) async* {
-                final int steps = request.steps;
-                final List<String> stages = [
-                  'initializing',
-                  'in_progress',
-                  'processing',
-                  'analyzing',
-                  'in_progress',
-                ];
-                final List<String> messages = [
-                  'Инициализация анализа...',
-                  'Загрузка набора данных...',
-                  'Предварительная обработка...',
-                  'Статистический анализ...',
-                  'Обработка результатов...',
-                  'Генерация отчетов...',
-                  'Применение фильтров...',
-                  'Оптимизация данных...',
-                  'Финальная проверка...',
-                  'Формирование результатов...',
-                ];
+          await Future.delayed(Duration(milliseconds: 500));
 
-                // Начальный статус
-                yield ProgressMessage(
-                  taskId: request.taskId,
-                  progress: 0,
-                  status: 'initializing',
-                  message: 'Задача запущена. Подготовка к выполнению...',
-                );
+          // Имитация процесса обработки
+          for (int i = 1; i <= steps; i++) {
+            final progress = (i / steps * 100).round();
+            final stageIndex = i % stages.length;
+            final messageIndex = i - 1;
+            final status = i == steps ? 'completed' : stages[stageIndex];
+            final message =
+                i == steps
+                    ? 'Обработано ${(3000 + (i * 500)).toStringAsFixed(0)} элементов данных'
+                    : messages[messageIndex];
 
-                await Future.delayed(Duration(milliseconds: 500));
+            // Разная задержка для разных этапов
+            final delay =
+                status == 'analyzing'
+                    ? Duration(milliseconds: 1000)
+                    : Duration(milliseconds: 500);
+            await Future.delayed(delay);
 
-                // Имитация процесса обработки
-                for (int i = 1; i <= steps; i++) {
-                  final progress = (i / steps * 100).round();
-                  final stageIndex = i % stages.length;
-                  final messageIndex = i - 1;
-                  final status = i == steps ? 'completed' : stages[stageIndex];
-                  final message =
-                      i == steps
-                          ? 'Обработано ${(3000 + (i * 500)).toStringAsFixed(0)} элементов данных'
-                          : messages[messageIndex];
+            yield ProgressMessage(
+              taskId: request.taskId,
+              progress: progress,
+              status: status,
+              message: message,
+            );
+          }
 
-                  // Разная задержка для разных этапов
-                  final delay =
-                      status == 'analyzing'
-                          ? Duration(milliseconds: 1000)
-                          : Duration(milliseconds: 500);
-                  await Future.delayed(delay);
+          print('Сервер: Задача "${request.taskName}" успешно завершена');
+        }).create();
 
-                  yield ProgressMessage(
-                    taskId: request.taskId,
-                    progress: progress,
-                    status: status,
-                    message: message,
-                  );
-                }
+    // Оборачиваем BidiStream в ServerStreamingBidiStream
+    final serverStream =
+        ServerStreamingBidiStream<TaskRequest, ProgressMessage>(
+          stream: bidiStream,
+          sendFunction: bidiStream.send,
+          closeFunction: bidiStream.close,
+        );
 
-                print('Сервер: Задача "${request.taskName}" успешно завершена');
-              }).create();
+    // Отправляем начальный запрос в стрим
+    serverStream.sendRequest(request);
 
-          // Оборачиваем BidiStream в ServerStreamingBidiStream
-          final serverStream =
-              ServerStreamingBidiStream<TaskRequest, ProgressMessage>(
-                stream: bidiStream,
-                sendFunction: bidiStream.send,
-                closeFunction: bidiStream.close,
-              );
+    return serverStream;
+  }
+}
 
-          // Отправляем начальный запрос в стрим
-          serverStream.sendRequest(request);
+class ClientTaskService extends TaskServiceContract {
+  final RpcEndpoint endpoint;
 
-          return serverStream;
-        },
-        requestParser: TaskRequest.fromJson,
-        responseParser: ProgressMessage.fromJson,
-      );
+  ClientTaskService(this.endpoint);
+
+  @override
+  ServerStreamingBidiStream<TaskRequest, ProgressMessage> handler(
+    TaskRequest request,
+  ) {
+    return endpoint
+        .serverStreaming(
+          serviceName: serviceName,
+          methodName: TaskServiceContract.methodName,
+        )
+        .call<TaskRequest, ProgressMessage>(
+          request: request,
+          responseParser: ProgressMessage.fromJson,
+        );
+  }
 }
 
 /// Демонстрация прогресса задачи

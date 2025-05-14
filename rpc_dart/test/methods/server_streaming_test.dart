@@ -65,8 +65,7 @@ class ProgressMessage implements IRpcSerializableMessage {
 // Контракт сервиса для тестирования серверного стриминга
 abstract base class TaskServiceContract
     extends RpcServiceContract<IRpcSerializableMessage> {
-  @override
-  final String serviceName = 'TaskService';
+  TaskServiceContract() : super('TaskService');
 
   // Константа для имени метода
   static const String startTaskMethod = 'startTask';
@@ -81,6 +80,7 @@ abstract base class TaskServiceContract
       argumentParser: TaskRequest.fromJson,
       responseParser: ProgressMessage.fromJson,
     );
+    super.setup();
   }
 
   // Метод, который должен быть реализован в конкретном классе
