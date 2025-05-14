@@ -40,6 +40,11 @@ abstract class RpcServiceContract<BaseMessage extends IRpcSerializableMessage>
     _subContracts.add(contract);
   }
 
+  /// Возвращает список всех подконтрактов (непосредственных дочерних)
+  List<IRpcServiceContract<BaseMessage>> getSubContracts() {
+    return List.unmodifiable(_subContracts);
+  }
+
   /// Инициализирует все подконтракты
   /// Должен быть вызван строго после добавления всех подконтрактов
   @override

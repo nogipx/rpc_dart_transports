@@ -173,12 +173,8 @@ void main() {
       // Регистрируем корневой контракт на сервере
       final rootContract = RootContract();
 
-      // Регистрируем основной контракт
+      // Регистрируем только основной контракт (дочерние зарегистрируются автоматически)
       serverEndpoint.registerServiceContract(rootContract);
-
-      // Также регистрируем дочерние контракты
-      serverEndpoint.registerServiceContract(ChildContract('ChildService1'));
-      serverEndpoint.registerServiceContract(ChildContract('ChildService2'));
 
       // На стороне клиента создаем методы для вызова
       final rootMethod = clientEndpoint.unaryRequest(
@@ -224,11 +220,6 @@ void main() {
       // Регистрируем контракт с многоуровневой композицией
       final nestedContract = NestedCompositionContract();
       serverEndpoint.registerServiceContract(nestedContract);
-
-      // Также регистрируем все вложенные контракты
-      serverEndpoint
-          .registerServiceContract(ChildContract('ChildWithGrandchild'));
-      serverEndpoint.registerServiceContract(GrandchildContract());
 
       // Создаем метод для вызова на сервере второго уровня
       final childMethod = clientEndpoint.unaryRequest(
@@ -296,6 +287,93 @@ void main() {
 
       expect(rootHandler, isNotNull);
       expect(childHandler, isNotNull);
+    });
+
+    test('Подконтракты должны автоматически регистрироваться в эндпоинте', () {
+      // Регистрируем только корневой контракт
+      final rootContract = RootContract();
+      serverEndpoint.registerServiceContract(rootContract);
+
+      // Проверяем, что дочерние контракты тоже автоматически зарегистрировались
+      final rootServiceContract =
+          serverEndpoint.getServiceContract('RootService');
+      final childService1Contract =
+          serverEndpoint.getServiceContract('ChildService1');
+      final childService2Contract =
+          serverEndpoint.getServiceContract('ChildService2');
+
+      // Все контракты должны быть найдены
+      expect(rootServiceContract, isNotNull);
+      expect(childService1Contract, isNotNull);
+      expect(childService2Contract, isNotNull);
+
+      // Проверяем возможность вызова методов из дочерних контрактов
+      // без необходимости их отдельной регистрации
+      final rootMethod = clientEndpoint.unaryRequest(
+        serviceName: 'RootService',
+        methodName: 'rootMethod',
+      );
+
+      final childMethod1 = clientEndpoint.unaryRequest(
+        serviceName: 'ChildService1',
+        methodName: 'childMethod',
+      );
+
+      final childMethod2 = clientEndpoint.unaryRequest(
+        serviceName: 'ChildService2',
+        methodName: 'childMethod',
+      );
+
+      expect(rootMethod, isNotNull);
+      expect(childMethod1, isNotNull);
+      expect(childMethod2, isNotNull);
+    });
+
+    test(
+        'Многоуровневая композиция должна автоматически регистрировать все уровни',
+        () async {
+      // Регистрируем контракт с многоуровневой композицией
+      final nestedContract = NestedCompositionContract();
+      serverEndpoint.registerServiceContract(nestedContract);
+
+      // Проверяем, что контракты всех уровней автоматически зарегистрировались
+      final nestedServiceContract =
+          serverEndpoint.getServiceContract('NestedService');
+      final childWithGrandchildContract =
+          serverEndpoint.getServiceContract('ChildWithGrandchild');
+      final grandchildServiceContract =
+          serverEndpoint.getServiceContract('GrandchildService');
+
+      // Все контракты должны быть найдены
+      expect(nestedServiceContract, isNotNull);
+      expect(childWithGrandchildContract, isNotNull);
+      expect(grandchildServiceContract, isNotNull);
+
+      // Проверяем возможность вызова методов из вложенных контрактов
+      // без необходимости их отдельной регистрации
+      final childMethod = clientEndpoint.unaryRequest(
+        serviceName: 'ChildWithGrandchild',
+        methodName: 'childMethod',
+      );
+
+      final grandchildMethod = clientEndpoint.unaryRequest(
+        serviceName: 'GrandchildService',
+        methodName: 'grandchildMethod',
+      );
+
+      // Вызываем методы и проверяем результаты
+      final childResponse = await childMethod.call(
+        request: ChildRequest('auto-test'),
+        responseParser: ChildResponse.fromJson,
+      );
+
+      final grandchildResponse = await grandchildMethod.call(
+        request: ChildRequest('auto-nested'),
+        responseParser: ChildResponse.fromJson,
+      );
+
+      expect(childResponse.data, equals('ChildWithGrandchild:auto-test'));
+      expect(grandchildResponse.data, equals('grandchild:auto-nested'));
     });
   });
 }

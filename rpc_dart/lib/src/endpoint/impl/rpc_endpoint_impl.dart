@@ -185,6 +185,16 @@ class _RpcEndpointImpl<T extends IRpcSerializableMessage>
     // Регистрируем методы из класса
     contract.setup();
 
+    // Регистрируем все подконтракты, если они есть
+    if (contract is RpcServiceContract<T>) {
+      for (final subContract in contract.getSubContracts()) {
+        if (!_contracts.containsKey(subContract.serviceName)) {
+          // Рекурсивно регистрируем подконтракт (только если он еще не зарегистрирован)
+          _registerContract(subContract);
+        }
+      }
+    }
+
     // Для каждого метода в контракте
     for (final method in contract.methods) {
       final methodType = method.methodType;
