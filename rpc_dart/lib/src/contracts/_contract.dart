@@ -27,14 +27,14 @@ abstract interface class IRpcSerializableMessage {
 
 /// Базовый интерфейс для всех сервисных контрактов
 abstract interface class IRpcServiceContract<
-    T extends IRpcSerializableMessage> {
+    BaseMessage extends IRpcSerializableMessage> {
   const IRpcServiceContract();
 
   /// Уникальное имя сервиса
   String get serviceName;
 
   /// Список всех доступных методов
-  List<RpcMethodContract<T, T>> get methods;
+  List<RpcMethodContract<BaseMessage, BaseMessage>> get methods;
 
   /// Находит метод по имени
   ///
@@ -44,7 +44,7 @@ abstract interface class IRpcServiceContract<
   /// [getMethodHandler], [getMethodArgumentParser] и [getMethodResponseParser]
   /// вместо прямого приведения типов.
   RpcMethodContract<Request, Response>?
-      findMethod<Request extends T, Response extends T>(
+      findMethod<Request extends BaseMessage, Response extends BaseMessage>(
     String methodName,
   );
 
@@ -52,7 +52,8 @@ abstract interface class IRpcServiceContract<
   ///
   /// [methodName] - имя метода
   /// Возвращает типизированный обработчик или null, если метод не найден или не соответствует типам
-  dynamic getMethodHandler<Request extends T, Response extends T>(
+  dynamic getMethodHandler<Request extends BaseMessage,
+      Response extends BaseMessage>(
     String methodName,
   );
 
@@ -60,7 +61,8 @@ abstract interface class IRpcServiceContract<
   ///
   /// [methodName] - имя метода
   /// Возвращает типизированную функцию парсинга или null, если метод не найден или не соответствует типам
-  RpcMethodArgumentParser<Request>? getMethodArgumentParser<Request extends T>(
+  RpcMethodArgumentParser<Request>?
+      getMethodArgumentParser<Request extends BaseMessage>(
     String methodName,
   );
 
@@ -69,7 +71,7 @@ abstract interface class IRpcServiceContract<
   /// [methodName] - имя метода
   /// Возвращает типизированную функцию парсинга или null, если метод не найден или не соответствует типам
   RpcMethodResponseParser<Response>?
-      getMethodResponseParser<Response extends T>(
+      getMethodResponseParser<Response extends BaseMessage>(
     String methodName,
   );
 
@@ -78,7 +80,8 @@ abstract interface class IRpcServiceContract<
   void setup();
 
   /// Добавляет унарный метод в контракт
-  void addUnaryRequestMethod<Request extends T, Response extends T>({
+  void addUnaryRequestMethod<Request extends BaseMessage,
+      Response extends BaseMessage>({
     required String methodName,
     required RpcMethodUnaryHandler<Request, Response> handler,
     required RpcMethodArgumentParser<Request> argumentParser,
@@ -91,7 +94,8 @@ abstract interface class IRpcServiceContract<
   /// [handler] - обработчик, возвращающий [ServerStreamingBidiStream]
   /// [argumentParser] - функция преобразования JSON в объект запроса
   /// [responseParser] - функция преобразования JSON в объект ответа
-  void addServerStreamingMethod<Request extends T, Response extends T>({
+  void addServerStreamingMethod<Request extends BaseMessage,
+      Response extends BaseMessage>({
     required String methodName,
     required RpcMethodServerStreamHandler<Request, Response> handler,
     required RpcMethodArgumentParser<Request> argumentParser,
@@ -104,7 +108,8 @@ abstract interface class IRpcServiceContract<
   /// [handler] - обработчик, возвращающий [ClientStreamingBidiStream]
   /// [argumentParser] - функция преобразования JSON в объект запроса
   /// [responseParser] - функция преобразования JSON в объект ответа
-  void addClientStreamingMethod<Request extends T, Response extends T>({
+  void addClientStreamingMethod<Request extends BaseMessage,
+      Response extends BaseMessage>({
     required String methodName,
     required RpcMethodClientStreamHandler<Request, Response> handler,
     required RpcMethodArgumentParser<Request> argumentParser,
@@ -112,7 +117,8 @@ abstract interface class IRpcServiceContract<
   });
 
   /// Добавляет двунаправленный стриминговый метод в контракт
-  void addBidirectionalStreamingMethod<Request extends T, Response extends T>({
+  void addBidirectionalStreamingMethod<Request extends BaseMessage,
+      Response extends BaseMessage>({
     required String methodName,
     required RpcMethodBidirectionalHandler<Request, Response> handler,
     required RpcMethodArgumentParser<Request> argumentParser,

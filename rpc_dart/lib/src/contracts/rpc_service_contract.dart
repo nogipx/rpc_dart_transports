@@ -9,18 +9,20 @@ import '_index.dart'
         IRpcServiceContract,
         IRpcSerializableMessage;
 import 'typedefs.dart';
+// ignore: depend_on_referenced_packages
+import 'package:meta/meta.dart';
 
 /// Контракт, объединяющий несколько других контрактов
 /// для модульной организации сервисов
-final class RpcCompositeContract<T extends IRpcSerializableMessage>
-    implements IRpcServiceContract<T> {
+abstract class RpcServiceContract<BaseMessage extends IRpcSerializableMessage>
+    implements IRpcServiceContract<BaseMessage> {
   @override
   final String serviceName;
 
-  final List<IRpcServiceContract<T>> _subContracts = [];
+  final List<IRpcServiceContract<BaseMessage>> _subContracts = [];
 
   /// Кэш методов сервиса
-  final List<RpcMethodContract<T, T>> _methods = [];
+  final List<RpcMethodContract<BaseMessage, BaseMessage>> _methods = [];
 
   /// Хранилище обработчиков для каждого метода
   final Map<String, dynamic> _handlers = {};
@@ -31,15 +33,17 @@ final class RpcCompositeContract<T extends IRpcSerializableMessage>
   /// Хранилище функций парсинга ответов для каждого метода
   final Map<String, Function?> _responseParsers = {};
 
-  RpcCompositeContract(this.serviceName);
+  RpcServiceContract(this.serviceName);
 
   /// Добавляет подконтракт в композитный контракт
-  void addSubContract(IRpcServiceContract<T> contract) {
+  void addSubContract(IRpcServiceContract<BaseMessage> contract) {
     _subContracts.add(contract);
   }
 
   /// Инициализирует все подконтракты
+  /// Должен быть вызван строго после добавления всех подконтрактов
   @override
+  @mustCallSuper
   void setup() {
     for (final contract in _subContracts) {
       contract.setup();
@@ -47,8 +51,10 @@ final class RpcCompositeContract<T extends IRpcSerializableMessage>
   }
 
   @override
-  List<RpcMethodContract<T, T>> get methods {
-    final allMethods = <RpcMethodContract<T, T>>[..._methods];
+  List<RpcMethodContract<BaseMessage, BaseMessage>> get methods {
+    final allMethods = <RpcMethodContract<BaseMessage, BaseMessage>>[
+      ..._methods
+    ];
     for (final contract in _subContracts) {
       allMethods.addAll(contract.methods);
     }
@@ -57,7 +63,7 @@ final class RpcCompositeContract<T extends IRpcSerializableMessage>
 
   @override
   RpcMethodContract<Request, Response>?
-      findMethod<Request extends T, Response extends T>(
+      findMethod<Request extends BaseMessage, Response extends BaseMessage>(
     String methodName,
   ) {
     // Сначала ищем в локальных методах
@@ -78,7 +84,8 @@ final class RpcCompositeContract<T extends IRpcSerializableMessage>
   }
 
   @override
-  dynamic getMethodHandler<Request extends T, Response extends T>(
+  dynamic getMethodHandler<Request extends BaseMessage,
+      Response extends BaseMessage>(
     String methodName,
   ) {
     // Проверяем локальные обработчики
@@ -98,11 +105,12 @@ final class RpcCompositeContract<T extends IRpcSerializableMessage>
   }
 
   @override
-  RpcMethodArgumentParser<Request>? getMethodArgumentParser<Request extends T>(
+  RpcMethodArgumentParser<Request>?
+      getMethodArgumentParser<Request extends BaseMessage>(
     String methodName,
   ) {
     // Проверяем локальные парсеры
-    final method = findMethod<Request, T>(methodName);
+    final method = findMethod<Request, BaseMessage>(methodName);
     if (method != null && _argumentParsers.containsKey(methodName)) {
       final parser = _argumentParsers[methodName];
       return parser as RpcMethodArgumentParser<Request>?;
@@ -120,11 +128,11 @@ final class RpcCompositeContract<T extends IRpcSerializableMessage>
 
   @override
   RpcMethodResponseParser<Response>?
-      getMethodResponseParser<Response extends T>(
+      getMethodResponseParser<Response extends BaseMessage>(
     String methodName,
   ) {
     // Проверяем локальные парсеры
-    final method = findMethod<T, Response>(methodName);
+    final method = findMethod<BaseMessage, Response>(methodName);
     if (method != null && _responseParsers.containsKey(methodName)) {
       final parser = _responseParsers[methodName];
       return parser as RpcMethodResponseParser<Response>?;
@@ -141,7 +149,8 @@ final class RpcCompositeContract<T extends IRpcSerializableMessage>
   }
 
   @override
-  void addUnaryRequestMethod<Request extends T, Response extends T>({
+  void addUnaryRequestMethod<Request extends BaseMessage,
+      Response extends BaseMessage>({
     required String methodName,
     required RpcMethodUnaryHandler<Request, Response> handler,
     required RpcMethodArgumentParser<Request> argumentParser,
@@ -160,7 +169,8 @@ final class RpcCompositeContract<T extends IRpcSerializableMessage>
   }
 
   @override
-  void addServerStreamingMethod<Request extends T, Response extends T>({
+  void addServerStreamingMethod<Request extends BaseMessage,
+      Response extends BaseMessage>({
     required String methodName,
     required RpcMethodServerStreamHandler<Request, Response> handler,
     required RpcMethodArgumentParser<Request> argumentParser,
@@ -179,7 +189,8 @@ final class RpcCompositeContract<T extends IRpcSerializableMessage>
   }
 
   @override
-  void addClientStreamingMethod<Request extends T, Response extends T>({
+  void addClientStreamingMethod<Request extends BaseMessage,
+      Response extends BaseMessage>({
     required String methodName,
     required RpcMethodClientStreamHandler<Request, Response> handler,
     required RpcMethodArgumentParser<Request> argumentParser,
@@ -198,7 +209,8 @@ final class RpcCompositeContract<T extends IRpcSerializableMessage>
   }
 
   @override
-  void addBidirectionalStreamingMethod<Request extends T, Response extends T>({
+  void addBidirectionalStreamingMethod<Request extends BaseMessage,
+      Response extends BaseMessage>({
     required String methodName,
     required RpcMethodBidirectionalHandler<Request, Response> handler,
     required RpcMethodArgumentParser<Request> argumentParser,

@@ -7,30 +7,54 @@ import 'package:rpc_dart/rpc_dart.dart';
 
 import '../models/example_models.dart';
 
+final class ContractModuleExample extends RpcServiceContract<ExampleMessage> {
+  ContractModuleExample() : super('AppService');
+
+  @override
+  void setup() {
+    addSubContract(UserContract());
+    addSubContract(AuthContract());
+    super.setup();
+  }
+}
+
+class UserContract extends RpcServiceContract<ExampleMessage> {
+  UserContract() : super('UserService');
+
+  @override
+  void setup() {
+    addUnaryRequestMethod<UserRequest, UserResponse>(
+      methodName: 'getUser',
+      handler: (req) async => UserResponse(),
+      argumentParser: (json) => UserRequest.fromJson(json),
+      responseParser: (json) => UserResponse.fromJson(json),
+    );
+    super.setup();
+  }
+}
+
+class AuthContract extends RpcServiceContract<ExampleMessage> {
+  AuthContract() : super('AuthService');
+
+  @override
+  void setup() {
+    addUnaryRequestMethod<AuthRequest, AuthResponse>(
+      methodName: 'login',
+      handler: (req) async => AuthResponse(),
+      argumentParser: (json) => AuthRequest.fromJson(json),
+      responseParser: (json) => AuthResponse.fromJson(json),
+    );
+    super.setup();
+  }
+}
+
 /// Пример использования композитного контракта
 void useCompositeContract() {
   // Создаем транспорт для примера
   final transport = MemoryTransport('example_transport');
 
   // Создаем основной контракт
-  final rootContract = RpcCompositeContract<ExampleMessage>('AppService');
-
-  // Создаем подконтракты для разных модулей приложения
-  final userContract = RpcCompositeContract<ExampleMessage>('UserService');
-  final authContract = RpcCompositeContract<ExampleMessage>('AuthService');
-  final contentContract = RpcCompositeContract<ExampleMessage>(
-    'ContentService',
-  );
-
-  // Настраиваем контракты
-  _setupUserContract(userContract);
-  _setupAuthContract(authContract);
-  _setupContentContract(contentContract);
-
-  // Добавляем подконтракты в корневой контракт
-  rootContract.addSubContract(userContract);
-  rootContract.addSubContract(authContract);
-  rootContract.addSubContract(contentContract);
+  final rootContract = ContractModuleExample();
 
   // Теперь rootContract содержит все методы из подконтрактов
   // и может быть зарегистрирован в RPC эндпоинте
@@ -44,13 +68,13 @@ void useModularApproach() {
   final transport = MemoryTransport('example_transport');
 
   // Создаем основной контракт
-  final rootContract = RpcCompositeContract<ExampleMessage>('AppService');
+  final rootContract = ContractModuleExample();
 
   // Создаем модуль пользователей (напрямую)
   _addUserModule(rootContract, prefix: 'user');
 
   // Или создаем и добавляем отдельный контракт для аутентификации
-  final authContract = RpcCompositeContract<ExampleMessage>('AuthService');
+  final authContract = AuthContract();
   _setupAuthContract(authContract);
   rootContract.addSubContract(authContract);
 
@@ -61,7 +85,7 @@ void useModularApproach() {
 
 // Добавляет методы для пользователей напрямую в контракт с префиксом
 void _addUserModule(
-  RpcCompositeContract<ExampleMessage> contract, {
+  RpcServiceContract<ExampleMessage> contract, {
   String? prefix,
 }) {
   final methodPrefix = prefix != null ? '$prefix.' : '';
@@ -104,7 +128,7 @@ void _addUserModule(
 }
 
 // Вспомогательные методы для настройки контрактов
-void _setupUserContract(RpcCompositeContract<ExampleMessage> contract) {
+void _setupUserContract(RpcServiceContract<ExampleMessage> contract) {
   contract.addUnaryRequestMethod<UserRequest, UserResponse>(
     methodName: 'getUser',
     handler: (req) async => UserResponse(),
@@ -142,7 +166,7 @@ void _setupUserContract(RpcCompositeContract<ExampleMessage> contract) {
   );
 }
 
-void _setupAuthContract(RpcCompositeContract<ExampleMessage> contract) {
+void _setupAuthContract(RpcServiceContract<ExampleMessage> contract) {
   contract.addUnaryRequestMethod<AuthRequest, AuthResponse>(
     methodName: 'login',
     handler: (req) async => AuthResponse(),
@@ -158,7 +182,7 @@ void _setupAuthContract(RpcCompositeContract<ExampleMessage> contract) {
   );
 }
 
-void _setupContentContract(RpcCompositeContract<ExampleMessage> contract) {
+void _setupContentContract(RpcServiceContract<ExampleMessage> contract) {
   contract.addServerStreamingMethod<ContentRequest, ContentResponse>(
     methodName: 'getContent',
     handler: (request) {
