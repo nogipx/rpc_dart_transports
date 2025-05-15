@@ -191,9 +191,12 @@ void main() {
       // Ждем обработки
       await Future.delayed(Duration(milliseconds: 50));
 
-      // Проверяем, что клиент получил ответ
-      expect(clientReceived.length, equals(1));
-      expect(clientReceived.first.content, equals('server response'));
+      // Проверяем, что клиент получил только ответ от сервера (не получает свой запрос обратно)
+      expect(clientReceived.length, equals(1),
+          reason:
+              'Клиент должен получить только ответ от сервера, но не свой запрос');
+      expect(clientReceived[0].content, equals('server response'),
+          reason: 'Клиент должен получить только ответ сервера');
 
       // Закрываем стрим с клиентской стороны
       await stream.close();

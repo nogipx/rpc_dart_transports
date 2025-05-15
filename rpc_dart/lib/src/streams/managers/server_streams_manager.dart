@@ -35,6 +35,8 @@ class ServerStreamsManager<ResponseType extends IRpcSerializableMessage> {
       streamId: 'broadcast',
       metadata: metadata,
     );
+    streamLogger
+        .debug('Публикация данных в основной контроллер: $wrappedEvent');
     _mainController.add(wrappedEvent);
   }
 
@@ -56,10 +58,13 @@ class ServerStreamsManager<ResponseType extends IRpcSerializableMessage> {
       (wrappedEvent) {
         if (!clientController.isClosed &&
             (wrappedEvent.streamId == 'broadcast' ||
-                wrappedEvent.streamId == clientId)) {
+                (wrappedEvent.streamId == clientId &&
+                    wrappedEvent.metadata?['type'] != 'clientRequest'))) {
           try {
             // Извлекаем оригинальное сообщение из обертки
             clientController.add(wrappedEvent.message);
+            streamLogger.debug(
+                'Отправка данных клиенту $clientId: ${wrappedEvent.message.runtimeType}');
 
             // Обновляем время активности
             final wrapper = _clientStreams[clientId];
@@ -90,19 +95,14 @@ class ServerStreamsManager<ResponseType extends IRpcSerializableMessage> {
 
     // Функция обработки запросов от клиента
     void sendFunction(RequestType request) {
-      // Создаем обернутое сообщение для запроса
-      // ignore: unused_local_variable
-      final wrappedRequest = StreamMessage<RequestType>(
-        message: request,
-        streamId: clientId,
-        timestamp: DateTime.now(),
-      );
-
       // Логируем получение запроса от клиента
       streamLogger
           .debug('Получен запрос от клиента $clientId: ${request.runtimeType}');
 
-      // Обновляем время последней активности
+      // Больше не отправляем запросы клиента в основной контроллер
+      // Клиенты не могут общаться напрямую, это серверный стриминг
+
+      // Только обновляем время последней активности
       final wrapper = _clientStreams[clientId];
       wrapper?.updateLastActivity();
     }

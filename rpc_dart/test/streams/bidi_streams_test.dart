@@ -173,7 +173,7 @@ void main() {
         expect(
           () => serverStreamBidi
               .sendRequest(TestMessage(text: 'Второй запрос', value: 100)),
-          throwsStateError,
+          throwsA(isA<RpcException>()),
         );
 
         // Ждем завершения потока

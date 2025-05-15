@@ -1,10 +1,5 @@
 part of '../_index.dart';
 
-/// Обертка для Stream, предоставляющая двунаправленный функционал
-///
-/// Эта обертка превращает обычный Stream в двунаправленный с методами
-/// для отправки запросов и закрытия. Используется для обратной совместимости
-/// с кодом, ожидающим более богатый API, чем просто Stream.
 class ServerStreamingBidiStream<RequestType extends IRpcSerializableMessage,
         ResponseType extends IRpcSerializableMessage>
     implements Stream<ResponseType> {
@@ -27,9 +22,15 @@ class ServerStreamingBidiStream<RequestType extends IRpcSerializableMessage,
   /// Отправляет запрос в стрим
   void sendRequest(RequestType request) {
     if (_requestSent) {
-      throw StateError(
-          'Невозможно отправить второй запрос в ServerStreamingBidiStream. '
-          'Этот тип стрима поддерживает только один запрос.');
+      throw RpcUnsupportedOperationException(
+        operation: 'sendRequest',
+        type: 'serverStreaming',
+        details: {
+          'message':
+              'Невозможно отправить второй запрос в ServerStreamingBidiStream. '
+                  'Этот тип стрима поддерживает только один запрос для инициализации.'
+        },
+      );
     }
     _requestSent = true;
     _sendFunction(request);
