@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-import 'dart:async';
 import 'package:test/test.dart';
 import 'package:rpc_dart/rpc_dart.dart';
 
@@ -94,7 +93,7 @@ class ChildContract extends RpcServiceContract<TestMessage> {
     // Метод дочернего контракта
     addUnaryRequestMethod<ChildRequest, ChildResponse>(
       methodName: 'childMethod',
-      handler: (req) async => ChildResponse('${serviceName}:${req.data}'),
+      handler: (req) async => ChildResponse('$serviceName:${req.data}'),
       argumentParser: ChildRequest.fromJson,
       responseParser: ChildResponse.fromJson,
     );

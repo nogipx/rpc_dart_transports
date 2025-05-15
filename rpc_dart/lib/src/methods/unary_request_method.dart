@@ -98,7 +98,7 @@ final class UnaryRequestRpcMethod<T extends IRpcSerializableMessage>
               : context.payload;
 
           // Получаем типизированный ответ от обработчика
-          final response = await implementation.invoke(typedRequest);
+          final response = await implementation.makeUnaryRequest(typedRequest);
 
           // Преобразуем ответ в формат для передачи (JSON для RpcMessage)
           final result = response is RpcMessage ? response.toJson() : response;

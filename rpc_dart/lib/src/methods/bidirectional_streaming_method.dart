@@ -239,7 +239,7 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
             // Вместо создания отдельного outgoingStream, используем handleBidirectionalStream,
             // который соединит входящий поток с обработчиком
             final bidiStream = implementation
-                .handleBidirectionalStream(incomingController.stream);
+                .openBidirectionalStreaming(incomingController.stream);
 
             // Подписываемся на ответы из bidiStream и отправляем их клиенту
             bidiStream.listen(

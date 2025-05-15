@@ -66,47 +66,41 @@ final class RpcMethodImplementation<Request extends IRpcSerializableMessage,
         _bidirectionalHandler = handler;
 
   /// Вызывает метод с указанным запросом
-  Future<Response> invoke(Request request) async {
-    if (type == RpcMethodType.unary && _unaryHandler != null) {
-      return await _unaryHandler!(request);
+  Future<Response> makeUnaryRequest(Request request) async {
+    if (type != RpcMethodType.unary) {
+      throw _unsupportedOperationException('makeUnaryRequest');
+    }
+    if (_unaryHandler == null) {
+      throw _missingHandlerException('makeUnaryRequest');
     }
 
-    throw RpcUnsupportedOperationException(
-      operation: 'invoke',
-      type: type.name,
-      details: {
-        'contract': contract,
-        'message': 'Method type $type does not support unary invocation',
-      },
-    );
+    return await _unaryHandler!(request);
   }
 
   /// Открывает стрим ответов для указанного запроса
-  ServerStreamingBidiStream<Request, Response> openStream(Request request) {
-    if (type == RpcMethodType.serverStreaming && _serverStreamHandler != null) {
-      try {
-        return _serverStreamHandler!(request);
-      } catch (e) {
-        // В случае ошибки при получении стрима создаем пустой стрим с ошибкой
-        final errorStream = BidiStreamGenerator<Request, Response>((_) async* {
-          throw RpcCustomException(
-            customMessage: 'Ошибка при открытии стрима: $e',
-            debugLabel: 'RpcMethodImplementation.openStream',
-          );
-        }).createServerStreaming(initialRequest: request);
-
-        return errorStream;
-      }
+  ServerStreamingBidiStream<Request, Response> openServerStreaming(
+    Request request,
+  ) {
+    if (type != RpcMethodType.serverStreaming) {
+      throw _unsupportedOperationException('openServerStreaming');
+    }
+    if (_serverStreamHandler == null) {
+      throw _missingHandlerException('openServerStreaming');
     }
 
-    throw RpcUnsupportedOperationException(
-      operation: 'openStream',
-      type: type.name,
-      details: {
-        'contract': contract,
-        'message': 'Method type $type does not support server streaming',
-      },
-    );
+    try {
+      return _serverStreamHandler!(request);
+    } catch (e) {
+      // В случае ошибки при получении стрима создаем пустой стрим с ошибкой
+      final errorStream = BidiStreamGenerator<Request, Response>((_) async* {
+        throw RpcCustomException(
+          customMessage: 'Ошибка при открытии стрима: $e',
+          debugLabel: 'RpcMethodImplementation.openStream',
+        );
+      }).createServerStreaming(initialRequest: request);
+
+      return errorStream;
+    }
   }
 
   /// Обрабатывает поток запросов и возвращает один ответ
@@ -114,149 +108,152 @@ final class RpcMethodImplementation<Request extends IRpcSerializableMessage,
   /// [stream] - поток входящих запросов
   /// [metadata] - метаданные запроса
   /// [streamId] - идентификатор потока
-  Future<Response> handleClientStream({
+  // TODO: REFACTOR TO MAKE USE IT
+  Future<Response> openClientStreaming({
     required Stream<Request> stream,
     Map<String, dynamic>? metadata,
     String? streamId,
   }) async {
-    if (type == RpcMethodType.clientStreaming && _clientStreamHandler != null) {
-      // Получаем ClientStreamingBidiStream от обработчика
-      final clientStreamBidi = _clientStreamHandler!();
-
-      // Подписываемся на поток запросов и перенаправляем их в BidiStream
-      stream.listen(
-        (request) => clientStreamBidi.send(request),
-        onDone: () => clientStreamBidi.close(),
-        onError: (error) => clientStreamBidi.close(),
-      );
-
-      // Возвращаем результат
-      return await clientStreamBidi.getResponse();
+    if (type != RpcMethodType.clientStreaming) {
+      throw _unsupportedOperationException('openClientStreaming');
+    }
+    if (_clientStreamHandler == null) {
+      throw _missingHandlerException('openClientStreaming');
     }
 
-    throw RpcUnsupportedOperationException(
-      operation: 'handleClientStream',
-      type: type.name,
-      details: {
-        'contract': contract,
-        'message': 'Method type $type does not support client streaming',
-      },
-    );
-  }
+    // Получаем ClientStreamingBidiStream от обработчика
+    final clientStreamBidi = _clientStreamHandler!();
 
-  /// Открывает двунаправленный стрим
-  Stream<Response> openBidirectionalStream() {
-    if (type == RpcMethodType.bidirectional && _bidirectionalHandler != null) {
-      return _bidirectionalHandler!();
-    }
-
-    throw RpcUnsupportedOperationException(
-      operation: 'openBidirectionalStream',
-      type: type.name,
-      details: {
-        'contract': contract,
-        'message': 'Method type $type does not support bidirectional streaming',
-      },
+    // Подписываемся на поток запросов и перенаправляем их в BidiStream
+    stream.listen(
+      (request) => clientStreamBidi.send(request),
+      onDone: () => clientStreamBidi.close(),
+      onError: (error) => clientStreamBidi.close(),
     );
+
+    // Возвращаем результат
+    return await clientStreamBidi.getResponse();
   }
 
   /// Обрабатывает двунаправленный стрим с предоставленным входящим потоком запросов
   ///
   /// [incomingStream] - поток входящих запросов от клиента
-  BidiStream<Request, Response> handleBidirectionalStream(
-      Stream<Request> incomingStream) {
-    if (type == RpcMethodType.bidirectional && _bidirectionalHandler != null) {
-      try {
-        // Создаем поток и получаем его от обработчика
-        final bidiStream = _bidirectionalHandler!();
-
-        // Создаем BidiStreamGenerator для связи входящего потока с обработчиком
-        final generator =
-            BidiStreamGenerator<Request, Response>((requestStream) {
-          // Создаем контроллер для выходного потока
-          final outputController = StreamController<Response>();
-
-          // Перенаправляем ответы из потока обработчика в выходной контроллер
-          bidiStream.listen(
-            (response) {
-              rpcMethodLogger
-                  .debug('Обработчик отправил ответ: ${response.runtimeType}');
-              outputController.add(response);
-            },
-            onError: (error, stackTrace) {
-              rpcMethodLogger.error(
-                  'Ошибка в потоке обработчика', error, stackTrace);
-              outputController.addError(error, stackTrace);
-            },
-            onDone: () {
-              rpcMethodLogger.debug('Поток обработчика завершен');
-              outputController.close();
-            },
-          );
-
-          // Подписываемся на входящий поток запросов и передаем запросы в bidiStream
-          requestStream.listen(
-            (request) {
-              rpcMethodLogger.debug(
-                  'Получен запрос, отправляем в обработчик: ${request.runtimeType}');
-              // Отправляем запрос в исходный bidiStream
-              try {
-                // Безопасно отправляем запрос в BidiStream
-                final typedBidiStream = bidiStream;
-                typedBidiStream.send(request);
-              } catch (e, stackTrace) {
-                rpcMethodLogger.error(
-                    'Ошибка при отправке запроса в обработчик', e, stackTrace);
-                outputController.addError(e, stackTrace);
-              }
-            },
-            onError: (error, stackTrace) {
-              rpcMethodLogger.error(
-                  'Ошибка во входящем потоке запросов', error, stackTrace);
-              outputController.addError(error, stackTrace);
-            },
-            onDone: () {
-              // При закрытии входящего потока закрываем bidiStream
-              rpcMethodLogger.debug(
-                  'Входящий поток запросов завершен, закрываем обработчик');
-
-              try {
-                // Аналогично, используем приведение типов
-                final typedBidiStream = bidiStream;
-                typedBidiStream.close();
-              } catch (e) {
-                print('Ошибка при закрытии потока обработчика: $e');
-                // Не закрываем outputController здесь, т.к. он закроется при завершении потока bidiStream
-              }
-            },
-          );
-
-          return outputController.stream;
-        });
-
-        // Создаем BidiStream с входящим потоком запросов
-        return generator.create(incomingStream);
-      } catch (e) {
-        print('Ошибка при обработке двунаправленного потока: $e');
-        // В случае ошибки создаем поток с ошибкой
-        final errorGenerator =
-            BidiStreamGenerator<Request, Response>((requestStream) async* {
-          yield* Stream.error(RpcCustomException(
-            customMessage: 'Ошибка при создании двунаправленного потока: $e',
-            debugLabel: 'RpcMethodImplementation.handleBidirectionalStream',
-          ));
-        });
-
-        return errorGenerator.create(incomingStream);
-      }
+  BidiStream<Request, Response> openBidirectionalStreaming(
+    Stream<Request> incomingStream,
+  ) {
+    if (type != RpcMethodType.bidirectional) {
+      throw _unsupportedOperationException('openBidirectionalStreaming');
+    }
+    if (_bidirectionalHandler == null) {
+      throw _missingHandlerException('openBidirectionalStreaming');
     }
 
-    throw RpcUnsupportedOperationException(
-      operation: 'handleBidirectionalStream',
+    try {
+      // Создаем поток и получаем его от обработчика
+      final bidiStream = _bidirectionalHandler!();
+
+      // Создаем BidiStreamGenerator для связи входящего потока с обработчиком
+      final generator = BidiStreamGenerator<Request, Response>((requestStream) {
+        // Создаем контроллер для выходного потока
+        final outputController = StreamController<Response>();
+
+        // Перенаправляем ответы из потока обработчика в выходной контроллер
+        bidiStream.listen(
+          (response) {
+            rpcMethodLogger
+                .debug('Обработчик отправил ответ: ${response.runtimeType}');
+            outputController.add(response);
+          },
+          onError: (error, stackTrace) {
+            rpcMethodLogger.error(
+                'Ошибка в потоке обработчика', error, stackTrace);
+            outputController.addError(error, stackTrace);
+          },
+          onDone: () {
+            rpcMethodLogger.debug('Поток обработчика завершен');
+            outputController.close();
+          },
+        );
+
+        // Подписываемся на входящий поток запросов и передаем запросы в bidiStream
+        requestStream.listen(
+          (request) {
+            rpcMethodLogger.debug(
+                'Получен запрос, отправляем в обработчик: ${request.runtimeType}');
+            // Отправляем запрос в исходный bidiStream
+            try {
+              // Безопасно отправляем запрос в BidiStream
+              final typedBidiStream = bidiStream;
+              typedBidiStream.send(request);
+            } catch (e, stackTrace) {
+              rpcMethodLogger.error(
+                  'Ошибка при отправке запроса в обработчик', e, stackTrace);
+              outputController.addError(e, stackTrace);
+            }
+          },
+          onError: (error, stackTrace) {
+            rpcMethodLogger.error(
+                'Ошибка во входящем потоке запросов', error, stackTrace);
+            outputController.addError(error, stackTrace);
+          },
+          onDone: () {
+            // При закрытии входящего потока закрываем bidiStream
+            rpcMethodLogger.debug(
+                'Входящий поток запросов завершен, закрываем обработчик');
+
+            try {
+              // Аналогично, используем приведение типов
+              final typedBidiStream = bidiStream;
+              typedBidiStream.close();
+            } catch (e) {
+              print('Ошибка при закрытии потока обработчика: $e');
+              // Не закрываем outputController здесь, т.к. он закроется при завершении потока bidiStream
+            }
+          },
+        );
+
+        return outputController.stream;
+      });
+
+      // Создаем BidiStream с входящим потоком запросов
+      return generator.create(incomingStream);
+    } catch (e) {
+      print('Ошибка при обработке двунаправленного потока: $e');
+      // В случае ошибки создаем поток с ошибкой
+      final errorGenerator =
+          BidiStreamGenerator<Request, Response>((requestStream) async* {
+        yield* Stream.error(RpcCustomException(
+          customMessage: 'Ошибка при создании двунаправленного потока: $e',
+          debugLabel: 'RpcMethodImplementation.handleBidirectionalStream',
+        ));
+      });
+
+      return errorGenerator.create(incomingStream);
+    }
+  }
+
+  RpcUnsupportedOperationException _unsupportedOperationException(
+    String operation,
+  ) {
+    return RpcUnsupportedOperationException(
+      operation: operation,
       type: type.name,
       details: {
         'contract': contract,
-        'message': 'Method type $type does not support bidirectional streaming',
+        'message': 'Method type $type does not support $operation',
+      },
+    );
+  }
+
+  RpcUnsupportedOperationException _missingHandlerException(
+    String operation,
+  ) {
+    return RpcUnsupportedOperationException(
+      operation: operation,
+      type: type.name,
+      details: {
+        'contract': contract,
+        'message': 'Method type $type has no $operation handler',
       },
     );
   }

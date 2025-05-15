@@ -164,7 +164,8 @@ class RpcUnsupportedOperationException extends RpcException {
     Map<String, dynamic>? details,
   }) : super(
           code: RpcExceptionCode.unsupportedOperation,
-          message: 'Operation "$operation" is not supported for type "$type"',
+          message:
+              'Operation "$operation" is not supported for type "$type"\n  details:$details',
           details: details,
         );
 }

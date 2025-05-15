@@ -169,7 +169,7 @@ final class ServerStreamingRpcMethod<
     RpcMethodResponseParser<Response> responseParser,
   ) {
     // Запускаем стрим от обработчика
-    final serverStreamBidi = implementation.openStream(request);
+    final serverStreamBidi = implementation.openServerStreaming(request);
 
     // Подписываемся на события и пересылаем их через публичный API Endpoint
     serverStreamBidi.listen((data) {
