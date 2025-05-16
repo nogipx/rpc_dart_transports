@@ -2,16 +2,12 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-import 'dart:async';
-import 'dart:math';
-
-import 'package:rpc_dart/rpc_dart.dart';
-import 'package:rpc_dart/diagnostics.dart';
+part of '_contract.dart';
 
 /// Клиентская реализация диагностического сервиса
 class RpcDiagnosticClient {
   /// Контракт диагностического сервиса
-  final DiagnosticClientContract _contract;
+  final _DiagnosticClientContract _contract;
 
   /// Информация о клиенте
   final RpcClientIdentity clientIdentity;
@@ -42,7 +38,7 @@ class RpcDiagnosticClient {
     required this.clientIdentity,
     required this.options,
     String Function()? idGenerator,
-  })  : _contract = DiagnosticClientContract(endpoint),
+  })  : _contract = _DiagnosticClientContract(endpoint),
         _idGenerator = idGenerator ?? _defaultIdGenerator,
         _enabled = options.enabled {
     // Запускаем таймер для периодической отправки метрик, если включено
@@ -81,7 +77,7 @@ class RpcDiagnosticClient {
   Future<void> _registerClient() async {
     if (_enabled && !_isRegistered) {
       try {
-        await _contract.registerClient(clientIdentity);
+        await _contract.clientManagement.registerClient(clientIdentity);
         _isRegistered = true;
       } catch (e) {
         _isRegistered = false;
@@ -406,7 +402,7 @@ class RpcDiagnosticClient {
       }
 
       // Отправляем метрики на сервер
-      await _contract.sendMetrics(metricsCopy);
+      await _contract.metrics.sendMetrics(metricsCopy);
     } catch (e) {
       // В случае ошибки возвращаем метрики в буфер
       _metricsBuffer.addAll(metricsCopy);
@@ -421,7 +417,7 @@ class RpcDiagnosticClient {
     }
 
     try {
-      final result = await _contract.ping(RpcNull());
+      final result = await _contract.clientManagement.ping(RpcNull());
       return result.value;
     } catch (e) {
       return false;
@@ -742,7 +738,7 @@ class RpcDiagnosticClient {
     }
 
     // Получаем клиентский стриминг метод
-    final streamingMethod = _contract.logs();
+    final streamingMethod = _contract.logging.logsStream();
 
     // Вызываем метод call для получения ClientStreamingBidiStream
     return streamingMethod;

@@ -22,7 +22,7 @@ import 'package:rpc_dart/diagnostics.dart';
 /// ```
 class RpcLog {
   /// Диагностический сервис для отправки логов
-  static RpcDiagnosticService? _diagnosticService;
+  static IRpcDiagnosticService? _diagnosticService;
 
   /// Источник логов по умолчанию
   static String _defaultSource = 'RpcDart';
@@ -34,7 +34,7 @@ class RpcLog {
   static bool _consoleLoggingEnabled = true;
 
   /// Устанавливает диагностический сервис для логирования
-  static void setDiagnosticService(RpcDiagnosticService service) {
+  static void setDiagnosticService(IRpcDiagnosticService service) {
     _diagnosticService = service;
     _minLogLevel = service.options.minLogLevel;
     _consoleLoggingEnabled = service.options.consoleLoggingEnabled;

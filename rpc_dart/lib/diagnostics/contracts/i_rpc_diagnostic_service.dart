@@ -2,14 +2,12 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-import 'dart:async';
-
-import 'package:rpc_dart/diagnostics.dart';
+part of '_contract.dart';
 
 /// Интерфейс диагностического сервиса
 ///
 /// Предоставляет API для сбора и отправки метрик
-abstract class RpcDiagnosticService {
+abstract class IRpcDiagnosticService {
   /// Информация о клиенте
   RpcClientIdentity get clientIdentity;
 
