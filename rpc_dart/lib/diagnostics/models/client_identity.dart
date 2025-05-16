@@ -3,12 +3,13 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 import 'dart:convert';
+import 'package:rpc_dart/rpc_dart.dart';
 
 /// Класс для идентификации клиентов в диагностической системе.
 ///
 /// Используется для группировки и фильтрации метрик от разных клиентов
 /// при множественных подключениях.
-class ClientIdentity {
+class RpcClientIdentity implements IRpcSerializableMessage {
   /// Уникальный идентификатор клиента
   final String clientId;
 
@@ -36,7 +37,7 @@ class ClientIdentity {
   /// Дополнительные свойства
   final Map<String, dynamic>? properties;
 
-  const ClientIdentity({
+  const RpcClientIdentity({
     required this.clientId,
     required this.traceId,
     this.appVersion,
@@ -49,6 +50,7 @@ class ClientIdentity {
   });
 
   /// Преобразование в JSON
+  @override
   Map<String, dynamic> toJson() => {
         'client_id': clientId,
         'trace_id': traceId,
@@ -65,8 +67,8 @@ class ClientIdentity {
   String toJsonString() => jsonEncode(toJson());
 
   /// Создание из JSON
-  factory ClientIdentity.fromJson(Map<String, dynamic> json) {
-    return ClientIdentity(
+  factory RpcClientIdentity.fromJson(Map<String, dynamic> json) {
+    return RpcClientIdentity(
       clientId: json['client_id'] as String,
       traceId: json['trace_id'] as String,
       appVersion: json['app_version'] as String?,
@@ -80,9 +82,9 @@ class ClientIdentity {
   }
 
   /// Создание из строки JSON
-  factory ClientIdentity.fromJsonString(String jsonString) {
+  factory RpcClientIdentity.fromJsonString(String jsonString) {
     final Map<String, dynamic> json = jsonDecode(jsonString);
-    return ClientIdentity.fromJson(json);
+    return RpcClientIdentity.fromJson(json);
   }
 
   @override

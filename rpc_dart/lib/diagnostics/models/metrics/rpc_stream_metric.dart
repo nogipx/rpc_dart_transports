@@ -4,33 +4,30 @@
 
 part of '_metric.dart';
 
-/// Перечисление типов событий потока
-enum RpcStreamMetricEventType {
-  /// Открытие потока
-  open,
+/// Тип события стрима
+enum RpcStreamEventType {
+  /// Создание стрима
+  created,
 
-  /// Данные отправлены через поток
-  data,
+  /// Закрытие стрима
+  closed,
 
-  /// Поток закрыт
-  close,
+  /// Отправка сообщения
+  messageSent,
 
-  /// Произошла ошибка в потоке
+  /// Получение сообщения
+  messageReceived,
+
+  /// Ошибка в стриме
   error,
 
-  /// Достигнуто ограничение скорости потока
-  rateLimit,
-
-  /// Поток приостановлен
-  pause,
-
-  /// Поток возобновлен
-  resume,
+  /// Обратное давление
+  backpressure,
 
   /// Неизвестный тип события
   unknown;
 
-  static RpcStreamMetricEventType fromJson(String json) {
+  static RpcStreamEventType fromJson(String json) {
     return values.firstWhere(
       (e) => e.name == json,
       orElse: () => unknown,
@@ -38,10 +35,29 @@ enum RpcStreamMetricEventType {
   }
 }
 
-/// Метрика для отслеживания работы RPC-стримов
-///
-/// Используется для отслеживания создания и работы стримов,
-/// количества сообщений и пропускной способности.
+/// Направление потока данных
+enum RpcStreamDirection {
+  /// От клиента к серверу
+  clientToServer,
+
+  /// От сервера к клиенту
+  serverToClient,
+
+  /// Двунаправленный поток
+  bidirectional,
+
+  /// Неизвестное направление
+  unknown;
+
+  static RpcStreamDirection fromJson(String json) {
+    return values.firstWhere(
+      (e) => e.name == json,
+      orElse: () => unknown,
+    );
+  }
+}
+
+/// Метрика для отслеживания событий стримов
 class RpcStreamMetric implements IRpcSerializableMessage {
   /// Уникальный идентификатор метрики
   final String id;
@@ -52,31 +68,31 @@ class RpcStreamMetric implements IRpcSerializableMessage {
   /// Временная метка создания метрики
   final int timestamp;
 
-  /// Идентификатор потока
+  /// Идентификатор стрима
   final String streamId;
 
-  /// Тип события потока
-  final RpcStreamMetricEventType eventType;
+  /// Тип события стрима
+  final RpcStreamEventType eventType;
 
-  /// Направление потока (входящий/исходящий)
-  final String direction;
+  /// Направление (client_to_server, server_to_client)
+  final RpcStreamDirection direction;
 
-  /// Метод, связанный с событием, если применимо
+  /// Метод, связанный со стримом
   final String? method;
 
-  /// Количество данных в байтах
+  /// Размер данных в байтах
   final int? dataSize;
 
-  /// Количество сообщений, отправленных через поток
+  /// Количество сообщений
   final int? messageCount;
 
-  /// Скорость передачи данных (байт/сек)
+  /// Пропускная способность (сообщений в секунду)
   final double? throughput;
 
-  /// Длительность активности потока (для закрытых потоков)
+  /// Длительность события в миллисекундах
   final int? duration;
 
-  /// Информация об ошибке, если событие типа error
+  /// Информация об ошибке (если есть)
   final Map<String, dynamic>? error;
 
   /// Дополнительные метаданные
@@ -103,11 +119,11 @@ class RpcStreamMetric implements IRpcSerializableMessage {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'trace_id': traceId,
+      if (traceId != null) 'trace_id': traceId,
       'timestamp': timestamp,
       'stream_id': streamId,
       'event_type': eventType.name,
-      'direction': direction,
+      'direction': direction.name,
       if (method != null) 'method': method,
       if (dataSize != null) 'data_size': dataSize,
       if (messageCount != null) 'message_count': messageCount,
@@ -121,7 +137,10 @@ class RpcStreamMetric implements IRpcSerializableMessage {
   /// Создание из JSON
   factory RpcStreamMetric.fromJson(Map<String, dynamic> json) {
     final eventTypeString = json['event_type'] as String;
-    final eventType = RpcStreamMetricEventType.fromJson(eventTypeString);
+    final eventType = RpcStreamEventType.fromJson(eventTypeString);
+
+    final directionString = json['direction'] as String;
+    final direction = RpcStreamDirection.fromJson(directionString);
 
     return RpcStreamMetric(
       id: json['id'] as String,
@@ -129,7 +148,7 @@ class RpcStreamMetric implements IRpcSerializableMessage {
       timestamp: json['timestamp'] as int,
       streamId: json['stream_id'] as String,
       eventType: eventType,
-      direction: json['direction'] as String,
+      direction: direction,
       method: json['method'] as String?,
       dataSize: json['data_size'] as int?,
       messageCount: json['message_count'] as int?,
