@@ -9,7 +9,7 @@ import 'package:rpc_dart/rpc_dart.dart';
 import 'package:rpc_dart/diagnostics.dart';
 
 /// Клиентская реализация диагностического сервиса
-class DiagnosticClient {
+class RpcDiagnosticClient {
   /// Контракт диагностического сервиса
   final DiagnosticClientContract _contract;
 
@@ -37,7 +37,7 @@ class DiagnosticClient {
   /// Признак того, что клиент был зарегистрирован на сервере
   bool _isRegistered = false;
 
-  DiagnosticClient({
+  RpcDiagnosticClient({
     required RpcEndpoint endpoint,
     required this.clientIdentity,
     required this.options,
