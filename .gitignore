@@ -1,7 +1,8 @@
 .dart_tool/
 pubspec.lock
 .fvm/
-coverage/
+**/coverage/html/
+**/coverage/test/
 *.pem
 *.bin
 **/build/

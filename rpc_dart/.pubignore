@@ -5,7 +5,7 @@ test/
 .vscode/
 justfile
 REUSE.toml
-coverage/
+**/coverage/
 docs/
 LICENSES/
 *.pem
