@@ -108,7 +108,6 @@ final class RpcMethodImplementation<Request extends IRpcSerializableMessage,
   /// [stream] - поток входящих запросов
   /// [metadata] - метаданные запроса
   /// [streamId] - идентификатор потока
-  // TODO: REFACTOR TO MAKE USE IT
   Future<Response> openClientStreaming({
     required Stream<Request> stream,
     Map<String, dynamic>? metadata,

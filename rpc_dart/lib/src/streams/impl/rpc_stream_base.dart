@@ -27,10 +27,6 @@ abstract class RpcStream<RequestType extends IRpcSerializableMessage,
   })  : _responseStream = responseStream,
         _closeFunction = closeFunction;
 
-  /// Доступ к потоку ответов для наследников
-  @protected
-  Stream<ResponseType> get responseStream => _responseStream;
-
   /// Возвращает, закрыт ли поток
   bool get isClosed => _isClosed;
 

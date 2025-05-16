@@ -39,8 +39,6 @@ class ServerStreamsManager<ResponseType extends IRpcSerializableMessage> {
       streamId: 'broadcast',
       metadata: metadata,
     );
-    streamLogger
-        .debug('Публикация данных в основной контроллер: $wrappedEvent');
     _mainController.add(wrappedEvent);
   }
 
@@ -67,8 +65,6 @@ class ServerStreamsManager<ResponseType extends IRpcSerializableMessage> {
           try {
             // Извлекаем оригинальное сообщение из обертки
             clientController.add(wrappedEvent.message);
-            streamLogger.debug(
-                'Отправка данных клиенту $clientId: ${wrappedEvent.message.runtimeType}');
 
             // Обновляем время активности
             final wrapper = _clientStreams[clientId];

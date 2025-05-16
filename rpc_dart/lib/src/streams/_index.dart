@@ -4,7 +4,7 @@
 
 import 'dart:async';
 
-import 'package:meta/meta.dart';
+// import 'package:meta/meta.dart';
 import 'package:rpc_dart/rpc_dart.dart';
 
 part 'impl/bidi_stream.dart';
