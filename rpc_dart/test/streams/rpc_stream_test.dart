@@ -754,7 +754,6 @@ void main() {
         );
 
         final receivedMessages = <TestMessage>[];
-        bool isComplete = false;
 
         // Создаем подписку, которую будем тестировать
         final subscription = stream.listen((message) {

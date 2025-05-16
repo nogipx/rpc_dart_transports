@@ -77,8 +77,18 @@ class ClientStreamingBidiStream<RequestType extends IRpcSerializableMessage,
 
   @override
   Future<void> close() async {
+    if (isClosed) {
+      return;
+    }
+
+    // Сначала закрываем внутренний поток
     await _bidiStream.close();
+
+    // Отменяем подписку
     await _subscription?.cancel();
     _subscription = null;
+
+    // Вызываем метод базового класса для установки флага _isClosed
+    await super.close();
   }
 }
