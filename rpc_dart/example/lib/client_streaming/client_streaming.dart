@@ -12,7 +12,7 @@ import 'client_streaming_models.dart';
 final logger = ExampleLogger('ClientStreamingExample');
 
 /// Главная функция примера клиентского стриминга
-Future<void> runClientStreamingExample() async {
+Future<void> runClientStreamingExample({bool debug = false}) async {
   logger.section('Пример клиентского стриминга RPC');
 
   // Создаем два локальных транспорта для демонстрации
@@ -35,6 +35,16 @@ Future<void> runClientStreamingExample() async {
       transport: clientTransport,
       debugLabel: 'client',
     );
+
+    // Добавляем middleware в зависимости от режима отладки
+    if (debug) {
+      serverEndpoint.addMiddleware(DebugMiddleware(id: "server"));
+      clientEndpoint.addMiddleware(DebugMiddleware(id: "client"));
+    } else {
+      serverEndpoint.addMiddleware(LoggingMiddleware(id: "server"));
+      clientEndpoint.addMiddleware(LoggingMiddleware(id: "client"));
+    }
+
     logger.info('Эндпоинты созданы');
 
     // Создаем и регистрируем серверную часть
@@ -132,6 +142,6 @@ Uint8List _generateData(int size, int seed) {
 }
 
 /// Основная функция
-Future<void> main() async {
-  await runClientStreamingExample();
+Future<void> main({bool debug = false}) async {
+  await runClientStreamingExample(debug: debug);
 }

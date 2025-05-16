@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2025 Karim "nogipx" Mamatkazin <nogipx@gmail.com>
+
+SPDX-License-Identifier: LGPL-3.0-or-later
+-->
+
 # Техническое задание: Диагностический сервис для RPC Dart
 
 ## 1. Общие сведения

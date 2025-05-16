@@ -41,7 +41,7 @@ Future<void> main(List<String> args) async {
         break;
       case 'client':
       case 'client-streaming':
-        await client_streaming.main();
+        await client_streaming.main(debug: debug);
         break;
       case 'server':
       case 'server-streaming':
@@ -79,7 +79,7 @@ Future<void> runAllExamples(bool debug) async {
     await json_rpc.main();
 
     logger.emoji('🔄', 'Запуск примера клиентского стриминга...');
-    await client_streaming.main();
+    await client_streaming.main(debug: debug);
 
     logger.emoji('🔄', 'Запуск примера серверного стриминга...');
     await server_streaming.main(debug: debug);

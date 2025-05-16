@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2025 Karim "nogipx" Mamatkazin <nogipx@gmail.com>
+
+SPDX-License-Identifier: LGPL-3.0-or-later
+-->
+
 # Необходимые изменения для реализации диагностического сервиса
 
 На основе анализа кодовой базы библиотеки RPC Dart, для реализации диагностического сервиса потребуются следующие изменения и дополнения:
