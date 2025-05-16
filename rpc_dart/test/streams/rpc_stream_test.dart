@@ -543,32 +543,57 @@ void main() {
         );
 
         final receivedMessages = <TestMessage>[];
+        final completer = Completer<void>();
 
         // Act
-        final subscription = stream.listen(receivedMessages.add);
+        final subscription = stream.listen((message) {
+          receivedMessages.add(message);
+          print('Получено сообщение: $message');
+          if (receivedMessages.length >= 5) {
+            completer.complete();
+          }
+        });
 
         // Отправляем первое сообщение
         controller.add(TestMessages.simple(1));
+        // Ждем обработки сообщения
         await Future.microtask(() {});
+        await Future.microtask(() {});
+
+        // Проверяем количество полученных сообщений
+        expect(receivedMessages.length, equals(1));
 
         // Приостанавливаем подписку
         subscription.pause();
+        print('Подписка приостановлена');
 
-        // Отправляем второе сообщение (должно буферизоваться)
+        // Отправляем еще сообщения, которые должны буферизоваться
         controller.add(TestMessages.simple(2));
+        controller.add(TestMessages.simple(3));
+        controller.add(TestMessages.simple(4));
+        controller.add(TestMessages.simple(5));
+
+        // Даем время на обработку (но они не должны обрабатываться, т.к. подписка приостановлена)
+        await Future.microtask(() {});
         await Future.microtask(() {});
 
-        // Проверяем, что получено только первое сообщение
-        expect(receivedMessages.length, equals(1));
+        // Проверяем, что количество полученных сообщений не изменилось
+        expect(receivedMessages.length, equals(1),
+            reason:
+                'Сообщения не должны обрабатываться при приостановленной подписке');
 
         // Возобновляем подписку
+        print('Подписка возобновлена');
         subscription.resume();
-        await Future.microtask(() {});
+
+        // Ждем получения всех сообщений
+        await completer.future;
 
         // Assert
-        expect(receivedMessages.length, equals(2));
-        expect(receivedMessages[0].text, equals('Message 1'));
-        expect(receivedMessages[1].text, equals('Message 2'));
+        expect(receivedMessages.length, equals(5));
+        for (var i = 0; i < 5; i++) {
+          expect(receivedMessages[i].value, equals(i + 1));
+        }
 
         await subscription.cancel();
         await controller.close();
@@ -632,6 +657,427 @@ void main() {
             contains('Ошибка при обработке Message 2'));
 
         await subscription.cancel();
+      });
+    });
+
+    // Тесты для проверки timeout()
+    group('timeout()', () {
+      test(
+          'должен выбрасывать TimeoutException при превышении времени ожидания',
+          () async {
+        // Arrange
+        final controller = StreamController<TestMessage>();
+        final stream = TestRpcStream(
+          responseStream: controller.stream,
+          closeFunction: () => controller.close(),
+        );
+
+        // Act
+        final timeoutStream = stream.timeout(Duration(milliseconds: 50));
+
+        // Собираем ошибки
+        final errors = <Object>[];
+        final completer = Completer<void>();
+
+        timeoutStream.listen(
+          (_) {},
+          onError: (e) {
+            errors.add(e);
+            completer.complete();
+          },
+          onDone: () {
+            if (!completer.isCompleted) completer.complete();
+          },
+        );
+
+        // Ждем таймаут
+        await completer.future;
+
+        // Assert
+        expect(errors.length, equals(1));
+        expect(errors.first, isA<TimeoutException>());
+
+        await controller.close();
+      });
+
+      test('должен использовать onTimeout для обработки таймаута', () async {
+        // Arrange
+        final controller = StreamController<TestMessage>();
+        final stream = TestRpcStream(
+          responseStream: controller.stream,
+          closeFunction: () => controller.close(),
+        );
+
+        final fallbackMessage = TestMessages.withText('Таймаут');
+        final receivedMessages = <TestMessage>[];
+        final completer = Completer<void>();
+
+        // Act
+        final timeoutStream = stream.timeout(
+          Duration(milliseconds: 50),
+          onTimeout: (sink) {
+            sink.add(fallbackMessage);
+            sink.close();
+          },
+        );
+
+        timeoutStream.listen(
+          (msg) {
+            receivedMessages.add(msg);
+            completer.complete();
+          },
+          onDone: () {
+            if (!completer.isCompleted) completer.complete();
+          },
+        );
+
+        // Ждем сообщения о таймауте
+        await completer.future;
+
+        // Assert
+        expect(receivedMessages.length, equals(1));
+        expect(receivedMessages.first, equals(fallbackMessage));
+
+        await controller.close();
+      });
+    });
+
+    // Тесты для проверки обработки backpressure
+    group('backpressure', () {
+      test('должен корректно буферизовать события при паузе подписки',
+          () async {
+        // Arrange
+        final controller = StreamController<TestMessage>();
+        final stream = TestRpcStream(
+          responseStream: controller.stream,
+          closeFunction: () => controller.close(),
+        );
+
+        final receivedMessages = <TestMessage>[];
+        bool isComplete = false;
+
+        // Создаем подписку, которую будем тестировать
+        final subscription = stream.listen((message) {
+          receivedMessages.add(message);
+          print('Получено сообщение: $message');
+        });
+
+        // Отправляем первое сообщение
+        controller.add(TestMessages.simple(1));
+
+        // Ждем обработки первого сообщения
+        await Future.delayed(Duration(milliseconds: 50));
+
+        // Проверяем, что первое сообщение получено
+        expect(receivedMessages.length, equals(1));
+
+        // Приостанавливаем подписку
+        subscription.pause();
+        print('Подписка приостановлена');
+
+        // Отправляем еще сообщения во время паузы
+        controller.add(TestMessages.simple(2));
+        await Future.delayed(Duration(milliseconds: 20));
+        controller.add(TestMessages.simple(3));
+        await Future.delayed(Duration(milliseconds: 20));
+
+        // Проверяем, что новых сообщений не получено
+        expect(receivedMessages.length, equals(1),
+            reason: 'Не должно быть получено новых сообщений во время паузы');
+
+        // Возобновляем подписку
+        print('Подписка возобновлена');
+        subscription.resume();
+
+        // Ждем обработки буферизованных сообщений
+        await Future.delayed(Duration(milliseconds: 50));
+
+        // Assert - должны получить все 3 сообщения
+        expect(receivedMessages.length, equals(3));
+        expect(receivedMessages[0].value, equals(1));
+        expect(receivedMessages[1].value, equals(2));
+        expect(receivedMessages[2].value, equals(3));
+
+        await subscription.cancel();
+        await controller.close();
+      });
+
+      test('должен обрабатывать большой объем данных без потери сообщений',
+          () async {
+        // Arrange
+        final controller = StreamController<TestMessage>();
+        final stream = TestRpcStream(
+          responseStream: controller.stream,
+          closeFunction: () => controller.close(),
+        );
+
+        const messageCount = 1000;
+        final receivedMessages = <TestMessage>[];
+        final completer = Completer<void>();
+
+        // Act - подписываемся на поток
+        final subscription = stream.listen((message) {
+          receivedMessages.add(message);
+          if (receivedMessages.length == messageCount) {
+            completer.complete();
+          }
+        });
+
+        // Генерируем большое количество сообщений
+        for (var i = 0; i < messageCount; i++) {
+          controller.add(TestMessages.simple(i));
+
+          // Периодически даем время обработать сообщения
+          if (i % 100 == 0) {
+            await Future.microtask(() {});
+          }
+        }
+
+        // Ждем обработки всех сообщений
+        await completer.future;
+
+        // Assert
+        expect(receivedMessages.length, equals(messageCount));
+
+        // Проверяем, что все сообщения получены в правильном порядке
+        for (var i = 0; i < messageCount; i++) {
+          expect(receivedMessages[i].value, equals(i));
+        }
+
+        await subscription.cancel();
+        await controller.close();
+      });
+    });
+
+    // Тесты для проверки трансформеров потоков
+    group('transform()', () {
+      test('должен корректно применять StreamTransformer', () async {
+        // Arrange
+        final messages = [TestMessages.simple(1), TestMessages.simple(2)];
+        final stream = TestRpcStream.withMessages(messages);
+
+        // Создаем трансформер, который удваивает значение каждого сообщения
+        final transformer =
+            StreamTransformer<TestMessage, TestMessage>.fromHandlers(
+          handleData: (data, sink) {
+            sink.add(TestMessage(
+              text: 'Transformed: ${data.text}',
+              value: data.value * 2,
+            ));
+          },
+        );
+
+        // Act
+        final transformedStream = stream.transform(transformer);
+
+        // Assert
+        final results = await transformedStream.toList();
+        expect(results.length, equals(2));
+        expect(results[0].text, equals('Transformed: Message 1'));
+        expect(results[0].value, equals(2));
+        expect(results[1].text, equals('Transformed: Message 2'));
+        expect(results[1].value, equals(4));
+      });
+
+      test('должен корректно объединять несколько трансформеров в цепочку',
+          () async {
+        // Arrange
+        final messages = [TestMessages.simple(1), TestMessages.simple(2)];
+        final stream = TestRpcStream.withMessages(messages);
+
+        // Создаем трансформер для удвоения значения
+        final doubleTransformer =
+            StreamTransformer<TestMessage, TestMessage>.fromHandlers(
+          handleData: (data, sink) {
+            sink.add(TestMessage(
+              text: data.text,
+              value: data.value * 2,
+            ));
+          },
+        );
+
+        // Создаем трансформер для префикса текста
+        final prefixTransformer =
+            StreamTransformer<TestMessage, TestMessage>.fromHandlers(
+          handleData: (data, sink) {
+            sink.add(TestMessage(
+              text: 'Prefix: ${data.text}',
+              value: data.value,
+            ));
+          },
+        );
+
+        // Создаем трансформер для фильтрации сообщений с четными значениями
+        final filterTransformer =
+            StreamTransformer<TestMessage, TestMessage>.fromHandlers(
+          handleData: (data, sink) {
+            if (data.value % 2 == 0) {
+              sink.add(data);
+            }
+          },
+        );
+
+        // Act - применяем цепочку трансформеров
+        final transformedStream = stream
+            .transform(doubleTransformer)
+            .transform(prefixTransformer)
+            .transform(filterTransformer);
+
+        // Assert
+        final results = await transformedStream.toList();
+        expect(results.length,
+            equals(2)); // оба значения после удвоения становятся четными
+        expect(results[0].text, equals('Prefix: Message 1'));
+        expect(results[0].value, equals(2));
+        expect(results[1].text, equals('Prefix: Message 2'));
+        expect(results[1].value, equals(4));
+      });
+
+      test('должен передавать ошибки через цепочку трансформеров', () async {
+        // Arrange
+        final controller = StreamController<TestMessage>();
+        final stream = TestRpcStream(
+          responseStream: controller.stream,
+          closeFunction: () => controller.close(),
+        );
+
+        // Создаем трансформер, который просто пропускает данные и ошибки
+        final passTransformer =
+            StreamTransformer<TestMessage, TestMessage>.fromHandlers(
+          handleData: (data, sink) => sink.add(data),
+          handleError: (error, stackTrace, sink) =>
+              sink.addError(error, stackTrace),
+        );
+
+        // Собираем ошибки
+        final errors = <Object>[];
+        final completer = Completer<void>();
+
+        // Act
+        final transformedStream = stream.transform(passTransformer);
+        transformedStream.listen(
+          (_) {},
+          onError: (e) {
+            errors.add(e);
+            completer.complete();
+          },
+          onDone: () {
+            if (!completer.isCompleted) completer.complete();
+          },
+        );
+
+        // Добавляем ошибку
+        controller.addError('Тестовая ошибка в трансформере');
+
+        // Ждем обработки ошибки
+        await completer.future;
+
+        // Assert
+        expect(errors.length, equals(1));
+        expect(errors.first, equals('Тестовая ошибка в трансформере'));
+
+        await controller.close();
+      });
+    });
+
+    // Тесты для методов агрегации данных
+    group('методы агрегации', () {
+      test('fold() должен корректно накапливать результаты', () async {
+        // Arrange
+        final messages = List.generate(5, (i) => TestMessages.simple(i + 1));
+        final stream = TestRpcStream.withMessages(messages);
+
+        // Act - используем fold для суммирования значений
+        final sum = await stream.fold<int>(
+          0,
+          (previous, element) => previous + element.value,
+        );
+
+        // Assert
+        // 1 + 2 + 3 + 4 + 5 = 15
+        expect(sum, equals(15));
+      });
+
+      test('reduce() должен корректно объединять элементы', () async {
+        // Arrange
+        final messages = List.generate(5, (i) => TestMessages.simple(i + 1));
+        final stream = TestRpcStream.withMessages(messages);
+
+        // Act - используем reduce для нахождения сообщения с максимальным значением
+        final maxMessage = await stream.reduce((previous, element) {
+          return previous.value > element.value ? previous : element;
+        });
+
+        // Assert
+        expect(maxMessage.value, equals(5));
+        expect(maxMessage.text, equals('Message 5'));
+      });
+
+      test('join() должен корректно объединять строковые представления',
+          () async {
+        // Arrange
+        final messages = List.generate(3, (i) => TestMessages.simple(i + 1));
+        final stream = TestRpcStream.withMessages(messages);
+
+        // Создаем поток строк из текстов сообщений
+        final textStream = stream.map((msg) => msg.text);
+
+        // Act - объединяем строки с разделителем
+        final joined = await textStream.join(', ');
+
+        // Assert
+        expect(joined, equals('Message 1, Message 2, Message 3'));
+      });
+
+      test('every() должен проверять соответствие всех элементов условию',
+          () async {
+        // Arrange - все сообщения с положительными значениями
+        final positiveMessages =
+            List.generate(5, (i) => TestMessages.simple(i + 1));
+        final positiveStream = TestRpcStream.withMessages(positiveMessages);
+
+        // Смешанные положительные и отрицательные значения
+        final mixedMessages = [
+          TestMessages.withValue(1),
+          TestMessages.withValue(-2),
+          TestMessages.withValue(3),
+        ];
+        final mixedStream = TestRpcStream.withMessages(mixedMessages);
+
+        // Act & Assert
+        // Проверяем, что все значения > 0
+        final allPositive1 = await positiveStream.every((msg) => msg.value > 0);
+        expect(allPositive1, isTrue);
+
+        final allPositive2 = await mixedStream.every((msg) => msg.value > 0);
+        expect(allPositive2, isFalse);
+      });
+
+      test(
+          'any() должен проверять наличие хотя бы одного элемента, соответствующего условию',
+          () async {
+        // Arrange
+        final messages1 = [
+          TestMessages.withValue(1),
+          TestMessages.withValue(3),
+          TestMessages.withValue(5),
+        ];
+        final stream1 = TestRpcStream.withMessages(messages1);
+
+        final messages2 = [
+          TestMessages.withValue(1),
+          TestMessages.withValue(2),
+          TestMessages.withValue(4),
+        ];
+        final stream2 = TestRpcStream.withMessages(messages2);
+
+        // Act & Assert
+        // Проверяем наличие хотя бы одного четного значения
+        final hasEven1 = await stream1.any((msg) => msg.value % 2 == 0);
+        expect(hasEven1, isFalse);
+
+        final hasEven2 = await stream2.any((msg) => msg.value % 2 == 0);
+        expect(hasEven2, isTrue);
       });
     });
   });
