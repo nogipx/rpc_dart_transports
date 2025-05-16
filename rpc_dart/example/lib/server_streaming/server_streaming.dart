@@ -1,12 +1,16 @@
 import 'dart:async';
 import 'package:rpc_dart/rpc_dart.dart';
+import '../utils/logger.dart';
 
 import 'server_streaming_models.dart';
+
+/// Логгер для примера
+final logger = ExampleLogger('ServerStreamingExample');
 
 /// Пример использования серверного стриминга (один запрос -> поток ответов)
 /// Демонстрирует мониторинг прогресса выполнения длительной задачи
 Future<void> main({bool debug = true}) async {
-  print('=== Пример серверного стриминга ===\n');
+  logger.section('Пример серверного стриминга');
 
   // Создаем транспорты в памяти
   final clientTransport = MemoryTransport('client');
@@ -15,12 +19,12 @@ Future<void> main({bool debug = true}) async {
   // Соединяем транспорты
   clientTransport.connect(serverTransport);
   serverTransport.connect(clientTransport);
-  print('Транспорты соединены');
+  logger.info('Транспорты соединены');
 
   // Создаем эндпоинты с метками для отладки
   final client = RpcEndpoint(transport: clientTransport, debugLabel: 'client');
   final server = RpcEndpoint(transport: serverTransport, debugLabel: 'server');
-  print('Эндпоинты созданы');
+  logger.info('Эндпоинты созданы');
 
   if (debug) {
     server.addMiddleware(DebugMiddleware(id: "server"));
@@ -39,20 +43,20 @@ Future<void> main({bool debug = true}) async {
     // Регистрируем контракт на сервере
     server.registerServiceContract(serverContract);
     client.registerServiceContract(clientContract);
-    print('Сервис задач зарегистрирован');
+    logger.info('Сервис задач зарегистрирован');
 
     // Демонстрация прогресса задачи
     await demonstrateTaskProgress(client);
   } catch (e) {
-    print('Произошла ошибка: $e');
+    logger.error('Произошла ошибка', e);
   } finally {
     // Закрываем эндпоинты
     await client.close();
     await server.close();
-    print('\nЭндпоинты закрыты');
+    logger.info('Эндпоинты закрыты');
   }
 
-  print('\n=== Пример завершен ===');
+  logger.section('Пример завершен');
 }
 
 abstract class TaskServiceContract extends RpcServiceContract {
@@ -81,7 +85,7 @@ class ServerTaskService extends TaskServiceContract {
   ServerStreamingBidiStream<TaskRequest, ProgressMessage> handler(
     TaskRequest request,
   ) {
-    print(
+    logger.info(
       'Сервер: Начинаем задачу "${request.taskName}" (ID: ${request.taskId})',
     );
 
@@ -144,7 +148,7 @@ class ServerTaskService extends TaskServiceContract {
             );
           }
 
-          print('Сервер: Задача "${request.taskName}" успешно завершена');
+          logger.info('Сервер: Задача "${request.taskName}" успешно завершена');
         }).create();
 
     // Оборачиваем BidiStream в ServerStreamingBidiStream
@@ -185,7 +189,7 @@ class ClientTaskService extends TaskServiceContract {
 
 /// Демонстрация прогресса задачи
 Future<void> demonstrateTaskProgress(RpcEndpoint client) async {
-  print('\n--- Мониторинг длительного процесса ---');
+  logger.section('Мониторинг длительного процесса');
 
   // Создаем запрос на выполнение сложной задачи
   final request = TaskRequest(
@@ -194,8 +198,11 @@ Future<void> demonstrateTaskProgress(RpcEndpoint client) async {
     steps: 10,
   );
 
-  print('🚀 Запускаем задачу "${request.taskName}" (ID: ${request.taskId})');
-  print('⌛ Запрос отправлен, ожидаем получение потока обновлений...');
+  logger.emoji(
+    '🚀',
+    'Запускаем задачу "${request.taskName}" (ID: ${request.taskId})',
+  );
+  logger.info('Запрос отправлен, ожидаем получение потока обновлений...');
 
   // Открываем стрим для получения обновлений о прогрессе
   final stream = client
@@ -206,8 +213,8 @@ Future<void> demonstrateTaskProgress(RpcEndpoint client) async {
       );
 
   try {
-    print('\n📊 Прогресс выполнения:');
-    print('┌────────────────────────────────────────────────────┐');
+    logger.info('Прогресс выполнения:');
+    logger.info('┌────────────────────────────────────────────────────┐');
 
     // Отображаем индикатор прогресса
     await for (final progress in stream) {
@@ -216,21 +223,23 @@ Future<void> demonstrateTaskProgress(RpcEndpoint client) async {
       final statusIcon = _getStatusIcon(progress.status);
 
       // Очищаем предыдущую строку и выводим новый прогресс
-      print(
+      logger.info(
         '│ $statusIcon $progressBar ${progress.progress.toString().padLeft(3)}% │',
       );
 
       if (progress.status == 'completed') {
-        print('└────────────────────────────────────────────────────┘');
-        print('\n✅ Задача успешно завершена!');
-        print('📋 Итоговый отчет:');
-        print('  • ID задачи: ${progress.taskId}');
-        print('  • Время выполнения: ${DateTime.now().toString()}');
-        print('  • Результат: ${progress.message}');
+        logger.info('└────────────────────────────────────────────────────┘');
+        logger.emoji('✅', 'Задача успешно завершена!');
+        logger.info('Итоговый отчет:');
+        logger.bulletList([
+          'ID задачи: ${progress.taskId}',
+          'Время выполнения: ${DateTime.now().toString()}',
+          'Результат: ${progress.message}',
+        ]);
       }
     }
   } catch (e) {
-    print('Произошла ошибка при получении обновлений: $e');
+    logger.error('Произошла ошибка при получении обновлений', e);
   }
 }
 

@@ -1,12 +1,16 @@
 import 'package:rpc_dart/rpc_dart.dart';
+import '../utils/logger.dart';
 
 import 'unary_contract.dart';
 import 'unary_models.dart';
 
+/// Логгер для примера
+final logger = ExampleLogger('UnaryExample');
+
 /// Пример унарных вызовов RPC (один запрос -> один ответ)
 /// Демонстрирует выполнение базовых математических операций с числами
 Future<void> main({bool debug = false}) async {
-  print('=== Пример унарных вызовов RPC ===\n');
+  logger.section('Пример унарных вызовов RPC');
 
   // Создаем транспорты в памяти
   final clientTransport = MemoryTransport('client');
@@ -15,12 +19,12 @@ Future<void> main({bool debug = false}) async {
   // Соединяем транспорты
   clientTransport.connect(serverTransport);
   serverTransport.connect(clientTransport);
-  print('Транспорты соединены');
+  logger.info('Транспорты соединены');
 
   // Создаем эндпоинты
   final client = RpcEndpoint(transport: clientTransport, debugLabel: 'client');
   final server = RpcEndpoint(transport: serverTransport, debugLabel: 'server');
-  print('Эндпоинты созданы');
+  logger.info('Эндпоинты созданы');
 
   // Добавляем middleware
   if (debug) {
@@ -38,21 +42,20 @@ Future<void> main({bool debug = false}) async {
 
     server.registerServiceContract(serverContract);
     client.registerServiceContract(clientContract);
-    print('Контракты зарегистрированы');
+    logger.info('Контракты зарегистрированы');
 
     // Демонстрация математических операций
     await demonstrateBasicOperations(clientContract);
   } catch (e, stack) {
-    print('Произошла ошибка: $e');
-    print('Стек вызовов: $stack');
+    logger.error('Произошла ошибка', e, stack);
   } finally {
     // Закрываем эндпоинты
     await client.close();
     await server.close();
-    print('\nЭндпоинты закрыты');
+    logger.info('Эндпоинты закрыты');
   }
 
-  print('\n=== Пример завершен ===');
+  logger.section('Пример завершен');
 }
 
 /// Демонстрирует базовые математические операции
@@ -69,9 +72,11 @@ Future<void> demonstrateBasicOperations(
   final result = await service.compute(request);
 
   // Выводим результат
-  print('Результат математических операций с $value1 и $value2:');
-  print('  Сумма: ${result.sum}');
-  print('  Разность: ${result.difference}');
-  print('  Произведение: ${result.product}');
-  print('  Частное: ${result.quotient}');
+  logger.info('Результат математических операций с $value1 и $value2:');
+  logger.bulletList([
+    'Сумма: ${result.sum}',
+    'Разность: ${result.difference}',
+    'Произведение: ${result.product}',
+    'Частное: ${result.quotient}',
+  ]);
 }

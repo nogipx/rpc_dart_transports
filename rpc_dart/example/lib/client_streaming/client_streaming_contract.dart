@@ -1,4 +1,5 @@
 import 'package:rpc_dart/rpc_dart.dart';
+import '../utils/logger.dart';
 
 import 'client_streaming_models.dart';
 
@@ -26,20 +27,23 @@ abstract final class StreamServiceContract extends RpcServiceContract {
 
 /// Серверная реализация StreamService
 final class ServerStreamService extends StreamServiceContract {
+  /// Логгер для серверной части
+  final logger = ExampleLogger('ServerStreamService');
+
   @override
   ClientStreamingBidiStream<DataBlock, DataBlockResult> processDataBlocks() {
-    print('Сервер: создание обработчика для блоков файла');
+    logger.debug('Создание обработчика для блоков файла');
 
     final bidiStream =
         BidiStreamGenerator<DataBlock, DataBlockResult>((requests) async* {
-          print('Сервер: начата обработка блоков файла');
+          logger.debug('Начата обработка блоков файла');
 
           // Счетчики для обработки файла
           int blockCount = 0; // Количество блоков
           int totalSize = 0; // Общий размер файла в байтах
           String? metadata; // Метаданные файла
 
-          print('  Начинаем получение блоков файла...');
+          logger.debug('Начинаем получение блоков файла...');
 
           try {
             // Получаем блоки данных из потока
@@ -52,20 +56,20 @@ final class ServerStreamService extends StreamServiceContract {
                 metadata = block.metadata;
               }
 
-              print(
-                '  Получен блок #${block.index}: ${block.data.length} байт',
+              logger.debug(
+                'Получен блок #${block.index}: ${block.data.length} байт',
               );
 
               // Имитация обработки больших блоков данных (проверка на вирусы, расчет хеша и т.д.)
               // Уменьшаем задержку, чтобы не срабатывал таймаут в примере
               if (block.data.length > 1000) {
-                print('  Обработка большого блока данных...');
+                logger.debug('Обработка большого блока данных...');
                 await Future.delayed(Duration(milliseconds: 10));
               }
             }
 
-            print(
-              'Сервер: завершена обработка $blockCount блоков, общий размер: $totalSize байт',
+            logger.debug(
+              'Завершена обработка $blockCount блоков, общий размер: $totalSize байт',
             );
 
             // Формируем отчет о загрузке файла
@@ -76,13 +80,12 @@ final class ServerStreamService extends StreamServiceContract {
               processingTime: DateTime.now().toIso8601String(),
             );
 
-            print('Сервер: отправка результата обработки: $result');
+            logger.debug('Отправка результата обработки: $result');
 
             // Возвращаем результат обработки клиенту
             yield result;
           } catch (e, stack) {
-            print('Произошла ошибка при обработке файла: $e');
-            print('Стек вызовов: $stack');
+            logger.error('Произошла ошибка при обработке файла', e, stack);
             rethrow;
           }
         }).create();

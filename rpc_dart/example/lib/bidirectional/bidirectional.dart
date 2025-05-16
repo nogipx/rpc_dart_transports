@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:rpc_dart/rpc_dart.dart';
+import '../utils/logger.dart';
 
 import 'bidirectional_contract.dart';
 import 'bidirectional_models.dart';
@@ -8,10 +9,13 @@ import 'bidirectional_models.dart';
 /// Имя метода для чата
 const chatMethod = 'chat';
 
+/// Логгер для примера
+final logger = ExampleLogger('BiDirectionalExample');
+
 /// Пример двунаправленного стриминга (поток запросов <-> поток ответов)
 /// Демонстрирует работу чата с помощью двунаправленного стриминга
 Future<void> main({bool debug = false}) async {
-  print('=== Пример двунаправленного стриминга (чат) ===\n');
+  logger.section('Пример двунаправленного стриминга (чат)');
 
   // Создаем и настраиваем эндпоинты
   final endpoints = setupEndpoints();
@@ -26,7 +30,7 @@ Future<void> main({bool debug = false}) async {
     serverEndpoint.addMiddleware(LoggingMiddleware(id: "server"));
     clientEndpoint.addMiddleware(LoggingMiddleware(id: "client"));
   }
-  print('Эндпоинты настроены');
+  logger.info('Эндпоинты настроены');
 
   try {
     // Создаем и регистрируем серверную и клиентскую реализации чат-сервиса
@@ -35,20 +39,20 @@ Future<void> main({bool debug = false}) async {
 
     serverEndpoint.registerServiceContract(serverContract);
     clientEndpoint.registerServiceContract(clientContract);
-    print('Сервисы чата зарегистрированы');
+    logger.info('Сервисы чата зарегистрированы');
 
     // Демонстрация работы чата
     await demonstrateChatExample(clientContract);
   } catch (e) {
-    print('Произошла ошибка: $e');
+    logger.error('Произошла ошибка', e);
   } finally {
     // Закрываем эндпоинты
     await clientEndpoint.close();
     await serverEndpoint.close();
-    print('\nЭндпоинты закрыты');
+    logger.info('Эндпоинты закрыты');
   }
 
-  print('\n=== Пример завершен ===');
+  logger.section('Пример завершен');
 }
 
 /// Настраиваем транспорт и эндпоинты
@@ -76,11 +80,11 @@ Future<void> main({bool debug = false}) async {
 
 /// Демонстрация работы чата
 Future<void> demonstrateChatExample(ClientChatService chatService) async {
-  print('\n=== Демонстрация работы чата ===\n');
+  logger.section('Демонстрация работы чата');
 
   // Устанавливаем имя пользователя
   final userName = 'Пользователь';
-  print('👤 Подключаемся к чату как "$userName"');
+  logger.emoji('👤', 'Подключаемся к чату как "$userName"');
 
   // Открываем двунаправленный канал для чата
   final bidiStream = chatService.chatHandler();
@@ -115,10 +119,10 @@ Future<void> demonstrateChatExample(ClientChatService chatService) async {
           break;
       }
 
-      print(formattedMessage);
+      logger.info(formattedMessage);
     },
-    onError: (e) => print('❌ Ошибка: $e'),
-    onDone: () => print('🔚 Соединение закрыто'),
+    onError: (e) => logger.error('Ошибка', e),
+    onDone: () => logger.emoji('🔚', 'Соединение закрыто'),
   );
 
   // Имитируем отправку сообщений от пользователя
@@ -143,7 +147,7 @@ Future<void> demonstrateChatExample(ClientChatService chatService) async {
 
     // Используем метод send() класса BidiStream для отправки сообщений
     bidiStream.send(chatMessage);
-    print('📤 Отправлено: $text');
+    logger.emoji('📤', 'Отправлено: $text');
   }
 
   // Даем время получить ответы от сервера
@@ -153,5 +157,5 @@ Future<void> demonstrateChatExample(ClientChatService chatService) async {
   await bidiStream.close();
   await subscription.cancel();
 
-  print('\n=== Демонстрация чата завершена ===');
+  logger.section('Демонстрация чата завершена');
 }

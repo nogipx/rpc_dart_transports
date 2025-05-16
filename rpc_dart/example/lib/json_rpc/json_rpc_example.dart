@@ -3,10 +3,14 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 import 'package:rpc_dart/rpc_dart.dart';
+import '../utils/logger.dart';
+
+/// Логгер для примера
+final logger = ExampleLogger('JsonRpcExample');
 
 /// Пример использования JSON-RPC транспорта для унарных методов
 Future<void> main() async {
-  print('Starting JSON-RPC example...');
+  logger.section('JSON-RPC example');
 
   // Создаем память и базовый транспорт (в реальном приложении это бы был HTTP/WebSocket)
   final transport1 = MemoryTransport('transport1');
@@ -46,7 +50,9 @@ Future<void> main() async {
     serviceName: 'calc',
     methodName: 'add',
     handler: (context) async {
-      print('Сервер: обработка запроса add с данными ${context.payload}');
+      logger.debug(
+        'Сервер: обработка запроса add с данными ${context.payload}',
+      );
       if (context.payload is! Map<String, dynamic>) {
         throw RpcInvalidArgumentException(
           'Invalid arguments',
@@ -65,7 +71,7 @@ Future<void> main() async {
       final a = data['a'] as num;
       final b = data['b'] as num;
       final result = {'result': a + b};
-      print('Сервер: возвращаем результат $result');
+      logger.debug('Сервер: возвращаем результат $result');
       return result;
     },
   );
@@ -74,7 +80,9 @@ Future<void> main() async {
     serviceName: 'calc',
     methodName: 'subtract',
     handler: (context) async {
-      print('Сервер: обработка запроса subtract с данными ${context.payload}');
+      logger.debug(
+        'Сервер: обработка запроса subtract с данными ${context.payload}',
+      );
       if (context.payload is! Map<String, dynamic>) {
         throw RpcInvalidArgumentException(
           'Invalid arguments',
@@ -93,52 +101,54 @@ Future<void> main() async {
       final a = data['a'] as num;
       final b = data['b'] as num;
       final result = {'result': a - b};
-      print('Сервер: возвращаем результат $result');
+      logger.debug('Сервер: возвращаем результат $result');
       return result;
     },
   );
 
   try {
     // Вызов метода сложения
-    print('\nКлиент: вызываем метод add...');
+    logger.section('Вызов метода add');
     final addResult = await client.invoke(
       serviceName: 'calc',
       methodName: 'add',
       request: {'a': 10, 'b': 5},
     );
-    print('Клиент: получен результат: 10 + 5 = ${addResult['result']}');
+    logger.info('Клиент: получен результат: 10 + 5 = ${addResult['result']}');
 
     // Вызов метода вычитания
-    print('\nКлиент: вызываем метод subtract...');
+    logger.section('Вызов метода subtract');
     final subtractResult = await client.invoke(
       serviceName: 'calc',
       methodName: 'subtract',
       request: {'a': 10, 'b': 5},
     );
-    print('Клиент: получен результат: 10 - 5 = ${subtractResult['result']}');
+    logger.info(
+      'Клиент: получен результат: 10 - 5 = ${subtractResult['result']}',
+    );
 
     // Демонстрация ошибки: неверные аргументы
     try {
-      print('\nКлиент: вызываем метод add с неверными аргументами...');
+      logger.section('Вызов метода add с неверными аргументами');
       await client.invoke(
         serviceName: 'calc',
         methodName: 'add',
         request: {'a': 'not a number', 'b': 5},
       );
     } catch (e) {
-      print('Клиент: получена ожидаемая ошибка (invalid arguments): $e');
+      logger.error('Клиент: получена ожидаемая ошибка (invalid arguments)', e);
     }
 
     // Демонстрация ошибки: метод не найден
     try {
-      print('\nКлиент: вызываем несуществующий метод multiply...');
+      logger.section('Вызов несуществующего метода multiply');
       await client.invoke(
         serviceName: 'calc',
         methodName: 'multiply',
         request: {'a': 10, 'b': 5},
       );
     } catch (e) {
-      print('Клиент: получена ожидаемая ошибка (method not found): $e');
+      logger.error('Клиент: получена ожидаемая ошибка (method not found)', e);
     }
   } finally {
     // Закрываем клиент и сервер
@@ -146,5 +156,5 @@ Future<void> main() async {
     await server.close();
   }
 
-  print('\nJSON-RPC example completed.');
+  logger.section('JSON-RPC example completed');
 }
