@@ -4,24 +4,27 @@
 
 part of '../_index.dart';
 
+/// Класс для серверного стриминга с возможностью отправки одного запроса
+///
+/// Позволяет отправить не более одного запроса и затем получать поток ответов.
 class ServerStreamingBidiStream<RequestType extends IRpcSerializableMessage,
         ResponseType extends IRpcSerializableMessage>
-    implements Stream<ResponseType> {
-  final Stream<ResponseType> _stream;
-  final Future<void> Function() _closeFunction;
+    extends RpcStream<RequestType, ResponseType> {
   final void Function(RequestType) _sendFunction;
 
   /// Флаг, указывающий, был ли отправлен запрос
   bool _requestSent = false;
 
-  /// Конструктор обертки двунаправленного стрима
+  /// Конструктор обертки серверного стриминга
   ServerStreamingBidiStream({
     required Stream<ResponseType> stream,
     required Future<void> Function() closeFunction,
     required void Function(RequestType) sendFunction,
-  })  : _stream = stream,
-        _closeFunction = closeFunction,
-        _sendFunction = sendFunction;
+  })  : _sendFunction = sendFunction,
+        super(
+          responseStream: stream,
+          closeFunction: closeFunction,
+        );
 
   /// Отправляет запрос в стрим
   void sendRequest(RequestType request) {
@@ -40,18 +43,14 @@ class ServerStreamingBidiStream<RequestType extends IRpcSerializableMessage,
     _sendFunction(request);
   }
 
-  /// Закрывает стрим
-  Future<void> close() {
-    return _closeFunction();
-  }
-
   // Методы Stream, которые просто делегируют вызовы внутреннему стриму
   @override
   Stream<ResponseType> asBroadcastStream({
     void Function(StreamSubscription<ResponseType> subscription)? onListen,
     void Function(StreamSubscription<ResponseType> subscription)? onCancel,
   }) {
-    return _stream.asBroadcastStream(onListen: onListen, onCancel: onCancel);
+    return responseStream.asBroadcastStream(
+        onListen: onListen, onCancel: onCancel);
   }
 
   @override
@@ -61,7 +60,7 @@ class ServerStreamingBidiStream<RequestType extends IRpcSerializableMessage,
     void Function()? onDone,
     bool? cancelOnError,
   }) {
-    return _stream.listen(
+    return responseStream.listen(
       onData,
       onError: onError,
       onDone: onDone,
@@ -71,59 +70,59 @@ class ServerStreamingBidiStream<RequestType extends IRpcSerializableMessage,
 
   @override
   Stream<E> asyncExpand<E>(Stream<E>? Function(ResponseType event) convert) {
-    return _stream.asyncExpand(convert);
+    return responseStream.asyncExpand(convert);
   }
 
   @override
   Stream<E> asyncMap<E>(FutureOr<E> Function(ResponseType event) convert) {
-    return _stream.asyncMap(convert);
+    return responseStream.asyncMap(convert);
   }
 
   @override
   Stream<R1> cast<R1>() {
-    return _stream.cast<R1>();
+    return responseStream.cast<R1>();
   }
 
   @override
   Future<bool> contains(Object? needle) {
-    return _stream.contains(needle);
+    return responseStream.contains(needle);
   }
 
   @override
   Stream<ResponseType> distinct(
       [bool Function(ResponseType previous, ResponseType next)? equals]) {
-    return _stream.distinct(equals);
+    return responseStream.distinct(equals);
   }
 
   @override
   Future<E> drain<E>([E? futureValue]) {
-    return _stream.drain(futureValue);
+    return responseStream.drain(futureValue);
   }
 
   @override
   Future<ResponseType> elementAt(int index) {
-    return _stream.elementAt(index);
+    return responseStream.elementAt(index);
   }
 
   @override
   Future<bool> every(bool Function(ResponseType element) test) {
-    return _stream.every(test);
+    return responseStream.every(test);
   }
 
   @override
   Stream<S> expand<S>(Iterable<S> Function(ResponseType element) convert) {
-    return _stream.expand(convert);
+    return responseStream.expand(convert);
   }
 
   @override
-  Future<ResponseType> get first => _stream.first;
+  Future<ResponseType> get first => responseStream.first;
 
   @override
   Future<ResponseType> firstWhere(
     bool Function(ResponseType element) test, {
     ResponseType Function()? orElse,
   }) {
-    return _stream.firstWhere(test, orElse: orElse);
+    return responseStream.firstWhere(test, orElse: orElse);
   }
 
   @override
@@ -131,12 +130,12 @@ class ServerStreamingBidiStream<RequestType extends IRpcSerializableMessage,
     S initialValue,
     S Function(S previous, ResponseType element) combine,
   ) {
-    return _stream.fold(initialValue, combine);
+    return responseStream.fold(initialValue, combine);
   }
 
   @override
   Future<void> forEach(void Function(ResponseType element) action) {
-    return _stream.forEach(action);
+    return responseStream.forEach(action);
   }
 
   @override
@@ -144,75 +143,75 @@ class ServerStreamingBidiStream<RequestType extends IRpcSerializableMessage,
     Function onError, {
     bool Function(dynamic error)? test,
   }) {
-    return _stream.handleError(onError, test: test);
+    return responseStream.handleError(onError, test: test);
   }
 
   @override
-  bool get isBroadcast => _stream.isBroadcast;
+  bool get isBroadcast => responseStream.isBroadcast;
 
   @override
-  Future<bool> get isEmpty => _stream.isEmpty;
+  Future<bool> get isEmpty => responseStream.isEmpty;
 
   @override
   Future<String> join([String separator = '']) {
-    return _stream.join(separator);
+    return responseStream.join(separator);
   }
 
   @override
-  Future<ResponseType> get last => _stream.last;
+  Future<ResponseType> get last => responseStream.last;
 
   @override
   Future<ResponseType> lastWhere(
     bool Function(ResponseType element) test, {
     ResponseType Function()? orElse,
   }) {
-    return _stream.lastWhere(test, orElse: orElse);
+    return responseStream.lastWhere(test, orElse: orElse);
   }
 
   @override
-  Future<int> get length => _stream.length;
+  Future<int> get length => responseStream.length;
 
   @override
   Stream<S> map<S>(S Function(ResponseType event) convert) {
-    return _stream.map(convert);
+    return responseStream.map(convert);
   }
 
   @override
   Future<ResponseType> reduce(
       ResponseType Function(ResponseType previous, ResponseType element)
           combine) {
-    return _stream.reduce(combine);
+    return responseStream.reduce(combine);
   }
 
   @override
-  Future<ResponseType> get single => _stream.single;
+  Future<ResponseType> get single => responseStream.single;
 
   @override
   Future<ResponseType> singleWhere(
     bool Function(ResponseType element) test, {
     ResponseType Function()? orElse,
   }) {
-    return _stream.singleWhere(test, orElse: orElse);
+    return responseStream.singleWhere(test, orElse: orElse);
   }
 
   @override
   Stream<ResponseType> skip(int count) {
-    return _stream.skip(count);
+    return responseStream.skip(count);
   }
 
   @override
   Stream<ResponseType> skipWhile(bool Function(ResponseType element) test) {
-    return _stream.skipWhile(test);
+    return responseStream.skipWhile(test);
   }
 
   @override
   Stream<ResponseType> take(int count) {
-    return _stream.take(count);
+    return responseStream.take(count);
   }
 
   @override
   Stream<ResponseType> takeWhile(bool Function(ResponseType element) test) {
-    return _stream.takeWhile(test);
+    return responseStream.takeWhile(test);
   }
 
   @override
@@ -220,36 +219,36 @@ class ServerStreamingBidiStream<RequestType extends IRpcSerializableMessage,
     Duration timeLimit, {
     void Function(EventSink<ResponseType> sink)? onTimeout,
   }) {
-    return _stream.timeout(timeLimit, onTimeout: onTimeout);
+    return responseStream.timeout(timeLimit, onTimeout: onTimeout);
   }
 
   @override
   Future<List<ResponseType>> toList() {
-    return _stream.toList();
+    return responseStream.toList();
   }
 
   @override
   Future<Set<ResponseType>> toSet() {
-    return _stream.toSet();
+    return responseStream.toSet();
   }
 
   @override
   Stream<ResponseType> where(bool Function(ResponseType event) test) {
-    return _stream.where(test);
+    return responseStream.where(test);
   }
 
   @override
   Future<bool> any(bool Function(ResponseType element) test) {
-    return _stream.any(test);
+    return responseStream.any(test);
   }
 
   @override
   Future<void> pipe(StreamConsumer<ResponseType> streamConsumer) {
-    return _stream.pipe(streamConsumer);
+    return responseStream.pipe(streamConsumer);
   }
 
   @override
   Stream<S> transform<S>(StreamTransformer<ResponseType, S> streamTransformer) {
-    return _stream.transform(streamTransformer);
+    return responseStream.transform(streamTransformer);
   }
 }

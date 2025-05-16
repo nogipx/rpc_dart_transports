@@ -11,21 +11,13 @@ part of '../_index.dart';
 /// - Завершение передачи данных (finishTransfer)
 /// - Закрытие потока (close)
 class BidiStream<Request extends IRpcSerializableMessage,
-    Response extends IRpcSerializableMessage> extends Stream<Response> {
-  /// Исходный поток данных
-  final Stream<Response> _responseStream;
-
+        Response extends IRpcSerializableMessage>
+    extends RpcStream<Request, Response> {
   /// Функция отправки данных
   final void Function(Request data) _sendFunction;
 
   /// Функция завершения передачи данных (но не закрытия потока)
   final Future<void> Function()? _finishTransferFunction;
-
-  /// Функция закрытия потока
-  final Future<void> Function() _closeFunction;
-
-  /// Состояние - закрыт ли поток
-  bool _isClosed = false;
 
   /// Состояние - завершена ли передача данных
   bool _isTransferFinished = false;
@@ -36,14 +28,16 @@ class BidiStream<Request extends IRpcSerializableMessage,
     required void Function(Request data) sendFunction,
     Future<void> Function()? finishTransferFunction,
     required Future<void> Function() closeFunction,
-  })  : _responseStream = responseStream,
-        _sendFunction = sendFunction,
+  })  : _sendFunction = sendFunction,
         _finishTransferFunction = finishTransferFunction,
-        _closeFunction = closeFunction;
+        super(
+          responseStream: responseStream,
+          closeFunction: closeFunction,
+        );
 
   /// Отправляет сообщение в поток
   void send(Request data) {
-    if (_isClosed || _isTransferFinished) {
+    if (isClosed || _isTransferFinished) {
       throw StateError(
           'Нельзя отправлять сообщения в закрытый поток или после завершения передачи');
     }
@@ -52,7 +46,7 @@ class BidiStream<Request extends IRpcSerializableMessage,
 
   /// Сигнализирует о завершении передачи данных, но не закрывает поток
   Future<void> finishTransfer() async {
-    if (_isClosed || _isTransferFinished) {
+    if (isClosed || _isTransferFinished) {
       return;
     }
 
@@ -65,15 +59,13 @@ class BidiStream<Request extends IRpcSerializableMessage,
     }
   }
 
-  /// Возвращает, закрыт ли поток
-  bool get isClosed => _isClosed;
-
   /// Возвращает, завершена ли передача данных
   bool get isTransferFinished => _isTransferFinished;
 
-  /// Закрывает поток
+  /// Закрывает поток (переопределяет метод базового класса)
+  @override
   Future<void> close() async {
-    if (_isClosed) {
+    if (isClosed) {
       return;
     }
 
@@ -82,23 +74,8 @@ class BidiStream<Request extends IRpcSerializableMessage,
       await finishTransfer();
     }
 
-    _isClosed = true;
-    await _closeFunction();
-  }
-
-  @override
-  StreamSubscription<Response> listen(
-    void Function(Response event)? onData, {
-    Function? onError,
-    void Function()? onDone,
-    bool? cancelOnError,
-  }) {
-    return _responseStream.listen(
-      onData,
-      onError: onError,
-      onDone: onDone,
-      cancelOnError: cancelOnError,
-    );
+    // Вызываем метод базового класса для завершения закрытия
+    await super.close();
   }
 }
 
