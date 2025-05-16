@@ -1,9 +1,1 @@
 .dart_tool/
-pubspec.lock
-.fvm/
-**/coverage/html/
-**/coverage/test/
-*.pem
-*.bin
-**/build/
-**/examples
