@@ -10,6 +10,7 @@ import 'client_streaming/client_streaming.dart' as client_streaming;
 import 'json_rpc/json_rpc_example.dart' as json_rpc;
 import 'server_streaming/server_streaming.dart' as server_streaming;
 import 'unary/unary.dart' as unary;
+import 'diagnostics/diagnostics_example.dart' as diagnostics;
 
 const String _source = 'ExampleRunner';
 
@@ -52,6 +53,10 @@ Future<void> main(List<String> args) async {
       case 'json':
       case 'json-rpc':
         await json_rpc.main();
+        break;
+      case 'diagnostics':
+      case 'diagnostic':
+        await diagnostics.main(debug: debug);
         break;
       case 'all':
         await runAllExamples(debug);
@@ -103,6 +108,9 @@ Future<void> runAllExamples(bool debug) async {
     );
     await bidirectional.main(debug: debug);
 
+    RpcLog.info(message: '🔄 Запуск примера диагностики...', source: _source);
+    await diagnostics.main(debug: debug);
+
     RpcLog.info(message: '✅ Все примеры успешно выполнены!', source: _source);
   } catch (e) {
     RpcLog.error(
@@ -132,6 +140,7 @@ void printHelp() {
     'server - Пример серверного стриминга (один запрос -> поток ответов)',
     'bidi - Пример двунаправленного стриминга (поток запросов <-> поток ответов)',
     'json - Пример использования JSON-RPC',
+    'diagnostics - Пример настройки сервиса диагностики',
     'all - Запустить все примеры последовательно',
     'help - Показать эту справку',
   ];

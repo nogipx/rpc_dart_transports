@@ -5,3 +5,4 @@
 library diagnostics;
 
 export 'diagnostics/_index.dart';
+export 'src/logs/_logs.dart';

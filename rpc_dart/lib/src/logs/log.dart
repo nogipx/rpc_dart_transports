@@ -1,8 +1,4 @@
-// SPDX-FileCopyrightText: 2025 Karim "nogipx" Mamatkazin <nogipx@gmail.com>
-//
-// SPDX-License-Identifier: LGPL-3.0-or-later
-
-import 'package:rpc_dart/diagnostics.dart';
+part of '_logs.dart';
 
 /// Глобальный логгер для доступа к функциям логирования из любой части библиотеки
 ///
@@ -20,40 +16,15 @@ import 'package:rpc_dart/diagnostics.dart';
 ///   );
 /// }
 /// ```
-class RpcLog {
-  /// Диагностический сервис для отправки логов
-  static IRpcDiagnosticService? _diagnosticService;
+///
+/// ПРИМЕЧАНИЕ: Этот класс сохранен для обратной совместимости.
+/// Для новых проектов рекомендуется использовать [RpcLogManager] и [RpcLogger].
+abstract interface class RpcLog {
+  /// Имя логгера по умолчанию
+  static const String _defaultLoggerName = 'RpcDart';
 
-  /// Источник логов по умолчанию
-  static String _defaultSource = 'RpcDart';
-
-  /// Минимальный уровень логов для отправки
-  static RpcLogLevel _minLogLevel = RpcLogLevel.info;
-
-  /// Флаг вывода логов в консоль
-  static bool _consoleLoggingEnabled = true;
-
-  /// Устанавливает диагностический сервис для логирования
-  static void setDiagnosticService(IRpcDiagnosticService service) {
-    _diagnosticService = service;
-    _minLogLevel = service.options.minLogLevel;
-    _consoleLoggingEnabled = service.options.consoleLoggingEnabled;
-  }
-
-  /// Устанавливает источник логов по умолчанию
-  static void setDefaultSource(String source) {
-    _defaultSource = source;
-  }
-
-  /// Устанавливает минимальный уровень логов для консольного вывода
-  static void setMinLogLevel(RpcLogLevel level) {
-    _minLogLevel = level;
-  }
-
-  /// Включает/выключает вывод логов в консоль
-  static void setConsoleLogging(bool enabled) {
-    _consoleLoggingEnabled = enabled;
-  }
+  /// Получает логгер по умолчанию
+  static RpcLogger get _defaultLogger => RpcLogManager.get(_defaultLoggerName);
 
   /// Отправляет лог с указанным уровнем в сервис диагностики
   static Future<void> log({
@@ -65,74 +36,33 @@ class RpcLog {
     Map<String, dynamic>? error,
     String? stackTrace,
     Map<String, dynamic>? data,
+    AnsiColor? color,
   }) async {
-    final actualSource = source ?? _defaultSource;
-
-    // Проверяем минимальный уровень для консоли
-    if (_consoleLoggingEnabled && level.index >= _minLogLevel.index) {
-      _logToConsole(
+    if (source != null && source != _defaultLoggerName) {
+      // Если указан другой источник, используем отдельный логгер для него
+      final logger = RpcLogManager.get(source);
+      await logger.log(
         level: level,
         message: message,
-        source: actualSource,
-        context: context,
-        error: error,
-        stackTrace: stackTrace,
-      );
-    }
-
-    // Отправляем в диагностический сервис, если он установлен
-    if (_diagnosticService != null) {
-      await _diagnosticService!.log(
-        level: level,
-        message: message,
-        source: actualSource,
         context: context,
         requestId: requestId,
         error: error,
         stackTrace: stackTrace,
         data: data,
+        color: color,
       );
-    }
-  }
-
-  /// Отображает лог в консоли
-  static void _logToConsole({
-    required RpcLogLevel level,
-    required String message,
-    required String source,
-    String? context,
-    Map<String, dynamic>? error,
-    String? stackTrace,
-  }) {
-    final timestamp = DateTime.now();
-    final formattedTime =
-        '${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}:${timestamp.second.toString().padLeft(2, '0')}';
-
-    String prefix;
-    switch (level) {
-      case RpcLogLevel.debug:
-        prefix = '🔍 DEBUG';
-      case RpcLogLevel.info:
-        prefix = '📝 INFO ';
-      case RpcLogLevel.warning:
-        prefix = '⚠️ WARN ';
-      case RpcLogLevel.error:
-        prefix = '❌ ERROR';
-      case RpcLogLevel.critical:
-        prefix = '🔥 CRIT ';
-      default:
-        prefix = '     ';
-    }
-
-    final contextStr = context != null ? ' ($context)' : '';
-    print('[$formattedTime] $prefix [$source$contextStr] $message');
-
-    if (error != null) {
-      print('  Error details: $error');
-    }
-
-    if (stackTrace != null) {
-      print('  Stack trace: \n$stackTrace');
+    } else {
+      // Иначе используем логгер по умолчанию
+      await _defaultLogger.log(
+        level: level,
+        message: message,
+        context: context,
+        requestId: requestId,
+        error: error,
+        stackTrace: stackTrace,
+        data: data,
+        color: color,
+      );
     }
   }
 
@@ -143,6 +73,7 @@ class RpcLog {
     String? context,
     String? requestId,
     Map<String, dynamic>? data,
+    AnsiColor? color,
   }) async {
     await log(
       level: RpcLogLevel.debug,
@@ -151,6 +82,7 @@ class RpcLog {
       context: context,
       requestId: requestId,
       data: data,
+      color: color,
     );
   }
 
@@ -161,6 +93,7 @@ class RpcLog {
     String? context,
     String? requestId,
     Map<String, dynamic>? data,
+    AnsiColor? color,
   }) async {
     await log(
       level: RpcLogLevel.info,
@@ -169,6 +102,7 @@ class RpcLog {
       context: context,
       requestId: requestId,
       data: data,
+      color: color,
     );
   }
 
@@ -179,6 +113,7 @@ class RpcLog {
     String? context,
     String? requestId,
     Map<String, dynamic>? data,
+    AnsiColor? color,
   }) async {
     await log(
       level: RpcLogLevel.warning,
@@ -187,6 +122,7 @@ class RpcLog {
       context: context,
       requestId: requestId,
       data: data,
+      color: color,
     );
   }
 
@@ -199,6 +135,7 @@ class RpcLog {
     Map<String, dynamic>? error,
     String? stackTrace,
     Map<String, dynamic>? data,
+    AnsiColor? color,
   }) async {
     await log(
       level: RpcLogLevel.error,
@@ -209,6 +146,7 @@ class RpcLog {
       error: error,
       stackTrace: stackTrace,
       data: data,
+      color: color,
     );
   }
 
@@ -221,6 +159,7 @@ class RpcLog {
     Map<String, dynamic>? error,
     String? stackTrace,
     Map<String, dynamic>? data,
+    AnsiColor? color,
   }) async {
     await log(
       level: RpcLogLevel.critical,
@@ -231,6 +170,7 @@ class RpcLog {
       error: error,
       stackTrace: stackTrace,
       data: data,
+      color: color,
     );
   }
 }
