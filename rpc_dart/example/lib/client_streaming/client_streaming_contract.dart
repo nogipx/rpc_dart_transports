@@ -1,7 +1,10 @@
 import 'package:rpc_dart/rpc_dart.dart';
-import '../utils/logger.dart';
+import 'package:rpc_dart/diagnostics.dart';
 
 import 'client_streaming_models.dart';
+
+/// Константа с источником логов для сервера
+const String _source = 'ServerStreamService';
 
 /// Контракт стриминг-сервиса
 abstract final class StreamServiceContract extends RpcServiceContract {
@@ -27,23 +30,29 @@ abstract final class StreamServiceContract extends RpcServiceContract {
 
 /// Серверная реализация StreamService
 final class ServerStreamService extends StreamServiceContract {
-  /// Логгер для серверной части
-  final logger = ExampleLogger('ServerStreamService');
-
   @override
   ClientStreamingBidiStream<DataBlock, DataBlockResult> processDataBlocks() {
-    logger.debug('Создание обработчика для блоков файла');
+    RpcLog.debug(
+      message: 'Создание обработчика для блоков файла',
+      source: _source,
+    );
 
     final bidiStream =
         BidiStreamGenerator<DataBlock, DataBlockResult>((requests) async* {
-          logger.debug('Начата обработка блоков файла');
+          RpcLog.debug(
+            message: 'Начата обработка блоков файла',
+            source: _source,
+          );
 
           // Счетчики для обработки файла
           int blockCount = 0; // Количество блоков
           int totalSize = 0; // Общий размер файла в байтах
           String? metadata; // Метаданные файла
 
-          logger.debug('Начинаем получение блоков файла...');
+          RpcLog.debug(
+            message: 'Начинаем получение блоков файла...',
+            source: _source,
+          );
 
           try {
             // Получаем блоки данных из потока
@@ -56,20 +65,27 @@ final class ServerStreamService extends StreamServiceContract {
                 metadata = block.metadata;
               }
 
-              logger.debug(
-                'Получен блок #${block.index}: ${block.data.length} байт',
+              RpcLog.debug(
+                message:
+                    'Получен блок #${block.index}: ${block.data.length} байт',
+                source: _source,
               );
 
               // Имитация обработки больших блоков данных (проверка на вирусы, расчет хеша и т.д.)
               // Уменьшаем задержку, чтобы не срабатывал таймаут в примере
               if (block.data.length > 1000) {
-                logger.debug('Обработка большого блока данных...');
+                RpcLog.debug(
+                  message: 'Обработка большого блока данных...',
+                  source: _source,
+                );
                 await Future.delayed(Duration(milliseconds: 10));
               }
             }
 
-            logger.debug(
-              'Завершена обработка $blockCount блоков, общий размер: $totalSize байт',
+            RpcLog.debug(
+              message:
+                  'Завершена обработка $blockCount блоков, общий размер: $totalSize байт',
+              source: _source,
             );
 
             // Формируем отчет о загрузке файла
@@ -80,12 +96,20 @@ final class ServerStreamService extends StreamServiceContract {
               processingTime: DateTime.now().toIso8601String(),
             );
 
-            logger.debug('Отправка результата обработки: $result');
+            RpcLog.debug(
+              message: 'Отправка результата обработки: $result',
+              source: _source,
+            );
 
             // Возвращаем результат обработки клиенту
             yield result;
           } catch (e, stack) {
-            logger.error('Произошла ошибка при обработке файла', e, stack);
+            RpcLog.error(
+              message: 'Произошла ошибка при обработке файла',
+              source: _source,
+              error: {'error': e.toString()},
+              stackTrace: stack.toString(),
+            );
             rethrow;
           }
         }).create();

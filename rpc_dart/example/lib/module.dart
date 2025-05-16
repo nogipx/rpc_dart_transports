@@ -4,7 +4,6 @@
 
 import 'dart:io';
 import 'package:rpc_dart/diagnostics.dart';
-import 'utils/logger.dart';
 
 import 'bidirectional/bidirectional.dart' as bidirectional;
 import 'client_streaming/client_streaming.dart' as client_streaming;
@@ -12,11 +11,11 @@ import 'json_rpc/json_rpc_example.dart' as json_rpc;
 import 'server_streaming/server_streaming.dart' as server_streaming;
 import 'unary/unary.dart' as unary;
 
-final logger = ExampleLogger('ExampleRunner');
+const String _source = 'ExampleRunner';
 
 /// Главная функция запуска примеров
 Future<void> main(List<String> args) async {
-  logger.section('RPC Dart Examples');
+  printHeader('RPC Dart Examples');
 
   if (args.isEmpty) {
     printHelp();
@@ -28,7 +27,7 @@ Future<void> main(List<String> args) async {
 
   if (debug) {
     RpcLog.setMinLogLevel(RpcLogLevel.debug);
-    logger.info('Включен режим отладки');
+    RpcLog.info(message: 'Включен режим отладки', source: _source);
   } else {
     RpcLog.setMinLogLevel(RpcLogLevel.info);
   }
@@ -62,42 +61,72 @@ Future<void> main(List<String> args) async {
         printHelp();
     }
   } catch (e, stack) {
-    logger.error('Произошла ошибка при выполнении примера', e, stack);
+    RpcLog.error(
+      message: 'Произошла ошибка при выполнении примера',
+      source: _source,
+      error: {'error': e.toString()},
+      stackTrace: stack.toString(),
+    );
     exit(1);
   }
 }
 
 /// Запускает все примеры последовательно
 Future<void> runAllExamples(bool debug) async {
-  logger.section('Запуск всех примеров');
+  printHeader('Запуск всех примеров');
 
   try {
-    logger.emoji('🔄', 'Запуск примера унарных вызовов...');
+    RpcLog.info(
+      message: '🔄 Запуск примера унарных вызовов...',
+      source: _source,
+    );
     await unary.main(debug: debug);
 
-    logger.emoji('🔄', 'Запуск примера JSON-RPC...');
+    RpcLog.info(message: '🔄 Запуск примера JSON-RPC...', source: _source);
     await json_rpc.main();
 
-    logger.emoji('🔄', 'Запуск примера клиентского стриминга...');
+    RpcLog.info(
+      message: '🔄 Запуск примера клиентского стриминга...',
+      source: _source,
+    );
     await client_streaming.main(debug: debug);
 
-    logger.emoji('🔄', 'Запуск примера серверного стриминга...');
+    RpcLog.info(
+      message: '🔄 Запуск примера серверного стриминга...',
+      source: _source,
+    );
     await server_streaming.main(debug: debug);
 
-    logger.emoji('🔄', 'Запуск примера двунаправленного стриминга...');
+    RpcLog.info(
+      message: '🔄 Запуск примера двунаправленного стриминга...',
+      source: _source,
+    );
     await bidirectional.main(debug: debug);
 
-    logger.emoji('✅', 'Все примеры успешно выполнены!');
+    RpcLog.info(message: '✅ Все примеры успешно выполнены!', source: _source);
   } catch (e) {
-    logger.error('Ошибка при выполнении примеров', e);
+    RpcLog.error(
+      message: 'Ошибка при выполнении примеров',
+      source: _source,
+      error: {'error': e.toString()},
+    );
   }
+}
+
+/// Выводит заголовок
+void printHeader(String title) {
+  RpcLog.info(message: '-------------------------', source: _source);
+  RpcLog.info(message: ' $title', source: _source);
+  RpcLog.info(message: '-------------------------', source: _source);
 }
 
 /// Выводит справку по использованию
 void printHelp() {
-  logger.section('Справка по использованию');
-  logger.info('Доступные примеры:');
-  logger.bulletList([
+  printHeader('Справка по использованию');
+
+  RpcLog.info(message: 'Доступные примеры:', source: _source);
+
+  final examples = [
     'unary - Пример унарных вызовов (один запрос -> один ответ)',
     'client - Пример клиентского стриминга (поток запросов -> один ответ)',
     'server - Пример серверного стриминга (один запрос -> поток ответов)',
@@ -105,9 +134,16 @@ void printHelp() {
     'json - Пример использования JSON-RPC',
     'all - Запустить все примеры последовательно',
     'help - Показать эту справку',
-  ]);
+  ];
 
-  logger.info('Использование:');
-  logger.info('dart run example/lib/module.dart <example> [--debug]');
-  logger.info('  --debug: включить режим отладки');
+  for (final example in examples) {
+    RpcLog.info(message: '  • $example', source: _source);
+  }
+
+  RpcLog.info(message: 'Использование:', source: _source);
+  RpcLog.info(
+    message: 'dart run example/lib/module.dart <example> [--debug]',
+    source: _source,
+  );
+  RpcLog.info(message: '  --debug: включить режим отладки', source: _source);
 }

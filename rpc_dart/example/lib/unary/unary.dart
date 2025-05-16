@@ -1,16 +1,16 @@
 import 'package:rpc_dart/rpc_dart.dart';
-import '../utils/logger.dart';
+import 'package:rpc_dart/diagnostics.dart';
 
 import 'unary_contract.dart';
 import 'unary_models.dart';
 
-/// Логгер для примера
-final logger = ExampleLogger('UnaryExample');
+/// Константа с источником логов
+const String _source = 'UnaryExample';
 
 /// Пример унарных вызовов RPC (один запрос -> один ответ)
 /// Демонстрирует выполнение базовых математических операций с числами
 Future<void> main({bool debug = false}) async {
-  logger.section('Пример унарных вызовов RPC');
+  printHeader('Пример унарных вызовов RPC');
 
   // Создаем транспорты в памяти
   final clientTransport = MemoryTransport('client');
@@ -19,12 +19,12 @@ Future<void> main({bool debug = false}) async {
   // Соединяем транспорты
   clientTransport.connect(serverTransport);
   serverTransport.connect(clientTransport);
-  logger.info('Транспорты соединены');
+  RpcLog.info(message: 'Транспорты соединены', source: _source);
 
   // Создаем эндпоинты
   final client = RpcEndpoint(transport: clientTransport, debugLabel: 'client');
   final server = RpcEndpoint(transport: serverTransport, debugLabel: 'server');
-  logger.info('Эндпоинты созданы');
+  RpcLog.info(message: 'Эндпоинты созданы', source: _source);
 
   // Добавляем middleware
   if (debug) {
@@ -42,20 +42,32 @@ Future<void> main({bool debug = false}) async {
 
     server.registerServiceContract(serverContract);
     client.registerServiceContract(clientContract);
-    logger.info('Контракты зарегистрированы');
+    RpcLog.info(message: 'Контракты зарегистрированы', source: _source);
 
     // Демонстрация математических операций
     await demonstrateBasicOperations(clientContract);
   } catch (e, stack) {
-    logger.error('Произошла ошибка', e, stack);
+    RpcLog.error(
+      message: 'Произошла ошибка',
+      source: _source,
+      error: {'error': e.toString()},
+      stackTrace: stack.toString(),
+    );
   } finally {
     // Закрываем эндпоинты
     await client.close();
     await server.close();
-    logger.info('Эндпоинты закрыты');
+    RpcLog.info(message: 'Эндпоинты закрыты', source: _source);
   }
 
-  logger.section('Пример завершен');
+  printHeader('Пример завершен');
+}
+
+/// Печатает заголовок раздела
+void printHeader(String title) {
+  RpcLog.info(message: '-------------------------', source: _source);
+  RpcLog.info(message: ' $title', source: _source);
+  RpcLog.info(message: '-------------------------', source: _source);
 }
 
 /// Демонстрирует базовые математические операции
@@ -72,11 +84,13 @@ Future<void> demonstrateBasicOperations(
   final result = await service.compute(request);
 
   // Выводим результат
-  logger.info('Результат математических операций с $value1 и $value2:');
-  logger.bulletList([
-    'Сумма: ${result.sum}',
-    'Разность: ${result.difference}',
-    'Произведение: ${result.product}',
-    'Частное: ${result.quotient}',
-  ]);
+  RpcLog.info(
+    message: 'Результат математических операций с $value1 и $value2:',
+    source: _source,
+  );
+
+  RpcLog.info(message: '  • Сумма: ${result.sum}', source: _source);
+  RpcLog.info(message: '  • Разность: ${result.difference}', source: _source);
+  RpcLog.info(message: '  • Произведение: ${result.product}', source: _source);
+  RpcLog.info(message: '  • Частное: ${result.quotient}', source: _source);
 }

@@ -3,14 +3,14 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 import 'package:rpc_dart/rpc_dart.dart';
-import '../utils/logger.dart';
+import 'package:rpc_dart/diagnostics.dart';
 
-/// Логгер для примера
-final logger = ExampleLogger('JsonRpcExample');
+/// Константа с источником логов
+const String _source = 'JsonRpcExample';
 
 /// Пример использования JSON-RPC транспорта для унарных методов
 Future<void> main() async {
-  logger.section('JSON-RPC example');
+  printHeader('JSON-RPC example');
 
   // Создаем память и базовый транспорт (в реальном приложении это бы был HTTP/WebSocket)
   final transport1 = MemoryTransport('transport1');
@@ -50,8 +50,9 @@ Future<void> main() async {
     serviceName: 'calc',
     methodName: 'add',
     handler: (context) async {
-      logger.debug(
-        'Сервер: обработка запроса add с данными ${context.payload}',
+      RpcLog.debug(
+        message: 'Сервер: обработка запроса add с данными ${context.payload}',
+        source: _source,
       );
       if (context.payload is! Map<String, dynamic>) {
         throw RpcInvalidArgumentException(
@@ -71,7 +72,10 @@ Future<void> main() async {
       final a = data['a'] as num;
       final b = data['b'] as num;
       final result = {'result': a + b};
-      logger.debug('Сервер: возвращаем результат $result');
+      RpcLog.debug(
+        message: 'Сервер: возвращаем результат $result',
+        source: _source,
+      );
       return result;
     },
   );
@@ -80,8 +84,10 @@ Future<void> main() async {
     serviceName: 'calc',
     methodName: 'subtract',
     handler: (context) async {
-      logger.debug(
-        'Сервер: обработка запроса subtract с данными ${context.payload}',
+      RpcLog.debug(
+        message:
+            'Сервер: обработка запроса subtract с данными ${context.payload}',
+        source: _source,
       );
       if (context.payload is! Map<String, dynamic>) {
         throw RpcInvalidArgumentException(
@@ -101,54 +107,70 @@ Future<void> main() async {
       final a = data['a'] as num;
       final b = data['b'] as num;
       final result = {'result': a - b};
-      logger.debug('Сервер: возвращаем результат $result');
+      RpcLog.debug(
+        message: 'Сервер: возвращаем результат $result',
+        source: _source,
+      );
       return result;
     },
   );
 
   try {
     // Вызов метода сложения
-    logger.section('Вызов метода add');
+    printHeader('Вызов метода add');
     final addResult = await client.invoke(
       serviceName: 'calc',
       methodName: 'add',
       request: {'a': 10, 'b': 5},
     );
-    logger.info('Клиент: получен результат: 10 + 5 = ${addResult['result']}');
+    RpcLog.info(
+      message: 'Клиент: получен результат: 10 + 5 = ${addResult['result']}',
+      source: _source,
+    );
 
     // Вызов метода вычитания
-    logger.section('Вызов метода subtract');
+    printHeader('Вызов метода subtract');
     final subtractResult = await client.invoke(
       serviceName: 'calc',
       methodName: 'subtract',
       request: {'a': 10, 'b': 5},
     );
-    logger.info(
-      'Клиент: получен результат: 10 - 5 = ${subtractResult['result']}',
+    RpcLog.info(
+      message:
+          'Клиент: получен результат: 10 - 5 = ${subtractResult['result']}',
+      source: _source,
     );
 
     // Демонстрация ошибки: неверные аргументы
     try {
-      logger.section('Вызов метода add с неверными аргументами');
+      printHeader('Вызов метода add с неверными аргументами');
       await client.invoke(
         serviceName: 'calc',
         methodName: 'add',
         request: {'a': 'not a number', 'b': 5},
       );
     } catch (e) {
-      logger.error('Клиент: получена ожидаемая ошибка (invalid arguments)', e);
+      RpcLog.error(
+        message: 'Клиент: получена ожидаемая ошибка (invalid arguments)',
+        source: _source,
+        error: {'error': e.toString()},
+      );
     }
 
     // Демонстрация ошибки: метод не найден
     try {
-      logger.section('Вызов несуществующего метода multiply');
+      printHeader('Вызов несуществующего метода multiply');
       await client.invoke(
         serviceName: 'calc',
         methodName: 'multiply',
         request: {'a': 10, 'b': 5},
       );
     } catch (e) {
-      logger.error('Клиент: получена ожидаемая ошибка (method not found)', e);
+      RpcLog.error(
+        message: 'Клиент: получена ожидаемая ошибка (method not found)',
+        source: _source,
+        error: {'error': e.toString()},
+      );
     }
   } finally {
     // Закрываем клиент и сервер
@@ -156,5 +178,12 @@ Future<void> main() async {
     await server.close();
   }
 
-  logger.section('JSON-RPC example completed');
+  printHeader('JSON-RPC example completed');
+}
+
+/// Печатает заголовок раздела
+void printHeader(String title) {
+  RpcLog.info(message: '-------------------------', source: _source);
+  RpcLog.info(message: ' $title', source: _source);
+  RpcLog.info(message: '-------------------------', source: _source);
 }

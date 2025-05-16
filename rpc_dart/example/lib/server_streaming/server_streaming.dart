@@ -1,16 +1,16 @@
 import 'dart:async';
 import 'package:rpc_dart/rpc_dart.dart';
-import '../utils/logger.dart';
+import 'package:rpc_dart/diagnostics.dart';
 
 import 'server_streaming_models.dart';
 
-/// Логгер для примера
-final logger = ExampleLogger('ServerStreamingExample');
+/// Константа для источника логов
+const String _source = 'ServerStreamingExample';
 
 /// Пример использования серверного стриминга (один запрос -> поток ответов)
 /// Демонстрирует мониторинг прогресса выполнения длительной задачи
 Future<void> main({bool debug = true}) async {
-  logger.section('Пример серверного стриминга');
+  printHeader('Пример серверного стриминга');
 
   // Создаем транспорты в памяти
   final clientTransport = MemoryTransport('client');
@@ -19,12 +19,12 @@ Future<void> main({bool debug = true}) async {
   // Соединяем транспорты
   clientTransport.connect(serverTransport);
   serverTransport.connect(clientTransport);
-  logger.info('Транспорты соединены');
+  RpcLog.info(message: 'Транспорты соединены', source: _source);
 
   // Создаем эндпоинты с метками для отладки
   final client = RpcEndpoint(transport: clientTransport, debugLabel: 'client');
   final server = RpcEndpoint(transport: serverTransport, debugLabel: 'server');
-  logger.info('Эндпоинты созданы');
+  RpcLog.info(message: 'Эндпоинты созданы', source: _source);
 
   if (debug) {
     server.addMiddleware(DebugMiddleware(id: "server"));
@@ -43,20 +43,24 @@ Future<void> main({bool debug = true}) async {
     // Регистрируем контракт на сервере
     server.registerServiceContract(serverContract);
     client.registerServiceContract(clientContract);
-    logger.info('Сервис задач зарегистрирован');
+    RpcLog.info(message: 'Сервис задач зарегистрирован', source: _source);
 
     // Демонстрация прогресса задачи
     await demonstrateTaskProgress(client);
   } catch (e) {
-    logger.error('Произошла ошибка', e);
+    RpcLog.error(
+      message: 'Произошла ошибка',
+      source: _source,
+      error: {'error': e.toString()},
+    );
   } finally {
     // Закрываем эндпоинты
     await client.close();
     await server.close();
-    logger.info('Эндпоинты закрыты');
+    RpcLog.info(message: 'Эндпоинты закрыты', source: _source);
   }
 
-  logger.section('Пример завершен');
+  printHeader('Пример завершен');
 }
 
 abstract class TaskServiceContract extends RpcServiceContract {
@@ -85,8 +89,10 @@ class ServerTaskService extends TaskServiceContract {
   ServerStreamingBidiStream<TaskRequest, ProgressMessage> handler(
     TaskRequest request,
   ) {
-    logger.info(
-      'Сервер: Начинаем задачу "${request.taskName}" (ID: ${request.taskId})',
+    RpcLog.info(
+      message:
+          'Сервер: Начинаем задачу "${request.taskName}" (ID: ${request.taskId})',
+      source: _source,
     );
 
     final bidiStream =
@@ -148,7 +154,10 @@ class ServerTaskService extends TaskServiceContract {
             );
           }
 
-          logger.info('Сервер: Задача "${request.taskName}" успешно завершена');
+          RpcLog.info(
+            message: 'Сервер: Задача "${request.taskName}" успешно завершена',
+            source: _source,
+          );
         }).create();
 
     // Оборачиваем BidiStream в ServerStreamingBidiStream
@@ -187,9 +196,42 @@ class ClientTaskService extends TaskServiceContract {
   }
 }
 
+/// Печатает заголовок раздела
+void printHeader(String title) {
+  RpcLog.info(message: '-------------------------', source: _source);
+  RpcLog.info(message: ' $title', source: _source);
+  RpcLog.info(message: '-------------------------', source: _source);
+}
+
+/// Возвращает иконку статуса
+String _getStatusIcon(String status) {
+  switch (status) {
+    case 'initializing':
+      return '🔄';
+    case 'in_progress':
+      return '🔹';
+    case 'processing':
+      return '🔧';
+    case 'analyzing':
+      return '🔍';
+    case 'completed':
+      return '✅';
+    default:
+      return '📊';
+  }
+}
+
+/// Формирует строку индикатора прогресса
+String _buildProgressBar(int percent) {
+  final barLength = 10;
+  final filled = (barLength * percent / 100).round();
+  final empty = barLength - filled;
+  return '[${'█' * filled}${' ' * empty}]';
+}
+
 /// Демонстрация прогресса задачи
 Future<void> demonstrateTaskProgress(RpcEndpoint client) async {
-  logger.section('Мониторинг длительного процесса');
+  printHeader('Мониторинг длительного процесса');
 
   // Создаем запрос на выполнение сложной задачи
   final request = TaskRequest(
@@ -198,11 +240,15 @@ Future<void> demonstrateTaskProgress(RpcEndpoint client) async {
     steps: 10,
   );
 
-  logger.emoji(
-    '🚀',
-    'Запускаем задачу "${request.taskName}" (ID: ${request.taskId})',
+  RpcLog.info(
+    message:
+        '🚀 Запускаем задачу "${request.taskName}" (ID: ${request.taskId})',
+    source: _source,
   );
-  logger.info('Запрос отправлен, ожидаем получение потока обновлений...');
+  RpcLog.info(
+    message: 'Запрос отправлен, ожидаем получение потока обновлений...',
+    source: _source,
+  );
 
   // Открываем стрим для получения обновлений о прогрессе
   final stream = client
@@ -213,8 +259,11 @@ Future<void> demonstrateTaskProgress(RpcEndpoint client) async {
       );
 
   try {
-    logger.info('Прогресс выполнения:');
-    logger.info('┌────────────────────────────────────────────────────┐');
+    RpcLog.info(message: 'Прогресс выполнения:', source: _source);
+    RpcLog.info(
+      message: '┌────────────────────────────────────────────────────┐',
+      source: _source,
+    );
 
     // Отображаем индикатор прогресса
     await for (final progress in stream) {
@@ -223,51 +272,39 @@ Future<void> demonstrateTaskProgress(RpcEndpoint client) async {
       final statusIcon = _getStatusIcon(progress.status);
 
       // Очищаем предыдущую строку и выводим новый прогресс
-      logger.info(
-        '│ $statusIcon $progressBar ${progress.progress.toString().padLeft(3)}% │',
+      RpcLog.info(
+        message:
+            '│ $statusIcon $progressBar ${progress.progress.toString().padLeft(3)}% │',
+        source: _source,
       );
 
       if (progress.status == 'completed') {
-        logger.info('└────────────────────────────────────────────────────┘');
-        logger.emoji('✅', 'Задача успешно завершена!');
-        logger.info('Итоговый отчет:');
-        logger.bulletList([
-          'ID задачи: ${progress.taskId}',
-          'Время выполнения: ${DateTime.now().toString()}',
-          'Результат: ${progress.message}',
-        ]);
+        RpcLog.info(
+          message: '└────────────────────────────────────────────────────┘',
+          source: _source,
+        );
+        RpcLog.info(message: '✅ Задача успешно завершена!', source: _source);
+        RpcLog.info(message: 'Итоговый отчет:', source: _source);
+
+        RpcLog.info(
+          message: '  • ID задачи: ${progress.taskId}',
+          source: _source,
+        );
+        RpcLog.info(
+          message: '  • Время выполнения: ${DateTime.now().toString()}',
+          source: _source,
+        );
+        RpcLog.info(
+          message: '  • Результат: ${progress.message}',
+          source: _source,
+        );
       }
     }
   } catch (e) {
-    logger.error('Произошла ошибка при получении обновлений', e);
+    RpcLog.error(
+      message: 'Произошла ошибка при получении обновлений',
+      source: _source,
+      error: {'error': e.toString()},
+    );
   }
-}
-
-/// Возвращает иконку статуса
-String _getStatusIcon(String status) {
-  switch (status) {
-    case 'initializing':
-      return '🔄';
-    case 'in_progress':
-      return '⏳';
-    case 'processing':
-      return '🔍';
-    case 'analyzing':
-      return '📊';
-    case 'completed':
-      return '✅';
-    case 'error':
-      return '❌';
-    default:
-      return '⏱️';
-  }
-}
-
-/// Создает строку прогресса
-String _buildProgressBar(int progress) {
-  const barLength = 30;
-  final completed = (progress / 100 * barLength).round();
-  final remaining = barLength - completed;
-
-  return '[${'█' * completed}${' ' * remaining}]';
 }
