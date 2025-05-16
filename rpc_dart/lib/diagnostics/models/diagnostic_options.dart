@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
+import 'package:rpc_dart/diagnostics.dart';
+
 /// Опции для настройки работы диагностического сервиса
 class DiagnosticOptions {
   /// Включить сбор метрик
@@ -39,6 +41,16 @@ class DiagnosticOptions {
   /// Включить сбор метрик ресурсов
   final bool resourceMetricsEnabled;
 
+  /// Включить сбор логов
+  final bool loggingEnabled;
+
+  /// Минимальный уровень логов для отправки
+  /// Логи с уровнем ниже указанного не будут отправляться
+  final RpcLogLevel minLogLevel;
+
+  /// Включить вывод логов в консоль параллельно с отправкой в сервис
+  final bool consoleLoggingEnabled;
+
   const DiagnosticOptions({
     this.enabled = true,
     this.samplingRate = 1.0,
@@ -51,5 +63,8 @@ class DiagnosticOptions {
     this.streamMetricsEnabled = true,
     this.errorMetricsEnabled = true,
     this.resourceMetricsEnabled = true,
+    this.loggingEnabled = true,
+    this.minLogLevel = RpcLogLevel.info,
+    this.consoleLoggingEnabled = true,
   });
 }

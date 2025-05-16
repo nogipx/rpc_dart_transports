@@ -6,6 +6,7 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'dart:convert';
 
+import 'package:rpc_dart/diagnostics.dart';
 import 'package:rpc_dart/src/transport/_index.dart';
 
 /// Обертка транспорта, которая добавляет шифрование к базовому транспорту
@@ -71,7 +72,10 @@ class EncryptedTransport implements RpcTransport {
   /// Логирует сообщения, если включен режим отладки
   void _log(String message) {
     if (_debug) {
-      print('[EncryptedTransport:$id] $message');
+      RpcLog.debug(
+        message: message,
+        source: 'EncryptedTransport:$id',
+      );
     }
   }
 
@@ -120,8 +124,15 @@ class EncryptedTransport implements RpcTransport {
         _log('Данные не зашифрованы или не удалось определить формат: $e');
         _decryptedController.add(data);
       }
-    } catch (e, _) {
+    } catch (e, stackTrace) {
       _log('Ошибка при обработке входящих данных: $e');
+      RpcLog.error(
+        message:
+            'Ошибка при обработке входящих данных в шифрованном транспорте',
+        source: 'EncryptedTransport:$id',
+        error: {'error': e.toString()},
+        stackTrace: stackTrace.toString(),
+      );
       _decryptedController.addError(e);
     }
   }
@@ -187,13 +198,24 @@ class EncryptedTransport implements RpcTransport {
       } catch (e) {
         _log(
             'Ошибка при определении типа сообщения, отправляем без шифрования: $e');
+        RpcLog.warning(
+          message: 'Не удалось определить тип сообщения для шифрования',
+          source: 'EncryptedTransport:$id',
+          data: {'error': e.toString()},
+        );
       }
 
       // Если сообщение не нужно шифровать или произошла ошибка,
       // отправляем данные как есть
       return await _baseTransport.send(data, timeout: timeout);
-    } catch (e) {
+    } catch (e, stackTrace) {
       _log('Ошибка при отправке данных: $e');
+      RpcLog.error(
+        message: 'Ошибка при отправке данных через шифрованный транспорт',
+        source: 'EncryptedTransport:$id',
+        error: {'error': e.toString()},
+        stackTrace: stackTrace.toString(),
+      );
       return RpcTransportActionStatus.unknownError;
     }
   }

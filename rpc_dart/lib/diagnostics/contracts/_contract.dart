@@ -18,6 +18,8 @@ abstract class RpcDiagnosticServiceContract extends RpcServiceContract {
   static const methodStreamMetric = 'streamMetric';
   static const methodErrorMetric = 'errorMetric';
   static const methodResourceMetric = 'resourceMetric';
+  static const methodLogMetric = 'logMetric';
+  static const methodStreamLogs = 'streamLogs';
   static const methodRegisterClient = 'registerClient';
   static const methodPing = 'ping';
 
@@ -67,6 +69,14 @@ abstract class RpcDiagnosticServiceContract extends RpcServiceContract {
       responseParser: RpcNull.fromJson,
     );
 
+    addClientStreamingMethod<RpcMetric<RpcLogMetric>, RpcNull>(
+      methodName: methodStreamLogs,
+      handler: logs,
+      argumentParser: (json) =>
+          RpcMetric.fromJson(json) as RpcMetric<RpcLogMetric>,
+      responseParser: RpcNull.fromJson,
+    );
+
     addUnaryRequestMethod<RpcClientIdentity, RpcNull>(
       methodName: methodRegisterClient,
       handler: registerClient,
@@ -107,6 +117,8 @@ abstract class RpcDiagnosticServiceContract extends RpcServiceContract {
 
   /// Метод для проверки доступности диагностического сервера
   Future<RpcBool> ping(RpcNull _);
+
+  ClientStreamingBidiStream<RpcMetric<RpcLogMetric>, RpcNull> logs();
 }
 
 /// Клиентская реализация контракта диагностического сервиса
@@ -221,6 +233,16 @@ class DiagnosticClientContract extends RpcDiagnosticServiceContract {
           responseParser: RpcBool.fromJson,
         );
   }
+
+  @override
+  ClientStreamingBidiStream<RpcMetric<RpcLogMetric>, RpcNull> logs() {
+    return _endpoint
+        .clientStreaming(
+          serviceName: serviceName,
+          methodName: RpcDiagnosticServiceContract.methodStreamLogs,
+        )
+        .call(responseParser: RpcNull.fromJson);
+  }
 }
 
 /// Серверная реализация контракта диагностического сервиса
@@ -231,6 +253,7 @@ class DiagnosticServerContract extends RpcDiagnosticServiceContract {
   final void Function(RpcMetric<RpcStreamMetric>) _onStreamMetric;
   final void Function(RpcMetric<RpcErrorMetric>) _onErrorMetric;
   final void Function(RpcMetric<RpcResourceMetric>) _onResourceMetric;
+  final void Function(RpcMetric<RpcLogMetric>) _onLog;
   final void Function(RpcClientIdentity) _onRegisterClient;
   final Future<bool> Function() _onPing;
 
@@ -241,7 +264,9 @@ class DiagnosticServerContract extends RpcDiagnosticServiceContract {
     required void Function(RpcMetric<RpcStreamMetric>) onStreamMetric,
     required void Function(RpcMetric<RpcErrorMetric>) onErrorMetric,
     required void Function(RpcMetric<RpcResourceMetric>) onResourceMetric,
+    required void Function(Stream<RpcMetric<RpcLogMetric>>) onStreamLogs,
     required void Function(RpcClientIdentity) onRegisterClient,
+    required void Function(RpcMetric<RpcLogMetric>) onLog,
     required Future<bool> Function() onPing,
   })  : _onSendMetrics = onSendMetrics,
         _onTraceEvent = onTraceEvent,
@@ -249,6 +274,7 @@ class DiagnosticServerContract extends RpcDiagnosticServiceContract {
         _onStreamMetric = onStreamMetric,
         _onErrorMetric = onErrorMetric,
         _onResourceMetric = onResourceMetric,
+        _onLog = onLog,
         _onRegisterClient = onRegisterClient,
         _onPing = onPing;
 
@@ -298,5 +324,17 @@ class DiagnosticServerContract extends RpcDiagnosticServiceContract {
   Future<RpcBool> ping(RpcNull _) async {
     final result = await _onPing();
     return RpcBool(result);
+  }
+
+  @override
+  ClientStreamingBidiStream<RpcMetric<RpcLogMetric>, RpcNull> logs() {
+    return BidiStreamGenerator<RpcMetric<RpcLogMetric>, RpcNull>(
+      (userLogsStream) async* {
+        await for (final log in userLogsStream) {
+          _onLog(log);
+        }
+        yield RpcNull();
+      },
+    ).createClientStreaming();
   }
 }

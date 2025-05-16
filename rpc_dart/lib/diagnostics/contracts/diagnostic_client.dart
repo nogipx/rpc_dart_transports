@@ -489,4 +489,314 @@ class RpcDiagnosticClient {
     // Отключаем сбор метрик
     _enabled = false;
   }
+
+  /// Отправить метрику лога
+  Future<void> _reportLogMetric(RpcMetric<RpcLogMetric> metric) async {
+    if (!_enabled || !options.loggingEnabled) return;
+
+    // Проверка уровня логирования
+    if (metric.content.level.index < options.minLogLevel.index) {
+      return;
+    }
+
+    // Вывод в консоль, если включено
+    if (options.consoleLoggingEnabled) {
+      _logToConsole(metric.content);
+    }
+
+    // Проверяем семплирование
+    if (!_shouldSample()) return;
+
+    // Добавляем в буфер
+    _metricsBuffer.add(metric);
+
+    // Проверяем размер буфера
+    if (_metricsBuffer.length >= options.maxBufferSize) {
+      await flush();
+    }
+  }
+
+  /// Вывод лога в консоль с форматированием
+  void _logToConsole(RpcLogMetric log) {
+    final timestamp = DateTime.fromMillisecondsSinceEpoch(log.timestamp);
+    final formattedTime =
+        '${timestamp.hour}:${timestamp.minute}:${timestamp.second}';
+    final source = log.source;
+    final message = log.message;
+
+    String prefix;
+    switch (log.level) {
+      case RpcLogLevel.debug:
+        prefix = '🔍 DEBUG';
+      case RpcLogLevel.info:
+        prefix = '📝 INFO ';
+      case RpcLogLevel.warning:
+        prefix = '⚠️ WARN ';
+      case RpcLogLevel.error:
+        prefix = '❌ ERROR';
+      case RpcLogLevel.critical:
+        prefix = '🔥 CRIT ';
+      default:
+        prefix = '     ';
+    }
+
+    print('[$formattedTime] $prefix [$source] $message');
+
+    if (log.error != null) {
+      print('  Error details: ${log.error}');
+    }
+
+    if (log.stackTrace != null) {
+      print('  Stack trace: \n${log.stackTrace}');
+    }
+  }
+
+  /// Создает метрику лога
+  RpcMetric<RpcLogMetric> createLogMetric({
+    required RpcLogLevel level,
+    required String message,
+    required String source,
+    String? context,
+    String? requestId,
+    Map<String, dynamic>? error,
+    String? stackTrace,
+    Map<String, dynamic>? data,
+  }) {
+    final id = _idGenerator();
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    final logMetric = RpcLogMetric(
+      id: id,
+      traceId: clientIdentity.traceId,
+      timestamp: now,
+      level: level,
+      message: message,
+      source: source,
+      context: context,
+      requestId: requestId,
+      error: error,
+      stackTrace: stackTrace,
+      data: data,
+    );
+
+    return RpcMetric.log(
+      id: id,
+      timestamp: now,
+      clientId: clientIdentity.clientId,
+      content: logMetric,
+    );
+  }
+
+  /// Отправляет лог сообщение с указанным уровнем
+  Future<void> log({
+    required RpcLogLevel level,
+    required String message,
+    required String source,
+    String? context,
+    String? requestId,
+    Map<String, dynamic>? error,
+    String? stackTrace,
+    Map<String, dynamic>? data,
+  }) async {
+    final metric = createLogMetric(
+      level: level,
+      message: message,
+      source: source,
+      context: context,
+      requestId: requestId,
+      error: error,
+      stackTrace: stackTrace,
+      data: data,
+    );
+
+    await _reportLogMetric(metric);
+  }
+
+  /// Логирование с уровнем debug
+  Future<void> debug({
+    required String message,
+    required String source,
+    String? context,
+    String? requestId,
+    Map<String, dynamic>? data,
+  }) {
+    return log(
+      level: RpcLogLevel.debug,
+      message: message,
+      source: source,
+      context: context,
+      requestId: requestId,
+      data: data,
+    );
+  }
+
+  /// Логирование с уровнем info
+  Future<void> info({
+    required String message,
+    required String source,
+    String? context,
+    String? requestId,
+    Map<String, dynamic>? data,
+  }) {
+    return log(
+      level: RpcLogLevel.info,
+      message: message,
+      source: source,
+      context: context,
+      requestId: requestId,
+      data: data,
+    );
+  }
+
+  /// Логирование с уровнем warning
+  Future<void> warning({
+    required String message,
+    required String source,
+    String? context,
+    String? requestId,
+    Map<String, dynamic>? data,
+  }) {
+    return log(
+      level: RpcLogLevel.warning,
+      message: message,
+      source: source,
+      context: context,
+      requestId: requestId,
+      data: data,
+    );
+  }
+
+  /// Логирование с уровнем error
+  Future<void> error({
+    required String message,
+    required String source,
+    String? context,
+    String? requestId,
+    Map<String, dynamic>? error,
+    String? stackTrace,
+    Map<String, dynamic>? data,
+  }) {
+    return log(
+      level: RpcLogLevel.error,
+      message: message,
+      source: source,
+      context: context,
+      requestId: requestId,
+      error: error,
+      stackTrace: stackTrace,
+      data: data,
+    );
+  }
+
+  /// Логирование с уровнем critical
+  Future<void> critical({
+    required String message,
+    required String source,
+    String? context,
+    String? requestId,
+    Map<String, dynamic>? error,
+    String? stackTrace,
+    Map<String, dynamic>? data,
+  }) {
+    return log(
+      level: RpcLogLevel.critical,
+      message: message,
+      source: source,
+      context: context,
+      requestId: requestId,
+      error: error,
+      stackTrace: stackTrace,
+      data: data,
+    );
+  }
+
+  Future<void> reportLogMetric(RpcMetric<RpcLogMetric> metric) async {
+    await _reportLogMetric(metric);
+  }
+
+  /// Инициализация потока логов для отправки через client streaming
+  ///
+  /// Возвращает объект потока, в который можно отправлять логи.
+  /// Этот метод эффективнее, чем отправка отдельных логов через reportLogMetric,
+  /// особенно при высокой нагрузке или частом логировании.
+  ///
+  /// Пример использования:
+  /// ```dart
+  /// final logStream = diagnosticClient.createLogStream();
+  ///
+  /// // Отправка логов в поток
+  /// logStream.send(logMetric1);
+  /// logStream.send(logMetric2);
+  ///
+  /// // Завершение отправки и закрытие потока
+  /// await logStream.finishSending();
+  /// await logStream.close();
+  /// ```
+  ClientStreamingBidiStream<RpcMetric<RpcLogMetric>, RpcNull>
+      createLogStream() {
+    if (!_enabled || !options.loggingEnabled) {
+      throw RpcCustomException(
+        customMessage: 'Логирование отключено в настройках диагностики',
+        debugLabel: 'RpcDiagnosticClient.createLogStream',
+      );
+    }
+
+    // Получаем клиентский стриминг метод
+    final streamingMethod = _contract.logs();
+
+    // Вызываем метод call для получения ClientStreamingBidiStream
+    return streamingMethod;
+  }
+
+  /// Отправка серии логов через client streaming
+  ///
+  /// Принимает список логов для отправки одним потоком.
+  /// Это более эффективно, чем отправка каждого лога отдельно,
+  /// особенно при частом логировании.
+  Future<void> sendLogsInBatch(List<RpcMetric<RpcLogMetric>> logs) async {
+    if (!_enabled || !options.loggingEnabled || logs.isEmpty) {
+      return;
+    }
+
+    // Фильтруем логи по уровню перед отправкой
+    final filteredLogs = logs
+        .where((log) => log.content.level.index >= options.minLogLevel.index)
+        .toList();
+
+    if (filteredLogs.isEmpty) return;
+
+    // Выводим логи в консоль, если включено
+    if (options.consoleLoggingEnabled) {
+      for (final log in filteredLogs) {
+        _logToConsole(log.content);
+      }
+    }
+
+    // Проверяем семплирование
+    if (!_shouldSample()) return;
+
+    try {
+      // Получаем стрим для отправки логов
+      final logStream = createLogStream();
+
+      // Отправляем логи
+      for (final log in filteredLogs) {
+        logStream.send(log);
+      }
+
+      // Завершаем передачу и закрываем поток
+      await logStream.finishSending();
+      await logStream.close();
+    } catch (e) {
+      print('Ошибка при отправке логов через стриминг: $e');
+
+      // В случае ошибки добавляем логи в обычный буфер
+      _metricsBuffer.addAll(filteredLogs);
+
+      // Проверяем размер буфера
+      if (_metricsBuffer.length >= options.maxBufferSize) {
+        await flush();
+      }
+    }
+  }
 }

@@ -16,3 +16,6 @@ export 'models/diagnostic_options.dart';
 
 // Export service interface
 export 'contracts/diagnostic_service.dart';
+
+// Export logger
+export 'logging.dart';
