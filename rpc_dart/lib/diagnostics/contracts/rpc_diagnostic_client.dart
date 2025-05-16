@@ -81,7 +81,8 @@ class RpcDiagnosticClient {
         _isRegistered = true;
       } catch (e) {
         _isRegistered = false;
-        // Просто логируем ошибку и продолжаем работу
+        // Используем прямой вызов print для избежания рекурсии
+        // здесь мы не можем использовать RpcLog, т.к. он может вызвать эту функцию снова
         print('Failed to register diagnostic client: $e');
       }
     }
@@ -406,6 +407,8 @@ class RpcDiagnosticClient {
     } catch (e) {
       // В случае ошибки возвращаем метрики в буфер
       _metricsBuffer.addAll(metricsCopy);
+      // Используем прямой вызов print для избежания рекурсии
+      // здесь мы не можем использовать RpcLog, т.к. он может вызвать эту функцию снова
       print('Failed to flush metrics: $e');
     }
   }
@@ -536,6 +539,8 @@ class RpcDiagnosticClient {
         prefix = '     ';
     }
 
+    // Используем прямой вызов print, так как эта функция вызывается из RpcLog
+    // для избежания рекурсии
     print('[$formattedTime] $prefix [$source] $message');
 
     if (log.error != null) {
@@ -784,6 +789,8 @@ class RpcDiagnosticClient {
       await logStream.finishSending();
       await logStream.close();
     } catch (e) {
+      // Используем прямой вызов print для избежания рекурсии
+      // здесь мы не можем использовать RpcLog, т.к. он может вызвать эту функцию снова
       print('Ошибка при отправке логов через стриминг: $e');
 
       // В случае ошибки добавляем логи в обычный буфер

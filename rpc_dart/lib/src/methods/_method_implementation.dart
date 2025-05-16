@@ -159,17 +159,26 @@ final class RpcMethodImplementation<Request extends IRpcSerializableMessage,
         // Перенаправляем ответы из потока обработчика в выходной контроллер
         bidiStream.listen(
           (response) {
-            rpcMethodLogger
-                .debug('Обработчик отправил ответ: ${response.runtimeType}');
+            RpcLog.debug(
+              message: 'Обработчик отправил ответ: ${response.runtimeType}',
+              source: 'RpcMethodImplementation',
+            );
             outputController.add(response);
           },
           onError: (error, stackTrace) {
-            rpcMethodLogger.error(
-                'Ошибка в потоке обработчика', error, stackTrace);
+            RpcLog.error(
+              message: 'Ошибка в потоке обработчика',
+              source: 'RpcMethodImplementation',
+              error: {'error': error.toString()},
+              stackTrace: stackTrace.toString(),
+            );
             outputController.addError(error, stackTrace);
           },
           onDone: () {
-            rpcMethodLogger.debug('Поток обработчика завершен');
+            RpcLog.debug(
+              message: 'Поток обработчика завершен',
+              source: 'RpcMethodImplementation',
+            );
             outputController.close();
           },
         );
@@ -177,35 +186,51 @@ final class RpcMethodImplementation<Request extends IRpcSerializableMessage,
         // Подписываемся на входящий поток запросов и передаем запросы в bidiStream
         requestStream.listen(
           (request) {
-            rpcMethodLogger.debug(
-                'Получен запрос, отправляем в обработчик: ${request.runtimeType}');
+            RpcLog.debug(
+              message:
+                  'Получен запрос, отправляем в обработчик: ${request.runtimeType}',
+              source: 'RpcMethodImplementation',
+            );
             // Отправляем запрос в исходный bidiStream
             try {
               // Безопасно отправляем запрос в BidiStream
               final typedBidiStream = bidiStream;
               typedBidiStream.send(request);
             } catch (e, stackTrace) {
-              rpcMethodLogger.error(
-                  'Ошибка при отправке запроса в обработчик', e, stackTrace);
+              RpcLog.error(
+                message: 'Ошибка при отправке запроса в обработчик',
+                source: 'RpcMethodImplementation',
+                error: {'error': e.toString()},
+                stackTrace: stackTrace.toString(),
+              );
               outputController.addError(e, stackTrace);
             }
           },
           onError: (error, stackTrace) {
-            rpcMethodLogger.error(
-                'Ошибка во входящем потоке запросов', error, stackTrace);
+            RpcLog.error(
+              message: 'Ошибка во входящем потоке запросов',
+              source: 'RpcMethodImplementation',
+              error: {'error': error.toString()},
+              stackTrace: stackTrace.toString(),
+            );
             outputController.addError(error, stackTrace);
           },
           onDone: () {
             // При закрытии входящего потока закрываем bidiStream
-            rpcMethodLogger.debug(
-                'Входящий поток запросов завершен, закрываем обработчик');
+            RpcLog.debug(
+              message: 'Входящий поток запросов завершен, закрываем обработчик',
+              source: 'RpcMethodImplementation',
+            );
 
             try {
               // Аналогично, используем приведение типов
               final typedBidiStream = bidiStream;
               typedBidiStream.close();
             } catch (e) {
-              print('Ошибка при закрытии потока обработчика: $e');
+              RpcLog.error(
+                message: 'Ошибка при закрытии потока обработчика: $e',
+                source: 'RpcMethodImplementation',
+              );
               // Не закрываем outputController здесь, т.к. он закроется при завершении потока bidiStream
             }
           },
@@ -217,7 +242,10 @@ final class RpcMethodImplementation<Request extends IRpcSerializableMessage,
       // Создаем BidiStream с входящим потоком запросов
       return generator.create(incomingStream);
     } catch (e) {
-      print('Ошибка при обработке двунаправленного потока: $e');
+      RpcLog.error(
+        message: 'Ошибка при обработке двунаправленного потока: $e',
+        source: 'RpcMethodImplementation',
+      );
       // В случае ошибки создаем поток с ошибкой
       final errorGenerator =
           BidiStreamGenerator<Request, Response>((requestStream) async* {

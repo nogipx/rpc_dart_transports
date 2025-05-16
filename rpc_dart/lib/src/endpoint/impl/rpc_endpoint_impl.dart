@@ -248,7 +248,10 @@ class _RpcEndpointImpl<T extends IRpcSerializableMessage>
           );
         }
       } catch (e) {
-        print('Ошибка при регистрации метода $methodName: $e');
+        RpcLog.error(
+          message: 'Ошибка при регистрации метода $methodName: $e',
+          source: 'RpcEndpointImpl',
+        );
         continue;
       }
     }

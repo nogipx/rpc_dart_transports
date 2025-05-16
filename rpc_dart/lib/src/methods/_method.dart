@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 import 'dart:async';
+import 'package:rpc_dart/diagnostics.dart';
 import 'package:rpc_dart/rpc_dart.dart';
 
 part '_method_implementation.dart';
@@ -10,7 +11,6 @@ part 'bidirectional_streaming_method.dart';
 part 'client_streaming_method.dart';
 part 'server_streaming_method.dart';
 part 'unary_request_method.dart';
-part 'logger.dart';
 
 /// Базовый абстрактный класс для всех типов RPC методов
 abstract base class RpcMethod<T extends IRpcSerializableMessage> {

@@ -4,6 +4,7 @@
 
 import 'package:rpc_dart/rpc_dart.dart'
     show RpcMethodContext, SimpleRpcMiddleware, RpcDataDirection;
+import 'package:rpc_dart/diagnostics.dart' show RpcLog;
 
 /// Middleware для измерения времени выполнения RPC-вызовов
 class TimingMiddleware implements SimpleRpcMiddleware {
@@ -24,7 +25,10 @@ class TimingMiddleware implements SimpleRpcMiddleware {
     if (_onTiming != null) {
       _onTiming!(message, duration);
     } else {
-      print('$message: ${duration.inMilliseconds}ms');
+      RpcLog.info(
+        message: '$message: ${duration.inMilliseconds}ms',
+        source: 'TimingMiddleware',
+      );
     }
   }
 

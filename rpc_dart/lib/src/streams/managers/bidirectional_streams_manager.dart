@@ -93,7 +93,11 @@ class BidirectionalStreamsManager<Request extends IRpcSerializableMessage,
             final wrapper = _clientStreams[clientId];
             wrapper?.updateLastActivity();
           } catch (e) {
-            streamLogger.error('Ошибка при отправке ответа клиенту', e);
+            RpcLog.error(
+              message: 'Ошибка при отправке ответа клиенту',
+              source: 'BidirectionalStreamsManager',
+              error: {'error': e.toString()},
+            );
           }
         }
       },
@@ -102,14 +106,22 @@ class BidirectionalStreamsManager<Request extends IRpcSerializableMessage,
           try {
             clientOutputController.addError(error, stackTrace);
           } catch (e) {
-            streamLogger.error('Ошибка при передаче ошибки клиенту', e);
+            RpcLog.error(
+              message: 'Ошибка при передаче ошибки клиенту',
+              source: 'BidirectionalStreamsManager',
+              error: {'error': e.toString()},
+            );
           }
         }
       },
       onDone: () {
         if (!clientOutputController.isClosed) {
           clientOutputController.close().catchError((e) {
-            streamLogger.error('Ошибка при закрытии outputController', e);
+            RpcLog.error(
+              message: 'Ошибка при закрытии outputController',
+              source: 'BidirectionalStreamsManager',
+              error: {'error': e.toString()},
+            );
           });
         }
       },
@@ -140,7 +152,11 @@ class BidirectionalStreamsManager<Request extends IRpcSerializableMessage,
           onRequestReceived?.call(wrappedRequest);
         }
       } catch (e) {
-        streamLogger.error('Ошибка при отправке запроса', e);
+        RpcLog.error(
+          message: 'Ошибка при отправке запроса',
+          source: 'BidirectionalStreamsManager',
+          error: {'error': e.toString()},
+        );
       }
     }
 
@@ -149,7 +165,11 @@ class BidirectionalStreamsManager<Request extends IRpcSerializableMessage,
       try {
         await outputSubscription.cancel();
       } catch (e) {
-        streamLogger.error('Ошибка при отмене подписки', e);
+        RpcLog.error(
+          message: 'Ошибка при отмене подписки',
+          source: 'BidirectionalStreamsManager',
+          error: {'error': e.toString()},
+        );
       }
 
       try {
@@ -157,7 +177,11 @@ class BidirectionalStreamsManager<Request extends IRpcSerializableMessage,
           await clientInputController.close();
         }
       } catch (e) {
-        streamLogger.error('Ошибка при закрытии inputController', e);
+        RpcLog.error(
+          message: 'Ошибка при закрытии inputController',
+          source: 'BidirectionalStreamsManager',
+          error: {'error': e.toString()},
+        );
       }
 
       try {
@@ -165,7 +189,11 @@ class BidirectionalStreamsManager<Request extends IRpcSerializableMessage,
           await clientOutputController.close();
         }
       } catch (e) {
-        streamLogger.error('Ошибка при закрытии outputController', e);
+        RpcLog.error(
+          message: 'Ошибка при закрытии outputController',
+          source: 'BidirectionalStreamsManager',
+          error: {'error': e.toString()},
+        );
       }
 
       _clientStreams.remove(clientId);
@@ -219,7 +247,11 @@ class BidirectionalStreamsManager<Request extends IRpcSerializableMessage,
         // Обновляем время активности
         wrapper.updateLastActivity();
       } catch (e) {
-        streamLogger.error('Ошибка при отправке ответа клиенту $clientId', e);
+        RpcLog.error(
+          message: 'Ошибка при отправке ответа клиенту $clientId',
+          source: 'BidirectionalStreamsManager',
+          error: {'error': e.toString()},
+        );
       }
     }
   }
@@ -332,7 +364,11 @@ class BidirectionalStreamsManager<Request extends IRpcSerializableMessage,
         await _mainInputController.close();
       }
     } catch (e) {
-      streamLogger.error('Ошибка при закрытии _mainInputController', e);
+      RpcLog.error(
+        message: 'Ошибка при закрытии _mainInputController',
+        source: 'BidirectionalStreamsManager',
+        error: {'error': e.toString()},
+      );
     }
 
     try {
@@ -340,7 +376,11 @@ class BidirectionalStreamsManager<Request extends IRpcSerializableMessage,
         await _mainOutputController.close();
       }
     } catch (e) {
-      streamLogger.error('Ошибка при закрытии _mainOutputController', e);
+      RpcLog.error(
+        message: 'Ошибка при закрытии _mainOutputController',
+        source: 'BidirectionalStreamsManager',
+        error: {'error': e.toString()},
+      );
     }
   }
 }
@@ -387,7 +427,11 @@ class _EnhancedBidiStreamWrapper<Request extends IRpcSerializableMessage,
     try {
       await outputSubscription.cancel();
     } catch (e) {
-      streamLogger.error('Ошибка при отмене подписки', e);
+      RpcLog.error(
+        message: 'Ошибка при отмене подписки',
+        source: 'BidirectionalStreamsManager',
+        error: {'error': e.toString()},
+      );
     }
 
     try {
@@ -395,7 +439,11 @@ class _EnhancedBidiStreamWrapper<Request extends IRpcSerializableMessage,
         await inputController.close();
       }
     } catch (e) {
-      streamLogger.error('Ошибка при закрытии inputController', e);
+      RpcLog.error(
+        message: 'Ошибка при закрытии inputController',
+        source: 'BidirectionalStreamsManager',
+        error: {'error': e.toString()},
+      );
     }
 
     try {
@@ -403,7 +451,11 @@ class _EnhancedBidiStreamWrapper<Request extends IRpcSerializableMessage,
         await outputController.close();
       }
     } catch (e) {
-      streamLogger.error('Ошибка при закрытии outputController', e);
+      RpcLog.error(
+        message: 'Ошибка при закрытии outputController',
+        source: 'BidirectionalStreamsManager',
+        error: {'error': e.toString()},
+      );
     }
   }
 }

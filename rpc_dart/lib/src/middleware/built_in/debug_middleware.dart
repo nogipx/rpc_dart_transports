@@ -4,6 +4,7 @@
 
 import 'dart:async';
 import 'package:rpc_dart/rpc_dart.dart';
+import 'package:rpc_dart/diagnostics.dart' show RpcLog;
 
 /// Middleware для отладки RPC-вызовов
 ///
@@ -28,7 +29,14 @@ class DebugMiddleware implements IRpcMiddleware {
   /// Внутренний метод для логирования
   void _log(String message) {
     final logMessage = 'DebugMiddleware[$id]: \n$message';
-    _logger != null ? _logger!(logMessage) : print(logMessage);
+    if (_logger != null) {
+      _logger!(logMessage);
+    } else {
+      RpcLog.debug(
+        message: logMessage,
+        source: 'DebugMiddleware',
+      );
+    }
   }
 
   @override

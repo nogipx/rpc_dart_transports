@@ -7,6 +7,7 @@ import 'dart:collection';
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:rpc_dart/diagnostics/logging.dart';
 import 'package:rpc_dart/rpc_dart.dart';
 
 part 'impl/i_rpc_endpoint_core.dart';

@@ -70,7 +70,11 @@ class ServerStreamsManager<ResponseType extends IRpcSerializableMessage> {
             final wrapper = _clientStreams[clientId];
             wrapper?.updateLastActivity();
           } catch (e) {
-            streamLogger.error('Ошибка при отправке данных клиенту', e);
+            RpcLog.error(
+              message: 'Ошибка при отправке данных клиенту',
+              source: 'ServerStreamsManager',
+              error: {'error': e.toString()},
+            );
           }
         }
       },
@@ -79,15 +83,22 @@ class ServerStreamsManager<ResponseType extends IRpcSerializableMessage> {
           try {
             clientController.addError(error, stackTrace);
           } catch (e) {
-            streamLogger.error('Ошибка при передаче ошибки клиенту', e);
+            RpcLog.error(
+              message: 'Ошибка при передаче ошибки клиенту',
+              source: 'ServerStreamsManager',
+              error: {'error': e.toString()},
+            );
           }
         }
       },
       onDone: () {
         if (!clientController.isClosed) {
           clientController.close().catchError((e) {
-            streamLogger.error(
-                'Ошибка при закрытии клиентского контроллера', e);
+            RpcLog.error(
+              message: 'Ошибка при закрытии клиентского контроллера',
+              source: 'ServerStreamsManager',
+              error: {'error': e.toString()},
+            );
           });
         }
       },
@@ -96,8 +107,10 @@ class ServerStreamsManager<ResponseType extends IRpcSerializableMessage> {
     // Функция обработки запросов от клиента
     void sendFunction(RequestType request) {
       // Логируем получение запроса от клиента
-      streamLogger
-          .debug('Получен запрос от клиента $clientId: ${request.runtimeType}');
+      RpcLog.debug(
+        message: 'Получен запрос от клиента $clientId: ${request.runtimeType}',
+        source: 'ServerStreamsManager',
+      );
 
       // Больше не отправляем запросы клиента в основной контроллер
       // Клиенты не могут общаться напрямую, это серверный стриминг
@@ -148,7 +161,11 @@ class ServerStreamsManager<ResponseType extends IRpcSerializableMessage> {
         // Обновляем время последней активности
         wrapper.updateLastActivity();
       } catch (e) {
-        streamLogger.error('Ошибка при публикации данных клиенту $clientId', e);
+        RpcLog.error(
+          message: 'Ошибка при публикации данных клиенту $clientId',
+          source: 'ServerStreamsManager',
+          error: {'error': e.toString()},
+        );
       }
     }
   }
@@ -236,7 +253,11 @@ class ServerStreamsManager<ResponseType extends IRpcSerializableMessage> {
         await _mainController.close();
       }
     } catch (e) {
-      streamLogger.error('Ошибка при закрытии основного контроллера', e);
+      RpcLog.error(
+        message: 'Ошибка при закрытии основного контроллера',
+        source: 'ServerStreamsManager',
+        error: {'error': e.toString()},
+      );
     }
   }
 }
@@ -278,7 +299,11 @@ class _ClientStreamWrapper<ResponseType extends IRpcSerializableMessage> {
     try {
       await subscription.cancel();
     } catch (e) {
-      streamLogger.error('Ошибка при отмене подписки', e);
+      RpcLog.error(
+        message: 'Ошибка при отмене подписки',
+        source: 'ServerStreamsManager',
+        error: {'error': e.toString()},
+      );
     }
 
     try {
@@ -286,7 +311,11 @@ class _ClientStreamWrapper<ResponseType extends IRpcSerializableMessage> {
         await controller.close();
       }
     } catch (e) {
-      streamLogger.error('Ошибка при закрытии контроллера', e);
+      RpcLog.error(
+        message: 'Ошибка при закрытии контроллера',
+        source: 'ServerStreamsManager',
+        error: {'error': e.toString()},
+      );
     }
   }
 }

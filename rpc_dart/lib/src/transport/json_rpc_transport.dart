@@ -5,10 +5,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
-import 'package:rpc_dart/src/message/message.dart';
-import 'package:rpc_dart/src/message/message_types.dart';
-
-import '_index.dart';
+import 'package:rpc_dart/rpc_dart.dart';
+import 'package:rpc_dart/diagnostics.dart' show RpcLog;
 
 /// Коды ошибок JSON-RPC 2.0
 class JsonRpcErrorCode {
@@ -69,7 +67,10 @@ class JsonRpcTransport implements RpcTransport {
   /// Логирует сообщения, если включен режим отладки
   void _log(String message) {
     if (_debug) {
-      print('[JsonRpcTransport:$id] $message');
+      RpcLog.debug(
+        message: message,
+        source: 'JsonRpcTransport[$id]',
+      );
     }
   }
 

@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import '_serializer.dart';
 import 'msgpack/msgpack.dart' as msgpack;
 import '../contracts/_contract.dart' show IRpcSerializableMessage;
+import 'package:rpc_dart/diagnostics.dart' show RpcLog;
 
 /// Реализация сериализатора, использующего MessagePack
 /// MessagePack - это бинарный формат сериализации, более компактный чем JSON
@@ -32,7 +33,10 @@ class MsgPackSerializer implements RpcSerializer {
     try {
       return msgpack.serialize(prepared);
     } catch (e) {
-      print('MsgPackSerializer: ошибка при сериализации: $e');
+      RpcLog.error(
+        message: 'MsgPackSerializer: ошибка при сериализации: $e',
+        source: 'MsgPackSerializer',
+      );
       rethrow;
     }
   }
@@ -108,7 +112,10 @@ class MsgPackSerializer implements RpcSerializer {
 
       return processedResult;
     } catch (e) {
-      print('MsgPackSerializer: ошибка при десериализации = $e');
+      RpcLog.error(
+        message: 'MsgPackSerializer: ошибка при десериализации: $e',
+        source: 'MsgPackSerializer',
+      );
       rethrow;
     }
   }
