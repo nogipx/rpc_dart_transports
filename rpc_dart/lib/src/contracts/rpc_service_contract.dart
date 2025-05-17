@@ -26,9 +26,6 @@ abstract class RpcServiceContract
     IRpcMethodRegistry? methodRegistry,
   }) : _methodRegistry = methodRegistry ?? RpcMethodRegistry();
 
-  /// Получает реестр методов, используемый данным контрактом
-  IRpcMethodRegistry get methodRegistry => _methodRegistry;
-
   /// Объединяет реестр методов этого контракта с реестром другого контракта или эндпоинта
   ///
   /// Переносит все методы и контракты из текущего реестра в целевой

@@ -8,7 +8,7 @@ part of '../_index.dart';
 ///
 /// Этот класс является внутренней реализацией и не должен использоваться напрямую.
 /// Для публичного API используйте [RpcEndpoint].
-final class _RpcEngine implements IRpcEngine {
+final class _RpcEngineImpl implements IRpcEngine {
   /// Транспорт для отправки/получения сообщений
   final IRpcTransport _transport;
   @override
@@ -21,6 +21,8 @@ final class _RpcEngine implements IRpcEngine {
 
   /// Реестр методов
   final IRpcMethodRegistry _registry;
+  @override
+  IRpcMethodRegistry get registry => _registry;
 
   /// Метка для отладки
   final String? debugLabel;
@@ -45,13 +47,15 @@ final class _RpcEngine implements IRpcEngine {
   /// [transport] - транспорт для обмена сообщениями
   /// [serializer] - сериализатор для преобразования сообщений
   /// [debugLabel] - опциональная метка для отладки и логирования
-  _RpcEngine(
-    this._transport,
-    this._serializer, {
+  _RpcEngineImpl({
+    required IRpcTransport transport,
+    required IRpcSerializer serializer,
+    required IRpcMethodRegistry registry,
     this.debugLabel,
     RpcUniqueIdGenerator? uniqueIdGenerator,
-    required IRpcMethodRegistry registry,
-  }) : _registry = registry {
+  })  : _transport = transport,
+        _serializer = serializer,
+        _registry = registry {
     _uniqueIdGenerator = uniqueIdGenerator ?? _defaultUniqueIdGenerator;
     _initialize();
   }

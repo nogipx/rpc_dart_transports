@@ -5,19 +5,12 @@
 part of '../_index.dart';
 
 /// Типизированный Endpoint с поддержкой контрактов
-final class _RpcEndpointRegistryImpl
+final class _RpcEndpointImpl
     implements IRpcEngine, IRpcEndpoint, IRpcMethodRegistry {
   /// Делегат для базовой функциональности
-  final IRpcEngine _delegate;
+  final IRpcEngine _engine;
 
-  final IRpcMethodRegistry _methodRegistry;
-
-  /// Зарегистрированные контракты сервисов
-  final Map<String, IRpcServiceContract<IRpcSerializableMessage>> _contracts =
-      {};
-
-  /// Зарегистрированные реализации методов
-  final Map<String, Map<String, RpcMethodImplementation>> _implementations = {};
+  final IRpcMethodRegistry _registry;
 
   /// Логгер
   RpcLogger get _logger => RpcLogger('RpcEndpoint[${debugLabel ?? ''}]');
@@ -27,40 +20,39 @@ final class _RpcEndpointRegistryImpl
   final String? debugLabel;
 
   /// Создает новый типизированный Endpoint
-  _RpcEndpointRegistryImpl({
+  _RpcEndpointImpl({
     required IRpcTransport transport,
     required IRpcSerializer serializer,
+    required IRpcMethodRegistry methodRegistry,
     this.debugLabel,
     RpcUniqueIdGenerator? uniqueIdGenerator,
-    required IRpcMethodRegistry methodRegistry,
-  })  : _delegate = _RpcEngine(
-          transport,
-          serializer,
+  })  : _engine = _RpcEngineImpl(
+          transport: transport,
+          serializer: serializer,
+          registry: methodRegistry,
           debugLabel: debugLabel,
           uniqueIdGenerator: uniqueIdGenerator,
-          registry: methodRegistry,
         ),
-        _methodRegistry = methodRegistry;
+        _registry = methodRegistry;
 
   @override
-  IRpcTransport get transport => _delegate.transport;
+  IRpcTransport get transport => _engine.transport;
 
   @override
-  IRpcSerializer get serializer => _delegate.serializer;
+  IRpcSerializer get serializer => _engine.serializer;
 
   @override
-  IRpcMethodRegistry get registry => _methodRegistry;
+  IRpcMethodRegistry get registry => _registry;
 
   @override
   void addMiddleware(IRpcMiddleware middleware) =>
-      _delegate.addMiddleware(middleware);
+      _engine.addMiddleware(middleware);
 
   @override
-  String generateUniqueId([String? prefix]) =>
-      _delegate.generateUniqueId(prefix);
+  String generateUniqueId([String? prefix]) => _engine.generateUniqueId(prefix);
 
   @override
-  Future<void> close() => _delegate.close();
+  Future<void> close() => _engine.close();
 
   @override
   Future<void> closeStream({
@@ -69,7 +61,7 @@ final class _RpcEndpointRegistryImpl
     String? serviceName,
     String? methodName,
   }) =>
-      _delegate.closeStream(
+      _engine.closeStream(
         streamId: streamId,
         metadata: metadata,
         serviceName: serviceName,
@@ -84,7 +76,7 @@ final class _RpcEndpointRegistryImpl
     Duration? timeout,
     Map<String, dynamic>? metadata,
   }) =>
-      _delegate.invoke(
+      _engine.invoke(
         serviceName: serviceName,
         methodName: methodName,
         request: request,
@@ -93,7 +85,7 @@ final class _RpcEndpointRegistryImpl
       );
 
   @override
-  bool get isActive => _delegate.isActive;
+  bool get isActive => _engine.isActive;
 
   @override
   Stream<dynamic> openStream({
@@ -103,7 +95,7 @@ final class _RpcEndpointRegistryImpl
     Map<String, dynamic>? metadata,
     String? streamId,
   }) =>
-      _delegate.openStream(
+      _engine.openStream(
         serviceName: serviceName,
         methodName: methodName,
         request: request,
@@ -117,9 +109,11 @@ final class _RpcEndpointRegistryImpl
     required String methodName,
     required RpcMethodImplementation implementation,
   }) {
-    _implementations
-        .putIfAbsent(serviceName, () => {})
-        .putIfAbsent(methodName, () => implementation);
+    _registry.registerMethodImplementation(
+      serviceName: serviceName,
+      methodName: methodName,
+      implementation: implementation,
+    );
   }
 
   @override
@@ -130,7 +124,7 @@ final class _RpcEndpointRegistryImpl
     String? serviceName,
     String? methodName,
   }) =>
-      _delegate.sendStreamData(
+      _engine.sendStreamData(
         streamId: streamId,
         data: data,
         metadata: metadata,
@@ -146,7 +140,7 @@ final class _RpcEndpointRegistryImpl
     String? serviceName,
     String? methodName,
   }) =>
-      _delegate.sendStreamError(
+      _engine.sendStreamError(
         streamId: streamId,
         errorMessage: errorMessage,
         metadata: metadata,
@@ -159,7 +153,7 @@ final class _RpcEndpointRegistryImpl
     IRpcServiceContract<IRpcSerializableMessage> contract,
   ) {
     // Проверяем, не зарегистрирован ли уже контракт с таким именем
-    if (_contracts.containsKey(contract.serviceName)) {
+    if (_registry.getServiceContract(contract.serviceName) != null) {
       throw RpcInternalException(
         'Контракт для сервиса ${contract.serviceName} уже зарегистрирован',
       );
@@ -172,13 +166,12 @@ final class _RpcEndpointRegistryImpl
   void _registerContract(
     IRpcServiceContract<IRpcSerializableMessage> contract,
   ) {
-    _contracts[contract.serviceName] = contract;
-    _implementations.putIfAbsent(contract.serviceName, () => {});
+    _registry.registerContract(contract);
 
     // Если это RpcServiceContract, используем объединение реестров
     if (contract is RpcServiceContract) {
       // Объединяем реестр контракта с реестром эндпоинта
-      contract.mergeInto(_methodRegistry);
+      contract.mergeInto(_registry);
     } else {
       // Для старых типов контрактов используем прежнюю логику
       contract.setup();
@@ -186,7 +179,7 @@ final class _RpcEndpointRegistryImpl
       // Регистрируем все подконтракты, если они есть
       if (contract is RpcServiceContract) {
         for (final subContract in contract.getSubContracts()) {
-          if (!_contracts.containsKey(subContract.serviceName)) {
+          if (_registry.getServiceContract(subContract.serviceName) == null) {
             // Рекурсивно регистрируем подконтракт (только если он еще не зарегистрирован)
             _registerContract(subContract);
           }
@@ -196,7 +189,7 @@ final class _RpcEndpointRegistryImpl
 
     // Проверяем методы в реестре эндпоинта для этого сервиса
     final registeredMethods =
-        _methodRegistry.getMethodsForService(contract.serviceName);
+        _registry.getMethodsForService(contract.serviceName);
 
     // Для каждого метода создаем реализацию
     for (final method in registeredMethods) {
@@ -297,7 +290,7 @@ final class _RpcEndpointRegistryImpl
   IRpcServiceContract<IRpcSerializableMessage>? getServiceContract(
     String serviceName,
   ) {
-    return _contracts[serviceName];
+    return _registry.getServiceContract(serviceName);
   }
 
   /// Создает объект унарного метода для указанного сервиса и метода
@@ -339,32 +332,32 @@ final class _RpcEndpointRegistryImpl
 
   @override
   void clearMethodsRegistry() {
-    _methodRegistry.clearMethodsRegistry();
+    _registry.clearMethodsRegistry();
   }
 
   @override
   MethodRegistration? findMethod(String serviceName, String methodName) {
-    return _methodRegistry.findMethod(serviceName, methodName);
+    return _registry.findMethod(serviceName, methodName);
   }
 
   @override
   Map<String, IRpcServiceContract<IRpcSerializableMessage>> getAllContracts() {
-    return _methodRegistry.getAllContracts();
+    return _registry.getAllContracts();
   }
 
   @override
   Iterable<MethodRegistration> getAllMethods() {
-    return _methodRegistry.getAllMethods();
+    return _registry.getAllMethods();
   }
 
   @override
   Iterable<MethodRegistration> getMethodsForService(String serviceName) {
-    return _methodRegistry.getMethodsForService(serviceName);
+    return _registry.getMethodsForService(serviceName);
   }
 
   @override
   void registerContract(IRpcServiceContract<IRpcSerializableMessage> contract) {
-    _methodRegistry.registerContract(contract);
+    _registry.registerContract(contract);
   }
 
   @override
@@ -377,7 +370,7 @@ final class _RpcEndpointRegistryImpl
     Function? responseParser,
   }) {
     // Регистрируем метод в реестре методов
-    _methodRegistry.registerMethod(
+    _registry.registerMethod(
       serviceName: serviceName,
       methodName: methodName,
       methodType: methodType,

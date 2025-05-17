@@ -10,8 +10,8 @@ import 'dart:typed_data';
 import 'package:rpc_dart/rpc_dart.dart';
 
 part 'impl/method_context.dart';
-part 'impl/rpc_engine.dart';
-part 'impl/rpc_endpoint_registry_impl.dart';
+part 'impl/rpc_engine_impl.dart';
+part 'impl/rpc_endpoint_impl.dart';
 part 'impl/rpc_method_registry.dart';
 
 part 'interfaces/i_rpc_engine.dart';

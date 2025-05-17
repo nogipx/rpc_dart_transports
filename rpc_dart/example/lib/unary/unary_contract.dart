@@ -29,21 +29,6 @@ abstract base class BasicServiceContract extends RpcServiceContract {
       '  • RespParser: ${getMethodResponseParser<ComputeResult>("compute") != null ? 'Есть' : 'Нет!'}',
     );
 
-    // Диагностика реестра внутри контракта
-    final registration = methodRegistry.findMethod(serviceName, 'compute');
-    if (registration != null) {
-      print('\nВ реестре контракта:');
-      print('  • Handler: ${registration.handler != null ? 'Есть' : 'Нет!'}');
-      print(
-        '  • ArgParser: ${registration.argumentParser != null ? 'Есть' : 'Нет!'}',
-      );
-      print(
-        '  • RespParser: ${registration.responseParser != null ? 'Есть' : 'Нет!'}',
-      );
-    } else {
-      print('\nМетод compute не найден в реестре контракта!');
-    }
-
     super.setup();
   }
 

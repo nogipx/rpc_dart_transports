@@ -15,6 +15,9 @@ abstract interface class IRpcEngine {
   /// Сериализатор для преобразования сообщений
   IRpcSerializer get serializer;
 
+  /// Реестр методов
+  IRpcMethodRegistry get registry;
+
   /// Добавляет middleware для обработки запросов и ответов
   void addMiddleware(IRpcMiddleware middleware);
 

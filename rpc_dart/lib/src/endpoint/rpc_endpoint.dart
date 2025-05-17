@@ -5,8 +5,7 @@
 part of '_index.dart';
 
 /// Типизированный RPC эндпоинт
-base class RpcEndpoint extends _RpcEndpointRegistryImpl
-    implements IRpcEndpoint {
+base class RpcEndpoint extends _RpcEndpointImpl implements IRpcEndpoint {
   /// Создаёт новый типизированный RPC эндпоинт
   ///
   /// [transport] - транспорт для обмена сообщениями
