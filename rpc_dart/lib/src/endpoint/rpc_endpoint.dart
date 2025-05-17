@@ -21,6 +21,5 @@ class RpcEndpoint<T extends IRpcSerializableMessage> extends _RpcEndpointImpl<T>
   });
 
   @override
-  String toString() =>
-      'RpcEndpoint${debugLabel != null ? "($debugLabel)" : ""}';
+  String toString() => 'RpcEndpoint[${debugLabel ?? ''}]';
 }

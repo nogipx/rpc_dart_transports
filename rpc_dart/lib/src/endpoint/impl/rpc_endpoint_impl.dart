@@ -24,6 +24,9 @@ class _RpcEndpointImpl<T extends IRpcSerializableMessage>
   /// Зарегистрированные реализации методов
   final Map<String, Map<String, RpcMethodImplementation>> _implementations = {};
 
+  /// Логгер
+  RpcLogger get _logger => RpcLogger('RpcEndpoint[${debugLabel ?? ''}]');
+
   /// Метка для отладки
   @override
   final String? debugLabel;
@@ -247,10 +250,11 @@ class _RpcEndpointImpl<T extends IRpcSerializableMessage>
             responseParser: responseParser,
           );
         }
-      } catch (e) {
-        RpcLog.error(
-          message: 'Ошибка при регистрации метода $methodName: $e',
-          source: 'RpcEndpointImpl',
+      } catch (error, trace) {
+        _logger.error(
+          'Ошибка при регистрации метода $methodName: $error',
+          error: error,
+          stackTrace: trace,
         );
         continue;
       }

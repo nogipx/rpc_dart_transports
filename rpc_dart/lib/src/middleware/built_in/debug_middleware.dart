@@ -4,7 +4,6 @@
 
 import 'dart:async';
 import 'package:rpc_dart/rpc_dart.dart';
-import 'package:rpc_dart/diagnostics.dart' show RpcLog;
 
 /// Middleware для отладки RPC-вызовов
 ///
@@ -15,7 +14,7 @@ class DebugMiddleware implements IRpcMiddleware {
   final String id;
 
   /// Функция для логирования
-  final void Function(String message)? _logger;
+  final RpcLogger _logger;
 
   /// Создает middleware для отладки
   ///
@@ -23,20 +22,13 @@ class DebugMiddleware implements IRpcMiddleware {
   /// [logger] - опциональная функция для логирования, по умолчанию print
   DebugMiddleware({
     this.id = 'default',
-    void Function(String message)? logger,
+    required RpcLogger logger,
   }) : _logger = logger;
 
   /// Внутренний метод для логирования
   void _log(String message) {
     final logMessage = 'DebugMiddleware[$id]: \n$message';
-    if (_logger != null) {
-      _logger!(logMessage);
-    } else {
-      RpcLog.debug(
-        message: logMessage,
-        source: 'DebugMiddleware',
-      );
-    }
+    _logger.debug(logMessage);
   }
 
   @override
@@ -150,7 +142,7 @@ class DebugWithTimingMiddleware extends DebugMiddleware {
   /// Создает middleware для отладки с замером времени
   DebugWithTimingMiddleware({
     super.id = 'timing',
-    super.logger,
+    required super.logger,
   });
 
   @override

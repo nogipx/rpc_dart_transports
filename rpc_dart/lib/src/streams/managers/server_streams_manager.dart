@@ -20,11 +20,23 @@ class ServerStreamsManager<ResponseType extends IRpcSerializableMessage> {
   // Хранилище активных клиентских стримов
   final _clientStreams = <String, _ClientStreamWrapper<ResponseType>>{};
 
+  // Логгер для отладки и диагностики
+  final RpcLogger _logger;
+
+  // Диагностический клиент (доступен через геттер)
+  IRpcDiagnosticClient? get _diagnostic => _logger.diagnostic;
+
   // Счетчик для генерации клиентских ID
   int _streamCounter = 0;
 
   // Флаг закрытия менеджера
   bool _isDisposed = false;
+
+  /// Создает новый ServerStreamsManager
+  ///
+  /// [logger] - логгер для отладки и диагностики (по умолчанию создаётся с именем 'streams.server_manager')
+  ServerStreamsManager({RpcLogger? logger})
+      : _logger = logger ?? RpcLogger('streams.server_manager');
 
   /// Публикация данных во все активные стримы
   ///
@@ -40,6 +52,17 @@ class ServerStreamsManager<ResponseType extends IRpcSerializableMessage> {
       metadata: metadata,
     );
     _mainController.add(wrappedEvent);
+
+    // Отправляем метрику о публикации, если есть диагностика
+    _diagnostic?.reportStreamMetric(
+      _diagnostic!.createStreamMetric(
+        eventType: RpcStreamEventType.messageSent,
+        streamId: 'broadcast',
+        direction: RpcStreamDirection.serverToClient,
+        method: 'server.broadcast',
+        dataSize: event.toString().length,
+      ),
+    );
   }
 
   /// Создание нового стрима для клиента
@@ -69,11 +92,11 @@ class ServerStreamsManager<ResponseType extends IRpcSerializableMessage> {
             // Обновляем время активности
             final wrapper = _clientStreams[clientId];
             wrapper?.updateLastActivity();
-          } catch (e) {
-            RpcLog.error(
-              message: 'Ошибка при отправке данных клиенту',
-              source: 'ServerStreamsManager',
-              error: {'error': e.toString()},
+          } catch (e, stackTrace) {
+            _logger.error(
+              'Ошибка при отправке данных клиенту',
+              error: e,
+              stackTrace: stackTrace,
             );
           }
         }
@@ -82,22 +105,22 @@ class ServerStreamsManager<ResponseType extends IRpcSerializableMessage> {
         if (!clientController.isClosed) {
           try {
             clientController.addError(error, stackTrace);
-          } catch (e) {
-            RpcLog.error(
-              message: 'Ошибка при передаче ошибки клиенту',
-              source: 'ServerStreamsManager',
-              error: {'error': e.toString()},
+          } catch (e, stackTrace) {
+            _logger.error(
+              'Ошибка при передаче ошибки клиенту',
+              error: e,
+              stackTrace: stackTrace,
             );
           }
         }
       },
       onDone: () {
         if (!clientController.isClosed) {
-          clientController.close().catchError((e) {
-            RpcLog.error(
-              message: 'Ошибка при закрытии клиентского контроллера',
-              source: 'ServerStreamsManager',
-              error: {'error': e.toString()},
+          clientController.close().catchError((e, stackTrace) {
+            _logger.error(
+              'Ошибка при закрытии клиентского контроллера',
+              error: e,
+              stackTrace: stackTrace,
             );
           });
         }
@@ -107,9 +130,8 @@ class ServerStreamsManager<ResponseType extends IRpcSerializableMessage> {
     // Функция обработки запросов от клиента
     void sendFunction(RequestType request) {
       // Логируем получение запроса от клиента
-      RpcLog.debug(
-        message: 'Получен запрос от клиента $clientId: ${request.runtimeType}',
-        source: 'ServerStreamsManager',
+      _logger.debug(
+        'Получен запрос от клиента $clientId: ${request.runtimeType}',
       );
 
       // Больше не отправляем запросы клиента в основной контроллер
@@ -118,6 +140,17 @@ class ServerStreamsManager<ResponseType extends IRpcSerializableMessage> {
       // Только обновляем время последней активности
       final wrapper = _clientStreams[clientId];
       wrapper?.updateLastActivity();
+
+      // Отправляем метрику о получении запроса, если есть диагностика
+      _diagnostic?.reportStreamMetric(
+        _diagnostic!.createStreamMetric(
+          eventType: RpcStreamEventType.messageReceived,
+          streamId: clientId,
+          direction: RpcStreamDirection.clientToServer,
+          method: 'server.client_request',
+          dataSize: request.toString().length,
+        ),
+      );
     }
 
     // Сохраняем информацию о клиентском стриме
@@ -126,6 +159,7 @@ class ServerStreamsManager<ResponseType extends IRpcSerializableMessage> {
       subscription: subscription,
       clientId: clientId,
       createdAt: DateTime.now(),
+      logger: RpcLogger('${_logger.name}.wrapper.$clientId'),
     );
 
     // Создаем и возвращаем обертку с расширенным API
@@ -160,11 +194,22 @@ class ServerStreamsManager<ResponseType extends IRpcSerializableMessage> {
 
         // Обновляем время последней активности
         wrapper.updateLastActivity();
-      } catch (e) {
-        RpcLog.error(
-          message: 'Ошибка при публикации данных клиенту $clientId',
-          source: 'ServerStreamsManager',
-          error: {'error': e.toString()},
+
+        // Отправляем метрику об отправке сообщения клиенту, если есть диагностика
+        _diagnostic?.reportStreamMetric(
+          _diagnostic!.createStreamMetric(
+            eventType: RpcStreamEventType.messageSent,
+            streamId: clientId,
+            direction: RpcStreamDirection.serverToClient,
+            method: 'server.client_response',
+            dataSize: event.toString().length,
+          ),
+        );
+      } catch (e, stackTrace) {
+        _logger.error(
+          'Ошибка при публикации данных клиенту $clientId',
+          error: e,
+          stackTrace: stackTrace,
         );
       }
     }
@@ -252,11 +297,11 @@ class ServerStreamsManager<ResponseType extends IRpcSerializableMessage> {
       if (!_mainController.isClosed) {
         await _mainController.close();
       }
-    } catch (e) {
-      RpcLog.error(
-        message: 'Ошибка при закрытии основного контроллера',
-        source: 'ServerStreamsManager',
-        error: {'error': e.toString()},
+    } catch (e, stackTrace) {
+      _logger.error(
+        'Ошибка при закрытии основного контроллера',
+        error: e,
+        stackTrace: stackTrace,
       );
     }
   }
@@ -269,6 +314,9 @@ class _ClientStreamWrapper<ResponseType extends IRpcSerializableMessage> {
   final String clientId;
   final DateTime createdAt;
 
+  // Логгер для отладки
+  final RpcLogger _logger;
+
   /// Время последней активности клиента
   DateTime lastActivity;
 
@@ -277,7 +325,9 @@ class _ClientStreamWrapper<ResponseType extends IRpcSerializableMessage> {
     required this.subscription,
     required this.clientId,
     required this.createdAt,
-  }) : lastActivity = DateTime.now();
+    RpcLogger? logger,
+  })  : _logger = logger ?? RpcLogger('streams.server_wrapper.$clientId'),
+        lastActivity = DateTime.now();
 
   /// Обновляет время последней активности
   void updateLastActivity() {
@@ -298,11 +348,11 @@ class _ClientStreamWrapper<ResponseType extends IRpcSerializableMessage> {
   Future<void> dispose() async {
     try {
       await subscription.cancel();
-    } catch (e) {
-      RpcLog.error(
-        message: 'Ошибка при отмене подписки',
-        source: 'ServerStreamsManager',
-        error: {'error': e.toString()},
+    } catch (e, stackTrace) {
+      _logger.error(
+        'Ошибка при отмене подписки',
+        error: e,
+        stackTrace: stackTrace,
       );
     }
 
@@ -310,11 +360,11 @@ class _ClientStreamWrapper<ResponseType extends IRpcSerializableMessage> {
       if (!controller.isClosed) {
         await controller.close();
       }
-    } catch (e) {
-      RpcLog.error(
-        message: 'Ошибка при закрытии контроллера',
-        source: 'ServerStreamsManager',
-        error: {'error': e.toString()},
+    } catch (e, stackTrace) {
+      _logger.error(
+        'Ошибка при закрытии контроллера',
+        error: e,
+        stackTrace: stackTrace,
       );
     }
   }

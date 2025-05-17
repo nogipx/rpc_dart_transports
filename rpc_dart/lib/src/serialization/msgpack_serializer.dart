@@ -3,10 +3,13 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 import 'dart:typed_data';
+import 'package:rpc_dart/logger.dart';
+
 import '_serializer.dart';
 import 'msgpack/msgpack.dart' as msgpack;
 import '../contracts/_contract.dart' show IRpcSerializableMessage;
-import 'package:rpc_dart/diagnostics.dart' show RpcLog;
+
+final RpcLogger _logger = RpcLogger('MsgPackSerializer');
 
 /// Реализация сериализатора, использующего MessagePack
 /// MessagePack - это бинарный формат сериализации, более компактный чем JSON
@@ -32,10 +35,11 @@ class MsgPackSerializer implements RpcSerializer {
     // Сериализуем подготовленный объект
     try {
       return msgpack.serialize(prepared);
-    } catch (e) {
-      RpcLog.error(
-        message: 'MsgPackSerializer: ошибка при сериализации: $e',
-        source: 'MsgPackSerializer',
+    } catch (e, stackTrace) {
+      _logger.error(
+        'MsgPackSerializer: ошибка при сериализации: $e',
+        error: e,
+        stackTrace: stackTrace,
       );
       rethrow;
     }
@@ -111,10 +115,11 @@ class MsgPackSerializer implements RpcSerializer {
       }
 
       return processedResult;
-    } catch (e) {
-      RpcLog.error(
-        message: 'MsgPackSerializer: ошибка при десериализации: $e',
-        source: 'MsgPackSerializer',
+    } catch (e, stackTrace) {
+      _logger.error(
+        'MsgPackSerializer: ошибка при десериализации: $e',
+        error: e,
+        stackTrace: stackTrace,
       );
       rethrow;
     }
