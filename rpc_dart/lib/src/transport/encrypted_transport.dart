@@ -9,6 +9,8 @@ import 'dart:convert';
 import 'package:rpc_dart/diagnostics.dart';
 import 'package:rpc_dart/src/transport/_index.dart';
 
+final RpcLogger _logger = RpcLogger('EncryptedTransport');
+
 /// Обертка транспорта, которая добавляет шифрование к базовому транспорту
 ///
 /// Этот класс шифрует исходящие сообщения и дешифрует входящие сообщения,
@@ -72,10 +74,14 @@ class EncryptedTransport implements RpcTransport {
   /// Логирует сообщения, если включен режим отладки
   void _log(String message) {
     if (_debug) {
-      RpcLog.debug(
-        message: message,
-        source: 'EncryptedTransport:$id',
-      );
+      _logger.debug(message);
+    }
+  }
+
+  /// Логирует сообщения, если включен режим отладки
+  void _logError(String message, {Object? error, StackTrace? stackTrace}) {
+    if (_debug) {
+      _logger.error(message, error: error, stackTrace: stackTrace);
     }
   }
 
@@ -125,13 +131,10 @@ class EncryptedTransport implements RpcTransport {
         _decryptedController.add(data);
       }
     } catch (e, stackTrace) {
-      _log('Ошибка при обработке входящих данных: $e');
-      RpcLog.error(
-        message:
-            'Ошибка при обработке входящих данных в шифрованном транспорте',
-        source: 'EncryptedTransport:$id',
-        error: {'error': e.toString()},
-        stackTrace: stackTrace.toString(),
+      _logError(
+        'Ошибка при обработке входящих данных: $e',
+        error: e,
+        stackTrace: stackTrace,
       );
       _decryptedController.addError(e);
     }
@@ -195,13 +198,11 @@ class EncryptedTransport implements RpcTransport {
             timeout: timeout,
           );
         }
-      } catch (e) {
-        _log(
-            'Ошибка при определении типа сообщения, отправляем без шифрования: $e');
-        RpcLog.warning(
-          message: 'Не удалось определить тип сообщения для шифрования',
-          source: 'EncryptedTransport:$id',
-          data: {'error': e.toString()},
+      } catch (e, stackTrace) {
+        _logError(
+          'Ошибка при определении типа сообщения, отправляем без шифрования: $e',
+          error: e,
+          stackTrace: stackTrace,
         );
       }
 
@@ -209,12 +210,10 @@ class EncryptedTransport implements RpcTransport {
       // отправляем данные как есть
       return await _baseTransport.send(data, timeout: timeout);
     } catch (e, stackTrace) {
-      _log('Ошибка при отправке данных: $e');
-      RpcLog.error(
-        message: 'Ошибка при отправке данных через шифрованный транспорт',
-        source: 'EncryptedTransport:$id',
-        error: {'error': e.toString()},
-        stackTrace: stackTrace.toString(),
+      _logError(
+        'Ошибка при отправке данных через шифрованный транспорт: $e',
+        error: e,
+        stackTrace: stackTrace,
       );
       return RpcTransportActionStatus.unknownError;
     }

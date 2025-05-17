@@ -289,8 +289,8 @@ void main() {
       print('Endpoints created');
 
       // Добавляем middleware для отладки
-      clientEndpoint.addMiddleware(DebugMiddleware(id: "client"));
-      serverEndpoint.addMiddleware(DebugMiddleware(id: "server"));
+      clientEndpoint.addMiddleware(DebugMiddleware(RpcLogger("client")));
+      serverEndpoint.addMiddleware(DebugMiddleware(RpcLogger("server")));
       print('Debug middleware added');
 
       // Создаем сервисы

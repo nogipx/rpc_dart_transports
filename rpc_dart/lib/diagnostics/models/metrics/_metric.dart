@@ -4,7 +4,6 @@
 
 import 'dart:convert';
 
-import 'package:rpc_dart/logger.dart';
 import 'package:rpc_dart/rpc_dart.dart';
 
 part 'rpc_error_metric.dart';

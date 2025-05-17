@@ -10,25 +10,17 @@ import 'package:rpc_dart/rpc_dart.dart';
 /// Логирует все запросы, ответы, ошибки и потоковые данные
 /// аналогично DebugTransport, но на уровне RPC-вызовов
 class DebugMiddleware implements IRpcMiddleware {
-  /// Идентификатор для логов
-  final String id;
-
   /// Функция для логирования
   final RpcLogger _logger;
 
   /// Создает middleware для отладки
   ///
-  /// [id] - идентификатор для логов, помогает различать несколько экземпляров
   /// [logger] - опциональная функция для логирования, по умолчанию print
-  DebugMiddleware({
-    this.id = 'default',
-    required RpcLogger logger,
-  }) : _logger = logger;
+  DebugMiddleware(RpcLogger logger) : _logger = logger;
 
   /// Внутренний метод для логирования
   void _log(String message) {
-    final logMessage = 'DebugMiddleware[$id]: \n$message';
-    _logger.debug(logMessage);
+    _logger.debug(message);
   }
 
   @override
@@ -131,67 +123,5 @@ class DebugMiddleware implements IRpcMiddleware {
         'StreamID: $streamId';
 
     _log('$message\n');
-  }
-}
-
-/// Расширенная версия DebugMiddleware с замером производительности
-class DebugWithTimingMiddleware extends DebugMiddleware {
-  /// Хранилище времени начала запросов по ID сообщения
-  final Map<String, DateTime> _requestStartTimes = {};
-
-  /// Создает middleware для отладки с замером времени
-  DebugWithTimingMiddleware({
-    super.id = 'timing',
-    required super.logger,
-  });
-
-  @override
-  FutureOr<dynamic> onRequest(
-    String serviceName,
-    String methodName,
-    dynamic payload,
-    RpcMethodContext context,
-    RpcDataDirection direction,
-  ) {
-    _requestStartTimes[context.messageId] = DateTime.now();
-    return super
-        .onRequest(serviceName, methodName, payload, context, direction);
-  }
-
-  @override
-  FutureOr<dynamic> onResponse(
-    String serviceName,
-    String methodName,
-    dynamic response,
-    RpcMethodContext context,
-    RpcDataDirection direction,
-  ) {
-    _logTiming(serviceName, methodName, context.messageId);
-    return super
-        .onResponse(serviceName, methodName, response, context, direction);
-  }
-
-  @override
-  FutureOr<dynamic> onError(
-    String serviceName,
-    String methodName,
-    dynamic error,
-    StackTrace? stackTrace,
-    RpcMethodContext context,
-    RpcDataDirection direction,
-  ) {
-    _logTiming(serviceName, methodName, context.messageId);
-    return super.onError(
-        serviceName, methodName, error, stackTrace, context, direction);
-  }
-
-  /// Вычисляет и логирует время выполнения запроса
-  void _logTiming(String serviceName, String methodName, String messageId) {
-    final startTime = _requestStartTimes.remove(messageId);
-    if (startTime != null) {
-      final duration = DateTime.now().difference(startTime);
-      _log(
-          'ВРЕМЯ ВЫПОЛНЕНИЯ $serviceName.$methodName: ${duration.inMilliseconds}ms');
-    }
   }
 }
