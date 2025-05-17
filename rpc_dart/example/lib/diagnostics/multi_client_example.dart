@@ -3,12 +3,11 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 import 'dart:async';
-import 'dart:io';
 import 'dart:math';
 import 'package:rpc_dart/rpc_dart.dart';
 import 'package:rpc_dart/diagnostics.dart';
 
-const String _source = 'MultiClientExample';
+final logger = RpcLogger('MultiClientExample');
 
 /// Пример работы с несколькими клиентами, подключенными к одному
 /// диагностическому серверу
@@ -16,9 +15,6 @@ const String _source = 'MultiClientExample';
 /// В этом примере мы имитируем несколько клиентов (акторов), каждый из которых
 /// генерирует логи и метрики, а центральный сервер диагностики их собирает и обрабатывает
 Future<void> main({bool debug = true}) async {
-  // Настраиваем красивый вывод для демонстрации
-  RpcLog.setupColoredConsole();
-
   printHeader('Пример работы с несколькими клиентами');
 
   // Создаем транспорт для сервера диагностики
@@ -29,10 +25,7 @@ Future<void> main({bool debug = true}) async {
   );
 
   // Запускаем сервер диагностики
-  RpcLog.info(
-    message: 'Запуск сервера диагностики...',
-    color: AnsiColor.magenta,
-  );
+  logger.info('Запуск сервера диагностики...', color: AnsiColor.magenta);
   final diagnosticServer = await setupDiagnosticServer(
     diagnosticServerEndpoint,
   );
@@ -41,8 +34,8 @@ Future<void> main({bool debug = true}) async {
   List<ClientActor> clients = [];
   const int numberOfClients = 3;
 
-  RpcLog.info(
-    message: 'Создание $numberOfClients клиентов...',
+  logger.info(
+    'Создание $numberOfClients клиентов...',
     color: AnsiColor.magenta,
   );
   for (int i = 1; i <= numberOfClients; i++) {
@@ -69,17 +62,14 @@ Future<void> main({bool debug = true}) async {
     );
 
     clients.add(client);
-    RpcLog.info(
-      message: 'Клиент $i (${clientType.name}) создан и подключен',
+    logger.info(
+      'Клиент $i (${clientType.name}) создан и подключен',
       color: AnsiColor.green,
     );
   }
 
   // Имитируем работу клиентов - генерация логов и метрик
-  RpcLog.info(
-    message: 'Запуск имитации работы клиентов...',
-    color: AnsiColor.magenta,
-  );
+  logger.info('Запуск имитации работы клиентов...', color: AnsiColor.magenta);
 
   // Запускаем работу клиентов параллельно
   final workFutures = clients.map((client) => client.simulateWork()).toList();
@@ -110,17 +100,18 @@ Future<void> main({bool debug = true}) async {
 /// Устанавливает и настраивает сервер диагностики
 Future<DiagnosticServerImpl> setupDiagnosticServer(RpcEndpoint endpoint) async {
   // Создаем сервер диагностики
-  final diagnosticServer = DiagnosticServerImpl();
+  final diagnosticServer = DiagnosticServerImpl(
+    ConsoleRpcLogger('diagnostic-server'),
+  );
 
   // Создаем и регистрируем контракт диагностики на эндпоинте
-  final contract = DiagnosticServerContract(
+  final contract = RpcDiagnosticServerContract(
     onSendMetrics: diagnosticServer.handleMetrics,
     onTraceEvent: diagnosticServer.handleTraceEvent,
     onLatencyMetric: diagnosticServer.handleLatencyMetric,
     onStreamMetric: diagnosticServer.handleStreamMetric,
     onErrorMetric: diagnosticServer.handleErrorMetric,
     onResourceMetric: diagnosticServer.handleResourceMetric,
-    onStreamLogs: diagnosticServer.handleStreamLogs,
     onRegisterClient: diagnosticServer.handleClientRegistration,
     onLog: diagnosticServer.handleLog,
     onPing: () async => true,
@@ -144,7 +135,6 @@ Future<ClientActor> setupClient({
     clientId: 'client-$clientIndex',
     traceId: 'trace-${DateTime.now().millisecondsSinceEpoch}-$clientIndex',
     appVersion: '1.0.$clientIndex',
-    platform: Platform.operatingSystem,
     properties: {
       'clientType': clientType.name,
       'applicationName': 'MultiClientApp',
@@ -154,16 +144,16 @@ Future<ClientActor> setupClient({
   );
 
   // Настройка опций диагностики для данного типа клиента
-  DiagnosticOptions options;
+  RpcDiagnosticOptions options;
   switch (clientType) {
     case ClientType.mobile:
       // Мобильный клиент - экономим ресурсы, собираем только важные метрики
-      options = DiagnosticOptions(
+      options = RpcDiagnosticOptions(
         enabled: true,
         samplingRate: 0.5, // Собираем только 50% метрик
         maxBufferSize: 20,
         flushIntervalMs: 5000, // Отправка каждые 5 секунд
-        minLogLevel: RpcLogLevel.info, // Только инфо и выше
+        minLogLevel: RpcLoggerLevel.info, // Только инфо и выше
         consoleLoggingEnabled: debug,
         traceEnabled: false, // Отключаем трассировку
         latencyEnabled: true,
@@ -175,12 +165,12 @@ Future<ClientActor> setupClient({
       break;
     case ClientType.desktop:
       // Десктопный клиент - собираем больше метрик
-      options = DiagnosticOptions(
+      options = RpcDiagnosticOptions(
         enabled: true,
         samplingRate: 0.8, // Собираем 80% метрик
         maxBufferSize: 50,
         flushIntervalMs: 3000,
-        minLogLevel: debug ? RpcLogLevel.debug : RpcLogLevel.info,
+        minLogLevel: debug ? RpcLoggerLevel.debug : RpcLoggerLevel.info,
         consoleLoggingEnabled: debug,
         traceEnabled: true,
         latencyEnabled: true,
@@ -192,12 +182,12 @@ Future<ClientActor> setupClient({
       break;
     case ClientType.server:
       // Серверный компонент - собираем все метрики
-      options = DiagnosticOptions(
+      options = RpcDiagnosticOptions(
         enabled: true,
         samplingRate: 1.0, // Собираем 100% метрик
         maxBufferSize: 100,
         flushIntervalMs: 2000,
-        minLogLevel: debug ? RpcLogLevel.debug : RpcLogLevel.info,
+        minLogLevel: debug ? RpcLoggerLevel.debug : RpcLoggerLevel.info,
         consoleLoggingEnabled: debug,
         traceEnabled: true,
         latencyEnabled: true,
@@ -210,7 +200,7 @@ Future<ClientActor> setupClient({
   }
 
   // Создаем клиент диагностики
-  final diagnosticClient = RpcDiagnosticService(
+  final diagnosticClient = RpcDiagnosticClient(
     endpoint: clientEndpoint,
     clientIdentity: clientIdentity,
     options: options,
@@ -219,18 +209,16 @@ Future<ClientActor> setupClient({
   // Настраиваем локальный логгер для этого клиента
   // В реальной системе это может быть переопределение RpcLog
   // для конкретного модуля
-  final logger = ClientLogger(
-    client: diagnosticClient,
-    prefix: '[Клиент-$clientIndex]',
-    clientType: clientType,
+  final name = 'Client-$clientIndex';
+  final logger = DiagnosticRpcLogger(
+    name,
+    consoleLogger: ConsoleRpcLogger(name),
   );
 
   // Проверяем соединение с сервером диагностики
   final connected = await diagnosticClient.ping();
-  RpcLog.info(
-    message:
-        'Клиент-$clientIndex (${clientType.name}): соединение с сервером диагностики ${connected ? "установлено" : "не установлено"}',
-    color: connected ? AnsiColor.green : AnsiColor.red,
+  logger.info(
+    'Клиент-$clientIndex (${clientType.name}): соединение с сервером диагностики ${connected ? "установлено" : "не установлено"}',
   );
 
   // Создаем и возвращаем объект актора
@@ -253,9 +241,9 @@ enum ClientType {
 /// Актор, представляющий клиента
 class ClientActor {
   final RpcEndpoint endpoint;
-  final IRpcDiagnosticService diagnosticService;
+  final IRpcDiagnosticClient diagnosticService;
   final ClientType clientType;
-  final ClientLogger logger;
+  final RpcLogger logger;
   final int clientIndex;
   final Random random = Random();
 
@@ -338,7 +326,7 @@ class ClientActor {
   Future<void> performStreamTask(int taskIndex) async {
     logger.debug('Запуск стрим-задачи #$taskIndex');
 
-    final streamId = 'stream-${clientIndex}-$taskIndex';
+    final streamId = 'stream-$clientIndex-$taskIndex';
 
     // Создаем метрику начала стрима
     await diagnosticService.reportStreamMetric(
@@ -466,81 +454,12 @@ enum OperationType {
   resourceIntensiveTask, // Ресурсоемкая задача
 }
 
-/// Логгер для клиента, с цветной маркировкой по типу клиента
-class ClientLogger {
-  final IRpcDiagnosticService client;
-  final String prefix;
-  final ClientType clientType;
-
-  ClientLogger({
-    required this.client,
-    required this.prefix,
-    required this.clientType,
-  });
-
-  AnsiColor get _clientColor {
-    switch (clientType) {
-      case ClientType.mobile:
-        return AnsiColor.green;
-      case ClientType.desktop:
-        return AnsiColor.blue;
-      case ClientType.server:
-        return AnsiColor.magenta;
-      default:
-        return AnsiColor.white;
-    }
-  }
-
-  Future<void> debug(String message) async {
-    RpcLog.debug(
-      message: '$prefix DEBUG: $message',
-      source: 'Client-${clientType.name}',
-      color: _clientColor,
-    );
-    await client.debug(message: message, source: 'Client-${clientType.name}');
-  }
-
-  Future<void> info(String message) async {
-    RpcLog.info(
-      message: '$prefix INFO: $message',
-      source: 'Client-${clientType.name}',
-      color: _clientColor,
-    );
-    await client.info(message: message, source: 'Client-${clientType.name}');
-  }
-
-  Future<void> warning(String message) async {
-    RpcLog.warning(
-      message: '$prefix WARNING: $message',
-      source: 'Client-${clientType.name}',
-      color: _clientColor,
-    );
-    await client.warning(message: message, source: 'Client-${clientType.name}');
-  }
-
-  Future<void> error(
-    String message, {
-    Object? error,
-    StackTrace? stackTrace,
-  }) async {
-    RpcLog.error(
-      message: '$prefix ERROR: $message',
-      source: 'Client-${clientType.name}',
-      error: error != null ? {'error': error.toString()} : null,
-      stackTrace: stackTrace?.toString(),
-      color: _clientColor,
-    );
-    await client.error(
-      message: message,
-      source: 'Client-${clientType.name}',
-      error: error != null ? {'error': error.toString()} : null,
-      stackTrace: stackTrace?.toString(),
-    );
-  }
-}
-
 /// Реализация сервера диагностики
 class DiagnosticServerImpl {
+  final RpcLogger logger;
+
+  DiagnosticServerImpl(this.logger);
+
   // Хранение клиентов
   final Map<String, RpcClientIdentity> _clients = {};
 
@@ -571,11 +490,9 @@ class DiagnosticServerImpl {
       'resource': 0,
     };
 
-    RpcLog.info(
-      message:
-          'Диагностический сервер: зарегистрирован клиент ${client.clientId} ' +
+    logger.info(
+      'Диагностический сервер: зарегистрирован клиент ${client.clientId} ' +
           '(${client.properties?['clientType']})',
-      color: AnsiColor.cyan,
     );
   }
 
@@ -614,10 +531,8 @@ class DiagnosticServerImpl {
       }
     }
 
-    RpcLog.info(
-      message:
-          'Диагностический сервер: получено ${metrics.length} метрик от клиента ${metrics.first.clientId}',
-      color: AnsiColor.cyan,
+    logger.info(
+      'Диагностический сервер: получено ${metrics.length} метрик от клиента ${metrics.first.clientId}',
     );
   }
 
@@ -643,11 +558,9 @@ class DiagnosticServerImpl {
 
     // Для важных метрик (долгое выполнение) можно выводить специальные уведомления
     if (metric.content.durationMs > 200) {
-      RpcLog.warning(
-        message:
-            'Клиент ${metric.clientId}: обнаружена высокая латентность ' +
+      logger.warning(
+        'Клиент ${metric.clientId}: обнаружена высокая латентность ' +
             '${metric.content.operation} (${metric.content.durationMs}ms)',
-        color: AnsiColor.yellow,
       );
     }
   }
@@ -666,9 +579,8 @@ class DiagnosticServerImpl {
         (_clientMetrics[metric.clientId]?['error'] ?? 0) + 1;
 
     // Для ошибок важно выводить уведомления
-    RpcLog.error(
-      message: 'Клиент ${metric.clientId}: ошибка - ${metric.content.message}',
-      color: AnsiColor.red,
+    logger.error(
+      'Клиент ${metric.clientId}: ошибка - ${metric.content.message}',
     );
   }
 
@@ -680,33 +592,31 @@ class DiagnosticServerImpl {
 
     // Для высокого использования ресурсов можно выводить специальные уведомления
     if ((metric.content.cpuUsage ?? 0) > 0.7) {
-      RpcLog.warning(
-        message:
-            'Клиент ${metric.clientId}: высокая загрузка CPU - ${(metric.content.cpuUsage! * 100).toStringAsFixed(1)}%',
-        color: AnsiColor.yellow,
+      logger.warning(
+        'Клиент ${metric.clientId}: высокая загрузка CPU - ${(metric.content.cpuUsage! * 100).toStringAsFixed(1)}%',
       );
     }
   }
 
   // Обработка логов
-  void handleLog(RpcMetric<RpcLogMetric> log) {
+  void handleLog(RpcMetric<RpcLoggerMetric> log) {
     _metricCounts['logs'] = (_metricCounts['logs'] ?? 0) + 1;
     _clientMetrics[log.clientId]?['logs'] =
         (_clientMetrics[log.clientId]?['logs'] ?? 0) + 1;
 
     // Логи важного уровня (warning и выше) можно выводить специально
     final logLevel = log.content.level;
-    if (logLevel == RpcLogLevel.warning ||
-        logLevel == RpcLogLevel.error ||
-        logLevel == RpcLogLevel.critical) {
+    if (logLevel == RpcLoggerLevel.warning ||
+        logLevel == RpcLoggerLevel.error ||
+        logLevel == RpcLoggerLevel.critical) {
       final color =
-          logLevel == RpcLogLevel.warning
+          logLevel == RpcLoggerLevel.warning
               ? AnsiColor.yellow
-              : logLevel == RpcLogLevel.error
+              : logLevel == RpcLoggerLevel.error
               ? AnsiColor.red
               : AnsiColor.brightRed;
 
-      RpcLog.log(
+      logger.log(
         level: logLevel,
         message:
             'Клиент ${log.clientId} [${logLevel.name.toUpperCase()}]: ${log.content.message}',
@@ -715,55 +625,42 @@ class DiagnosticServerImpl {
     }
   }
 
-  // Обработка потоков логов
-  void handleStreamLogs(Stream<RpcMetric<RpcLogMetric>> logStream) {
-    logStream.listen((log) {
-      handleLog(log);
-    });
-  }
-
   // Вывод статистики собранных метрик
   void printCollectedMetricsStats() {
     printHeader('Статистика собранных метрик');
 
-    RpcLog.info(
-      message: 'Общее количество метрик по типам:',
-      color: AnsiColor.cyan,
-    );
+    logger.info('Общее количество метрик по типам:', color: AnsiColor.cyan);
     for (final type in _metricCounts.keys) {
       if (type != 'total') {
-        RpcLog.info(
-          message: '  $type: ${_metricCounts[type]} метрик',
+        logger.info(
+          '  $type: ${_metricCounts[type]} метрик',
           color: AnsiColor.cyan,
         );
       }
     }
-    RpcLog.info(
-      message: '  Всего: ${_metricCounts['total']} метрик',
+    logger.info(
+      '  Всего: ${_metricCounts['total']} метрик',
       color: AnsiColor.brightCyan,
     );
 
-    RpcLog.info(message: '\nМетрики по клиентам:', color: AnsiColor.magenta);
+    logger.info('\nМетрики по клиентам:', color: AnsiColor.magenta);
     for (final clientId in _clientMetrics.keys) {
       final clientType =
           _clients[clientId]?.properties?['clientType'] ?? 'unknown';
 
-      RpcLog.info(
-        message: 'Клиент $clientId ($clientType):',
-        color: AnsiColor.magenta,
-      );
+      logger.info('Клиент $clientId ($clientType):', color: AnsiColor.magenta);
 
       for (final type in _clientMetrics[clientId]!.keys) {
         if (type != 'total') {
-          RpcLog.info(
-            message: '  $type: ${_clientMetrics[clientId]![type]} метрик',
+          logger.info(
+            '  $type: ${_clientMetrics[clientId]![type]} метрик',
             color: AnsiColor.magenta,
           );
         }
       }
 
-      RpcLog.info(
-        message: '  Всего: ${_clientMetrics[clientId]!['total']} метрик',
+      logger.info(
+        '  Всего: ${_clientMetrics[clientId]!['total']} метрик',
         color: AnsiColor.brightMagenta,
       );
 
@@ -775,13 +672,13 @@ class DiagnosticServerImpl {
 /// Вспомогательная функция для отображения заголовков
 void printHeader(String title) {
   print('');
-  RpcLog.info(
-    message: '========================================',
+  logger.info(
+    '========================================',
     color: AnsiColor.brightWhite,
   );
-  RpcLog.info(message: ' $title', color: AnsiColor.brightWhite);
-  RpcLog.info(
-    message: '========================================',
+  logger.info(' $title', color: AnsiColor.brightWhite);
+  logger.info(
+    '========================================',
     color: AnsiColor.brightWhite,
   );
   print('');

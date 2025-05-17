@@ -3,11 +3,10 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 import 'dart:async';
-import 'dart:io';
 import 'package:rpc_dart/rpc_dart.dart';
 import 'package:rpc_dart/diagnostics.dart';
 
-const String _source = 'DiagnosticsExample';
+final logger = RpcLogger('DiagnosticsExample');
 
 /// Пример настройки и использования диагностического сервиса
 ///
@@ -26,7 +25,7 @@ Future<void> main({bool debug = true}) async {
   // Соединяем транспорты
   clientTransport.connect(serverTransport);
   serverTransport.connect(clientTransport);
-  RpcLog.info(message: 'Транспорты соединены', source: _source);
+  logger.info(message: 'Транспорты соединены');
 
   // Создаем эндпоинты
   final clientEndpoint = RpcEndpoint(
@@ -46,41 +45,32 @@ Future<void> main({bool debug = true}) async {
 
   try {
     // Регистрируем диагностический сервер
-    RpcLog.info(
-      message: 'Настройка диагностического сервера...',
-      source: _source,
-    );
+    logger.info(message: 'Настройка диагностического сервера...');
     final serverContract = setupDiagnosticServer(serverEndpoint);
 
     // Настраиваем и регистрируем диагностический клиент
-    RpcLog.info(
-      message: 'Настройка диагностического клиента...',
-      source: _source,
-    );
-    final diagnosticClient = await setupDiagnosticClient(clientEndpoint, debug);
+    logger.info(message: 'Настройка диагностического клиента...');
 
     // Устанавливаем диагностический клиент как глобальный сервис для RpcLog
-    RpcLog.setDiagnosticService(diagnosticClient);
-    RpcLog.info(
-      message: 'Диагностический клиент установлен для RpcLog',
-      source: _source,
+    RpcLoggerSettings.setDiagnostic(
+      await setupDiagnosticClient(clientEndpoint, debug),
     );
+    logger.info(message: 'Диагностический клиент установлен для RpcLog');
 
     // Демонстрация различных типов логирования и метрик
-    await demonstrateDiagnostics(diagnosticClient);
+    await demonstrateDiagnostics(RpcLoggerSettings.diagnostic!);
 
     // Отключаем диагностический клиент от RpcLog
-    RpcLog.setDefaultSource(_source);
+    RpcLoggerSettings.removeDiagnostic();
 
     // Закрываем эндпоинты
     await clientEndpoint.close();
     await serverEndpoint.close();
   } catch (e, stack) {
-    RpcLog.error(
+    logger.error(
       message: 'Произошла ошибка при демонстрации диагностики',
-      source: _source,
-      error: {'error': e.toString()},
-      stackTrace: stack.toString(),
+      error: e,
+      stackTrace: stack,
     );
   }
 
@@ -88,9 +78,9 @@ Future<void> main({bool debug = true}) async {
 }
 
 /// Настройка сервера диагностики
-DiagnosticServerContract setupDiagnosticServer(RpcEndpoint endpoint) {
+RpcDiagnosticServerContract setupDiagnosticServer(RpcEndpoint endpoint) {
   // Создаем и регистрируем контракт диагностического сервера
-  final serverContract = DiagnosticServerContract(
+  final serverContract = RpcDiagnosticServerContract(
     // Обработчик для всех отправленных метрик
     onSendMetrics: (metrics) {
       print('Получено ${metrics.length} метрик от клиента');
@@ -121,12 +111,6 @@ DiagnosticServerContract setupDiagnosticServer(RpcEndpoint endpoint) {
       // Не выводим логи повторно, чтобы избежать дублирования
       // Просто сохраняем их или обрабатываем без вывода в консоль
     },
-    onStreamLogs: (logStream) {
-      // Подписываемся на поток логов, но не выводим их повторно
-      logStream.listen((logMetric) {
-        // Логи уже выводятся через RpcLog на стороне клиента
-      });
-    },
     // Обработчик для регистрации клиентов
     onRegisterClient: (clientIdentity) {
       print('Зарегистрирован клиент: ${clientIdentity.clientId}');
@@ -145,7 +129,7 @@ DiagnosticServerContract setupDiagnosticServer(RpcEndpoint endpoint) {
 }
 
 /// Настраиваем диагностический клиент с заданными опциями
-Future<IRpcDiagnosticService> setupDiagnosticClient(
+Future<IRpcDiagnosticClient> setupDiagnosticClient(
   RpcEndpoint endpoint,
   bool debug,
 ) async {
@@ -155,7 +139,6 @@ Future<IRpcDiagnosticService> setupDiagnosticClient(
     traceId: 'trace-${DateTime.now().millisecondsSinceEpoch}',
     // Дополнительная информация о клиенте
     appVersion: '1.0.0',
-    platform: Platform.operatingSystem,
     properties: {
       'applicationName': 'ExampleApp',
       'sessionId': 'session-${DateTime.now().millisecondsSinceEpoch}',
@@ -163,7 +146,7 @@ Future<IRpcDiagnosticService> setupDiagnosticClient(
   );
 
   // Настройка опций диагностики
-  final options = DiagnosticOptions(
+  final options = RpcDiagnosticOptions(
     // Включаем сбор метрик
     enabled: true,
     // Собираем 100% метрик (можно установить меньше для снижения нагрузки)
@@ -173,7 +156,7 @@ Future<IRpcDiagnosticService> setupDiagnosticClient(
     // Автоматическая отправка метрик каждые 3 секунды
     flushIntervalMs: 3000,
     // Минимальный уровень логов для отправки
-    minLogLevel: debug ? RpcLogLevel.debug : RpcLogLevel.info,
+    minLogLevel: debug ? RpcLoggerLevel.debug : RpcLoggerLevel.info,
     // Выводить логи в консоль
     consoleLoggingEnabled: true,
     // Настройка типов собираемых метрик
@@ -186,7 +169,7 @@ Future<IRpcDiagnosticService> setupDiagnosticClient(
   );
 
   // Создаем клиент диагностики, который регистрируется на сервере
-  final diagnosticClient = RpcDiagnosticService(
+  final diagnosticClient = RpcDiagnosticClient(
     endpoint: endpoint,
     clientIdentity: clientIdentity,
     options: options,
@@ -196,45 +179,37 @@ Future<IRpcDiagnosticService> setupDiagnosticClient(
 
   // Проверяем соединение с сервером диагностики
   final connected = await diagnosticClient.ping();
-  RpcLog.info(
+  logger.info(
     message:
         'Соединение с сервером диагностики: ${connected ? "установлено" : "не установлено"}',
-    source: _source,
   );
 
   return diagnosticClient;
 }
 
 /// Демонстрация различных возможностей диагностики
-Future<void> demonstrateDiagnostics(IRpcDiagnosticService diagnostics) async {
+Future<void> demonstrateDiagnostics(IRpcDiagnosticClient diagnostics) async {
   printHeader('Демонстрация работы диагностического сервиса');
 
   // 1. Простое логирование
-  RpcLog.info(
-    message: '1. Демонстрация разных уровней логирования',
-    source: _source,
-  );
+  logger.info(message: '1. Демонстрация разных уровней логирования');
 
-  RpcLog.debug(message: 'Это отладочное сообщение', source: _source);
-  RpcLog.info(message: 'Это информационное сообщение', source: _source);
-  RpcLog.warning(message: 'Это предупреждение', source: _source);
-  RpcLog.error(
+  logger.debug(message: 'Это отладочное сообщение');
+  logger.info(message: 'Это информационное сообщение');
+  logger.warning(message: 'Это предупреждение');
+  logger.error(
     message: 'Это сообщение об ошибке',
-    source: _source,
     error: {'code': 500, 'reason': 'Демонстрационная ошибка'},
   );
 
   // 2. Измерение производительности операций
-  RpcLog.info(
-    message: '2. Измерение производительности операций',
-    source: _source,
-  );
+  logger.info(message: '2. Измерение производительности операций');
 
   // Измеряем время выполнения функции
   final result = await diagnostics.measureLatency(
     operation: () async {
       // Имитация долгой операции
-      RpcLog.debug(message: 'Выполнение долгой операции...', source: _source);
+      logger.debug(message: 'Выполнение долгой операции...');
       await Future.delayed(Duration(milliseconds: 500));
       return 'Результат операции';
     },
@@ -244,10 +219,10 @@ Future<void> demonstrateDiagnostics(IRpcDiagnosticService diagnostics) async {
     service: 'DiagnosticsExample',
   );
 
-  RpcLog.info(message: 'Результат операции: $result', source: _source);
+  logger.info(message: 'Результат операции: $result');
 
   // 3. Отправка метрик стриминга
-  RpcLog.info(message: '3. Отправка метрик стриминга', source: _source);
+  logger.info(message: '3. Отправка метрик стриминга');
 
   final streamId = 'demo-stream-${DateTime.now().millisecondsSinceEpoch}';
 
@@ -262,7 +237,7 @@ Future<void> demonstrateDiagnostics(IRpcDiagnosticService diagnostics) async {
   );
 
   // Имитация обработки стрима
-  RpcLog.debug(message: 'Моделируем работу со стримом...', source: _source);
+  logger.debug(message: 'Моделируем работу со стримом...');
   await Future.delayed(Duration(milliseconds: 300));
 
   // Метрика получения данных
@@ -289,7 +264,7 @@ Future<void> demonstrateDiagnostics(IRpcDiagnosticService diagnostics) async {
   );
 
   // 4. Отправка метрик ошибок
-  RpcLog.info(message: '4. Отправка метрик ошибок', source: _source);
+  logger.info(message: '4. Отправка метрик ошибок');
 
   try {
     // Имитируем ошибку
@@ -309,7 +284,7 @@ Future<void> demonstrateDiagnostics(IRpcDiagnosticService diagnostics) async {
   }
 
   // 5. Отправка метрики ресурсов
-  RpcLog.info(message: '5. Отправка метрик ресурсов', source: _source);
+  logger.info(message: '5. Отправка метрик ресурсов');
 
   await diagnostics.reportResourceMetric(
     diagnostics.createResourceMetric(
@@ -325,10 +300,7 @@ Future<void> demonstrateDiagnostics(IRpcDiagnosticService diagnostics) async {
   );
 
   // 6. Принудительная отправка всех накопленных метрик
-  RpcLog.info(
-    message: '6. Отправка всех накопленных метрик на сервер',
-    source: _source,
-  );
+  logger.info(message: '6. Отправка всех накопленных метрик на сервер');
   await diagnostics.flush();
 
   // Пауза для обработки всех метрик на сервере
@@ -337,7 +309,7 @@ Future<void> demonstrateDiagnostics(IRpcDiagnosticService diagnostics) async {
 
 /// Вспомогательная функция для отображения заголовков
 void printHeader(String title) {
-  RpcLog.info(message: '-------------------------', source: _source);
-  RpcLog.info(message: ' $title', source: _source);
-  RpcLog.info(message: '-------------------------', source: _source);
+  logger.info(message: '-------------------------');
+  logger.info(message: ' $title');
+  logger.info(message: '-------------------------');
 }

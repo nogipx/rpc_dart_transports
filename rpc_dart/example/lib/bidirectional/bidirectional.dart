@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:rpc_dart/rpc_dart.dart';
-import 'package:rpc_dart/diagnostics.dart';
 
 import 'bidirectional_contract.dart';
 import 'bidirectional_models.dart';
@@ -10,7 +9,7 @@ import 'bidirectional_models.dart';
 const chatMethod = 'chat';
 
 /// Константа с источником логов
-const String _source = 'BiDirectionalExample';
+final RpcLogger _logger = RpcLogger('BiDirectionalExample');
 
 /// Пример двунаправленного стриминга (поток запросов <-> поток ответов)
 /// Демонстрирует работу чата с помощью двунаправленного стриминга
@@ -30,7 +29,7 @@ Future<void> main({bool debug = false}) async {
     serverEndpoint.addMiddleware(LoggingMiddleware(id: "server"));
     clientEndpoint.addMiddleware(LoggingMiddleware(id: "client"));
   }
-  RpcLog.info(message: 'Эндпоинты настроены', source: _source);
+  _logger.info(message: 'Эндпоинты настроены');
 
   try {
     // Создаем и регистрируем серверную и клиентскую реализации чат-сервиса
@@ -39,21 +38,17 @@ Future<void> main({bool debug = false}) async {
 
     serverEndpoint.registerServiceContract(serverContract);
     clientEndpoint.registerServiceContract(clientContract);
-    RpcLog.info(message: 'Сервисы чата зарегистрированы', source: _source);
+    _logger.info(message: 'Сервисы чата зарегистрированы');
 
     // Демонстрация работы чата
     await demonstrateChatExample(clientContract);
   } catch (e) {
-    RpcLog.error(
-      message: 'Произошла ошибка',
-      source: _source,
-      error: {'error': e.toString()},
-    );
+    _logger.error(message: 'Произошла ошибка', error: {'error': e.toString()});
   } finally {
     // Закрываем эндпоинты
     await clientEndpoint.close();
     await serverEndpoint.close();
-    RpcLog.info(message: 'Эндпоинты закрыты', source: _source);
+    _logger.info(message: 'Эндпоинты закрыты');
   }
 
   printHeader('Пример завершен');
@@ -61,9 +56,9 @@ Future<void> main({bool debug = false}) async {
 
 /// Печатает заголовок раздела
 void printHeader(String title) {
-  RpcLog.info(message: '-------------------------', source: _source);
-  RpcLog.info(message: ' $title', source: _source);
-  RpcLog.info(message: '-------------------------', source: _source);
+  _logger.info(message: '-------------------------');
+  _logger.info(message: ' $title');
+  _logger.info(message: '-------------------------');
 }
 
 /// Настраиваем транспорт и эндпоинты
@@ -95,10 +90,7 @@ Future<void> demonstrateChatExample(ClientChatService chatService) async {
 
   // Устанавливаем имя пользователя
   final userName = 'Пользователь';
-  RpcLog.info(
-    message: '👤 Подключаемся к чату как "$userName"',
-    source: _source,
-  );
+  _logger.info(message: '👤 Подключаемся к чату как "$userName"');
 
   // Открываем двунаправленный канал для чата
   final bidiStream = chatService.chatHandler();
@@ -133,16 +125,11 @@ Future<void> demonstrateChatExample(ClientChatService chatService) async {
           break;
       }
 
-      RpcLog.info(message: formattedMessage, source: _source);
+      _logger.info(message: formattedMessage);
     },
     onError:
-        (e) => RpcLog.error(
-          message: 'Ошибка',
-          source: _source,
-          error: {'error': e.toString()},
-        ),
-    onDone:
-        () => RpcLog.info(message: '🔚 Соединение закрыто', source: _source),
+        (e) => _logger.error(message: 'Ошибка', error: {'error': e.toString()}),
+    onDone: () => _logger.info(message: '🔚 Соединение закрыто'),
   );
 
   // Имитируем отправку сообщений от пользователя
@@ -167,7 +154,7 @@ Future<void> demonstrateChatExample(ClientChatService chatService) async {
 
     // Используем метод send() класса BidiStream для отправки сообщений
     bidiStream.send(chatMessage);
-    RpcLog.info(message: '📤 Отправлено: $text', source: _source);
+    _logger.info(message: '📤 Отправлено: $text');
   }
 
   // Даем время получить ответы от сервера

@@ -5,14 +5,17 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:rpc_dart/rpc_dart.dart';
-import 'package:rpc_dart/diagnostics.dart';
 import 'client_streaming_contract.dart';
 import 'client_streaming_models.dart';
 
 const String _source = 'ClientStreamingExample';
+late final RpcLogger _logger;
 
 /// Главная функция примера клиентского стриминга
 Future<void> runClientStreamingExample({bool debug = false}) async {
+  // Создаем логгер для примера
+  _logger = RpcLogger(_source);
+
   printHeader('Пример клиентского стриминга RPC');
 
   // Создаем два локальных транспорта для демонстрации
@@ -22,7 +25,7 @@ Future<void> runClientStreamingExample({bool debug = false}) async {
   // Соединяем транспорты между собой
   serverTransport.connect(clientTransport);
   clientTransport.connect(serverTransport);
-  RpcLog.info(message: 'Транспорты соединены', source: _source);
+  _logger.info('Транспорты соединены');
 
   try {
     // Создаем эндпоинты для сервера и клиента
@@ -38,38 +41,36 @@ Future<void> runClientStreamingExample({bool debug = false}) async {
 
     // Добавляем middleware в зависимости от режима отладки
     if (debug) {
-      serverEndpoint.addMiddleware(DebugMiddleware(id: "server"));
-      clientEndpoint.addMiddleware(DebugMiddleware(id: "client"));
+      serverEndpoint.addMiddleware(DebugMiddleware(RpcLogger("server")));
+      clientEndpoint.addMiddleware(DebugMiddleware(RpcLogger("client")));
     } else {
-      serverEndpoint.addMiddleware(LoggingMiddleware(id: "server"));
-      clientEndpoint.addMiddleware(LoggingMiddleware(id: "client"));
+      serverEndpoint.addMiddleware(LoggingMiddleware());
+      clientEndpoint.addMiddleware(LoggingMiddleware());
     }
 
-    RpcLog.info(message: 'Эндпоинты созданы', source: _source);
+    _logger.info('Эндпоинты созданы');
 
     // Создаем и регистрируем серверную часть
     final serverService = ServerStreamService();
     serverEndpoint.registerServiceContract(serverService);
-    RpcLog.info(message: 'Серверный сервис зарегистрирован', source: _source);
+    _logger.info('Серверный сервис зарегистрирован');
 
     // Создаем клиентскую часть
     final clientService = ClientStreamService(clientEndpoint);
     clientEndpoint.registerServiceContract(clientService);
-    RpcLog.info(message: 'Клиентский сервис зарегистрирован', source: _source);
+    _logger.info('Клиентский сервис зарегистрирован');
 
-    // Запускаем демонстрацию
+    // Запускаем демонстрацию с обычным клиентским стримингом
     await demonstrateFileUpload(clientService);
-  } catch (e, stack) {
-    RpcLog.error(
-      message: 'Произошла ошибка',
-      source: _source,
-      error: {'error': e.toString()},
-      stackTrace: stack.toString(),
-    );
-    RpcLog.info(message: 'Закрываем эндпоинты...', source: _source);
+
+    // Запускаем демонстрацию без ожидания ответа
+    await demonstrateFileUploadWithoutResponse(clientService);
+  } catch (error, trace) {
+    _logger.error('Произошла ошибка', error: error, stackTrace: trace);
+    _logger.info('Закрываем эндпоинты...');
   } finally {
     await serverTransport.close();
-    RpcLog.info(message: 'Эндпоинты закрыты', source: _source);
+    _logger.info('Эндпоинты закрыты');
   }
 
   printHeader('Пример завершен');
@@ -80,7 +81,7 @@ Future<void> demonstrateFileUpload(ClientStreamService clientService) async {
   printHeader('Демонстрация загрузки файла частями');
 
   // Создаем тестовые данные (имитация большого файла)
-  RpcLog.info(message: '📁 Подготовка тестовых данных...', source: _source);
+  _logger.info('📁 Подготовка тестовых данных...');
   final fileData = List.generate(
     10,
     (i) => DataBlock(
@@ -98,65 +99,90 @@ Future<void> demonstrateFileUpload(ClientStreamService clientService) async {
 
   try {
     // Открываем поток для отправки данных
-    RpcLog.info(
-      message: '🔄 Открытие канала для отправки файла...',
-      source: _source,
-    );
+    _logger.info('🔄 Открытие канала для отправки файла...');
     final uploadStream = clientService.processDataBlocks();
 
     // Отправляем блоки файла
-    RpcLog.info(message: '📤 Отправка файла частями...', source: _source);
+    _logger.info('📤 Отправка файла частями...');
 
     for (final block in fileData) {
       // Отправляем каждый блок в потоке
       uploadStream.send(block);
-      RpcLog.info(
-        message: '📦 Отправлен блок #${block.index}: ${block.data.length} байт',
-        source: _source,
+      _logger.info(
+        '📦 Отправлен блок #${block.index}: ${block.data.length} байт',
       );
     }
 
     // Завершаем отправку (это сигнализирует серверу, что все данные отправлены)
-    RpcLog.info(
-      message: '✅ Завершение отправки файла ($totalSize байт)',
-      source: _source,
-    );
+    _logger.info('✅ Завершение отправки файла ($totalSize байт)');
     await uploadStream.finishSending();
 
-    // Закрываем поток клиентской части и ждем ответ
-    RpcLog.info(
-      message: '🔒 Канал отправки закрыт, ожидаем ответ сервера...',
-      source: _source,
+    // Закрываем поток клиентской части
+    _logger.info('🔒 Канал отправки закрыт');
+    await uploadStream.close();
+
+    _logger.info('✅ Файл успешно отправлен!');
+  } catch (e) {
+    _logger.error(
+      '❌ Ошибка при отправке файла',
+      error: {'error': e.toString()},
     );
-    final result = await uploadStream.getResponse();
+  }
+}
 
-    // Получаем и выводим результат обработки
-    if (result.blockCount > 0) {
-      printHeader('Результат загрузки и обработки файла');
+/// Демонстрирует процесс загрузки файла частями без ожидания ответа
+Future<void> demonstrateFileUploadWithoutResponse(
+  ClientStreamService clientService,
+) async {
+  printHeader('Демонстрация загрузки файла без ожидания ответа');
 
-      RpcLog.info(
-        message: '  • Обработано блоков: ${result.blockCount}',
-        source: _source,
-      );
-      RpcLog.info(
-        message: '  • Общий размер: ${result.totalSize} байт',
-        source: _source,
-      );
-      RpcLog.info(message: '  • Файл: ${result.metadata}', source: _source);
-      RpcLog.info(
-        message: '  • Время обработки: ${result.processingTime}',
-        source: _source,
-      );
+  // Создаем тестовые данные (имитация большого файла)
+  _logger.info('📁 Подготовка тестовых данных...');
+  final fileData = List.generate(
+    5,
+    (i) => DataBlock(
+      index: i,
+      data: _generateData(50000, i).toList(), // 50 KB на блок
+      metadata:
+          'filename=test_file_no_response.dat;mime=application/octet-stream;chunkSize=50000',
+    ),
+  );
 
-      RpcLog.info(
-        message: '✅ Файл успешно загружен и обработан!',
-        source: _source,
+  int totalSize = 0;
+  for (final block in fileData) {
+    totalSize += block.data.length;
+  }
+
+  try {
+    // Открываем поток для отправки данных без ожидания ответа
+    _logger.info(
+      '🔄 Открытие канала для отправки файла без ожидания ответа...',
+    );
+    final uploadStream = clientService.processDataBlocksNoResponse();
+
+    // Отправляем блоки файла
+    _logger.info('📤 Отправка файла частями...');
+
+    for (final block in fileData) {
+      // Отправляем каждый блок в потоке
+      uploadStream.send(block);
+      _logger.info(
+        '📦 Отправлен блок #${block.index}: ${block.data.length} байт',
       );
     }
+
+    // Завершаем отправку (это сигнализирует серверу, что все данные отправлены)
+    _logger.info('✅ Завершение отправки файла ($totalSize байт)');
+    await uploadStream.finishSending();
+
+    // Завершаем поток
+    _logger.info('🔒 Канал отправки закрыт');
+    await uploadStream.close();
+
+    _logger.info('✅ Файл успешно отправлен без ожидания ответа!');
   } catch (e) {
-    RpcLog.error(
-      message: '❌ Ошибка при отправке файла',
-      source: _source,
+    _logger.error(
+      '❌ Ошибка при отправке файла',
       error: {'error': e.toString()},
     );
   }
@@ -164,9 +190,9 @@ Future<void> demonstrateFileUpload(ClientStreamService clientService) async {
 
 /// Печатает заголовок раздела
 void printHeader(String title) {
-  RpcLog.info(message: '-------------------------', source: _source);
-  RpcLog.info(message: ' $title', source: _source);
-  RpcLog.info(message: '-------------------------', source: _source);
+  _logger.info('-------------------------');
+  _logger.info(' $title');
+  _logger.info('-------------------------');
 }
 
 /// Генерирует тестовые данные указанного размера

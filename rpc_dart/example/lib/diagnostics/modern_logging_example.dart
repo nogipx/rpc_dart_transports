@@ -16,27 +16,12 @@ Future<void> main() async {
   print('Пример использования новой системы логирования в RpcDart\n');
 
   // Настраиваем глобальные параметры логирования
-  RpcLogManager.setDefaultMinLogLevel(RpcLogLevel.debug);
+  RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.debug);
 
   // Создаем логгеры для разных компонентов
-  final apiLogger = RpcLogManager.get('API');
-  final dbLogger = RpcLogManager.get('Database');
-  final uiLogger = RpcLogManager.get('UI');
-
-  // Настраиваем каждый логгер индивидуально
-  apiLogger.setLogColors(
-    const RpcLogColors(info: AnsiColor.cyan, error: AnsiColor.brightRed),
-  );
-
-  dbLogger.setFilter(CustomLogFilter());
-
-  uiLogger.setLogColors(
-    const RpcLogColors(
-      debug: AnsiColor.blue,
-      info: AnsiColor.brightGreen,
-      warning: AnsiColor.brightYellow,
-    ),
-  );
+  final apiLogger = RpcLogger('API');
+  final dbLogger = RpcLogger('Database');
+  final uiLogger = RpcLogger('UI');
 
   // Демонстрация работы с логгерами
   print('=== Демонстрация работы с разными логгерами ===');
@@ -50,64 +35,57 @@ Future<void> main() async {
   } catch (e, stackTrace) {
     await apiLogger.error(
       message: 'Не удалось выполнить запрос к серверу',
-      error: {'exception': e.toString()},
-      stackTrace: stackTrace.toString(),
+      error: e,
+      stackTrace: stackTrace,
     );
   }
 
   // Демонстрация создания кастомного логгера
   print('\n=== Создание кастомного логгера ===');
-  final customLogger = RpcLogManager.createLogger(
-    name: 'CustomLogger',
-    minLogLevel: RpcLogLevel.warning,
-    formatter: CustomLogFormatter(),
-  );
+  final customLogger = RpcLogger('CustomLogger');
 
-  await customLogger.debug(message: 'Это сообщение не должно отображаться');
-  await customLogger.warning(
+  await customLogger.log(
+    level: RpcLoggerLevel.warning,
     message: 'Это предупреждение должно отображаться в кастомном формате',
   );
-  await customLogger.error(message: 'Ошибка в кастомном формате');
+  await customLogger.log(
+    level: RpcLoggerLevel.error,
+    message: 'Ошибка в кастомном формате',
+  );
 
   // Демонстрация работы с глобальными настройками
   print('\n=== Изменение глобальных настроек ===');
-  RpcLogManager.setDefaultMinLogLevel(RpcLogLevel.warning);
-  RpcLogManager.setGlobalFormatter(TimestampOnlyFormatter());
+  RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.warning);
 
   await apiLogger.debug(message: 'Этого сообщения не должно быть видно');
   await apiLogger.warning(
     message: 'Это предупреждение должно отображаться в новом формате',
   );
 
-  // Информация о зарегистрированных логгерах
-  print('\n=== Информация о зарегистрированных логгерах ===');
-  final loggerNames = RpcLogManager.getLoggerNames();
-  print('Зарегистрированные логгеры: ${loggerNames.join(', ')}');
-
   print('\nПример завершен');
 }
 
 /// Пример пользовательского фильтра логов
-class CustomLogFilter implements LogFilter {
+class CustomLogFilter implements IRpcLoggerFilter {
   @override
-  bool shouldLog(RpcLogLevel level, String source) {
+  bool shouldLog(RpcLoggerLevel level, String source) {
     // Пропускаем все сообщения для Database, кроме debug с определенным источником
-    if (source == 'Database' && level == RpcLogLevel.debug) {
+    if (source == 'Database' && level == RpcLoggerLevel.debug) {
       // В реальном фильтре здесь может быть более сложная логика
       return true;
     }
 
     // Для всех остальных используем стандартную проверку по уровню
-    return level.index >= RpcLogLevel.info.index;
+    return level.index >= RpcLoggerLevel.info.index;
   }
 }
 
 /// Пример пользовательского форматтера логов
-class CustomLogFormatter implements LogFormatter {
+class CustomLogFormatter implements IRpcLoggerFormatter {
   @override
   String format(
     DateTime timestamp,
-    RpcLogLevel level,
+    RpcLoggerLevel level,
     String source,
     String message, {
     String? context,
@@ -119,17 +97,17 @@ class CustomLogFormatter implements LogFormatter {
     return '【$time】$emoji [$levelName] $source: $message';
   }
 
-  String _getEmojiForLevel(RpcLogLevel level) {
+  String _getEmojiForLevel(RpcLoggerLevel level) {
     switch (level) {
-      case RpcLogLevel.debug:
+      case RpcLoggerLevel.debug:
         return '🔍';
-      case RpcLogLevel.info:
+      case RpcLoggerLevel.info:
         return 'ℹ️';
-      case RpcLogLevel.warning:
+      case RpcLoggerLevel.warning:
         return '⚠️';
-      case RpcLogLevel.error:
+      case RpcLoggerLevel.error:
         return '🚨';
-      case RpcLogLevel.critical:
+      case RpcLoggerLevel.critical:
         return '💀';
       default:
         return '📝';
@@ -138,11 +116,11 @@ class CustomLogFormatter implements LogFormatter {
 }
 
 /// Пример простого форматтера, который показывает только время и сообщение
-class TimestampOnlyFormatter implements LogFormatter {
+class TimestampOnlyFormatter implements IRpcLoggerFormatter {
   @override
   String format(
     DateTime timestamp,
-    RpcLogLevel level,
+    RpcLoggerLevel level,
     String source,
     String message, {
     String? context,

@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-import 'dart:io';
 import 'package:rpc_dart/diagnostics.dart';
 
 import 'bidirectional/bidirectional.dart' as bidirectional;
@@ -27,10 +26,11 @@ Future<void> main(List<String> args) async {
   final debug = args.length > 1 && args[1] == '--debug';
 
   if (debug) {
-    RpcLog.setMinLogLevel(RpcLogLevel.debug);
-    RpcLog.info(message: 'Включен режим отладки', source: _source);
+    RpcLog.setDefaultMinLogLevel(RpcLoggerLevel.debug);
+    RpcLog.get(_source).info(message: 'Включен режим отладки');
   } else {
-    RpcLog.setMinLogLevel(RpcLogLevel.info);
+    RpcLog.setDefaultMinLogLevel(RpcLoggerLevel.info);
+    RpcLog.get(_source).info(message: 'Включен режим отладки');
   }
 
   try {
