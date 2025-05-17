@@ -2,31 +2,13 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-import 'package:rpc_dart/rpc_dart.dart';
-
-/// Уровни логирования для RpcLogMetric
-enum RpcLogLevel {
-  debug,
-  info,
-  warning,
-  error,
-  critical,
-  none;
-
-  /// Создание из строки JSON
-  static RpcLogLevel fromJson(String json) {
-    return values.firstWhere(
-      (e) => e.name == json,
-      orElse: () => none,
-    );
-  }
-}
+part of '_logs.dart';
 
 /// Метрика для логирования сообщений
 ///
 /// Может использоваться для отправки различных уровней логов
 /// от компонентов библиотеки в диагностический сервис
-class RpcLogMetric implements IRpcSerializableMessage {
+class RpcLoggerMetric implements IRpcSerializableMessage {
   /// Уникальный идентификатор метрики
   final String id;
 
@@ -37,7 +19,7 @@ class RpcLogMetric implements IRpcSerializableMessage {
   final int timestamp;
 
   /// Уровень логирования
-  final RpcLogLevel level;
+  final RpcLoggerLevel level;
 
   /// Сообщение лога
   final String message;
@@ -60,7 +42,7 @@ class RpcLogMetric implements IRpcSerializableMessage {
   /// Дополнительные данные
   final Map<String, dynamic>? data;
 
-  const RpcLogMetric({
+  const RpcLoggerMetric({
     required this.id,
     this.traceId,
     required this.timestamp,
@@ -93,11 +75,11 @@ class RpcLogMetric implements IRpcSerializableMessage {
   }
 
   /// Создание из JSON
-  factory RpcLogMetric.fromJson(Map<String, dynamic> json) {
+  factory RpcLoggerMetric.fromJson(Map<String, dynamic> json) {
     final levelString = json['level'] as String;
-    final level = RpcLogLevel.fromJson(levelString);
+    final level = RpcLoggerLevel.fromJson(levelString);
 
-    return RpcLogMetric(
+    return RpcLoggerMetric(
       id: json['id'] as String,
       traceId: json['trace_id'] as String?,
       timestamp: json['timestamp'] as int,

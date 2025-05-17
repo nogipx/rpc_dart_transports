@@ -6,7 +6,6 @@ import 'dart:async' show Timer;
 import 'dart:math' show Random;
 
 import 'package:rpc_dart/diagnostics.dart';
-import 'package:rpc_dart/diagnostics/rpc_diagnostic_service.dart';
 import 'package:rpc_dart/rpc_dart.dart';
 
 part 'subcontracts/metrics.dart';

@@ -13,7 +13,7 @@ final class DiagnosticServerContract extends _RpcDiagnosticServiceContract {
     required void Function(RpcMetric<RpcStreamMetric>) onStreamMetric,
     required void Function(RpcMetric<RpcErrorMetric>) onErrorMetric,
     required void Function(RpcMetric<RpcResourceMetric>) onResourceMetric,
-    required void Function(RpcMetric<RpcLogMetric>) onLog,
+    required void Function(RpcMetric<RpcLoggerMetric>) onLog,
     required void Function(RpcClientIdentity) onRegisterClient,
     required Future<bool> Function() onPing,
   }) : super(
@@ -89,21 +89,21 @@ class _MetricsServer extends _RpcMetricsContract {
 }
 
 class _LoggingServer extends _RpcLoggingContract {
-  final void Function(RpcMetric<RpcLogMetric>) _onLog;
+  final void Function(RpcMetric<RpcLoggerMetric>) _onLog;
 
   _LoggingServer({
-    required void Function(RpcMetric<RpcLogMetric>) onLog,
+    required void Function(RpcMetric<RpcLoggerMetric>) onLog,
   }) : _onLog = onLog;
 
   @override
-  Future<RpcNull> logMetric(RpcMetric<RpcLogMetric> metric) async {
+  Future<RpcNull> logMetric(RpcMetric<RpcLoggerMetric> metric) async {
     _onLog(metric);
     return RpcNull();
   }
 
   @override
-  ClientStreamingBidiStream<RpcMetric<RpcLogMetric>, RpcNull> logsStream() {
-    return BidiStreamGenerator<RpcMetric<RpcLogMetric>, RpcNull>(
+  ClientStreamingBidiStream<RpcMetric<RpcLoggerMetric>, RpcNull> logsStream() {
+    return BidiStreamGenerator<RpcMetric<RpcLoggerMetric>, RpcNull>(
       (userLogsStream) async* {
         await for (final log in userLogsStream) {
           _onLog(log);

@@ -4,8 +4,8 @@
 
 import 'dart:convert';
 
+import 'package:rpc_dart/logger.dart';
 import 'package:rpc_dart/rpc_dart.dart';
-import 'rpc_log_metric.dart';
 
 part 'rpc_error_metric.dart';
 part 'rpc_latency_metric.dart';
@@ -134,12 +134,12 @@ class RpcMetric<T> implements IRpcSerializableMessage {
           clientId: clientId,
           content: RpcResourceMetric.fromJson(contentJson),
         ),
-      RpcMetricType.log => RpcMetric<RpcLogMetric>(
+      RpcMetricType.log => RpcMetric<RpcLoggerMetric>(
           id: id,
           timestamp: timestamp,
           metricType: metricType,
           clientId: clientId,
-          content: RpcLogMetric.fromJson(contentJson),
+          content: RpcLoggerMetric.fromJson(contentJson),
         ),
       _ => throw ArgumentError('Неизвестный тип метрики: $metricType'),
     };
@@ -232,13 +232,13 @@ class RpcMetric<T> implements IRpcSerializableMessage {
   }
 
   /// Создает метрику лога
-  static RpcMetric<RpcLogMetric> log({
+  static RpcMetric<RpcLoggerMetric> log({
     required String id,
     required int timestamp,
     required String clientId,
-    required RpcLogMetric content,
+    required RpcLoggerMetric content,
   }) {
-    return RpcMetric<RpcLogMetric>(
+    return RpcMetric<RpcLoggerMetric>(
       id: id,
       timestamp: timestamp,
       metricType: RpcMetricType.log,

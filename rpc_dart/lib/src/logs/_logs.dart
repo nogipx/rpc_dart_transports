@@ -8,8 +8,9 @@
 import 'dart:io';
 
 import 'package:rpc_dart/diagnostics.dart';
+import 'package:rpc_dart/rpc_dart.dart';
 
 part 'rpc_logger.dart';
 part 'rpc_logger_style.dart';
 part 'console_rpc_logger.dart';
-part '../../diagnostics/diagnostic_rpc_logger.dart';
+part 'rpc_logger_metric.dart';

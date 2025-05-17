@@ -16,16 +16,16 @@ abstract class _RpcLoggingContract extends RpcServiceContract {
   void setup() {
     addUnaryRequestMethod<RpcMetric, RpcNull>(
       methodName: methodLogMetric,
-      handler: (metric) => logMetric(metric as RpcMetric<RpcLogMetric>),
+      handler: (metric) => logMetric(metric as RpcMetric<RpcLoggerMetric>),
       argumentParser: RpcMetric.fromJson,
       responseParser: RpcNull.fromJson,
     );
 
-    addClientStreamingMethod<RpcMetric<RpcLogMetric>, RpcNull>(
+    addClientStreamingMethod<RpcMetric<RpcLoggerMetric>, RpcNull>(
       methodName: methodStreamLogs,
       handler: logsStream,
       argumentParser: (json) =>
-          RpcMetric.fromJson(json) as RpcMetric<RpcLogMetric>,
+          RpcMetric.fromJson(json) as RpcMetric<RpcLoggerMetric>,
       responseParser: RpcNull.fromJson,
     );
 
@@ -33,10 +33,10 @@ abstract class _RpcLoggingContract extends RpcServiceContract {
   }
 
   /// Метод для отправки лога
-  Future<RpcNull> logMetric(RpcMetric<RpcLogMetric> metric);
+  Future<RpcNull> logMetric(RpcMetric<RpcLoggerMetric> metric);
 
   /// Метод для отправки логов через стриминг
-  ClientStreamingBidiStream<RpcMetric<RpcLogMetric>, RpcNull> logsStream();
+  ClientStreamingBidiStream<RpcMetric<RpcLoggerMetric>, RpcNull> logsStream();
 }
 
 class _LoggingClient extends _RpcLoggingContract {
@@ -45,7 +45,7 @@ class _LoggingClient extends _RpcLoggingContract {
   _LoggingClient(this._endpoint);
 
   @override
-  Future<RpcNull> logMetric(RpcMetric<RpcLogMetric> metric) {
+  Future<RpcNull> logMetric(RpcMetric<RpcLoggerMetric> metric) {
     return _endpoint
         .unaryRequest(
           serviceName: serviceName,
@@ -58,7 +58,7 @@ class _LoggingClient extends _RpcLoggingContract {
   }
 
   @override
-  ClientStreamingBidiStream<RpcMetric<RpcLogMetric>, RpcNull> logsStream() {
+  ClientStreamingBidiStream<RpcMetric<RpcLoggerMetric>, RpcNull> logsStream() {
     return _endpoint
         .clientStreaming(
           serviceName: serviceName,
