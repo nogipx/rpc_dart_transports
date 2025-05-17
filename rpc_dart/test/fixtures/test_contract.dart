@@ -48,14 +48,14 @@ abstract base class TestFixtureBaseContract extends RpcServiceContract {
   final TransportTestsSubcontract transportTests;
   final SerializationTestsSubcontract serializationTests;
 
-  TestFixtureBaseContract({
-    required this.unaryTests,
-    required this.clientStreamingTests,
-    required this.serverStreamingTests,
-    required this.bidirectionalTests,
-    required this.transportTests,
-    required this.serializationTests,
-  }) : super('test_fixture');
+  TestFixtureBaseContract()
+      : unaryTests = UnaryTestsServer(),
+        clientStreamingTests = ClientStreamingTestsServer(),
+        serverStreamingTests = ServerStreamingTestsServer(),
+        bidirectionalTests = BidirectionalTestsServer(),
+        transportTests = TransportTestsServer(),
+        serializationTests = SerializationTestsServer(),
+        super('test_fixture');
 
   @override
   void setup() {
@@ -73,15 +73,11 @@ abstract base class TestFixtureBaseContract extends RpcServiceContract {
 /// Серверная реализация тестового контракта
 /// Используется в тестах для обработки запросов
 final class TestFixtureServerContract extends TestFixtureBaseContract {
-  TestFixtureServerContract()
-      : super(
-          unaryTests: UnaryTestsServer(),
-          clientStreamingTests: ClientStreamingTestsServer(),
-          serverStreamingTests: ServerStreamingTestsServer(),
-          bidirectionalTests: BidirectionalTestsServer(),
-          transportTests: TransportTestsServer(),
-          serializationTests: SerializationTestsServer(),
-        );
+  final RpcEndpoint _endpoint;
+
+  TestFixtureServerContract(this._endpoint) : super() {
+    _endpoint.registerServiceContract(this);
+  }
 }
 
 /// Клиентская реализация тестового контракта
@@ -89,21 +85,21 @@ final class TestFixtureServerContract extends TestFixtureBaseContract {
 final class TestFixtureClientContract extends TestFixtureBaseContract {
   final RpcEndpoint _endpoint;
 
-  TestFixtureClientContract(this._endpoint)
-      : super(
-          unaryTests: UnaryTestsClient(_endpoint),
-          clientStreamingTests: ClientStreamingTestsClient(_endpoint),
-          serverStreamingTests: ServerStreamingTestsClient(_endpoint),
-          bidirectionalTests: BidirectionalTestsClient(_endpoint),
-          transportTests: TransportTestsClient(_endpoint),
-          serializationTests: SerializationTestsClient(_endpoint),
-        );
+  TestFixtureClientContract(this._endpoint, {bool shouldRegister = true})
+      : super() {
+    if (shouldRegister) {
+      _endpoint.registerServiceContract(this);
+    }
+  }
 }
 
 /// Утилиты для создания тестового окружения
 class TestFixtureUtils {
   /// Создает пару эндпоинтов для тестирования (клиент и сервер)
-  static (RpcEndpoint client, RpcEndpoint server) createEndpointPair({
+  static ({
+    RpcEndpoint client,
+    RpcEndpoint server,
+  }) createEndpointPair({
     String clientLabel = 'client',
     String serverLabel = 'server',
   }) {
@@ -126,43 +122,49 @@ class TestFixtureUtils {
       debugLabel: serverLabel,
     );
 
-    return (clientEndpoint, serverEndpoint);
+    return (client: clientEndpoint, server: serverEndpoint);
   }
 
   /// Создает и регистрирует тестовый контракт
-  static (TestFixtureClientContract, TestFixtureServerContract)
-      createTestContracts(
+  static ({
+    TestFixtureClientContract client,
+    TestFixtureServerContract server,
+  }) createTestContracts(
     RpcEndpoint clientEndpoint,
-    RpcEndpoint serverEndpoint,
-  ) {
+    RpcEndpoint serverEndpoint, {
+    bool registerClientContract = false,
+  }) {
     // Создаем серверный контракт
-    final serverContract = TestFixtureServerContract();
-    serverEndpoint.registerServiceContract(serverContract);
+    final serverContract = TestFixtureServerContract(serverEndpoint);
 
     // Создаем клиентский контракт
-    final clientContract = TestFixtureClientContract(clientEndpoint);
+    final clientContract = TestFixtureClientContract(
+      clientEndpoint,
+      shouldRegister: registerClientContract,
+    );
 
-    return (clientContract, serverContract);
+    return (client: clientContract, server: serverContract);
   }
 
   /// Создает полное тестовое окружение с эндпоинтами и контрактами
-  static (
+  static ({
     RpcEndpoint clientEndpoint,
     RpcEndpoint serverEndpoint,
-    TestFixtureClientContract client,
-    TestFixtureServerContract server,
-  ) setupTestEnvironment() {
-    final (clientEndpoint, serverEndpoint) = createEndpointPair();
-    final (clientContract, serverContract) = createTestContracts(
-      clientEndpoint,
-      serverEndpoint,
+    TestFixtureClientContract clientContract,
+    TestFixtureServerContract serverContract,
+  }) setupTestEnvironment({bool registerClientContract = false}) {
+    final endpoints = createEndpointPair();
+    final contracts = createTestContracts(
+      endpoints.client,
+      endpoints.server,
+      registerClientContract: registerClientContract,
     );
 
     return (
-      clientEndpoint,
-      serverEndpoint,
-      clientContract,
-      serverContract,
+      clientEndpoint: endpoints.client,
+      serverEndpoint: endpoints.server,
+      clientContract: contracts.client,
+      serverContract: contracts.server,
     );
   }
 
