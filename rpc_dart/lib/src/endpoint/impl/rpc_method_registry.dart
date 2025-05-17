@@ -75,19 +75,19 @@ final class RpcMethodRegistry implements IRpcMethodRegistry {
     _logger.debug('Регистрация контракта: ${contract.serviceName}');
     _contracts[contract.serviceName] = contract;
 
-    // Вызываем setup для инициализации методов контракта
-    contract.setup();
-
-    // Собираем все методы контракта
-    _collectAndRegisterMethods(contract);
-
-    // Рекурсивно регистрируем подконтракты
+    // Если контракт имеет собственный реестр, объединяем его с текущим
     if (contract is RpcServiceContract) {
-      _logger.debug(
-          'Обнаружены подконтракты (${contract.getSubContracts().length}) для ${contract.serviceName}');
-      for (final subContract in contract.getSubContracts()) {
-        _logger.debug('Регистрация подконтракта: ${subContract.serviceName}');
-        registerContract(subContract);
+      contract.mergeInto(this);
+    } else {
+      // Для обычных контрактов продолжаем использовать прежнюю логику
+      contract.setup();
+      _collectAndRegisterMethods(contract);
+
+      // Рекурсивно регистрируем подконтракты, если возможно
+      if (contract is RpcServiceContract) {
+        for (final subContract in contract.getSubContracts()) {
+          registerContract(subContract);
+        }
       }
     }
   }
@@ -149,6 +149,15 @@ final class RpcMethodRegistry implements IRpcMethodRegistry {
       _logger.error(
           'Метод $serviceName.$methodName типа $methodType требует responseParser, но он не предоставлен');
     }
+
+    _logger.debug('Регистрация метода $serviceName.$methodName в реестре:');
+    _logger.debug('  - Handler: ${handler != null ? "Есть" : "Нет!"}');
+    _logger.debug('  - Handler type: ${handler?.runtimeType}');
+    _logger.debug('  - ArgParser: ${argumentParser != null ? "Есть" : "Нет!"}');
+    _logger.debug('  - ArgParser type: ${argumentParser?.runtimeType}');
+    _logger
+        .debug('  - RespParser: ${responseParser != null ? "Есть" : "Нет!"}');
+    _logger.debug('  - RespParser type: ${responseParser?.runtimeType}');
 
     // Создаем запись о методе в реестре
     _methods.putIfAbsent(serviceName, () => {});

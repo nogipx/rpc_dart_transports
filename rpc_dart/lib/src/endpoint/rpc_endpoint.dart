@@ -19,8 +19,8 @@ base class RpcEndpoint extends _RpcEndpointRegistryImpl
     super.serializer = const MsgPackSerializer(),
     super.debugLabel,
     super.uniqueIdGenerator,
-    super.methodRegistry,
-  });
+    IRpcMethodRegistry? methodRegistry,
+  }) : super(methodRegistry: methodRegistry ?? RpcMethodRegistry());
 
   @override
   String toString() => 'RpcEndpoint[${debugLabel ?? ''}]';

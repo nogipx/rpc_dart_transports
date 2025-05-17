@@ -32,14 +32,15 @@ final class _RpcEndpointRegistryImpl
     required IRpcSerializer serializer,
     this.debugLabel,
     RpcUniqueIdGenerator? uniqueIdGenerator,
-    IRpcMethodRegistry? methodRegistry,
+    required IRpcMethodRegistry methodRegistry,
   })  : _delegate = _RpcEngine(
           transport,
           serializer,
           debugLabel: debugLabel,
           uniqueIdGenerator: uniqueIdGenerator,
+          registry: methodRegistry,
         ),
-        _methodRegistry = methodRegistry ?? RpcMethodRegistry();
+        _methodRegistry = methodRegistry;
 
   @override
   IRpcTransport get transport => _delegate.transport;
@@ -174,51 +175,84 @@ final class _RpcEndpointRegistryImpl
     _contracts[contract.serviceName] = contract;
     _implementations.putIfAbsent(contract.serviceName, () => {});
 
-    // Регистрируем методы из класса
-    contract.setup();
-
-    // Регистрируем все подконтракты, если они есть
+    // Если это RpcServiceContract, используем объединение реестров
     if (contract is RpcServiceContract) {
-      for (final subContract in contract.getSubContracts()) {
-        if (!_contracts.containsKey(subContract.serviceName)) {
-          // Рекурсивно регистрируем подконтракт (только если он еще не зарегистрирован)
-          _registerContract(subContract);
+      // Объединяем реестр контракта с реестром эндпоинта
+      contract.mergeInto(_methodRegistry);
+    } else {
+      // Для старых типов контрактов используем прежнюю логику
+      contract.setup();
+
+      // Регистрируем все подконтракты, если они есть
+      if (contract is RpcServiceContract) {
+        for (final subContract in contract.getSubContracts()) {
+          if (!_contracts.containsKey(subContract.serviceName)) {
+            // Рекурсивно регистрируем подконтракт (только если он еще не зарегистрирован)
+            _registerContract(subContract);
+          }
         }
       }
     }
 
-    // Для каждого метода в контракте
-    for (final method in contract.methods) {
-      final methodType = method.methodType;
-      final methodName = method.methodName;
-      final handler = contract.getMethodHandler(methodName);
-      final argumentParser = contract.getMethodArgumentParser(methodName);
-      final responseParser = contract.getMethodResponseParser(methodName);
+    // Проверяем методы в реестре эндпоинта для этого сервиса
+    final registeredMethods =
+        _methodRegistry.getMethodsForService(contract.serviceName);
 
-      if (handler == null || argumentParser == null || responseParser == null) {
-        // Пропускаем методы без полной информации
+    // Для каждого метода создаем реализацию
+    for (final method in registeredMethods) {
+      final methodType = method.methodType ?? RpcMethodType.unary;
+      final methodName = method.methodName;
+      final handler = method.handler;
+      final argumentParser = method.argumentParser;
+      final responseParser = method.responseParser;
+
+      if (handler == null || argumentParser == null) {
+        _logger.debug(
+            'Пропускаем метод ${contract.serviceName}.$methodName из-за отсутствия обязательных компонентов');
         continue;
       }
 
       try {
         // Типобезопасная регистрация каждого типа метода
         if (methodType == RpcMethodType.unary) {
+          if (responseParser == null) {
+            _logger.debug(
+                'Пропускаем унарный метод ${contract.serviceName}.$methodName из-за отсутствия responseParser');
+            continue;
+          }
+
+          _logger.debug(
+              'Регистрация унарного метода ${contract.serviceName}.$methodName:');
+          _logger.debug('  - Handler type: ${handler.runtimeType}');
+          _logger.debug('  - ArgParser type: ${argumentParser.runtimeType}');
+          _logger.debug('  - RespParser type: ${responseParser.runtimeType}');
+
           unaryRequest(
             serviceName: contract.serviceName,
             methodName: methodName,
           ).register(
             handler: handler,
-            requestParser: argumentParser,
-            responseParser: responseParser,
+            requestParser: argumentParser
+                as RpcMethodArgumentParser<IRpcSerializableMessage>,
+            responseParser: responseParser
+                as RpcMethodResponseParser<IRpcSerializableMessage>,
           );
         } else if (methodType == RpcMethodType.serverStreaming) {
+          if (responseParser == null) {
+            _logger.debug(
+                'Пропускаем серверный стриминг метод ${contract.serviceName}.$methodName из-за отсутствия responseParser');
+            continue;
+          }
+
           serverStreaming(
             serviceName: contract.serviceName,
             methodName: methodName,
           ).register(
             handler: handler,
-            requestParser: argumentParser,
-            responseParser: responseParser,
+            requestParser: argumentParser
+                as RpcMethodArgumentParser<IRpcSerializableMessage>,
+            responseParser: responseParser
+                as RpcMethodResponseParser<IRpcSerializableMessage>,
           );
         } else if (methodType == RpcMethodType.clientStreaming) {
           clientStreaming(
@@ -226,16 +260,25 @@ final class _RpcEndpointRegistryImpl
             methodName: methodName,
           ).register(
             handler: handler,
-            requestParser: argumentParser,
+            requestParser: argumentParser
+                as RpcMethodArgumentParser<IRpcSerializableMessage>,
           );
         } else if (methodType == RpcMethodType.bidirectional) {
+          if (responseParser == null) {
+            _logger.debug(
+                'Пропускаем двунаправленный стриминг метод ${contract.serviceName}.$methodName из-за отсутствия responseParser');
+            continue;
+          }
+
           bidirectionalStreaming(
             serviceName: contract.serviceName,
             methodName: methodName,
           ).register(
             handler: handler,
-            requestParser: argumentParser,
-            responseParser: responseParser,
+            requestParser: argumentParser
+                as RpcMethodArgumentParser<IRpcSerializableMessage>,
+            responseParser: responseParser
+                as RpcMethodResponseParser<IRpcSerializableMessage>,
           );
         }
       } catch (error, trace) {
@@ -333,6 +376,7 @@ final class _RpcEndpointRegistryImpl
     Function? argumentParser,
     Function? responseParser,
   }) {
+    // Регистрируем метод в реестре методов
     _methodRegistry.registerMethod(
       serviceName: serviceName,
       methodName: methodName,

@@ -300,6 +300,9 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
     _registry.registerMethod(
       serviceName: serviceName,
       methodName: methodName,
+      methodType: RpcMethodType.clientStreaming,
+      argumentParser: requestParser,
+      responseParser: responseParser,
       handler: _createHandlerFunction<Request, Response>(
         implementation: implementation,
         requestParser: requestParser,

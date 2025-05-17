@@ -208,6 +208,9 @@ final class UnaryRequestRpcMethod<T extends IRpcSerializableMessage>
     _registry.registerMethod(
       serviceName: serviceName,
       methodName: methodName,
+      methodType: RpcMethodType.unary,
+      argumentParser: requestParser,
+      responseParser: responseParser,
       handler: (RpcMethodContext context) async {
         final requestId = context.messageId;
         final startTime = DateTime.now().millisecondsSinceEpoch;

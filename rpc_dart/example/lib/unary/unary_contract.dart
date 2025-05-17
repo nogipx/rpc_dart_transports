@@ -8,6 +8,8 @@ abstract base class BasicServiceContract extends RpcServiceContract {
 
   @override
   void setup() {
+    print('Setup вызван для ${runtimeType.toString()}');
+
     // Метод работы с примитивными числовыми значениями
     addUnaryRequestMethod<ComputeRequest, ComputeResult>(
       methodName: 'compute',
@@ -15,6 +17,33 @@ abstract base class BasicServiceContract extends RpcServiceContract {
       argumentParser: ComputeRequest.fromJson,
       responseParser: ComputeResult.fromJson,
     );
+
+    print('После регистрации метода compute:');
+    print(
+      '  • Handler: ${getMethodHandler<ComputeRequest, ComputeResult>("compute") != null ? 'Есть' : 'Нет!'}',
+    );
+    print(
+      '  • ArgParser: ${getMethodArgumentParser<ComputeRequest>("compute") != null ? 'Есть' : 'Нет!'}',
+    );
+    print(
+      '  • RespParser: ${getMethodResponseParser<ComputeResult>("compute") != null ? 'Есть' : 'Нет!'}',
+    );
+
+    // Диагностика реестра внутри контракта
+    final registration = methodRegistry.findMethod(serviceName, 'compute');
+    if (registration != null) {
+      print('\nВ реестре контракта:');
+      print('  • Handler: ${registration.handler != null ? 'Есть' : 'Нет!'}');
+      print(
+        '  • ArgParser: ${registration.argumentParser != null ? 'Есть' : 'Нет!'}',
+      );
+      print(
+        '  • RespParser: ${registration.responseParser != null ? 'Есть' : 'Нет!'}',
+      );
+    } else {
+      print('\nМетод compute не найден в реестре контракта!');
+    }
+
     super.setup();
   }
 
@@ -24,6 +53,8 @@ abstract base class BasicServiceContract extends RpcServiceContract {
 
 /// Серверная реализация контракта базового сервиса
 final class ServerBasicServiceContract extends BasicServiceContract {
+  ServerBasicServiceContract();
+
   @override
   Future<ComputeResult> compute(ComputeRequest request) async {
     final value1 = request.value1;
@@ -49,6 +80,8 @@ final class ServerBasicServiceContract extends BasicServiceContract {
 final class ClientBasicServiceContract extends BasicServiceContract {
   final RpcEndpoint _endpoint;
 
+  // Принимаем эндпоинт, но НЕ регистрируем контракт автоматически
+  // Это должно делаться явно через вызов registerServiceContract
   ClientBasicServiceContract(this._endpoint);
 
   @override

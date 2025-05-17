@@ -19,6 +19,9 @@ final class _RpcEngine implements IRpcEngine {
   @override
   IRpcSerializer get serializer => _serializer;
 
+  /// Реестр методов
+  final IRpcMethodRegistry _registry;
+
   /// Метка для отладки
   final String? debugLabel;
 
@@ -27,10 +30,6 @@ final class _RpcEngine implements IRpcEngine {
 
   /// Контроллеры потоков данных
   final Map<String, StreamController<dynamic>> _streamControllers = {};
-
-  /// Обработчики методов по имени сервиса и метода
-  final Map<String, Map<String, Future<dynamic> Function(RpcMethodContext)>>
-      _methodHandlers = {};
 
   /// Цепочка middleware для обработки запросов и ответов
   final RpcMiddlewareChain _middlewareChain = RpcMiddlewareChain();
@@ -51,7 +50,8 @@ final class _RpcEngine implements IRpcEngine {
     this._serializer, {
     this.debugLabel,
     RpcUniqueIdGenerator? uniqueIdGenerator,
-  }) {
+    required IRpcMethodRegistry registry,
+  }) : _registry = registry {
     _uniqueIdGenerator = uniqueIdGenerator ?? _defaultUniqueIdGenerator;
     _initialize();
   }
@@ -82,12 +82,19 @@ final class _RpcEngine implements IRpcEngine {
     required String serviceName,
     required String methodName,
     required dynamic handler,
-    Function? argumentParser,
     RpcMethodType? methodType,
+    Function? argumentParser,
     Function? responseParser,
   }) {
-    _methodHandlers.putIfAbsent(serviceName, () => {});
-    _methodHandlers[serviceName]![methodName] = handler;
+    // Если есть реестр методов, регистрируем метод и там
+    _registry.registerMethod(
+      serviceName: serviceName,
+      methodName: methodName,
+      methodType: methodType,
+      handler: handler,
+      argumentParser: argumentParser,
+      responseParser: responseParser,
+    );
   }
 
   /// Вызывает удаленный метод и возвращает результат
@@ -224,7 +231,23 @@ final class _RpcEngine implements IRpcEngine {
       return;
     }
 
-    final methodHandler = _methodHandlers[serviceName]?[methodName];
+    // Добавляем логи для отладки поиска метода
+    final hasRegistryMethod =
+        _registry.findMethod(serviceName, methodName) != null;
+
+    print("\n=== DEBUG _handleRequest ===");
+    print("Поиск метода: $serviceName.$methodName");
+    print("В registry: ${hasRegistryMethod ? 'Найден' : 'Не найден'}");
+    final methods = _registry.getMethodsForService(serviceName);
+    print("Все методы в registry для $serviceName:");
+    for (final method in methods) {
+      print("  - ${method.methodName} (${method.methodType})");
+    }
+    print("==========================\n");
+
+    // Проверяем наличие обработчика сначала в реестре
+    var methodHandler = _registry.findMethod(serviceName, methodName);
+
     if (methodHandler == null) {
       await _sendErrorMessage(
         message.id,
@@ -267,7 +290,7 @@ final class _RpcEngine implements IRpcEngine {
       );
 
       // Вызываем обработчик с обновленным контекстом
-      final result = await methodHandler(updatedContext);
+      final result = await methodHandler.handler(updatedContext);
 
       // Изменяем направление на отправку
       direction = RpcDataDirection.toRemote;

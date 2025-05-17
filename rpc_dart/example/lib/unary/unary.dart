@@ -10,6 +10,9 @@ final _logger = RpcLogger('UnaryExample');
 Future<void> main({bool debug = false}) async {
   printHeader('Пример унарных вызовов RPC');
 
+  // Устанавливаем уровень логгирования на DEBUG
+  RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.debug);
+
   // Создаем транспорты в памяти
   final clientTransport = MemoryTransport('client');
   final serverTransport = MemoryTransport('server');
@@ -24,22 +27,19 @@ Future<void> main({bool debug = false}) async {
   final server = RpcEndpoint(transport: serverTransport, debugLabel: 'server');
   _logger.info('Эндпоинты созданы');
 
-  // Добавляем middleware
-  if (debug) {
-    server.addMiddleware(DebugMiddleware(_logger));
-    client.addMiddleware(DebugMiddleware(_logger));
-  } else {
-    server.addMiddleware(LoggingMiddleware(_logger));
-    client.addMiddleware(LoggingMiddleware(_logger));
-  }
+  // Добавляем middleware - всегда включаем режим отладки
+  server.addMiddleware(DebugMiddleware(_logger));
+  client.addMiddleware(DebugMiddleware(_logger));
 
   try {
-    // Создаем и регистрируем контракты
+    // Создаем контракты
     final serverContract = ServerBasicServiceContract();
     final clientContract = ClientBasicServiceContract(client);
 
+    // Явно регистрируем контракты в эндпоинтах
     server.registerServiceContract(serverContract);
     client.registerServiceContract(clientContract);
+
     _logger.info('Контракты зарегистрированы');
 
     _logger.info('-------------------------');

@@ -249,6 +249,9 @@ final class ServerStreamingRpcMethod<T extends IRpcSerializableMessage>
     _registry.registerMethod(
       serviceName: serviceName,
       methodName: methodName,
+      methodType: RpcMethodType.serverStreaming,
+      argumentParser: requestParser,
+      responseParser: responseParser,
       handler: (RpcMethodContext context) async {
         try {
           final requestId = context.messageId;

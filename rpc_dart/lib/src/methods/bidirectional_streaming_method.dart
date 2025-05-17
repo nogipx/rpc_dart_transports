@@ -329,6 +329,9 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
     _registry.registerMethod(
       serviceName: serviceName,
       methodName: methodName,
+      methodType: RpcMethodType.bidirectional,
+      argumentParser: requestParser,
+      responseParser: responseParser,
       handler: (context) async {
         final requestId = context.messageId;
         final startTime = DateTime.now().millisecondsSinceEpoch;
