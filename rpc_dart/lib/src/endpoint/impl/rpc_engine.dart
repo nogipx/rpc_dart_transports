@@ -8,8 +8,7 @@ part of '../_index.dart';
 ///
 /// Этот класс является внутренней реализацией и не должен использоваться напрямую.
 /// Для публичного API используйте [RpcEndpoint].
-final class _RpcEndpointCoreImpl<T extends IRpcSerializableMessage>
-    implements _IRpcEndpointCore<T> {
+final class _RpcEngine implements IRpcEngine {
   /// Транспорт для отправки/получения сообщений
   final RpcTransport _transport;
   @override
@@ -47,7 +46,7 @@ final class _RpcEndpointCoreImpl<T extends IRpcSerializableMessage>
   /// [transport] - транспорт для обмена сообщениями
   /// [serializer] - сериализатор для преобразования сообщений
   /// [debugLabel] - опциональная метка для отладки и логирования
-  _RpcEndpointCoreImpl(
+  _RpcEngine(
     this._transport,
     this._serializer, {
     this.debugLabel,
@@ -82,7 +81,10 @@ final class _RpcEndpointCoreImpl<T extends IRpcSerializableMessage>
   void registerMethod({
     required String serviceName,
     required String methodName,
-    required Future<dynamic> Function(RpcMethodContext) handler,
+    required dynamic handler,
+    Function? argumentParser,
+    RpcMethodType? methodType,
+    Function? responseParser,
   }) {
     _methodHandlers.putIfAbsent(serviceName, () => {});
     _methodHandlers[serviceName]![methodName] = handler;
@@ -570,37 +572,5 @@ final class _RpcEndpointCoreImpl<T extends IRpcSerializableMessage>
     );
 
     await _sendMessage(message);
-  }
-
-  @override
-  BidirectionalStreamingRpcMethod<T> bidirectionalStreaming({
-    required String serviceName,
-    required String methodName,
-  }) {
-    throw UnimplementedError();
-  }
-
-  @override
-  ClientStreamingRpcMethod<T> clientStreaming({
-    required String serviceName,
-    required String methodName,
-  }) {
-    throw UnimplementedError();
-  }
-
-  @override
-  ServerStreamingRpcMethod<T> serverStreaming({
-    required String serviceName,
-    required String methodName,
-  }) {
-    throw UnimplementedError();
-  }
-
-  @override
-  UnaryRequestRpcMethod<T> unaryRequest({
-    required String serviceName,
-    required String methodName,
-  }) {
-    throw UnimplementedError();
   }
 }

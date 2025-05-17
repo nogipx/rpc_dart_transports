@@ -3,10 +3,6 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 import 'package:rpc_dart/rpc_dart.dart';
-import 'package:rpc_dart/diagnostics.dart';
-
-/// Константа с источником логов
-const String _source = 'JsonRpcExample';
 
 /// Пример использования JSON-RPC транспорта для унарных методов
 Future<void> main() async {

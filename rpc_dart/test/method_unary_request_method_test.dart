@@ -123,8 +123,6 @@ void main() {
   group('Тестирование унарного метода калькулятора', () {
     late RpcEndpoint clientEndpoint;
     late RpcEndpoint serverEndpoint;
-    late RpcServiceContract clientContract;
-    late RpcServiceContract serverContract;
     late CalculatorTestsClient calculatorClient;
     late CalculatorTestsServer calculatorServer;
 
@@ -142,8 +140,6 @@ void main() {
 
       clientEndpoint = testEnv.clientEndpoint;
       serverEndpoint = testEnv.serverEndpoint;
-      clientContract = testEnv.clientContract;
-      serverContract = testEnv.serverContract;
 
       // Получаем конкретные реализации из мапы расширений
       calculatorClient = testEnv.clientExtensions.get<CalculatorTestsContract>()

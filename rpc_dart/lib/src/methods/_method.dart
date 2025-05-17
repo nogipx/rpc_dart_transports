@@ -15,7 +15,7 @@ part 'unary_request_method.dart';
 /// Базовый абстрактный класс для всех типов RPC методов
 abstract base class RpcMethod<T extends IRpcSerializableMessage> {
   /// Endpoint, с которым связан метод
-  final IRpcEndpoint<T> _endpoint;
+  final IRpcEndpoint _endpoint;
 
   /// Название сервиса
   final String serviceName;
@@ -59,17 +59,17 @@ abstract base class RpcMethod<T extends IRpcSerializableMessage> {
     return methodContract;
   }
 
-  IRpcEndpointCore get _core {
-    if (_endpoint is! IRpcEndpointCore) {
+  IRpcEngine get _engine {
+    if (_endpoint is! IRpcEngine) {
       throw ArgumentError('Is not valid subtype');
     }
-    return _endpoint as IRpcEndpointCore;
+    return _endpoint as IRpcEngine;
   }
 
-  IRpcRegistrar<T> get _registrar {
-    if (_endpoint is! IRpcRegistrar<T>) {
+  IRpcMethodRegistry get _registry {
+    if (_endpoint is! IRpcMethodRegistry) {
       throw ArgumentError('Is not valid subtype');
     }
-    return _endpoint as IRpcRegistrar<T>;
+    return _endpoint as IRpcMethodRegistry;
   }
 }

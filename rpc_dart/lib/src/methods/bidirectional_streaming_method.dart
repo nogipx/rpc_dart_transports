@@ -9,7 +9,7 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
     extends RpcMethod<T> {
   /// Создает новый объект двунаправленного стриминг RPC метода
   BidirectionalStreamingRpcMethod(
-    IRpcEndpoint<T> endpoint,
+    IRpcEndpoint endpoint,
     String serviceName,
     String methodName,
   ) : super(endpoint, serviceName, methodName) {
@@ -62,7 +62,7 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
     final outgoingController = StreamController<Request>();
 
     // Инициируем соединение
-    _core.invoke(
+    _engine.invoke(
       serviceName: serviceName,
       methodName: methodName,
       request: {'_bidirectional': true, '_streamId': effectiveStreamId},
@@ -77,7 +77,7 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
 
     // Трансформируем входящий поток, применяя parser и отслеживая метрики
     Stream<Response> typedIncomingStream;
-    typedIncomingStream = _core
+    typedIncomingStream = _engine
         .openStream(
       serviceName: serviceName,
       methodName: methodName,
@@ -118,7 +118,7 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
           return response;
         } catch (e) {
           // В случае ошибки преобразования, логируем через метаданные для middleware
-          _core.sendStreamData(
+          _engine.sendStreamData(
             streamId: effectiveStreamId,
             data: null,
             metadata: {
@@ -190,7 +190,7 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
         final processedData = data is RpcMessage ? data.toJson() : data;
         final dataSize = processedData.toString().length;
 
-        _core.sendStreamData(
+        _engine.sendStreamData(
           streamId: effectiveStreamId,
           data: processedData,
           serviceName: serviceName,
@@ -218,7 +218,7 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
         final duration = endTime - startTime;
 
         // Маркер завершения для клиентского стрима
-        _core.sendStreamData(
+        _engine.sendStreamData(
           streamId: effectiveStreamId,
           data: {'_clientStreamEnd': true},
           serviceName: serviceName,
@@ -319,14 +319,14 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
         RpcMethodImplementation.bidirectionalStreaming(contract, handler);
 
     // Регистрируем реализацию метода
-    _registrar.registerMethodImplementation(
+    _registry.registerMethodImplementation(
       serviceName: serviceName,
       methodName: methodName,
       implementation: implementation,
     );
 
     // Регистрируем низкоуровневый обработчик
-    _registrar.registerMethod(
+    _registry.registerMethod(
       serviceName: serviceName,
       methodName: methodName,
       handler: (context) async {
@@ -389,7 +389,7 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
             var totalSentDataSize = 0;
 
             // Подписываемся на сообщения из транспорта для этого streamId и перенаправляем их в контроллер
-            final subscription = _core
+            final subscription = _engine
                 .openStream(
               serviceName: serviceName,
               methodName: methodName,
@@ -534,7 +534,7 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
                       data is RpcMessage ? data.toJson() : data;
                   final dataSize = processedData.toString().length;
 
-                  _core.sendStreamData(
+                  _engine.sendStreamData(
                     streamId: effectiveStreamId,
                     data: processedData,
                     serviceName: serviceName,
@@ -600,7 +600,7 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
                 );
 
                 try {
-                  _core.sendStreamError(
+                  _engine.sendStreamError(
                     streamId: effectiveStreamId,
                     errorMessage: error.toString(),
                     serviceName: serviceName,
@@ -623,7 +623,7 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
                 );
 
                 try {
-                  _core.closeStream(
+                  _engine.closeStream(
                     streamId: effectiveStreamId,
                     serviceName: serviceName,
                     methodName: methodName,

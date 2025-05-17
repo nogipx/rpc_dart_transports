@@ -195,7 +195,6 @@ void main() {
       final chatSession = clientService.chatSession();
 
       // Счетчики для проверки
-      int messagesSent = 0;
       int messagesReceived = 0;
 
       // Подписываемся на входящие сообщения
@@ -209,7 +208,6 @@ void main() {
         chatSession.send(
           ChatMessage('Клиент', 'Сообщение #$i'),
         );
-        messagesSent++;
       }
 
       // Даем время на обработку

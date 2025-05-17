@@ -12,7 +12,7 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
     extends RpcMethod<T> {
   /// Создает новый объект клиентского стриминг RPC метода
   ClientStreamingRpcMethod(
-    IRpcEndpoint<T> endpoint,
+    IRpcEndpoint endpoint,
     String serviceName,
     String methodName,
   ) : super(endpoint, serviceName, methodName) {
@@ -69,7 +69,7 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
     final responseController = StreamController<Response>();
 
     // Инициируем соединение с пустым запросом или метаданными
-    _core
+    _engine
         .invoke(
       serviceName: serviceName,
       methodName: methodName,
@@ -115,7 +115,7 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
             request is RpcMessage ? request.toJson() : request;
         final dataSize = processedRequest.toString().length;
 
-        _core.sendStreamData(
+        _engine.sendStreamData(
           streamId: effectiveStreamId,
           data: processedRequest,
           serviceName: serviceName,
@@ -181,7 +181,7 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
         );
 
         // Отправляем маркер завершения потока запросов
-        _core.sendStreamData(
+        _engine.sendStreamData(
           streamId: effectiveStreamId,
           data: {'_clientStreamEnd': true},
           serviceName: serviceName,
@@ -290,14 +290,14 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
             contract, handler);
 
     // Регистрируем реализацию метода
-    _registrar.registerMethodImplementation(
+    _registry.registerMethodImplementation(
       serviceName: serviceName,
       methodName: methodName,
       implementation: implementation,
     );
 
     // Регистрируем низкоуровневый обработчик
-    _registrar.registerMethod(
+    _registry.registerMethod(
       serviceName: serviceName,
       methodName: methodName,
       handler: _createHandlerFunction<Request, Response>(
@@ -359,7 +359,7 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
         );
 
         // Получаем стрим сообщений от клиента
-        final incomingStream = _core
+        final incomingStream = _engine
             .openStream(
           serviceName: serviceName,
           methodName: methodName,

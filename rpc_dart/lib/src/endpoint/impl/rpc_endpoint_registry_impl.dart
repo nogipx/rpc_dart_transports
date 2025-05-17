@@ -4,21 +4,13 @@
 
 part of '../_index.dart';
 
-final _random = Random();
-String _defaultUniqueIdGenerator([String? prefix]) {
-  // Текущее время в миллисекундах + случайное число
-  return '${prefix != null ? '${prefix}_' : ''}${DateTime.now().toUtc().toIso8601String()}_${_random.nextInt(1000000)}';
-}
-
-typedef RpcUniqueIdGenerator = String Function([String? prefix]);
-
 /// Типизированный Endpoint с поддержкой контрактов
-class _RpcEndpointImpl
-    implements
-        _IRpcEndpointCore<IRpcSerializableMessage>,
-        IRpcEndpoint<IRpcSerializableMessage> {
+final class _RpcEndpointRegistryImpl
+    implements IRpcEngine, IRpcEndpoint, IRpcMethodRegistry {
   /// Делегат для базовой функциональности
-  final _RpcEndpointCoreImpl<IRpcSerializableMessage> _delegate;
+  final IRpcEngine _delegate;
+
+  final IRpcMethodRegistry _methodRegistry;
 
   /// Зарегистрированные контракты сервисов
   final Map<String, IRpcServiceContract<IRpcSerializableMessage>> _contracts =
@@ -35,17 +27,19 @@ class _RpcEndpointImpl
   final String? debugLabel;
 
   /// Создает новый типизированный Endpoint
-  _RpcEndpointImpl({
+  _RpcEndpointRegistryImpl({
     required RpcTransport transport,
     required RpcSerializer serializer,
     this.debugLabel,
     RpcUniqueIdGenerator? uniqueIdGenerator,
-  }) : _delegate = _RpcEndpointCoreImpl(
+    IRpcMethodRegistry? methodRegistry,
+  })  : _delegate = _RpcEngine(
           transport,
           serializer,
           debugLabel: debugLabel,
           uniqueIdGenerator: uniqueIdGenerator,
-        );
+        ),
+        _methodRegistry = methodRegistry ?? RpcMethodRegistry();
 
   @override
   RpcTransport get transport => _delegate.transport;
@@ -114,17 +108,6 @@ class _RpcEndpointImpl
       );
 
   @override
-  void registerMethod({
-    required String serviceName,
-    required String methodName,
-    required Future<dynamic> Function(RpcMethodContext context) handler,
-  }) =>
-      _delegate.registerMethod(
-        serviceName: serviceName,
-        methodName: methodName,
-        handler: handler,
-      );
-
   void registerMethodImplementation({
     required String serviceName,
     required String methodName,
@@ -307,4 +290,53 @@ class _RpcEndpointImpl
   }) =>
           BidirectionalStreamingRpcMethod<IRpcSerializableMessage>(
               this, serviceName, methodName);
+
+  @override
+  void clearMethodsRegistry() {
+    _methodRegistry.clearMethodsRegistry();
+  }
+
+  @override
+  MethodRegistration? findMethod(String serviceName, String methodName) {
+    return _methodRegistry.findMethod(serviceName, methodName);
+  }
+
+  @override
+  Map<String, IRpcServiceContract<IRpcSerializableMessage>> getAllContracts() {
+    return _methodRegistry.getAllContracts();
+  }
+
+  @override
+  Iterable<MethodRegistration> getAllMethods() {
+    return _methodRegistry.getAllMethods();
+  }
+
+  @override
+  Iterable<MethodRegistration> getMethodsForService(String serviceName) {
+    return _methodRegistry.getMethodsForService(serviceName);
+  }
+
+  @override
+  void registerContract(IRpcServiceContract<IRpcSerializableMessage> contract) {
+    _methodRegistry.registerContract(contract);
+  }
+
+  @override
+  void registerMethod({
+    required String serviceName,
+    required String methodName,
+    required handler,
+    RpcMethodType? methodType,
+    Function? argumentParser,
+    Function? responseParser,
+  }) {
+    _methodRegistry.registerMethod(
+      serviceName: serviceName,
+      methodName: methodName,
+      methodType: methodType,
+      handler: handler,
+      argumentParser: argumentParser,
+      responseParser: responseParser,
+    );
+  }
 }

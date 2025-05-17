@@ -5,22 +5,21 @@
 part of '_index.dart';
 
 /// Типизированный RPC эндпоинт
-class RpcEndpoint extends _RpcEndpointImpl
-    implements
-        IRpcEndpoint<IRpcSerializableMessage>,
-        IRpcEndpointCore,
-        IRpcRegistrar<IRpcSerializableMessage> {
+base class RpcEndpoint extends _RpcEndpointRegistryImpl
+    implements IRpcEndpoint {
   /// Создаёт новый типизированный RPC эндпоинт
   ///
   /// [transport] - транспорт для обмена сообщениями
   /// [serializer] - сериализатор для преобразования сообщений
   /// [debugLabel] - опциональная метка для отладки и логирования
   /// [uniqueIdGenerator] - генератор уникальных ID, по умолчанию используется [_defaultUniqueIdGenerator]
+  /// [methodRegistry] - регистратор методов, по умолчанию используется [RpcMethodRegistry]
   RpcEndpoint({
     required super.transport,
     super.serializer = const MsgPackSerializer(),
     super.debugLabel,
     super.uniqueIdGenerator,
+    super.methodRegistry,
   });
 
   @override

@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:example/diagnostics/diagnostics_example.dart';
 import 'package:rpc_dart/rpc_dart.dart';
 
 import 'bidirectional_contract.dart';

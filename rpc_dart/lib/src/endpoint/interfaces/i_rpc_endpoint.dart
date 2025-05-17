@@ -6,7 +6,7 @@ part of '../_index.dart';
 
 /// Публичный интерфейс для клиентской стороны RPC.
 /// Предоставляет методы для вызова удаленных процедур.
-abstract interface class IRpcEndpoint<T extends IRpcSerializableMessage> {
+abstract interface class IRpcEndpoint {
   /// Транспорт, используемый для отправки и получения сообщений
   RpcTransport get transport;
 
@@ -20,25 +20,26 @@ abstract interface class IRpcEndpoint<T extends IRpcSerializableMessage> {
   String? get debugLabel;
 
   /// Создает объект унарного метода
-  UnaryRequestRpcMethod<T> unaryRequest({
+  UnaryRequestRpcMethod<IRpcSerializableMessage> unaryRequest({
     required String serviceName,
     required String methodName,
   });
 
   /// Создает объект метода с серверным стримингом
-  ServerStreamingRpcMethod<T> serverStreaming({
+  ServerStreamingRpcMethod<IRpcSerializableMessage> serverStreaming({
     required String serviceName,
     required String methodName,
   });
 
   /// Создает объект метода с клиентским стримингом
-  ClientStreamingRpcMethod<T> clientStreaming({
+  ClientStreamingRpcMethod<IRpcSerializableMessage> clientStreaming({
     required String serviceName,
     required String methodName,
   });
 
   /// Создает объект метода с двунаправленным стримингом
-  BidirectionalStreamingRpcMethod<T> bidirectionalStreaming({
+  BidirectionalStreamingRpcMethod<IRpcSerializableMessage>
+      bidirectionalStreaming({
     required String serviceName,
     required String methodName,
   });
@@ -52,7 +53,9 @@ abstract interface class IRpcEndpoint<T extends IRpcSerializableMessage> {
   Future<void> close();
 
   /// Получает контракт сервиса по имени
-  IRpcServiceContract<T>? getServiceContract(String serviceName);
+  IRpcServiceContract<IRpcSerializableMessage>? getServiceContract(
+    String serviceName,
+  );
 
   /// Генерирует уникальный ID
   String generateUniqueId([String? prefix]);

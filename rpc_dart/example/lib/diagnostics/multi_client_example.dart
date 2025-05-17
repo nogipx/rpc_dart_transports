@@ -491,8 +491,8 @@ class DiagnosticServerImpl {
     };
 
     logger.info(
-      'Диагностический сервер: зарегистрирован клиент ${client.clientId} ' +
-          '(${client.properties?['clientType']})',
+      'Диагностический сервер: зарегистрирован клиент ${client.clientId} '
+      '(${client.properties?['clientType']})',
     );
   }
 
@@ -559,8 +559,8 @@ class DiagnosticServerImpl {
     // Для важных метрик (долгое выполнение) можно выводить специальные уведомления
     if (metric.content.durationMs > 200) {
       logger.warning(
-        'Клиент ${metric.clientId}: обнаружена высокая латентность ' +
-            '${metric.content.operation} (${metric.content.durationMs}ms)',
+        'Клиент ${metric.clientId}: обнаружена высокая латентность '
+        '${metric.content.operation} (${metric.content.durationMs}ms)',
       );
     }
   }

@@ -8,7 +8,7 @@ part of '../_index.dart';
 ///
 /// Этот класс определяет общий публичный интерфейс для всех RPC-конечных точек.
 /// Для типизированной реализации используйте [RpcEndpoint].
-abstract interface class _IRpcEndpointCore<T extends IRpcSerializableMessage> {
+abstract interface class IRpcEngine {
   /// Транспорт для отправки/получения сообщений
   RpcTransport get transport;
 
@@ -18,11 +18,14 @@ abstract interface class _IRpcEndpointCore<T extends IRpcSerializableMessage> {
   /// Добавляет middleware для обработки запросов и ответов
   void addMiddleware(IRpcMiddleware middleware);
 
-  /// Регистрирует обработчик метода
+  /// Регистрирует отдельный метод
   void registerMethod({
     required String serviceName,
     required String methodName,
-    required Future<dynamic> Function(RpcMethodContext) handler,
+    required RpcMethodType methodType,
+    required dynamic handler,
+    required Function argumentParser,
+    Function? responseParser,
   });
 
   /// Вызывает удаленный метод и возвращает результат
@@ -57,6 +60,8 @@ abstract interface class _IRpcEndpointCore<T extends IRpcSerializableMessage> {
     required String streamId,
     required String errorMessage,
     Map<String, dynamic>? metadata,
+    String? serviceName,
+    String? methodName,
   });
 
   /// Закрывает поток
@@ -65,30 +70,6 @@ abstract interface class _IRpcEndpointCore<T extends IRpcSerializableMessage> {
     Map<String, dynamic>? metadata,
     String? serviceName,
     String? methodName,
-  });
-
-  /// Создает объект унарного метода для указанного сервиса и метода
-  UnaryRequestRpcMethod<T> unaryRequest({
-    required String serviceName,
-    required String methodName,
-  });
-
-  /// Создает объект серверного стриминг метода для указанного сервиса и метода
-  ServerStreamingRpcMethod<T> serverStreaming({
-    required String serviceName,
-    required String methodName,
-  });
-
-  /// Создает объект клиентского стриминг метода для указанного сервиса и метода
-  ClientStreamingRpcMethod<T> clientStreaming({
-    required String serviceName,
-    required String methodName,
-  });
-
-  /// Создает объект двунаправленного стриминг метода для указанного сервиса и метода
-  BidirectionalStreamingRpcMethod<T> bidirectionalStreaming({
-    required String serviceName,
-    required String methodName,
   });
 
   /// Проверяет, активна ли конечная точка

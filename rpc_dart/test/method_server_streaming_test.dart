@@ -99,8 +99,7 @@ class ServerTaskService extends TaskServiceContract {
     setup();
 
     // Выводим дополнительную информацию для отладки
-    print(
-        'Debug: methods = ${methods.map((m) => "${m.methodName}").join(", ")}');
+    print('Debug: methods = ${methods.map((m) => m.methodName).join(", ")}');
   }
 
   @override
@@ -148,8 +147,7 @@ class ClientTaskService extends TaskServiceContract {
     setup();
 
     // Выводим дополнительную информацию для отладки
-    print(
-        'Debug: methods = ${methods.map((m) => "${m.methodName}").join(", ")}');
+    print('Debug: methods = ${methods.map((m) => m.methodName).join(", ")}');
   }
 
   @override

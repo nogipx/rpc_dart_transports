@@ -9,7 +9,7 @@ final class ServerStreamingRpcMethod<T extends IRpcSerializableMessage>
     extends RpcMethod<T> {
   /// Создает новый объект серверного стриминг RPC метода
   ServerStreamingRpcMethod(
-    IRpcEndpoint<T> endpoint,
+    IRpcEndpoint endpoint,
     String serviceName,
     String methodName,
   ) : super(endpoint, serviceName, methodName) {
@@ -62,7 +62,7 @@ final class ServerStreamingRpcMethod<T extends IRpcSerializableMessage>
     );
 
     // Создаем базовый стрим с передачей запроса
-    final responseStream = _core
+    final responseStream = _engine
         .openStream(
       serviceName: serviceName,
       methodName: methodName,
@@ -115,7 +115,7 @@ final class ServerStreamingRpcMethod<T extends IRpcSerializableMessage>
             : actualRequest;
 
         // Отправляем запрос в стрим
-        _core.sendStreamData(
+        _engine.sendStreamData(
           streamId: effectiveStreamId,
           data: processedRequest,
           serviceName: serviceName,
@@ -138,7 +138,7 @@ final class ServerStreamingRpcMethod<T extends IRpcSerializableMessage>
         final duration = endTime - startTime;
 
         // Закрываем стрим со стороны клиента
-        _core.closeStream(
+        _engine.closeStream(
           streamId: effectiveStreamId,
           serviceName: serviceName,
           methodName: methodName,
@@ -239,14 +239,14 @@ final class ServerStreamingRpcMethod<T extends IRpcSerializableMessage>
         RpcMethodImplementation.serverStreaming(contract, handler);
 
     // Регистрируем реализацию метода
-    _registrar.registerMethodImplementation(
+    _registry.registerMethodImplementation(
       serviceName: serviceName,
       methodName: methodName,
       implementation: implementation,
     );
 
     // Регистрируем низкоуровневый обработчик
-    _registrar.registerMethod(
+    _registry.registerMethod(
       serviceName: serviceName,
       methodName: methodName,
       handler: (RpcMethodContext context) async {
@@ -347,7 +347,7 @@ final class ServerStreamingRpcMethod<T extends IRpcSerializableMessage>
       final dataSize = processedData.toString().length;
       totalDataSize += dataSize;
 
-      _core.sendStreamData(
+      _engine.sendStreamData(
         streamId: messageId,
         data: processedData,
         serviceName: serviceName,
@@ -373,7 +373,7 @@ final class ServerStreamingRpcMethod<T extends IRpcSerializableMessage>
         stackTrace: stackTrace,
       );
 
-      _core.sendStreamError(
+      _engine.sendStreamError(
         streamId: messageId,
         errorMessage: error.toString(),
         serviceName: serviceName,
@@ -413,7 +413,7 @@ final class ServerStreamingRpcMethod<T extends IRpcSerializableMessage>
       );
 
       // Закрываем стрим с указанием serviceName и methodName для middleware
-      _core.closeStream(
+      _engine.closeStream(
         streamId: messageId,
         serviceName: serviceName,
         methodName: methodName,

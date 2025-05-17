@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:rpc_dart/rpc_dart.dart';
-import 'package:rpc_dart/diagnostics.dart';
 
 import 'server_streaming_models.dart';
 

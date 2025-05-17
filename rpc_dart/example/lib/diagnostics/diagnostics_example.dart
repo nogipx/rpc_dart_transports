@@ -46,7 +46,7 @@ Future<void> main({bool debug = true}) async {
   try {
     // Регистрируем диагностический сервер
     logger.info('Настройка диагностического сервера...');
-    final serverContract = setupDiagnosticServer(serverEndpoint);
+    setupDiagnosticServer(serverEndpoint);
 
     // Настраиваем и регистрируем диагностический клиент
     logger.info('Настройка диагностического клиента...');

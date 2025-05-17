@@ -157,7 +157,7 @@ abstract class BasicStreamServiceContract extends IExtensionTestContract {
 class FileUploadServiceServer extends FileUploadServiceContract {
   // Защита от повторного создания обработчиков
   int _handlerCount = 0;
-  static const int MAX_HANDLERS = 5;
+  static const int maxHandlers = 5;
 
   // Используем флаг для предотвращения бесконечного создания обработчиков
   bool _isProcessing = false;
@@ -183,14 +183,14 @@ class FileUploadServiceServer extends FileUploadServiceContract {
 
   @override
   ClientStreamingBidiStream<FileChunk, UploadResult> uploadFile() {
-    if (_handlerCount >= MAX_HANDLERS) {
+    if (_handlerCount >= maxHandlers) {
       throw Exception('Слишком много обработчиков создано: $_handlerCount');
     }
 
     _handlerCount++;
 
     final sessionId =
-        'upload_${DateTime.now().millisecondsSinceEpoch}_${_handlerCount}';
+        'upload_${DateTime.now().millisecondsSinceEpoch}_$_handlerCount';
 
     // Защита от рекурсии
     if (_isProcessing) {
@@ -457,7 +457,6 @@ void main() {
     late FileUploadServiceClient fileUploadClient;
     late FileUploadServiceServer fileUploadServer;
     late BasicStreamServiceClient basicStreamClient;
-    late BasicStreamServiceServer basicStreamServer;
 
     setUp(() {
       // Используем фабрику для создания тестового окружения с несколькими расширениями
@@ -486,8 +485,6 @@ void main() {
           .get<FileUploadServiceContract>() as FileUploadServiceServer;
       basicStreamClient = testEnv.clientExtensions
           .get<BasicStreamServiceContract>() as BasicStreamServiceClient;
-      basicStreamServer = testEnv.serverExtensions
-          .get<BasicStreamServiceContract>() as BasicStreamServiceServer;
 
       // Очищаем данные перед каждым тестом
       fileUploadServer.clearData();

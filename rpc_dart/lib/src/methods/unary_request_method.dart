@@ -9,7 +9,7 @@ final class UnaryRequestRpcMethod<T extends IRpcSerializableMessage>
     extends RpcMethod<T> {
   /// Создает новый объект унарного RPC метода
   UnaryRequestRpcMethod(
-    IRpcEndpoint<T> endpoint,
+    IRpcEndpoint endpoint,
     String serviceName,
     String methodName,
   ) : super(endpoint, serviceName, methodName) {
@@ -55,7 +55,7 @@ final class UnaryRequestRpcMethod<T extends IRpcSerializableMessage>
     var success = false;
 
     try {
-      final responseData = await _core.invoke(
+      final responseData = await _engine.invoke(
         serviceName: serviceName,
         methodName: methodName,
         request: request is RpcMessage ? request.toJson() : request,
@@ -193,7 +193,7 @@ final class UnaryRequestRpcMethod<T extends IRpcSerializableMessage>
     final implementation = RpcMethodImplementation.unary(contract, handler);
 
     // Регистрируем реализацию метода
-    _registrar.registerMethodImplementation(
+    _registry.registerMethodImplementation(
       serviceName: serviceName,
       methodName: methodName,
       implementation: implementation,
@@ -205,7 +205,7 @@ final class UnaryRequestRpcMethod<T extends IRpcSerializableMessage>
 
     // Регистрируем низкоуровневый обработчик - это ключевой шаг для обеспечения
     // связи между контрактом и обработчиком вызова
-    _registrar.registerMethod(
+    _registry.registerMethod(
       serviceName: serviceName,
       methodName: methodName,
       handler: (RpcMethodContext context) async {
