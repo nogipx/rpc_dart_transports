@@ -52,7 +52,7 @@ class CalculationResponse implements IRpcSerializableMessage {
 }
 
 /// Контракт для тестов калькулятора, реализующий интерфейс расширения
-abstract class CalculatorTestsContract extends IExtensionTestContract {
+abstract class CalculatorTestsContract extends RpcServiceContract {
   static const String calculateMethod = 'calculate';
 
   CalculatorTestsContract() : super('calculator_tests');
@@ -128,8 +128,8 @@ void main() {
 
     setUp(() {
       // Используем фабрику для создания тестового окружения
-      final testEnv = TestContractFactory.setupTestEnvironment(
-        extensionFactories: [
+      final testEnv = TestFactory.setupTestEnvironment(
+        contractFactories: [
           (
             type: CalculatorTestsContract,
             clientFactory: (endpoint) => CalculatorTestsClient(endpoint),
@@ -142,10 +142,8 @@ void main() {
       serverEndpoint = testEnv.serverEndpoint;
 
       // Получаем конкретные реализации из мапы расширений
-      calculatorClient = testEnv.clientExtensions.get<CalculatorTestsContract>()
-          as CalculatorTestsClient;
-      calculatorServer = testEnv.serverExtensions.get<CalculatorTestsContract>()
-          as CalculatorTestsServer;
+      calculatorClient = testEnv.clientContract as CalculatorTestsClient;
+      calculatorServer = testEnv.serverContract as CalculatorTestsServer;
     });
 
     tearDown(() async {

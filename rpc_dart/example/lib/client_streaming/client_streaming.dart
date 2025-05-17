@@ -11,6 +11,11 @@ import 'client_streaming_models.dart';
 const String _source = 'ClientStreamingExample';
 late final RpcLogger _logger;
 
+/// Основная функция
+Future<void> main({bool debug = false}) async {
+  await runClientStreamingExample(debug: debug);
+}
+
 /// Главная функция примера клиентского стриминга
 Future<void> runClientStreamingExample({bool debug = false}) async {
   // Создаем логгер для примера
@@ -277,9 +282,4 @@ Uint8List _generateData(int size, int seed) {
     data[i] = (i + seed) % 256;
   }
   return data;
-}
-
-/// Основная функция
-Future<void> main({bool debug = false}) async {
-  await runClientStreamingExample(debug: debug);
 }

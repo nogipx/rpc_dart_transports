@@ -33,7 +33,7 @@ class ChatMessage implements IRpcSerializableMessage {
 }
 
 // Контракт чат-сервиса
-abstract class ChatServiceContract extends IExtensionTestContract {
+abstract class ChatServiceContract extends RpcServiceContract {
   // Константы для имен методов
   static const String chatSessionMethod = 'chatSession';
 
@@ -122,8 +122,8 @@ void main() {
 
     setUp(() {
       // Используем фабрику для создания тестового окружения
-      final testEnv = TestContractFactory.setupTestEnvironment(
-        extensionFactories: [
+      final testEnv = TestFactory.setupTestEnvironment(
+        contractFactories: [
           (
             type: ChatServiceContract,
             clientFactory: (endpoint) => ClientChatService(endpoint),
@@ -135,11 +135,8 @@ void main() {
       clientEndpoint = testEnv.clientEndpoint;
       serverEndpoint = testEnv.serverEndpoint;
 
-      // Получаем конкретные реализации из мапы расширений
-      clientService = testEnv.clientExtensions.get<ChatServiceContract>()
-          as ClientChatService;
-      serverService = testEnv.serverExtensions.get<ChatServiceContract>()
-          as ServerChatService;
+      clientService = testEnv.clientContract as ClientChatService;
+      serverService = testEnv.serverContract as ServerChatService;
     });
 
     tearDown(() async {

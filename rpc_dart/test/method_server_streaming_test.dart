@@ -1,7 +1,7 @@
 import 'package:rpc_dart/rpc_dart.dart';
 import 'package:test/test.dart';
-import 'fixtures/test_contract.dart';
 import 'fixtures/test_factory.dart';
+import 'fixtures/test_contract.dart';
 
 // Модели для тестирования серверного стриминга
 class TaskRequest implements IRpcSerializableMessage {
@@ -63,7 +63,7 @@ class ProgressMessage implements IRpcSerializableMessage {
 }
 
 // Контракт сервиса для тестирования серверного стриминга
-abstract class TaskServiceContract extends IExtensionTestContract {
+abstract class TaskServiceContract extends RpcServiceContract {
   // Константа для имени метода
   static const String startTaskMethod = 'startTask';
 
@@ -192,8 +192,8 @@ void main() {
       print('\nDebug: === Начало настройки теста ===');
 
       // Используем фабрику для создания тестового окружения
-      final testEnv = TestContractFactory.setupTestEnvironment(
-        extensionFactories: [
+      final testEnv = TestFactory.setupTestEnvironment(
+        contractFactories: [
           (
             type: TaskServiceContract,
             clientFactory: (endpoint) => ClientTaskService(endpoint),
@@ -208,10 +208,8 @@ void main() {
       serverEndpoint = testEnv.serverEndpoint;
 
       // Получаем конкретные реализации из мапы расширений
-      clientService = testEnv.clientExtensions.get<TaskServiceContract>()
-          as ClientTaskService;
-      serverService = testEnv.serverExtensions.get<TaskServiceContract>()
-          as ServerTaskService;
+      clientService = testEnv.clientContract as ClientTaskService;
+      serverService = testEnv.serverContract as ServerTaskService;
 
       // Дополнительная явная регистрация метода startTask
       print('Debug: Явная регистрация метода startTask с вызовом напрямую');

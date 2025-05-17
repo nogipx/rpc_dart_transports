@@ -6,8 +6,8 @@ import 'dart:async';
 
 import 'package:rpc_dart/rpc_dart.dart';
 import 'package:test/test.dart';
-import 'fixtures/test_contract.dart';
 import 'fixtures/test_factory.dart';
+import 'fixtures/test_contract.dart';
 
 // Модели для тестирования файлового клиентского стриминга
 class FileChunk implements IRpcSerializableMessage {
@@ -87,7 +87,7 @@ class StreamMessage implements IRpcSerializableMessage {
 }
 
 /// Контракт для тестирования клиентского стриминга файлов
-abstract class FileUploadServiceContract extends IExtensionTestContract {
+abstract class FileUploadServiceContract extends RpcServiceContract {
   static const String uploadFileMethod = 'uploadFile';
 
   FileUploadServiceContract() : super('file_upload_tests');
@@ -109,7 +109,7 @@ abstract class FileUploadServiceContract extends IExtensionTestContract {
 }
 
 /// Контракт для тестирования базовых операций клиентского стриминга
-abstract class BasicStreamServiceContract extends IExtensionTestContract {
+abstract class BasicStreamServiceContract extends RpcServiceContract {
   static const String collectDataMethod = 'collectData';
   static const String countItemsMethod = 'countItems';
   static const String errorStreamMethod = 'errorStream';
@@ -460,8 +460,8 @@ void main() {
 
     setUp(() {
       // Используем фабрику для создания тестового окружения с несколькими расширениями
-      final testEnv = TestContractFactory.setupTestEnvironment(
-        extensionFactories: [
+      final testEnv = TestFactory.setupTestEnvironment(
+        contractFactories: [
           (
             type: FileUploadServiceContract,
             clientFactory: (endpoint) => FileUploadServiceClient(endpoint),
@@ -479,12 +479,9 @@ void main() {
       serverEndpoint = testEnv.serverEndpoint;
 
       // Получаем конкретные реализации из mapы расширений
-      fileUploadClient = testEnv.clientExtensions
-          .get<FileUploadServiceContract>() as FileUploadServiceClient;
-      fileUploadServer = testEnv.serverExtensions
-          .get<FileUploadServiceContract>() as FileUploadServiceServer;
-      basicStreamClient = testEnv.clientExtensions
-          .get<BasicStreamServiceContract>() as BasicStreamServiceClient;
+      fileUploadClient = testEnv.clientContract as FileUploadServiceClient;
+      fileUploadServer = testEnv.serverContract as FileUploadServiceServer;
+      basicStreamClient = testEnv.clientContract as BasicStreamServiceClient;
 
       // Очищаем данные перед каждым тестом
       fileUploadServer.clearData();
