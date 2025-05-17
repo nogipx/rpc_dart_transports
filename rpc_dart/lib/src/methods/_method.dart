@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 import 'dart:async';
+import 'package:rpc_dart/diagnostics.dart';
 import 'package:rpc_dart/rpc_dart.dart';
 
 part '_method_implementation.dart';
@@ -29,6 +30,9 @@ abstract base class RpcMethod<T extends IRpcSerializableMessage> {
   RpcMethod(this._endpoint, this.serviceName, this.methodName) {
     _logger = RpcLogger('$serviceName.$methodName.base');
   }
+
+  /// Получает диагностический клиент через логгер
+  IRpcDiagnosticClient? get _diagnostic => _logger.diagnostic;
 
   /// Получает контракт метода
   RpcMethodContract<Request, Response>

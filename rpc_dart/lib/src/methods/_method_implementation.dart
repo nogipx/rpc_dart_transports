@@ -85,7 +85,20 @@ final class RpcMethodImplementation<Request extends IRpcSerializableMessage,
       throw _missingHandlerException('makeUnaryRequest');
     }
 
-    return await _unaryHandler!(request);
+    try {
+      return await _unaryHandler!(request);
+    } catch (e, stackTrace) {
+      // Логируем ошибку
+      _logger.error(
+        'Ошибка при вызове унарного метода: $e',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      throw RpcCustomException(
+        customMessage: 'Ошибка при вызове унарного метода: $e',
+        debugLabel: 'RpcMethodImplementation.makeUnaryRequest',
+      );
+    }
   }
 
   /// Открывает стрим ответов для указанного запроса
@@ -101,7 +114,13 @@ final class RpcMethodImplementation<Request extends IRpcSerializableMessage,
 
     try {
       return _serverStreamHandler!(request);
-    } catch (e) {
+    } catch (e, stackTrace) {
+      // Логируем ошибку
+      _logger.error(
+        'Ошибка при открытии стрима: $e',
+        error: e,
+        stackTrace: stackTrace,
+      );
       // В случае ошибки при получении стрима создаем пустой стрим с ошибкой
       final errorStream = BidiStreamGenerator<Request, Response>((_) async* {
         throw RpcCustomException(
@@ -135,11 +154,25 @@ final class RpcMethodImplementation<Request extends IRpcSerializableMessage,
     final clientStreamBidi = _clientStreamHandler!();
 
     // Подписываемся на поток запросов и перенаправляем их в BidiStream
-    stream.listen(
-      (request) => clientStreamBidi.send(request),
-      onDone: () => clientStreamBidi.close(),
-      onError: (error) => clientStreamBidi.close(),
-    );
+    try {
+      stream.listen(
+        (request) => clientStreamBidi.send(request),
+        onDone: () => clientStreamBidi.close(),
+        onError: (error) => clientStreamBidi.close(),
+      );
+    } catch (e, stackTrace) {
+      // Логируем ошибку
+      _logger.error(
+        'Ошибка при подписке на стрим: $e',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      clientStreamBidi.close();
+      throw RpcCustomException(
+        customMessage: 'Ошибка при подписке на стрим: $e',
+        debugLabel: 'RpcMethodImplementation.openClientStreaming',
+      );
+    }
 
     // Возвращаем результат
     return await clientStreamBidi.getResponse();
@@ -226,12 +259,13 @@ final class RpcMethodImplementation<Request extends IRpcSerializableMessage,
             );
 
             try {
-              // Аналогично, используем приведение типов
               final typedBidiStream = bidiStream;
               typedBidiStream.close();
-            } catch (e) {
+            } catch (e, stackTrace) {
               _logger.error(
                 'Ошибка при закрытии потока обработчика: $e',
+                error: e,
+                stackTrace: stackTrace,
               );
               // Не закрываем outputController здесь, т.к. он закроется при завершении потока bidiStream
             }
@@ -243,9 +277,11 @@ final class RpcMethodImplementation<Request extends IRpcSerializableMessage,
 
       // Создаем BidiStream с входящим потоком запросов
       return generator.create(incomingStream);
-    } catch (e) {
+    } catch (e, stackTrace) {
       _logger.error(
         'Ошибка при обработке двунаправленного потока: $e',
+        error: e,
+        stackTrace: stackTrace,
       );
       // В случае ошибки создаем поток с ошибкой
       final errorGenerator =

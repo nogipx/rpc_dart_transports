@@ -33,25 +33,122 @@ final class UnaryRequestRpcMethod<T extends IRpcSerializableMessage>
       'Вызов унарного метода $serviceName.$methodName',
     );
 
-    final result = await _core.invoke(
-      serviceName: serviceName,
-      methodName: methodName,
-      request: request is RpcMessage ? request.toJson() : request,
-      metadata: metadata,
-      timeout: timeout,
+    final requestId = _endpoint.generateUniqueId('request');
+    final startTime = DateTime.now().millisecondsSinceEpoch;
+
+    // Отправляем событие начала вызова метода, если диагностика доступна
+    _diagnostic?.reportTraceEvent(
+      _diagnostic!.createTraceEvent(
+        eventType: RpcTraceMetricType.methodStart,
+        method: methodName,
+        service: serviceName,
+        requestId: requestId,
+        metadata: {
+          'requestType': request.runtimeType.toString(),
+          ...?metadata,
+        },
+      ),
     );
 
-    _logger.debug(
-      'Получен ответ от метода $serviceName.$methodName',
-    );
+    Response? result;
+    Object? error;
+    var success = false;
 
-    // Если результат - Map<String, dynamic> и предоставлен парсер, используем его
-    if (result is Map<String, dynamic>) {
-      return responseParser(result);
+    try {
+      final responseData = await _core.invoke(
+        serviceName: serviceName,
+        methodName: methodName,
+        request: request is RpcMessage ? request.toJson() : request,
+        metadata: metadata,
+        timeout: timeout,
+      );
+
+      _logger.debug(
+        'Получен ответ от метода $serviceName.$methodName',
+      );
+
+      // Если результат - Map<String, dynamic> и предоставлен парсер, используем его
+      if (responseData is Map<String, dynamic>) {
+        result = responseParser(responseData);
+      } else {
+        // Иначе возвращаем результат как есть
+        result = responseData as Response;
+      }
+
+      success = true;
+      return result;
+    } catch (e, stack) {
+      error = e;
+      _logger.error(
+        'Ошибка при вызове унарного метода $serviceName.$methodName',
+        error: e,
+        stackTrace: stack,
+      );
+
+      // Отправляем метрику об ошибке
+      _diagnostic?.reportErrorMetric(
+        _diagnostic!.createErrorMetric(
+          errorType: RpcErrorMetricType.unexpectedError,
+          message: 'Ошибка при вызове метода $serviceName.$methodName: $e',
+          requestId: requestId,
+          method: '$serviceName.$methodName',
+          stackTrace: stack.toString(),
+          details: {'errorType': e.runtimeType.toString()},
+        ),
+      );
+
+      rethrow;
+    } finally {
+      final endTime = DateTime.now().millisecondsSinceEpoch;
+      final duration = endTime - startTime;
+
+      // Отправляем метрики о завершении вызова метода, если диагностика доступна
+      // Отправляем событие завершения трассировки
+      unawaited(
+        _diagnostic!.reportTraceEvent(
+          _diagnostic!.createTraceEvent(
+            eventType: success
+                ? RpcTraceMetricType.methodEnd
+                : RpcTraceMetricType.methodError,
+            method: methodName,
+            service: serviceName,
+            requestId: requestId,
+            durationMs: duration,
+            error: error != null
+                ? {
+                    'error': error.toString(),
+                    'type': error.runtimeType.toString()
+                  }
+                : null,
+            metadata: {
+              'requestType': request.runtimeType.toString(),
+              'responseType': result?.runtimeType.toString(),
+              ...?metadata,
+            },
+          ),
+        ),
+      );
+
+      // Отправляем метрику задержки
+      unawaited(
+        _diagnostic!.reportLatencyMetric(
+          _diagnostic!.createLatencyMetric(
+            operationType: RpcLatencyOperationType.methodCall,
+            operation: '$serviceName.$methodName',
+            startTime: startTime,
+            endTime: endTime,
+            success: success,
+            requestId: requestId,
+            error: error != null
+                ? {
+                    'error': error.toString(),
+                    'type': error.runtimeType.toString()
+                  }
+                : null,
+          ),
+        ),
+      );
     }
-
-    // Иначе возвращаем результат как есть
-    return result as Response;
   }
 
   /// Регистрирует обработчик унарного метода
@@ -112,6 +209,24 @@ final class UnaryRequestRpcMethod<T extends IRpcSerializableMessage>
       serviceName: serviceName,
       methodName: methodName,
       handler: (RpcMethodContext context) async {
+        final requestId = context.messageId;
+        final startTime = DateTime.now().millisecondsSinceEpoch;
+
+        // Отправляем событие начала обработки запроса
+        _diagnostic?.reportTraceEvent(
+          _diagnostic!.createTraceEvent(
+            eventType: RpcTraceMetricType.methodStart,
+            method: methodName,
+            service: serviceName,
+            requestId: requestId,
+            metadata: context.metadata,
+          ),
+        );
+
+        Object? error;
+        var success = false;
+        dynamic result;
+
         try {
           _logger.debug(
             'Обработка запроса для метода $serviceName.$methodName',
@@ -130,16 +245,73 @@ final class UnaryRequestRpcMethod<T extends IRpcSerializableMessage>
           );
 
           // Преобразуем ответ в формат для передачи (JSON для RpcMessage)
-          final result = response is RpcMessage ? response.toJson() : response;
-
+          result = response is RpcMessage ? response.toJson() : response;
+          success = true;
           return result;
-        } catch (e, stack) {
+        } catch (e, stackTrace) {
+          error = e;
           _logger.error(
             'Ошибка при обработке унарного метода $serviceName.$methodName: $e',
-            error: {'error': e.toString()},
-            stackTrace: stack,
+            error: e,
+            stackTrace: stackTrace,
           );
+
+          // Отправляем метрику об ошибке
+          _diagnostic?.reportErrorMetric(
+            _diagnostic!.createErrorMetric(
+              errorType: RpcErrorMetricType.unexpectedError,
+              message:
+                  'Ошибка при обработке метода $serviceName.$methodName: $e',
+              requestId: requestId,
+              method: '$serviceName.$methodName',
+              stackTrace: stackTrace.toString(),
+              details: {'errorType': e.runtimeType.toString()},
+            ),
+          );
+
           rethrow;
+        } finally {
+          final endTime = DateTime.now().millisecondsSinceEpoch;
+          final duration = endTime - startTime;
+
+          // Отправляем метрики о завершении обработки запроса
+          if (_diagnostic != null) {
+            // Событие завершения трассировки
+            unawaited(_diagnostic!.reportTraceEvent(
+              _diagnostic!.createTraceEvent(
+                eventType: success
+                    ? RpcTraceMetricType.methodEnd
+                    : RpcTraceMetricType.methodError,
+                method: methodName,
+                service: serviceName,
+                requestId: requestId,
+                durationMs: duration,
+                error: error != null
+                    ? {
+                        'error': error.toString(),
+                        'type': error.runtimeType.toString()
+                      }
+                    : null,
+                metadata: {
+                  'responseType': result?.runtimeType.toString(),
+                  ...context.metadata ?? {},
+                },
+              ),
+            ));
+
+            // Метрика задержки
+            unawaited(_diagnostic!.reportLatencyMetric(
+              _diagnostic!.createLatencyMetric(
+                operationType: RpcLatencyOperationType.requestProcessing,
+                operation: '$serviceName.$methodName',
+                startTime: startTime,
+                endTime: endTime,
+                success: success,
+                requestId: requestId,
+                error: error != null ? {'error': error.toString()} : null,
+              ),
+            ));
+          }
         }
       },
     );
