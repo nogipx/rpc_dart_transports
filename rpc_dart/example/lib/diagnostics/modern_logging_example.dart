@@ -6,8 +6,6 @@ import 'dart:async';
 import 'package:rpc_dart/rpc_dart.dart';
 import 'package:rpc_dart/diagnostics.dart';
 
-const String _source = 'LoggingExample';
-
 /// Пример работы с новой системой логирования
 ///
 /// Демонстрирует создание различных логгеров с независимыми настройками,
@@ -25,16 +23,16 @@ Future<void> main() async {
 
   // Демонстрация работы с логгерами
   print('=== Демонстрация работы с разными логгерами ===');
-  await apiLogger.info(message: 'API запущен и готов к работе');
-  await dbLogger.debug(message: 'Подключение к базе данных установлено');
-  await dbLogger.warning(message: 'Медленный запрос к базе данных');
-  await uiLogger.info(message: 'Пользовательский интерфейс инициализирован');
+  await apiLogger.info('API запущен и готов к работе');
+  await dbLogger.debug('Подключение к базе данных установлено');
+  await dbLogger.warning('Медленный запрос к базе данных');
+  await uiLogger.info('Пользовательский интерфейс инициализирован');
 
   try {
     throw Exception('Ошибка доступа к API');
   } catch (e, stackTrace) {
     await apiLogger.error(
-      message: 'Не удалось выполнить запрос к серверу',
+      'Не удалось выполнить запрос к серверу',
       error: e,
       stackTrace: stackTrace,
     );
@@ -57,9 +55,9 @@ Future<void> main() async {
   print('\n=== Изменение глобальных настроек ===');
   RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.warning);
 
-  await apiLogger.debug(message: 'Этого сообщения не должно быть видно');
+  await apiLogger.debug('Этого сообщения не должно быть видно');
   await apiLogger.warning(
-    message: 'Это предупреждение должно отображаться в новом формате',
+    'Это предупреждение должно отображаться в новом формате',
   );
 
   print('\nПример завершен');

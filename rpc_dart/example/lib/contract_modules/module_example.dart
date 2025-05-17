@@ -7,7 +7,7 @@ import 'package:rpc_dart/rpc_dart.dart';
 
 import '../models/example_models.dart';
 
-final class ContractModuleExample extends RpcServiceContract<ExampleMessage> {
+final class ContractModuleExample extends RpcServiceContract {
   ContractModuleExample() : super('AppService');
 
   @override
@@ -18,7 +18,7 @@ final class ContractModuleExample extends RpcServiceContract<ExampleMessage> {
   }
 }
 
-class UserContract extends RpcServiceContract<ExampleMessage> {
+class UserContract extends RpcServiceContract {
   UserContract() : super('UserService');
 
   @override
@@ -33,7 +33,7 @@ class UserContract extends RpcServiceContract<ExampleMessage> {
   }
 }
 
-class AuthContract extends RpcServiceContract<ExampleMessage> {
+class AuthContract extends RpcServiceContract {
   AuthContract() : super('AuthService');
 
   @override
@@ -58,7 +58,7 @@ void useCompositeContract() {
 
   // Теперь rootContract содержит все методы из подконтрактов
   // и может быть зарегистрирован в RPC эндпоинте
-  final endpoint = RpcEndpoint<ExampleMessage>(transport: transport);
+  final endpoint = RpcEndpoint(transport: transport);
   endpoint.registerServiceContract(rootContract);
 }
 
@@ -79,15 +79,12 @@ void useModularApproach() {
   rootContract.addSubContract(authContract);
 
   // Регистрируем контракт в эндпоинте
-  final endpoint = RpcEndpoint<ExampleMessage>(transport: transport);
+  final endpoint = RpcEndpoint(transport: transport);
   endpoint.registerServiceContract(rootContract);
 }
 
 // Добавляет методы для пользователей напрямую в контракт с префиксом
-void _addUserModule(
-  RpcServiceContract<ExampleMessage> contract, {
-  String? prefix,
-}) {
+void _addUserModule(RpcServiceContract contract, {String? prefix}) {
   final methodPrefix = prefix != null ? '$prefix.' : '';
 
   contract.addUnaryRequestMethod<UserRequest, UserResponse>(
@@ -129,7 +126,7 @@ void _addUserModule(
 
 // Вспомогательные методы для настройки контрактов
 
-void _setupAuthContract(RpcServiceContract<ExampleMessage> contract) {
+void _setupAuthContract(RpcServiceContract contract) {
   contract.addUnaryRequestMethod<AuthRequest, AuthResponse>(
     methodName: 'login',
     handler: (req) async => AuthResponse(),

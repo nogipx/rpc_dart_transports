@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:example/diagnostics/diagnostics_example.dart';
 import 'package:rpc_dart/rpc_dart.dart';
 
 import 'bidirectional_contract.dart';
@@ -23,13 +24,13 @@ Future<void> main({bool debug = false}) async {
 
   // Добавляем middleware для отладки и логирования
   if (debug) {
-    serverEndpoint.addMiddleware(DebugMiddleware(id: "server"));
-    clientEndpoint.addMiddleware(DebugMiddleware(id: "client"));
+    serverEndpoint.addMiddleware(DebugMiddleware(_logger));
+    clientEndpoint.addMiddleware(DebugMiddleware(_logger));
   } else {
-    serverEndpoint.addMiddleware(LoggingMiddleware(id: "server"));
-    clientEndpoint.addMiddleware(LoggingMiddleware(id: "client"));
+    serverEndpoint.addMiddleware(LoggingMiddleware(RpcLogger('server')));
+    clientEndpoint.addMiddleware(LoggingMiddleware(RpcLogger('client')));
   }
-  _logger.info(message: 'Эндпоинты настроены');
+  _logger.info('Эндпоинты настроены');
 
   try {
     // Создаем и регистрируем серверную и клиентскую реализации чат-сервиса
@@ -38,17 +39,17 @@ Future<void> main({bool debug = false}) async {
 
     serverEndpoint.registerServiceContract(serverContract);
     clientEndpoint.registerServiceContract(clientContract);
-    _logger.info(message: 'Сервисы чата зарегистрированы');
+    _logger.info('Сервисы чата зарегистрированы');
 
     // Демонстрация работы чата
     await demonstrateChatExample(clientContract);
   } catch (e) {
-    _logger.error(message: 'Произошла ошибка', error: {'error': e.toString()});
+    _logger.error('Произошла ошибка', error: {'error': e.toString()});
   } finally {
     // Закрываем эндпоинты
     await clientEndpoint.close();
     await serverEndpoint.close();
-    _logger.info(message: 'Эндпоинты закрыты');
+    _logger.info('Эндпоинты закрыты');
   }
 
   printHeader('Пример завершен');
@@ -56,9 +57,9 @@ Future<void> main({bool debug = false}) async {
 
 /// Печатает заголовок раздела
 void printHeader(String title) {
-  _logger.info(message: '-------------------------');
-  _logger.info(message: ' $title');
-  _logger.info(message: '-------------------------');
+  _logger.info('-------------------------');
+  _logger.info(' $title');
+  _logger.info('-------------------------');
 }
 
 /// Настраиваем транспорт и эндпоинты
@@ -90,7 +91,7 @@ Future<void> demonstrateChatExample(ClientChatService chatService) async {
 
   // Устанавливаем имя пользователя
   final userName = 'Пользователь';
-  _logger.info(message: '👤 Подключаемся к чату как "$userName"');
+  _logger.info('👤 Подключаемся к чату как "$userName"');
 
   // Открываем двунаправленный канал для чата
   final bidiStream = chatService.chatHandler();
@@ -125,11 +126,10 @@ Future<void> demonstrateChatExample(ClientChatService chatService) async {
           break;
       }
 
-      _logger.info(message: formattedMessage);
+      _logger.info(formattedMessage);
     },
-    onError:
-        (e) => _logger.error(message: 'Ошибка', error: {'error': e.toString()}),
-    onDone: () => _logger.info(message: '🔚 Соединение закрыто'),
+    onError: (e) => _logger.error('Ошибка', error: {'error': e.toString()}),
+    onDone: () => _logger.info('🔚 Соединение закрыто'),
   );
 
   // Имитируем отправку сообщений от пользователя
@@ -154,7 +154,7 @@ Future<void> demonstrateChatExample(ClientChatService chatService) async {
 
     // Используем метод send() класса BidiStream для отправки сообщений
     bidiStream.send(chatMessage);
-    _logger.info(message: '📤 Отправлено: $text');
+    _logger.info('📤 Отправлено: $text');
   }
 
   // Даем время получить ответы от сервера

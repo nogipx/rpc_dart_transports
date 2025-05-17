@@ -4,8 +4,7 @@ import 'package:rpc_dart/diagnostics.dart';
 
 import 'server_streaming_models.dart';
 
-/// Константа для источника логов
-const String _source = 'ServerStreamingExample';
+final _logger = RpcLogger('ServerStreamingExample');
 
 /// Пример использования серверного стриминга (один запрос -> поток ответов)
 /// Демонстрирует мониторинг прогресса выполнения длительной задачи
@@ -19,46 +18,30 @@ Future<void> main({bool debug = true}) async {
   // Соединяем транспорты
   clientTransport.connect(serverTransport);
   serverTransport.connect(clientTransport);
-  RpcLog.info(message: 'Транспорты соединены', source: _source);
 
   // Создаем эндпоинты с метками для отладки
   final client = RpcEndpoint(transport: clientTransport, debugLabel: 'client');
   final server = RpcEndpoint(transport: serverTransport, debugLabel: 'server');
-  RpcLog.info(message: 'Эндпоинты созданы', source: _source);
 
   if (debug) {
-    server.addMiddleware(DebugMiddleware(id: "server"));
-    client.addMiddleware(DebugMiddleware(id: "client"));
+    server.addMiddleware(DebugMiddleware(RpcLogger('server')));
+    client.addMiddleware(DebugMiddleware(RpcLogger('client')));
   } else {
-    server.addMiddleware(LoggingMiddleware(id: "server"));
-    client.addMiddleware(LoggingMiddleware(id: 'client'));
+    server.addMiddleware(LoggingMiddleware(RpcLogger('server')));
+    client.addMiddleware(LoggingMiddleware(RpcLogger('client')));
   }
 
-  try {
-    // Регистрируем метод на сервере
-    // Создаем сервисный контракт для сервиса задач
-    final serverContract = ServerTaskService();
-    final clientContract = ClientTaskService(client);
+  // Регистрируем метод на сервере
+  // Создаем сервисный контракт для сервиса задач
+  final serverContract = ServerTaskService();
+  final clientContract = ClientTaskService(client);
 
-    // Регистрируем контракт на сервере
-    server.registerServiceContract(serverContract);
-    client.registerServiceContract(clientContract);
-    RpcLog.info(message: 'Сервис задач зарегистрирован', source: _source);
+  // Регистрируем контракт на сервере
+  server.registerServiceContract(serverContract);
+  client.registerServiceContract(clientContract);
 
-    // Демонстрация прогресса задачи
-    await demonstrateTaskProgress(client);
-  } catch (e) {
-    RpcLog.error(
-      message: 'Произошла ошибка',
-      source: _source,
-      error: {'error': e.toString()},
-    );
-  } finally {
-    // Закрываем эндпоинты
-    await client.close();
-    await server.close();
-    RpcLog.info(message: 'Эндпоинты закрыты', source: _source);
-  }
+  // Демонстрация прогресса задачи
+  await demonstrateTaskProgress(client);
 
   printHeader('Пример завершен');
 }
@@ -89,10 +72,8 @@ class ServerTaskService extends TaskServiceContract {
   ServerStreamingBidiStream<TaskRequest, ProgressMessage> handler(
     TaskRequest request,
   ) {
-    RpcLog.info(
-      message:
-          'Сервер: Начинаем задачу "${request.taskName}" (ID: ${request.taskId})',
-      source: _source,
+    _logger.info(
+      'Сервер: Начинаем задачу "${request.taskName}" (ID: ${request.taskId})',
     );
 
     final bidiStream =
@@ -154,9 +135,8 @@ class ServerTaskService extends TaskServiceContract {
             );
           }
 
-          RpcLog.info(
-            message: 'Сервер: Задача "${request.taskName}" успешно завершена',
-            source: _source,
+          _logger.info(
+            'Сервер: Задача "${request.taskName}" успешно завершена',
           );
         }).create();
 
@@ -198,9 +178,9 @@ class ClientTaskService extends TaskServiceContract {
 
 /// Печатает заголовок раздела
 void printHeader(String title) {
-  RpcLog.info(message: '-------------------------', source: _source);
-  RpcLog.info(message: ' $title', source: _source);
-  RpcLog.info(message: '-------------------------', source: _source);
+  _logger.info('-------------------------');
+  _logger.info(' $title');
+  _logger.info('-------------------------');
 }
 
 /// Возвращает иконку статуса
@@ -240,15 +220,10 @@ Future<void> demonstrateTaskProgress(RpcEndpoint client) async {
     steps: 10,
   );
 
-  RpcLog.info(
-    message:
-        '🚀 Запускаем задачу "${request.taskName}" (ID: ${request.taskId})',
-    source: _source,
+  _logger.info(
+    '🚀 Запускаем задачу "${request.taskName}" (ID: ${request.taskId})',
   );
-  RpcLog.info(
-    message: 'Запрос отправлен, ожидаем получение потока обновлений...',
-    source: _source,
-  );
+  _logger.info('Запрос отправлен, ожидаем получение потока обновлений...');
 
   // Открываем стрим для получения обновлений о прогрессе
   final stream = client
@@ -259,11 +234,8 @@ Future<void> demonstrateTaskProgress(RpcEndpoint client) async {
       );
 
   try {
-    RpcLog.info(message: 'Прогресс выполнения:', source: _source);
-    RpcLog.info(
-      message: '┌────────────────────────────────────────────────────┐',
-      source: _source,
-    );
+    _logger.info('Прогресс выполнения:');
+    _logger.info('┌────────────────────────────────────────────────────┐');
 
     // Отображаем индикатор прогресса
     await for (final progress in stream) {
@@ -272,38 +244,22 @@ Future<void> demonstrateTaskProgress(RpcEndpoint client) async {
       final statusIcon = _getStatusIcon(progress.status);
 
       // Очищаем предыдущую строку и выводим новый прогресс
-      RpcLog.info(
-        message:
-            '│ $statusIcon $progressBar ${progress.progress.toString().padLeft(3)}% │',
-        source: _source,
+      _logger.info(
+        '│ $statusIcon $progressBar ${progress.progress.toString().padLeft(3)}% │',
       );
 
       if (progress.status == 'completed') {
-        RpcLog.info(
-          message: '└────────────────────────────────────────────────────┘',
-          source: _source,
-        );
-        RpcLog.info(message: '✅ Задача успешно завершена!', source: _source);
-        RpcLog.info(message: 'Итоговый отчет:', source: _source);
+        _logger.info('✅ Задача успешно завершена!');
+        _logger.info('Итоговый отчет:');
 
-        RpcLog.info(
-          message: '  • ID задачи: ${progress.taskId}',
-          source: _source,
-        );
-        RpcLog.info(
-          message: '  • Время выполнения: ${DateTime.now().toString()}',
-          source: _source,
-        );
-        RpcLog.info(
-          message: '  • Результат: ${progress.message}',
-          source: _source,
-        );
+        _logger.info('  • ID задачи: ${progress.taskId}');
+        _logger.info('  • Время выполнения: ${DateTime.now().toString()}');
+        _logger.info('  • Результат: ${progress.message}');
       }
     }
   } catch (e) {
-    RpcLog.error(
-      message: 'Произошла ошибка при получении обновлений',
-      source: _source,
+    _logger.error(
+      'Произошла ошибка при получении обновлений',
       error: {'error': e.toString()},
     );
   }

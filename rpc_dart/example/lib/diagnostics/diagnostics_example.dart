@@ -25,7 +25,7 @@ Future<void> main({bool debug = true}) async {
   // Соединяем транспорты
   clientTransport.connect(serverTransport);
   serverTransport.connect(clientTransport);
-  logger.info(message: 'Транспорты соединены');
+  logger.info('Транспорты соединены');
 
   // Создаем эндпоинты
   final clientEndpoint = RpcEndpoint(
@@ -39,23 +39,23 @@ Future<void> main({bool debug = true}) async {
 
   // Устанавливаем middlewares для отладки
   if (debug) {
-    clientEndpoint.addMiddleware(DebugMiddleware(id: 'client'));
-    serverEndpoint.addMiddleware(DebugMiddleware(id: 'server'));
+    clientEndpoint.addMiddleware(DebugMiddleware(logger));
+    serverEndpoint.addMiddleware(DebugMiddleware(logger));
   }
 
   try {
     // Регистрируем диагностический сервер
-    logger.info(message: 'Настройка диагностического сервера...');
+    logger.info('Настройка диагностического сервера...');
     final serverContract = setupDiagnosticServer(serverEndpoint);
 
     // Настраиваем и регистрируем диагностический клиент
-    logger.info(message: 'Настройка диагностического клиента...');
+    logger.info('Настройка диагностического клиента...');
 
     // Устанавливаем диагностический клиент как глобальный сервис для RpcLog
     RpcLoggerSettings.setDiagnostic(
       await setupDiagnosticClient(clientEndpoint, debug),
     );
-    logger.info(message: 'Диагностический клиент установлен для RpcLog');
+    logger.info('Диагностический клиент установлен для RpcLog');
 
     // Демонстрация различных типов логирования и метрик
     await demonstrateDiagnostics(RpcLoggerSettings.diagnostic!);
@@ -68,7 +68,7 @@ Future<void> main({bool debug = true}) async {
     await serverEndpoint.close();
   } catch (e, stack) {
     logger.error(
-      message: 'Произошла ошибка при демонстрации диагностики',
+      'Произошла ошибка при демонстрации диагностики',
       error: e,
       stackTrace: stack,
     );
@@ -180,8 +180,7 @@ Future<IRpcDiagnosticClient> setupDiagnosticClient(
   // Проверяем соединение с сервером диагностики
   final connected = await diagnosticClient.ping();
   logger.info(
-    message:
-        'Соединение с сервером диагностики: ${connected ? "установлено" : "не установлено"}',
+    'Соединение с сервером диагностики: ${connected ? "установлено" : "не установлено"}',
   );
 
   return diagnosticClient;
@@ -192,24 +191,24 @@ Future<void> demonstrateDiagnostics(IRpcDiagnosticClient diagnostics) async {
   printHeader('Демонстрация работы диагностического сервиса');
 
   // 1. Простое логирование
-  logger.info(message: '1. Демонстрация разных уровней логирования');
+  logger.info('1. Демонстрация разных уровней логирования');
 
-  logger.debug(message: 'Это отладочное сообщение');
-  logger.info(message: 'Это информационное сообщение');
-  logger.warning(message: 'Это предупреждение');
+  logger.debug('Это отладочное сообщение');
+  logger.info('Это информационное сообщение');
+  logger.warning('Это предупреждение');
   logger.error(
-    message: 'Это сообщение об ошибке',
+    'Это сообщение об ошибке',
     error: {'code': 500, 'reason': 'Демонстрационная ошибка'},
   );
 
   // 2. Измерение производительности операций
-  logger.info(message: '2. Измерение производительности операций');
+  logger.info('2. Измерение производительности операций');
 
   // Измеряем время выполнения функции
   final result = await diagnostics.measureLatency(
     operation: () async {
       // Имитация долгой операции
-      logger.debug(message: 'Выполнение долгой операции...');
+      logger.debug('Выполнение долгой операции...');
       await Future.delayed(Duration(milliseconds: 500));
       return 'Результат операции';
     },
@@ -219,10 +218,10 @@ Future<void> demonstrateDiagnostics(IRpcDiagnosticClient diagnostics) async {
     service: 'DiagnosticsExample',
   );
 
-  logger.info(message: 'Результат операции: $result');
+  logger.info('Результат операции: $result');
 
   // 3. Отправка метрик стриминга
-  logger.info(message: '3. Отправка метрик стриминга');
+  logger.info('3. Отправка метрик стриминга');
 
   final streamId = 'demo-stream-${DateTime.now().millisecondsSinceEpoch}';
 
@@ -237,7 +236,7 @@ Future<void> demonstrateDiagnostics(IRpcDiagnosticClient diagnostics) async {
   );
 
   // Имитация обработки стрима
-  logger.debug(message: 'Моделируем работу со стримом...');
+  logger.debug('Моделируем работу со стримом...');
   await Future.delayed(Duration(milliseconds: 300));
 
   // Метрика получения данных
@@ -264,7 +263,7 @@ Future<void> demonstrateDiagnostics(IRpcDiagnosticClient diagnostics) async {
   );
 
   // 4. Отправка метрик ошибок
-  logger.info(message: '4. Отправка метрик ошибок');
+  logger.info('4. Отправка метрик ошибок');
 
   try {
     // Имитируем ошибку
@@ -284,7 +283,7 @@ Future<void> demonstrateDiagnostics(IRpcDiagnosticClient diagnostics) async {
   }
 
   // 5. Отправка метрики ресурсов
-  logger.info(message: '5. Отправка метрик ресурсов');
+  logger.info('5. Отправка метрик ресурсов');
 
   await diagnostics.reportResourceMetric(
     diagnostics.createResourceMetric(
@@ -300,7 +299,7 @@ Future<void> demonstrateDiagnostics(IRpcDiagnosticClient diagnostics) async {
   );
 
   // 6. Принудительная отправка всех накопленных метрик
-  logger.info(message: '6. Отправка всех накопленных метрик на сервер');
+  logger.info('6. Отправка всех накопленных метрик на сервер');
   await diagnostics.flush();
 
   // Пауза для обработки всех метрик на сервере
@@ -309,7 +308,7 @@ Future<void> demonstrateDiagnostics(IRpcDiagnosticClient diagnostics) async {
 
 /// Вспомогательная функция для отображения заголовков
 void printHeader(String title) {
-  logger.info(message: '-------------------------');
-  logger.info(message: ' $title');
-  logger.info(message: '-------------------------');
+  logger.info('-------------------------');
+  logger.info(' $title');
+  logger.info('-------------------------');
 }

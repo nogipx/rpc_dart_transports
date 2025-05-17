@@ -44,8 +44,8 @@ Future<void> runClientStreamingExample({bool debug = false}) async {
       serverEndpoint.addMiddleware(DebugMiddleware(RpcLogger("server")));
       clientEndpoint.addMiddleware(DebugMiddleware(RpcLogger("client")));
     } else {
-      serverEndpoint.addMiddleware(LoggingMiddleware());
-      clientEndpoint.addMiddleware(LoggingMiddleware());
+      serverEndpoint.addMiddleware(LoggingMiddleware(RpcLogger('server')));
+      clientEndpoint.addMiddleware(LoggingMiddleware(RpcLogger('client')));
     }
 
     _logger.info('Эндпоинты созданы');
@@ -219,7 +219,7 @@ Future<void> demonstrateFileUploadWithResult(
     _logger.info(
       '🔄 Открытие канала для отправки файла с ожиданием результата...',
     );
-    final uploadStream = clientService.processDataBlocksWithResultAfter();
+    final uploadStream = clientService.processDataBlocksWithResponse();
 
     // Отправляем блоки файла
     _logger.info('📤 Отправка файла частями...');

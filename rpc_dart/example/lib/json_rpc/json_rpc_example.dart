@@ -45,14 +45,16 @@ Future<void> main() async {
     debugLabel: 'server',
   );
 
+  final serverLogger = RpcLogger('server');
+  final clientLogger = RpcLogger('client');
+
   // Настраиваем методы на сервере
   server.registerMethod(
     serviceName: 'calc',
     methodName: 'add',
     handler: (context) async {
-      RpcLog.debug(
-        message: 'Сервер: обработка запроса add с данными ${context.payload}',
-        source: _source,
+      serverLogger.debug(
+        'Сервер: обработка запроса add с данными ${context.payload}',
       );
       if (context.payload is! Map<String, dynamic>) {
         throw RpcInvalidArgumentException(
@@ -72,10 +74,7 @@ Future<void> main() async {
       final a = data['a'] as num;
       final b = data['b'] as num;
       final result = {'result': a + b};
-      RpcLog.debug(
-        message: 'Сервер: возвращаем результат $result',
-        source: _source,
-      );
+      serverLogger.debug('Сервер: возвращаем результат $result');
       return result;
     },
   );
@@ -84,10 +83,8 @@ Future<void> main() async {
     serviceName: 'calc',
     methodName: 'subtract',
     handler: (context) async {
-      RpcLog.debug(
-        message:
-            'Сервер: обработка запроса subtract с данными ${context.payload}',
-        source: _source,
+      serverLogger.debug(
+        'Сервер: обработка запроса subtract с данными ${context.payload}',
       );
       if (context.payload is! Map<String, dynamic>) {
         throw RpcInvalidArgumentException(
@@ -107,10 +104,7 @@ Future<void> main() async {
       final a = data['a'] as num;
       final b = data['b'] as num;
       final result = {'result': a - b};
-      RpcLog.debug(
-        message: 'Сервер: возвращаем результат $result',
-        source: _source,
-      );
+      serverLogger.debug('Сервер: возвращаем результат $result');
       return result;
     },
   );
@@ -123,9 +117,8 @@ Future<void> main() async {
       methodName: 'add',
       request: {'a': 10, 'b': 5},
     );
-    RpcLog.info(
-      message: 'Клиент: получен результат: 10 + 5 = ${addResult['result']}',
-      source: _source,
+    clientLogger.info(
+      'Клиент: получен результат: 10 + 5 = ${addResult['result']}',
     );
 
     // Вызов метода вычитания
@@ -135,10 +128,8 @@ Future<void> main() async {
       methodName: 'subtract',
       request: {'a': 10, 'b': 5},
     );
-    RpcLog.info(
-      message:
-          'Клиент: получен результат: 10 - 5 = ${subtractResult['result']}',
-      source: _source,
+    clientLogger.info(
+      'Клиент: получен результат: 10 - 5 = ${subtractResult['result']}',
     );
 
     // Демонстрация ошибки: неверные аргументы
@@ -150,9 +141,8 @@ Future<void> main() async {
         request: {'a': 'not a number', 'b': 5},
       );
     } catch (e) {
-      RpcLog.error(
-        message: 'Клиент: получена ожидаемая ошибка (invalid arguments)',
-        source: _source,
+      clientLogger.error(
+        'Клиент: получена ожидаемая ошибка (invalid arguments)',
         error: {'error': e.toString()},
       );
     }
@@ -166,9 +156,8 @@ Future<void> main() async {
         request: {'a': 10, 'b': 5},
       );
     } catch (e) {
-      RpcLog.error(
-        message: 'Клиент: получена ожидаемая ошибка (method not found)',
-        source: _source,
+      clientLogger.error(
+        'Клиент: получена ожидаемая ошибка (method not found)',
         error: {'error': e.toString()},
       );
     }
@@ -183,7 +172,7 @@ Future<void> main() async {
 
 /// Печатает заголовок раздела
 void printHeader(String title) {
-  RpcLog.info(message: '-------------------------', source: _source);
-  RpcLog.info(message: ' $title', source: _source);
-  RpcLog.info(message: '-------------------------', source: _source);
+  RpcLogger('JsonRpcExample').info('-------------------------');
+  RpcLogger('JsonRpcExample').info(' $title');
+  RpcLogger('JsonRpcExample').info('-------------------------');
 }

@@ -2,9 +2,13 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-import 'dart:developer' as dev;
 import 'package:rpc_dart/rpc_dart.dart'
-    show RpcMethodContext, SimpleRpcMiddleware, RpcDataDirection;
+    show
+        RpcDataDirection,
+        RpcLogger,
+        RpcLoggerLevel,
+        RpcMethodContext,
+        SimpleRpcMiddleware;
 
 /// Уровень логирования
 enum LogLevel {
@@ -45,37 +49,24 @@ class LoggingMiddleware implements SimpleRpcMiddleware {
   final LogLevel _minLevel;
 
   /// Функция для логирования
-  final LoggerFunction _logger;
-
-  /// Стандартная функция логирования, использующая dart:developer
-  static void _defaultLogger(LogRecord record) {
-    final levelStr = record.level.toString().split('.').last.toUpperCase();
-
-    dev.log(
-      '[$levelStr] ${record.message}',
-      time: record.timestamp,
-      name: 'RpcDart',
-      error: record.error,
-      stackTrace: record.stackTrace,
-    );
-  }
+  final RpcLogger _logger;
 
   /// Создает middleware для логирования
   ///
   /// [id] - идентификатор middleware
   /// [logger] - функция для логирования, если null используется dart:developer
   /// [minLevel] - минимальный уровень логирования
-  LoggingMiddleware({
-    this.id = '',
-    LoggerFunction? logger,
+  LoggingMiddleware(
+    RpcLogger logger, {
     LogLevel minLevel = LogLevel.info,
-  })  : _logger = logger ?? _defaultLogger,
-        _minLevel = minLevel;
+  })  : _logger = logger,
+        _minLevel = minLevel,
+        id = logger.name;
 
   /// Логирует сообщение с указанным уровнем
   void _log(
     String message, {
-    LogLevel level = LogLevel.info,
+    RpcLoggerLevel level = RpcLoggerLevel.info,
     Object? error,
     StackTrace? stackTrace,
   }) {
@@ -84,43 +75,37 @@ class LoggingMiddleware implements SimpleRpcMiddleware {
       return;
     }
 
-    final record = (
-      message: _formatMessage(message),
+    _logger.log(
       level: level,
-      timestamp: DateTime.now(),
       error: error,
       stackTrace: stackTrace,
+      message: message,
     );
-
-    _logger(record);
-  }
-
-  /// Форматирует сообщение, добавляя префикс с ID
-  String _formatMessage(String message) {
-    final prefix = id.isEmpty ? 'LoggingMiddleware' : 'LoggingMiddleware[$id]';
-    return '$prefix: $message';
   }
 
   /// Логирует сообщение c детальной информацией
   void _debug(String message, {Object? error, StackTrace? stackTrace}) {
-    _log(message, level: LogLevel.debug, error: error, stackTrace: stackTrace);
+    _log(message,
+        level: RpcLoggerLevel.debug, error: error, stackTrace: stackTrace);
   }
 
   /// Логирует информационное сообщение
   void _info(String message, {Object? error, StackTrace? stackTrace}) {
-    _log(message, level: LogLevel.info, error: error, stackTrace: stackTrace);
+    _log(message,
+        level: RpcLoggerLevel.info, error: error, stackTrace: stackTrace);
   }
 
   /// Логирует предупреждение
   // ignore: unused_element
   void _warning(String message, {Object? error, StackTrace? stackTrace}) {
     _log(message,
-        level: LogLevel.warning, error: error, stackTrace: stackTrace);
+        level: RpcLoggerLevel.warning, error: error, stackTrace: stackTrace);
   }
 
   /// Логирует ошибку
   void _error(String message, {Object? error, StackTrace? stackTrace}) {
-    _log(message, level: LogLevel.error, error: error, stackTrace: stackTrace);
+    _log(message,
+        level: RpcLoggerLevel.error, error: error, stackTrace: stackTrace);
   }
 
   @override

@@ -79,6 +79,8 @@ abstract base class UserServiceContract extends RpcServiceContract {
 
   @override
   void setup() {
+    print('Setting up UserServiceContract');
+    print('Service name: $serviceName');
     // Регистрация пользователя (унарный метод)
     addUnaryRequestMethod<UserRequest, UserResponse>(
       methodName: registerUserMethod,
@@ -88,12 +90,14 @@ abstract base class UserServiceContract extends RpcServiceContract {
     );
 
     // Получение уведомлений (стрим)
+    print('Adding server streaming method: $subscribeToNotificationsMethod');
     addServerStreamingMethod<UserRequest, NotificationMessage>(
       methodName: subscribeToNotificationsMethod,
       handler: subscribeToNotifications,
       argumentParser: UserRequest.fromJson,
       responseParser: NotificationMessage.fromJson,
     );
+    print('Method subscribeToNotifications registered in contract');
     super.setup();
   }
 
@@ -112,6 +116,7 @@ base class ServerUserService extends UserServiceContract {
 
   @override
   Future<UserResponse> registerUser(UserRequest request) async {
+    print('ServerUserService.registerUser called with ${request.username}');
     // Простая проверка валидности
     if (request.username.isEmpty) {
       throw ArgumentError('Username не может быть пустым');
@@ -134,11 +139,15 @@ base class ServerUserService extends UserServiceContract {
   @override
   ServerStreamingBidiStream<UserRequest, NotificationMessage>
       subscribeToNotifications(UserRequest request) {
+    print(
+        'ServerUserService.subscribeToNotifications called with ${request.username}');
     return BidiStreamGenerator<UserRequest, NotificationMessage>(
         (Stream<UserRequest> requestStream) async* {
       // Проверяем, существует ли пользователь
       bool userExists =
           _users.values.any((user) => user.name == request.username);
+
+      print('User exists check: $userExists');
 
       if (!userExists) {
         // Уведомление об ошибке
@@ -172,6 +181,7 @@ base class ClientUserService extends UserServiceContract {
 
   @override
   Future<UserResponse> registerUser(UserRequest request) {
+    print('ClientUserService.registerUser called with ${request.username}');
     return client
         .unaryRequest(
           serviceName: serviceName,
@@ -186,21 +196,63 @@ base class ClientUserService extends UserServiceContract {
   @override
   ServerStreamingBidiStream<UserRequest, NotificationMessage>
       subscribeToNotifications(UserRequest request) {
-    return client
-        .serverStreaming(
-          serviceName: serviceName,
-          methodName: UserServiceContract.subscribeToNotificationsMethod,
-        )
-        .call<UserRequest, NotificationMessage>(
-          request: request,
-          responseParser: NotificationMessage.fromJson,
-        );
+    print(
+        'ClientUserService.subscribeToNotifications called with ${request.username}');
+    try {
+      print(
+          'Creating ServerStreaming object. serviceName=$serviceName, methodName=${UserServiceContract.subscribeToNotificationsMethod}');
+      final serverStreaming = client.serverStreaming(
+        serviceName: serviceName,
+        methodName: UserServiceContract.subscribeToNotificationsMethod,
+      );
+
+      print('Calling method with request=${request.toJson()}');
+      final result = serverStreaming.call<UserRequest, NotificationMessage>(
+        request: request,
+        responseParser: NotificationMessage.fromJson,
+      );
+
+      print('ServerStreaming call completed');
+      return result;
+    } catch (e, stack) {
+      print('ERROR in subscribeToNotifications: $e');
+      print('Stack trace: $stack');
+      rethrow;
+    }
   }
 }
 
 // Фабричные методы
 UserRequest createUserRequest({String username = 'test_user', int age = 25}) {
   return UserRequest(username, age);
+}
+
+// Команда для вывода всех зарегистрированных методов
+void printRegisteredMethods(RpcEndpoint endpoint, String label) {
+  // Выводит информацию о зарегистрированных методах
+  print('== Методы, зарегистрированные на $label ==');
+  try {
+    final dynamic impl =
+        endpoint; // Используем dynamic для доступа к внутренним полям
+    final dynamic delegate = impl._delegate;
+    final Map<String, Map<String, dynamic>> methodHandlers =
+        delegate._methodHandlers;
+    final Map<String, dynamic> contractsMap = impl._contracts;
+
+    print('Зарегистрированные контракты: ${contractsMap.keys.join(', ')}');
+
+    for (final service in methodHandlers.keys) {
+      print('Сервис: $service');
+      final methods = methodHandlers[service]!;
+      for (final method in methods.keys) {
+        print('  - Метод: $method');
+      }
+    }
+  } catch (e, stack) {
+    print('Ошибка при получении информации о методах: $e');
+    print('Stack trace: $stack');
+  }
+  print('====================');
 }
 
 void main() {
@@ -214,31 +266,68 @@ void main() {
     late ServerUserService serverService;
 
     setUp(() {
-      // Создаем пару связанных транспортов
-      clientTransport = MemoryTransport('client');
-      serverTransport = MemoryTransport('server');
-      clientTransport.connect(serverTransport);
-      serverTransport.connect(clientTransport);
+      try {
+        // Создаем пару связанных транспортов
+        clientTransport = MemoryTransport('client');
+        serverTransport = MemoryTransport('server');
+        clientTransport.connect(serverTransport);
+        serverTransport.connect(clientTransport);
+        print('Transports connected');
 
-      // Сериализатор
-      serializer = JsonSerializer();
+        // Сериализатор
+        serializer = JsonSerializer();
+        print('Serializer created');
 
-      // Создаем эндпоинты
-      clientEndpoint = RpcEndpoint(
-        transport: clientTransport,
-        serializer: serializer,
-      );
-      serverEndpoint = RpcEndpoint(
-        transport: serverTransport,
-        serializer: serializer,
-      );
+        // Создаем эндпоинты
+        clientEndpoint = RpcEndpoint(
+          transport: clientTransport,
+          serializer: serializer,
+          debugLabel: 'client',
+        );
+        serverEndpoint = RpcEndpoint(
+          transport: serverTransport,
+          serializer: serializer,
+          debugLabel: 'server',
+        );
+        print('Endpoints created');
 
-      // Создаем сервисы
-      serverService = ServerUserService();
-      clientService = ClientUserService(clientEndpoint);
+        // Создаем сервисы
+        serverService = ServerUserService();
+        clientService = ClientUserService(clientEndpoint);
+        print('Services created');
 
-      // Регистрируем контракт сервера
-      serverEndpoint.registerServiceContract(serverService);
+        // Регистрируем контракт сервера
+        print(
+            'Registering server contract, service name: ${serverService.serviceName}');
+        try {
+          serverEndpoint.registerServiceContract(serverService);
+          print('Server contract registered successfully');
+        } catch (e, stack) {
+          print('ERROR registering server contract: $e');
+          print('Stack trace: $stack');
+          rethrow;
+        }
+
+        // Регистрируем контракт клиента
+        print(
+            'Registering client contract, service name: ${clientService.serviceName}');
+        try {
+          clientEndpoint.registerServiceContract(clientService);
+          print('Client contract registered successfully');
+        } catch (e, stack) {
+          print('ERROR registering client contract: $e');
+          print('Stack trace: $stack');
+          rethrow;
+        }
+
+        // Выводим информацию о зарегистрированных методах
+        printRegisteredMethods(serverEndpoint, 'SERVER');
+        printRegisteredMethods(clientEndpoint, 'CLIENT');
+      } catch (e, stack) {
+        print('ERROR in setUp: $e');
+        print('Stack trace: $stack');
+        rethrow;
+      }
     });
 
     tearDown(() async {
