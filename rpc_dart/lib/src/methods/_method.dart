@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 import 'dart:async';
-import 'package:rpc_dart/diagnostics.dart';
 import 'package:rpc_dart/rpc_dart.dart';
 
 part '_method_implementation.dart';
@@ -23,8 +22,13 @@ abstract base class RpcMethod<T extends IRpcSerializableMessage> {
   /// Название метода
   final String methodName;
 
+  /// Логгер для этого инстанса метода
+  late final RpcLogger _logger;
+
   /// Создает новый объект RPC метода
-  const RpcMethod(this._endpoint, this.serviceName, this.methodName);
+  RpcMethod(this._endpoint, this.serviceName, this.methodName) {
+    _logger = RpcLogger('$serviceName.$methodName.base');
+  }
 
   /// Получает контракт метода
   RpcMethodContract<Request, Response>
@@ -42,6 +46,7 @@ abstract base class RpcMethod<T extends IRpcSerializableMessage> {
     if (methodContract == null) {
       // Если метод не найден, создаем временный контракт на основе параметров
       return RpcMethodContract<Request, Response>(
+        serviceName: serviceName,
         methodName: methodName,
         methodType: type,
       );

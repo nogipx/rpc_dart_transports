@@ -13,7 +13,10 @@ final class ServerStreamingRpcMethod<
     IRpcEndpoint<MessageType> endpoint,
     String serviceName,
     String methodName,
-  ) : super(endpoint, serviceName, methodName);
+  ) : super(endpoint, serviceName, methodName) {
+    // Создаем логгер с консистентным именем
+    _logger = RpcLogger('$serviceName.$methodName.server_stream');
+  }
 
   /// Открывает поток данных от сервера
   ///
@@ -184,6 +187,11 @@ final class ServerStreamingRpcMethod<
       );
     }, onError: (error) {
       // Отправляем ошибку
+      _logger.error(
+        'Ошибка в серверном стриме: $error',
+        error: {'error': error.toString()},
+      );
+
       _core.sendStreamError(
         streamId: messageId,
         errorMessage: error.toString(),
@@ -191,6 +199,10 @@ final class ServerStreamingRpcMethod<
         methodName: methodName,
       );
     }, onDone: () {
+      _logger.debug(
+        'Серверный стрим завершен',
+      );
+
       // Закрываем стрим с указанием serviceName и methodName для middleware
       _core.closeStream(
         streamId: messageId,

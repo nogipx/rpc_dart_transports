@@ -129,6 +129,9 @@ abstract interface class IRpcServiceContract<
 /// Контракт метода сервиса
 final class RpcMethodContract<Request extends IRpcSerializableMessage,
     Response extends IRpcSerializableMessage> {
+  /// Имя сервиса
+  final String serviceName;
+
   /// Имя метода
   final String methodName;
 
@@ -140,6 +143,7 @@ final class RpcMethodContract<Request extends IRpcSerializableMessage,
 
   /// Конструктор
   const RpcMethodContract({
+    required this.serviceName,
     required this.methodName,
     required this.methodType,
     this.metadata,

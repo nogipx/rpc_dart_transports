@@ -12,7 +12,10 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
     IRpcEndpoint<T> endpoint,
     String serviceName,
     String methodName,
-  ) : super(endpoint, serviceName, methodName);
+  ) : super(endpoint, serviceName, methodName) {
+    // Создаем логгер с консистентным именем
+    _logger = RpcLogger('$serviceName.$methodName.client_stream');
+  }
 
   /// Открывает поток для отправки данных на сервер
   ///
@@ -58,10 +61,8 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
     subscription = responseStream.listen(
       (data) {
         // Логируем получение ответа
-        RpcLog.info(
-          message:
-              'ClientStreamingRpcMethod: получен ответ в потоке для $methodName (stream: $effectiveStreamId)',
-          source: 'ClientStreamingRpcMethod',
+        _logger.info(
+          'ClientStreamingRpcMethod: получен ответ в потоке для $methodName (stream: $effectiveStreamId)',
         );
 
         // Финальный ответ приходит как последнее сообщение стрима
@@ -74,10 +75,8 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
         }
       },
       onError: (error) {
-        RpcLog.error(
-          message:
-              'ClientStreamingRpcMethod: ошибка в потоке $methodName (stream: $effectiveStreamId)',
-          source: 'ClientStreamingRpcMethod',
+        _logger.error(
+          'ClientStreamingRpcMethod: ошибка в потоке $methodName (stream: $effectiveStreamId)',
           error: {'error': error.toString()},
         );
         if (!completer.isCompleted && !streamCompleted) {
@@ -89,10 +88,8 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
         }
       },
       onDone: () {
-        RpcLog.debug(
-          message:
-              'ClientStreamingRpcMethod: поток $methodName завершен (stream: $effectiveStreamId)',
-          source: 'ClientStreamingRpcMethod',
+        _logger.debug(
+          'ClientStreamingRpcMethod: поток $methodName завершен (stream: $effectiveStreamId)',
         );
         // Если поток завершился без ответа, обрабатываем это
         if (!completer.isCompleted && !streamCompleted) {
@@ -109,10 +106,8 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
       responseStream: responseStream,
       sendFunction: (data) {
         if (streamCompleted || dataTransferFinished) {
-          RpcLog.warning(
-            message:
-                'ClientStreamingRpcMethod: попытка отправки в закрытый или завершенный поток $methodName (stream: $effectiveStreamId)',
-            source: 'ClientStreamingRpcMethod',
+          _logger.warning(
+            'ClientStreamingRpcMethod: попытка отправки в закрытый или завершенный поток $methodName (stream: $effectiveStreamId)',
           );
           throw StateError(
               'Невозможно отправить данные: поток закрыт или передача данных завершена');
@@ -130,18 +125,14 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
       // Функция для завершения передачи данных (отправка маркера завершения)
       finishTransferFunction: () async {
         if (streamCompleted || dataTransferFinished) {
-          RpcLog.warning(
-            message:
-                'ClientStreamingRpcMethod: попытка завершить уже завершенный поток $methodName (stream: $effectiveStreamId)',
-            source: 'ClientStreamingRpcMethod',
+          _logger.warning(
+            'ClientStreamingRpcMethod: попытка завершить уже завершенный поток $methodName (stream: $effectiveStreamId)',
           );
           return;
         }
 
-        RpcLog.debug(
-          message:
-              'ClientStreamingRpcMethod: завершение передачи данных для $methodName (stream: $effectiveStreamId)',
-          source: 'ClientStreamingRpcMethod',
+        _logger.debug(
+          'ClientStreamingRpcMethod: завершение передачи данных для $methodName (stream: $effectiveStreamId)',
         );
 
         // Отмечаем, что передача данных завершена
@@ -160,20 +151,16 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
       // Функция для полного закрытия потока
       closeFunction: () async {
         if (streamCompleted) {
-          RpcLog.debug(
-            message:
-                'ClientStreamingRpcMethod: попытка закрыть уже закрытый поток $methodName (stream: $effectiveStreamId)',
-            source: 'ClientStreamingRpcMethod',
+          _logger.debug(
+            'ClientStreamingRpcMethod: попытка закрыть уже закрытый поток $methodName (stream: $effectiveStreamId)',
           );
           return;
         }
 
         // Если передача данных еще не завершена, завершаем её
         if (!dataTransferFinished) {
-          RpcLog.info(
-            message:
-                'ClientStreamingRpcMethod: автоматическое завершение передачи при закрытии $methodName (stream: $effectiveStreamId)',
-            source: 'ClientStreamingRpcMethod',
+          _logger.info(
+            'ClientStreamingRpcMethod: автоматическое завершение передачи при закрытии $methodName (stream: $effectiveStreamId)',
           );
 
           // Отправляем маркер завершения, если ещё не отправлен
@@ -187,10 +174,8 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
           dataTransferFinished = true;
         }
 
-        RpcLog.debug(
-          message:
-              'ClientStreamingRpcMethod: закрытие потока $methodName (stream: $effectiveStreamId)',
-          source: 'ClientStreamingRpcMethod',
+        _logger.debug(
+          'ClientStreamingRpcMethod: закрытие потока $methodName (stream: $effectiveStreamId)',
         );
 
         // Закрываем клиентскую часть стрима
@@ -260,14 +245,11 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
       implementation: implementation,
     );
 
-    RpcLog.debug(
-      message:
-          'ClientStreamingRpcMethod: регистрация метода $serviceName.$methodName',
-      source: 'ClientStreamingRpcMethod',
+    _logger.debug(
+      'ClientStreamingRpcMethod: регистрация метода $serviceName.$methodName',
     );
-    RpcLog.debug(
-      message: 'Реализация: $implementation',
-      source: 'ClientStreamingRpcMethod',
+    _logger.debug(
+      'Реализация: $implementation',
     );
 
     // Регистрируем низкоуровневый обработчик - это ключевой шаг для обеспечения
@@ -276,9 +258,8 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
       serviceName: serviceName,
       methodName: methodName,
       handler: (RpcMethodContext context) async {
-        RpcLog.debug(
-          message: 'Вызов метода $serviceName.$methodName',
-          source: 'ClientStreamingRpcMethod',
+        _logger.debug(
+          'Вызов метода $serviceName.$methodName',
         );
 
         // Получаем ID сообщения из контекста
@@ -305,22 +286,16 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
                   data['_finishTransfer'] == true)) {
             if (data['_clientStreamEnd'] == true &&
                 data['_finishTransfer'] == true) {
-              RpcLog.debug(
-                message:
-                    'Получен полный маркер завершения клиентского стрима (включает _clientStreamEnd и _finishTransfer)',
-                source: 'ClientStreamingRpcMethod',
+              _logger.debug(
+                'Получен полный маркер завершения клиентского стрима (включает _clientStreamEnd и _finishTransfer)',
               );
             } else if (data['_clientStreamEnd'] == true) {
-              RpcLog.debug(
-                message:
-                    'Получен устаревший маркер завершения клиентского стрима (_clientStreamEnd)',
-                source: 'ClientStreamingRpcMethod',
+              _logger.debug(
+                'Получен устаревший маркер завершения клиентского стрима (_clientStreamEnd)',
               );
             } else if (data['_finishTransfer'] == true) {
-              RpcLog.debug(
-                message:
-                    'Получен маркер завершения передачи данных (_finishTransfer)',
-                source: 'ClientStreamingRpcMethod',
+              _logger.debug(
+                'Получен маркер завершения передачи данных (_finishTransfer)',
               );
             }
             isEndMarkerReceived = true;
@@ -340,9 +315,8 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
                       data.containsKey('totalChunks')) &&
                   !data.containsKey('isLastChunk')) {
                 looksLikeResponseData = true;
-                RpcLog.debug(
-                  message: 'Пропускаем данные, похожие на ответ: $data',
-                  source: 'ClientStreamingRpcMethod',
+                _logger.debug(
+                  'Пропускаем данные, похожие на ответ: $data',
                 );
                 continue;
               }
@@ -352,17 +326,15 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
             if (!looksLikeResponseData) {
               final parsedData = requestParser(data);
               requests.add(parsedData);
-              RpcLog.debug(
-                message: 'Добавлен запрос ${requests.length}',
-                source: 'ClientStreamingRpcMethod',
+              _logger.debug(
+                'Добавлен запрос ${requests.length}',
               );
             }
           } catch (e, stack) {
-            RpcLog.error(
-              message: 'Ошибка при парсинге запроса: $e',
-              source: 'ClientStreamingRpcMethod',
+            _logger.error(
+              'Ошибка при парсинге запроса: $e',
               error: {'error': e.toString()},
-              stackTrace: stack.toString(),
+              stackTrace: stack,
             );
             errorMessage = e.toString();
             hasError = true;
@@ -372,9 +344,8 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
 
         // Если есть ошибка, отправляем её клиенту
         if (hasError) {
-          RpcLog.error(
-            message: 'Произошла ошибка при обработке запросов: $errorMessage',
-            source: 'ClientStreamingRpcMethod',
+          _logger.error(
+            'Произошла ошибка при обработке запросов: $errorMessage',
             error: {'errorMessage': errorMessage},
           );
           _core.sendStreamError(
@@ -394,11 +365,9 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
 
         // Проверяем, что мы получили маркер завершения
         if (!isEndMarkerReceived) {
-          RpcLog.warning(
-            message:
-                'Предупреждение: Стрим запросов закрылся без маркера завершения. '
-                'Это может вызвать проблемы с синхронизацией клиента и сервера.',
-            source: 'ClientStreamingRpcMethod',
+          _logger.warning(
+            'Предупреждение: Стрим запросов закрылся без маркера завершения. '
+            'Это может вызвать проблемы с синхронизацией клиента и сервера.',
           );
           // Здесь мы решаем продолжить, так как поток мог быть закрыт
           // и без явного маркера завершения - устаревшее поведение
@@ -408,9 +377,8 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
           // Получаем ClientStreamingBidiStream от обработчика
           final serviceBidiStream = handler();
 
-          RpcLog.debug(
-            message: 'Отправляем ${requests.length} запросов в обработчик',
-            source: 'ClientStreamingRpcMethod',
+          _logger.debug(
+            'Отправляем ${requests.length} запросов в обработчик',
           );
           // Отправляем все запросы в обработчик
           for (final request in requests) {
@@ -429,16 +397,14 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
               );
             },
           );
-          RpcLog.debug(
-            message: 'Получен ответ от обработчика: $response',
-            source: 'ClientStreamingRpcMethod',
+          _logger.debug(
+            'Получен ответ от обработчика: $response',
           );
 
           // Отправляем ответ клиенту
           final result = response.toJson();
-          RpcLog.debug(
-            message: 'Отправляем результат клиенту: $result',
-            source: 'ClientStreamingRpcMethod',
+          _logger.debug(
+            'Отправляем результат клиенту: $result',
           );
 
           _core.sendStreamData(
@@ -461,11 +427,10 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
           return {'status': 'streaming'};
         } catch (e, stack) {
           // В случае ошибки в обработчике
-          RpcLog.error(
-            message: 'Ошибка при обработке клиентского стрима: $e',
-            source: 'ClientStreamingRpcMethod',
+          _logger.error(
+            'Ошибка при обработке клиентского стрима: $e',
             error: {'error': e.toString()},
-            stackTrace: stack.toString(),
+            stackTrace: stack,
           );
 
           _core.sendStreamError(
@@ -486,10 +451,8 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
       },
     );
 
-    RpcLog.debug(
-      message:
-          'ClientStreamingRpcMethod: метод $serviceName.$methodName успешно зарегистрирован',
-      source: 'ClientStreamingRpcMethod',
+    _logger.debug(
+      'ClientStreamingRpcMethod: метод $serviceName.$methodName успешно зарегистрирован',
     );
   }
 }

@@ -163,6 +163,7 @@ abstract class RpcServiceContract<BaseMessage extends IRpcSerializableMessage>
   }) {
     _methods.add(
       RpcMethodContract<Request, Response>(
+        serviceName: serviceName,
         methodName: methodName,
         methodType: RpcMethodType.unary,
       ),
@@ -183,6 +184,7 @@ abstract class RpcServiceContract<BaseMessage extends IRpcSerializableMessage>
   }) {
     _methods.add(
       RpcMethodContract<Request, Response>(
+        serviceName: serviceName,
         methodName: methodName,
         methodType: RpcMethodType.serverStreaming,
       ),
@@ -203,6 +205,7 @@ abstract class RpcServiceContract<BaseMessage extends IRpcSerializableMessage>
   }) {
     _methods.add(
       RpcMethodContract<Request, Response>(
+        serviceName: serviceName,
         methodName: methodName,
         methodType: RpcMethodType.clientStreaming,
       ),
@@ -223,6 +226,7 @@ abstract class RpcServiceContract<BaseMessage extends IRpcSerializableMessage>
   }) {
     _methods.add(
       RpcMethodContract<Request, Response>(
+        serviceName: serviceName,
         methodName: methodName,
         methodType: RpcMethodType.bidirectional,
       ),

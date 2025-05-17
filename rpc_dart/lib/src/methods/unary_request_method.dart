@@ -12,7 +12,10 @@ final class UnaryRequestRpcMethod<T extends IRpcSerializableMessage>
     IRpcEndpoint<T> endpoint,
     String serviceName,
     String methodName,
-  ) : super(endpoint, serviceName, methodName);
+  ) : super(endpoint, serviceName, methodName) {
+    // Создаем логгер с консистентным именем
+    _logger = RpcLogger('$serviceName.$methodName.unary');
+  }
 
   /// Вызывает унарный метод и возвращает результат
   ///
@@ -26,12 +29,20 @@ final class UnaryRequestRpcMethod<T extends IRpcSerializableMessage>
     Map<String, dynamic>? metadata,
     Duration? timeout,
   }) async {
+    _logger.debug(
+      'Вызов унарного метода $serviceName.$methodName',
+    );
+
     final result = await _core.invoke(
       serviceName: serviceName,
       methodName: methodName,
       request: request is RpcMessage ? request.toJson() : request,
       metadata: metadata,
       timeout: timeout,
+    );
+
+    _logger.debug(
+      'Получен ответ от метода $serviceName.$methodName',
     );
 
     // Если результат - Map<String, dynamic> и предоставлен парсер, используем его
@@ -56,6 +67,9 @@ final class UnaryRequestRpcMethod<T extends IRpcSerializableMessage>
     // Получаем контракт сервиса
     final serviceContract = _endpoint.getServiceContract(serviceName);
     if (serviceContract == null) {
+      _logger.error(
+        'Контракт сервиса $serviceName не найден при регистрации метода $methodName',
+      );
       throw Exception(
           'Контракт сервиса $serviceName не найден. Необходимо сначала зарегистрировать контракт сервиса.');
     }
@@ -66,6 +80,9 @@ final class UnaryRequestRpcMethod<T extends IRpcSerializableMessage>
 
     // Если метод не найден в контракте, добавляем его
     if (existingMethod == null) {
+      _logger.debug(
+        'Добавление метода $methodName в контракт сервиса $serviceName',
+      );
       serviceContract.addUnaryRequestMethod<Request, Response>(
         methodName: methodName,
         handler: handler,
@@ -85,6 +102,10 @@ final class UnaryRequestRpcMethod<T extends IRpcSerializableMessage>
       implementation: implementation,
     );
 
+    _logger.debug(
+      'Зарегистрирован унарный метод $serviceName.$methodName',
+    );
+
     // Регистрируем низкоуровневый обработчик - это ключевой шаг для обеспечения
     // связи между контрактом и обработчиком вызова
     _registrar.registerMethod(
@@ -92,6 +113,10 @@ final class UnaryRequestRpcMethod<T extends IRpcSerializableMessage>
       methodName: methodName,
       handler: (RpcMethodContext context) async {
         try {
+          _logger.debug(
+            'Обработка запроса для метода $serviceName.$methodName',
+          );
+
           // Если request - это Map и мы получили функцию fromJson, преобразуем объект
           final typedRequest = (context.payload is Map<String, dynamic>)
               ? requestParser(context.payload)
@@ -100,11 +125,20 @@ final class UnaryRequestRpcMethod<T extends IRpcSerializableMessage>
           // Получаем типизированный ответ от обработчика
           final response = await implementation.makeUnaryRequest(typedRequest);
 
+          _logger.debug(
+            'Получен ответ от обработчика для метода $serviceName.$methodName',
+          );
+
           // Преобразуем ответ в формат для передачи (JSON для RpcMessage)
           final result = response is RpcMessage ? response.toJson() : response;
 
           return result;
-        } catch (e) {
+        } catch (e, stack) {
+          _logger.error(
+            'Ошибка при обработке унарного метода $serviceName.$methodName: $e',
+            error: {'error': e.toString()},
+            stackTrace: stack,
+          );
           rethrow;
         }
       },

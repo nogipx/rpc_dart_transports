@@ -8,11 +8,14 @@ part of '_method.dart';
 final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
     extends RpcMethod<T> {
   /// Создает новый объект двунаправленного стриминг RPC метода
-  const BidirectionalStreamingRpcMethod(
+  BidirectionalStreamingRpcMethod(
     IRpcEndpoint<T> endpoint,
     String serviceName,
     String methodName,
-  ) : super(endpoint, serviceName, methodName);
+  ) : super(endpoint, serviceName, methodName) {
+    // Создаем логгер с консистентным именем
+    _logger = RpcLogger('$serviceName.$methodName.bidi_stream');
+  }
 
   /// Создает типизированный двунаправленный канал связи
   ///
@@ -184,10 +187,8 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
 
           // Если это инициализация двунаправленного стрима
           if (isBidirectional) {
-            RpcLog.debug(
-              message:
-                  'Инициализация двунаправленного стрима со streamId: $effectiveStreamId',
-              source: 'BidirectionalStreamingRpcMethod',
+            _logger.debug(
+              'Инициализация двунаправленного стрима со streamId: $effectiveStreamId',
             );
 
             // Создаем контроллер для входящих сообщений от клиента
@@ -202,16 +203,14 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
             )
                 .listen(
               (data) {
-                RpcLog.debug(
-                  message: 'Получено сообщение от клиента: $data',
-                  source: 'BidirectionalStreamingRpcMethod',
+                _logger.debug(
+                  'Получено сообщение от клиента: $data',
                 );
                 // Проверяем маркер завершения стрима
                 if (data is Map<String, dynamic> &&
                     data['_clientStreamEnd'] == true) {
-                  RpcLog.debug(
-                    message: 'Получен маркер завершения стрима',
-                    source: 'BidirectionalStreamingRpcMethod',
+                  _logger.debug(
+                    'Получен маркер завершения стрима',
                   );
                   // Закрываем контроллер, но не отменяем подписку - это важно
                   incomingController.close();
@@ -224,34 +223,29 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
                       ? requestParser(data)
                       : data as Request;
 
-                  RpcLog.debug(
-                    message:
-                        'Добавляем сообщение в стрим обработчика: $request',
-                    source: 'BidirectionalStreamingRpcMethod',
+                  _logger.debug(
+                    'Добавляем сообщение в стрим обработчика: $request',
                   );
                   incomingController.add(request);
                 } catch (e) {
-                  RpcLog.error(
-                    message: 'Ошибка при обработке сообщения: $e',
-                    source: 'BidirectionalStreamingRpcMethod',
+                  _logger.error(
+                    'Ошибка при обработке сообщения: $e',
                     error: {'error': e.toString()},
                   );
                   incomingController.addError(e);
                 }
               },
               onError: (error) {
-                RpcLog.error(
-                  message: 'Ошибка в потоке сообщений: $error',
-                  source: 'BidirectionalStreamingRpcMethod',
+                _logger.error(
+                  'Ошибка в потоке сообщений: $error',
                   error: {'error': error.toString()},
                 );
                 // Не пробрасываем ошибку дальше - просто логируем
                 // Это предотвратит завершение стрима в случае временной ошибки
               },
               onDone: () {
-                RpcLog.debug(
-                  message: 'Входящий поток закрыт',
-                  source: 'BidirectionalStreamingRpcMethod',
+                _logger.debug(
+                  'Входящий поток закрыт',
                 );
                 // Закрываем контроллер, если он еще не закрыт
                 if (!incomingController.isClosed) {
@@ -268,9 +262,8 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
             // Подписываемся на ответы из bidiStream и отправляем их клиенту
             bidiStream.listen(
               (data) {
-                RpcLog.debug(
-                  message: 'Отправка ответа клиенту: $data',
-                  source: 'BidirectionalStreamingRpcMethod',
+                _logger.debug(
+                  'Отправка ответа клиенту: $data',
                 );
                 try {
                   _core.sendStreamData(
@@ -280,18 +273,16 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
                     methodName: methodName,
                   );
                 } catch (e) {
-                  RpcLog.error(
-                    message: 'Ошибка при отправке ответа клиенту: $e',
-                    source: 'BidirectionalStreamingRpcMethod',
+                  _logger.error(
+                    'Ошибка при отправке ответа клиенту: $e',
                     error: {'error': e.toString()},
                   );
                   // Не пробрасываем ошибку дальше
                 }
               },
               onError: (error) {
-                RpcLog.error(
-                  message: 'Ошибка в исходящем потоке: $error',
-                  source: 'BidirectionalStreamingRpcMethod',
+                _logger.error(
+                  'Ошибка в исходящем потоке: $error',
                   error: {'error': error.toString()},
                 );
                 try {
@@ -302,17 +293,15 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
                     methodName: methodName,
                   );
                 } catch (e) {
-                  RpcLog.error(
-                    message: 'Ошибка при отправке сообщения об ошибке: $e',
-                    source: 'BidirectionalStreamingRpcMethod',
+                  _logger.error(
+                    'Ошибка при отправке сообщения об ошибке: $e',
                     error: {'error': e.toString()},
                   );
                 }
               },
               onDone: () {
-                RpcLog.debug(
-                  message: 'Исходящий поток завершен',
-                  source: 'BidirectionalStreamingRpcMethod',
+                _logger.debug(
+                  'Исходящий поток завершен',
                 );
                 try {
                   _core.closeStream(
@@ -321,9 +310,8 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
                     methodName: methodName,
                   );
                 } catch (e) {
-                  RpcLog.error(
-                    message: 'Ошибка при закрытии стрима: $e',
-                    source: 'BidirectionalStreamingRpcMethod',
+                  _logger.error(
+                    'Ошибка при закрытии стрима: $e',
                     error: {'error': e.toString()},
                   );
                 }
@@ -331,9 +319,8 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
                 // При завершении outgoing потока отменяем подписку на входящие сообщения
                 // чтобы избежать утечек ресурсов
                 subscription.cancel().catchError((e) {
-                  RpcLog.error(
-                    message: 'Ошибка при отмене подписки на входящий поток: $e',
-                    source: 'BidirectionalStreamingRpcMethod',
+                  _logger.error(
+                    'Ошибка при отмене подписки на входящий поток: $e',
                     error: {'error': e.toString()},
                   );
                 });
@@ -353,10 +340,8 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
             };
           }
         } catch (e) {
-          RpcLog.error(
-            message:
-                'Неожиданная ошибка при обработке двунаправленного стрима: $e',
-            source: 'BidirectionalStreamingRpcMethod',
+          _logger.error(
+            'Неожиданная ошибка при обработке двунаправленного стрима: $e',
             error: {'error': e.toString()},
           );
           return {
