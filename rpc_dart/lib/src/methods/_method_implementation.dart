@@ -23,7 +23,7 @@ final class RpcMethodImplementation<Request extends IRpcSerializableMessage,
   final RpcMethodServerStreamHandler<Request, Response>? _serverStreamHandler;
 
   /// Обработчик клиентского стрима
-  final RpcMethodClientStreamHandler<Request, Response>? _clientStreamHandler;
+  final RpcMethodClientStreamHandler<Request>? _clientStreamHandler;
 
   /// Обработчик двунаправленного стрима
   final RpcMethodBidirectionalHandler<Request, Response>? _bidirectionalHandler;
@@ -55,7 +55,7 @@ final class RpcMethodImplementation<Request extends IRpcSerializableMessage,
   /// Создает реализацию клиентского стрима
   RpcMethodImplementation.clientStreaming(
     this.contract,
-    RpcMethodClientStreamHandler<Request, Response> handler,
+    RpcMethodClientStreamHandler<Request> handler,
   )   : type = RpcMethodType.clientStreaming,
         _unaryHandler = null,
         _serverStreamHandler = null,
@@ -133,49 +133,33 @@ final class RpcMethodImplementation<Request extends IRpcSerializableMessage,
     }
   }
 
-  /// Обрабатывает поток запросов и возвращает один ответ
-  ///
-  /// [stream] - поток входящих запросов
-  /// [metadata] - метаданные запроса
-  /// [streamId] - идентификатор потока
-  Future<Response> openClientStreaming({
+  /// Открывает клиентский стрим и возвращает результат
+  Future<RpcNull> openClientStreaming({
     required Stream<Request> stream,
     Map<String, dynamic>? metadata,
     String? streamId,
   }) async {
-    if (type != RpcMethodType.clientStreaming) {
-      throw _unsupportedOperationException('openClientStreaming');
-    }
     if (_clientStreamHandler == null) {
-      throw _missingHandlerException('openClientStreaming');
+      throw StateError(
+          'Невозможно вызвать обработчик клиентского стрима: обработчик не установлен');
     }
 
-    // Получаем ClientStreamingBidiStream от обработчика
-    final clientStreamBidi = _clientStreamHandler!();
+    // Получаем BidiStream от обработчика
+    final bidiStream = _clientStreamHandler!();
 
-    // Подписываемся на поток запросов и перенаправляем их в BidiStream
-    try {
-      stream.listen(
-        (request) => clientStreamBidi.send(request),
-        onDone: () => clientStreamBidi.close(),
-        onError: (error) => clientStreamBidi.close(),
-      );
-    } catch (e, stackTrace) {
-      // Логируем ошибку
-      _logger.error(
-        'Ошибка при подписке на стрим: $e',
-        error: e,
-        stackTrace: stackTrace,
-      );
-      clientStreamBidi.close();
-      throw RpcCustomException(
-        customMessage: 'Ошибка при подписке на стрим: $e',
-        debugLabel: 'RpcMethodImplementation.openClientStreaming',
-      );
-    }
+    // Если streamId задан, логируем его для отладки
+    _logger.debug(
+      'Открытие клиентского стрима ${streamId != null ? '(ID: $streamId)' : ''}',
+    );
 
-    // Возвращаем результат
-    return await clientStreamBidi.getResponse();
+    // Подписываемся на поток запросов и отправляем их в BidiStream
+    await stream.listen((data) {
+      bidiStream.send(data);
+    }).asFuture();
+
+    // Завершаем отправку и ждём ответ
+    await bidiStream.finishSending();
+    return RpcNull();
   }
 
   /// Обрабатывает двунаправленный стрим с предоставленным входящим потоком запросов

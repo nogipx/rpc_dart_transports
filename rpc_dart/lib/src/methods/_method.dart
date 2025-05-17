@@ -24,7 +24,7 @@ abstract base class RpcMethod<T extends IRpcSerializableMessage> {
   final String methodName;
 
   /// Логгер для этого инстанса метода
-  late final RpcLogger _logger;
+  RpcLogger? _logger;
 
   /// Создает новый объект RPC метода
   RpcMethod(this._endpoint, this.serviceName, this.methodName) {
@@ -32,7 +32,7 @@ abstract base class RpcMethod<T extends IRpcSerializableMessage> {
   }
 
   /// Получает диагностический клиент через логгер
-  IRpcDiagnosticClient? get _diagnostic => _logger.diagnostic;
+  IRpcDiagnosticClient? get _diagnostic => _logger?.diagnostic;
 
   /// Получает контракт метода
   RpcMethodContract<Request, Response>

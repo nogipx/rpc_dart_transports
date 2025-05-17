@@ -159,13 +159,17 @@ final class BidiStreamGenerator<Request extends IRpcSerializableMessage,
   /// Создает ClientStreamingBidiStream напрямую из генератора
   ///
   /// [initialRequests] - начальный поток запросов (опционально)
-  ClientStreamingBidiStream<Request, Response> createClientStreaming([
+  ClientStreamingBidiStream<Request> createClientStreaming([
     Stream<Request>? initialRequests,
   ]) {
-    // Создаем обычный BidiStream с начальными запросами, если они есть
-    final bidiStream = create(initialRequests);
+    // Сначала создаем обычный BidiStream
+    final bidiStream = create();
 
-    // Оборачиваем его в ClientStreamingBidiStream
-    return ClientStreamingBidiStream<Request, Response>(bidiStream);
+    // Оборачиваем его в ServerStreamingBidiStream
+    final clientStreamBidi = ClientStreamingBidiStream<Request>(
+      bidiStream as BidiStream<Request, RpcNull>,
+    );
+
+    return clientStreamBidi;
   }
 }

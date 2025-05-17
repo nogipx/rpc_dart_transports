@@ -6,54 +6,22 @@ part of '../_index.dart';
 
 /// Обертка BidiStream для клиентского стриминга
 ///
-/// Позволяет отправлять поток запросов и получить один ответ.
-class ClientStreamingBidiStream<RequestType extends IRpcSerializableMessage,
-        ResponseType extends IRpcSerializableMessage>
-    extends RpcStream<RequestType, ResponseType> {
+/// Позволяет отправлять поток запросов без ожидания ответа.
+/// Упрощенная версия, работающая только в режиме noResponse=true.
+class ClientStreamingBidiStream<RequestType extends IRpcSerializableMessage>
+    extends RpcStream<RequestType, RpcNull> {
   /// Внутренний BidiStream
-  final BidiStream<RequestType, ResponseType> _bidiStream;
+  final BidiStream<RequestType, RpcNull> _bidiStream;
 
-  /// Completer для отслеживания ответа
-  final Completer<ResponseType> _responseCompleter = Completer<ResponseType>();
+  /// Внутренний флаг завершения потока для отслеживания состояния
+  bool _isStreamFinished = false;
 
-  /// Подписка на поток ответов
-  StreamSubscription<ResponseType>? _subscription;
-
-  /// Создает обертку для клиентского стриминга
+  /// Создает обертку для клиентского стриминга без ожидания ответа
   ClientStreamingBidiStream(this._bidiStream)
       : super(
           responseStream: _bidiStream,
           closeFunction: _bidiStream.close,
-        ) {
-    // Подписываемся на первый элемент потока ответов
-    _subscription = _bidiStream.listen(
-      (response) {
-        if (!_responseCompleter.isCompleted) {
-          _responseCompleter.complete(response);
-        }
-      },
-      onError: (error) {
-        if (!_responseCompleter.isCompleted) {
-          _responseCompleter.completeError(error);
-        }
-      },
-      onDone: () {
-        if (!_responseCompleter.isCompleted) {
-          _responseCompleter.completeError(
-            RpcUnsupportedOperationException(
-              operation: 'getResponse',
-              type: 'clientStreaming',
-              details: {
-                'message': 'Поток завершился без ответа',
-              },
-            ),
-          );
-        }
-        _subscription?.cancel();
-        _subscription = null;
-      },
-    );
-  }
+        );
 
   /// Отправляет запрос через внутренний BidiStream
   void send(RequestType request) {
@@ -65,15 +33,17 @@ class ClientStreamingBidiStream<RequestType extends IRpcSerializableMessage,
     await _bidiStream.finishTransfer();
   }
 
-  /// Ожидает получения единственного ответа
+  /// Принудительно завершает обработку стрима и устанавливает флаг завершения
   ///
-  /// Типичное использование клиентского стриминга предполагает
-  /// получение одного ответа после серии запросов.
-  Future<ResponseType> getResponse() async {
-    // Возвращаем Future из Completer, который будет завершен,
-    // когда придет первый ответ или произойдет ошибка
-    return _responseCompleter.future;
+  /// Отличается от close() тем, что не закрывает полностью стрим,
+  /// а только устанавливает флаг завершения для предотвращения
+  /// повторной обработки сообщений
+  void markAsFinished() {
+    _isStreamFinished = true;
   }
+
+  /// Проверяет, завершен ли стрим (логически)
+  bool get isFinished => _isStreamFinished || isClosed;
 
   @override
   Future<void> close() async {
@@ -83,10 +53,6 @@ class ClientStreamingBidiStream<RequestType extends IRpcSerializableMessage,
 
     // Сначала закрываем внутренний поток
     await _bidiStream.close();
-
-    // Отменяем подписку
-    await _subscription?.cancel();
-    _subscription = null;
 
     // Вызываем метод базового класса для установки флага _isClosed
     await super.close();

@@ -29,7 +29,7 @@ final class UnaryRequestRpcMethod<T extends IRpcSerializableMessage>
     Map<String, dynamic>? metadata,
     Duration? timeout,
   }) async {
-    _logger.debug(
+    _logger?.debug(
       'Вызов унарного метода $serviceName.$methodName',
     );
 
@@ -63,7 +63,7 @@ final class UnaryRequestRpcMethod<T extends IRpcSerializableMessage>
         timeout: timeout,
       );
 
-      _logger.debug(
+      _logger?.debug(
         'Получен ответ от метода $serviceName.$methodName',
       );
 
@@ -79,7 +79,7 @@ final class UnaryRequestRpcMethod<T extends IRpcSerializableMessage>
       return result;
     } catch (e, stack) {
       error = e;
-      _logger.error(
+      _logger?.error(
         'Ошибка при вызове унарного метода $serviceName.$methodName',
         error: e,
         stackTrace: stack,
@@ -105,7 +105,7 @@ final class UnaryRequestRpcMethod<T extends IRpcSerializableMessage>
       // Отправляем метрики о завершении вызова метода, если диагностика доступна
       // Отправляем событие завершения трассировки
       unawaited(
-        _diagnostic!.reportTraceEvent(
+        _diagnostic?.reportTraceEvent(
           _diagnostic!.createTraceEvent(
             eventType: success
                 ? RpcTraceMetricType.methodEnd
@@ -131,7 +131,7 @@ final class UnaryRequestRpcMethod<T extends IRpcSerializableMessage>
 
       // Отправляем метрику задержки
       unawaited(
-        _diagnostic!.reportLatencyMetric(
+        _diagnostic?.reportLatencyMetric(
           _diagnostic!.createLatencyMetric(
             operationType: RpcLatencyOperationType.methodCall,
             operation: '$serviceName.$methodName',
@@ -164,7 +164,7 @@ final class UnaryRequestRpcMethod<T extends IRpcSerializableMessage>
     // Получаем контракт сервиса
     final serviceContract = _endpoint.getServiceContract(serviceName);
     if (serviceContract == null) {
-      _logger.error(
+      _logger?.error(
         'Контракт сервиса $serviceName не найден при регистрации метода $methodName',
       );
       throw Exception(
@@ -177,7 +177,7 @@ final class UnaryRequestRpcMethod<T extends IRpcSerializableMessage>
 
     // Если метод не найден в контракте, добавляем его
     if (existingMethod == null) {
-      _logger.debug(
+      _logger?.debug(
         'Добавление метода $methodName в контракт сервиса $serviceName',
       );
       serviceContract.addUnaryRequestMethod<Request, Response>(
@@ -199,7 +199,7 @@ final class UnaryRequestRpcMethod<T extends IRpcSerializableMessage>
       implementation: implementation,
     );
 
-    _logger.debug(
+    _logger?.debug(
       'Зарегистрирован унарный метод $serviceName.$methodName',
     );
 
@@ -228,7 +228,7 @@ final class UnaryRequestRpcMethod<T extends IRpcSerializableMessage>
         dynamic result;
 
         try {
-          _logger.debug(
+          _logger?.debug(
             'Обработка запроса для метода $serviceName.$methodName',
           );
 
@@ -240,7 +240,7 @@ final class UnaryRequestRpcMethod<T extends IRpcSerializableMessage>
           // Получаем типизированный ответ от обработчика
           final response = await implementation.makeUnaryRequest(typedRequest);
 
-          _logger.debug(
+          _logger?.debug(
             'Получен ответ от обработчика для метода $serviceName.$methodName',
           );
 
@@ -250,7 +250,7 @@ final class UnaryRequestRpcMethod<T extends IRpcSerializableMessage>
           return result;
         } catch (e, stackTrace) {
           error = e;
-          _logger.error(
+          _logger?.error(
             'Ошибка при обработке унарного метода $serviceName.$methodName: $e',
             error: e,
             stackTrace: stackTrace,

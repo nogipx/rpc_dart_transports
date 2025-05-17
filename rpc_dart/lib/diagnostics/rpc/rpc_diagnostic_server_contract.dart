@@ -102,7 +102,7 @@ class _LoggingServer extends _RpcLoggingContract {
   }
 
   @override
-  ClientStreamingBidiStream<RpcMetric<RpcLoggerMetric>, RpcNull> logsStream() {
+  ClientStreamingBidiStream<RpcMetric<RpcLoggerMetric>> logsStream() {
     return BidiStreamGenerator<RpcMetric<RpcLoggerMetric>, RpcNull>(
       (userLogsStream) async* {
         await for (final log in userLogsStream) {

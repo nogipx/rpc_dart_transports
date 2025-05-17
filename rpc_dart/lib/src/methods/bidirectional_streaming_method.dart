@@ -365,7 +365,7 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
 
           // Если это инициализация двунаправленного стрима
           if (isBidirectional) {
-            _logger.debug(
+            _logger?.debug(
               'Инициализация двунаправленного стрима со streamId: $effectiveStreamId',
             );
 
@@ -397,13 +397,13 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
             )
                 .listen(
               (data) {
-                _logger.debug(
+                _logger?.debug(
                   'Получено сообщение от клиента: $data',
                 );
                 // Проверяем маркер завершения стрима
                 if (data is Map<String, dynamic> &&
                     data['_clientStreamEnd'] == true) {
-                  _logger.debug(
+                  _logger?.debug(
                     'Получен маркер завершения стрима',
                   );
                   // Закрываем контроллер, но не отменяем подписку - это важно
@@ -446,12 +446,12 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
                     ),
                   );
 
-                  _logger.debug(
+                  _logger?.debug(
                     'Добавляем сообщение в стрим обработчика: $request',
                   );
                   incomingController.add(request);
                 } catch (e, stackTrace) {
-                  _logger.error(
+                  _logger?.error(
                     'Ошибка при обработке сообщения: $e',
                     error: e,
                     stackTrace: stackTrace,
@@ -474,7 +474,7 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
                 }
               },
               onError: (error, stackTrace) {
-                _logger.error(
+                _logger?.error(
                   'Ошибка в потоке сообщений: $error',
                   error: error,
                   stackTrace: stackTrace,
@@ -497,7 +497,7 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
                 // Это предотвратит завершение стрима в случае временной ошибки
               },
               onDone: () {
-                _logger.debug(
+                _logger?.debug(
                   'Входящий поток закрыт',
                 );
                 // Закрываем контроллер, если он еще не закрыт
@@ -526,7 +526,7 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
             // Подписываемся на ответы из bidiStream и отправляем их клиенту
             bidiStream.listen(
               (data) {
-                _logger.debug(
+                _logger?.debug(
                   'Отправка ответа клиенту: $data',
                 );
                 try {
@@ -557,7 +557,7 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
                     ),
                   );
                 } catch (e, stackTrace) {
-                  _logger.error(
+                  _logger?.error(
                     'Ошибка при отправке ответа клиенту: $e',
                     error: e,
                     stackTrace: stackTrace,
@@ -580,7 +580,7 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
                 }
               },
               onError: (error, stackTrace) {
-                _logger.error(
+                _logger?.error(
                   'Ошибка в исходящем потоке: $error',
                   error: error,
                   stackTrace: stackTrace,
@@ -607,7 +607,7 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
                     methodName: methodName,
                   );
                 } catch (e, errorStackTrace) {
-                  _logger.error(
+                  _logger?.error(
                     'Ошибка при отправке сообщения об ошибке: $e',
                     error: e,
                     stackTrace: errorStackTrace,
@@ -618,7 +618,7 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
                 final endTime = DateTime.now().millisecondsSinceEpoch;
                 final duration = endTime - startTime;
 
-                _logger.debug(
+                _logger?.debug(
                   'Исходящий поток завершен',
                 );
 
@@ -679,7 +679,7 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
                     ),
                   );
                 } catch (e, errorStackTrace) {
-                  _logger.error(
+                  _logger?.error(
                     'Ошибка при закрытии стрима: $e',
                     error: e,
                     stackTrace: errorStackTrace,
@@ -702,7 +702,7 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
                 // При завершении outgoing потока отменяем подписку на входящие сообщения
                 // чтобы избежать утечек ресурсов
                 subscription.cancel().catchError((e, cancelStackTrace) {
-                  _logger.error(
+                  _logger?.error(
                     'Ошибка при отмене подписки на входящий поток: $e',
                     error: e,
                     stackTrace: cancelStackTrace,
@@ -719,7 +719,7 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
           } else {
             // Если это обычный запрос, обрабатываем по старой логике
             // Это может быть нужно для совместимости или других целей
-            _logger.warning(
+            _logger?.warning(
               'Для метода $serviceName.$methodName требуется маркер _bidirectional',
             );
 
@@ -728,7 +728,7 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
             };
           }
         } catch (e, stackTrace) {
-          _logger.error(
+          _logger?.error(
             'Неожиданная ошибка при обработке двунаправленного стрима: $e',
             error: e,
             stackTrace: stackTrace,

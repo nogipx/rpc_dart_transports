@@ -5,8 +5,11 @@
 part of '_index.dart';
 
 /// Типизированный RPC эндпоинт
-class RpcEndpoint<T extends IRpcSerializableMessage> extends _RpcEndpointImpl<T>
-    implements IRpcEndpoint<T>, IRpcEndpointCore, IRpcRegistrar<T> {
+class RpcEndpoint extends _RpcEndpointImpl
+    implements
+        IRpcEndpoint<IRpcSerializableMessage>,
+        IRpcEndpointCore,
+        IRpcRegistrar<IRpcSerializableMessage> {
   /// Создаёт новый типизированный RPC эндпоинт
   ///
   /// [transport] - транспорт для обмена сообщениями

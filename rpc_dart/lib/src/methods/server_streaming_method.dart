@@ -298,7 +298,7 @@ final class ServerStreamingRpcMethod<T extends IRpcSerializableMessage>
           return {'status': 'streaming'};
         } catch (e, stackTrace) {
           // Логируем ошибку
-          _logger.error(
+          _logger?.error(
             'Ошибка при запуске серверного стрима: $e',
             error: e,
             stackTrace: stackTrace,
@@ -367,7 +367,7 @@ final class ServerStreamingRpcMethod<T extends IRpcSerializableMessage>
       );
     }, onError: (error, stackTrace) {
       // Отправляем ошибку
-      _logger.error(
+      _logger?.error(
         'Ошибка в серверном стриме: $error',
         error: error,
         stackTrace: stackTrace,
@@ -408,7 +408,7 @@ final class ServerStreamingRpcMethod<T extends IRpcSerializableMessage>
       final endTime = DateTime.now().millisecondsSinceEpoch;
       final duration = endTime - startTime;
 
-      _logger.debug(
+      _logger?.debug(
         'Серверный стрим завершен',
       );
 

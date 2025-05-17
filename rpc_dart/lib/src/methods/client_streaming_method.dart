@@ -4,7 +4,8 @@
 
 part of '_method.dart';
 
-/// Класс для работы с RPC методом типа "клиентский стриминг" (поток запросов - один ответ)
+/// Класс для работы с RPC методом типа "клиентский стриминг" (поток запросов - без ответа)
+/// Упрощенная реализация, которая не ожидает ответа от сервера
 final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
     extends RpcMethod<T> {
   /// Создает новый объект клиентского стриминг RPC метода
@@ -19,12 +20,9 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
 
   /// Открывает клиентский стриминг канал и возвращает объект для отправки запросов
   ///
-  /// [responseParser] - функция для преобразования JSON в объект ответа
   /// [metadata] - метаданные запроса (опционально)
   /// [streamId] - ID стрима (опционально, генерируется автоматически)
-  ClientStreamingBidiStream<Request, Response>
-      call<Request extends T, Response extends T>({
-    required RpcMethodResponseParser<Response> responseParser,
+  ClientStreamingBidiStream<Request> call<Request extends T>({
     Map<String, dynamic>? metadata,
     String? streamId,
   }) {
@@ -32,8 +30,6 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
         streamId ?? _endpoint.generateUniqueId('client_stream');
     final startTime = DateTime.now().millisecondsSinceEpoch;
     final requestId = _endpoint.generateUniqueId('request');
-
-    // Получаем диагностический клиент
 
     // Отправляем метрику о создании стрима
     _diagnostic?.reportStreamMetric(
@@ -63,9 +59,6 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
     // Создаем контроллер для запросов
     final requestController = StreamController<Request>();
 
-    // Создаем Future для ответа
-    final responseCompleter = Completer<Response>();
-
     // Инициируем соединение с пустым запросом или метаданными
     _core.invoke(
       serviceName: serviceName,
@@ -73,122 +66,9 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
       request: {
         '_clientStreaming': true,
         '_streamId': effectiveStreamId,
+        '_noResponse': true, // Всегда устанавливаем флаг noResponse
       },
       metadata: metadata,
-    );
-
-    // Подписываемся на ответы от сервера
-    final subscription = _core
-        .openStream(
-      serviceName: serviceName,
-      methodName: methodName,
-      streamId: effectiveStreamId,
-    )
-        .listen(
-      (data) {
-        // Если это ответ на стрим-запрос
-        if (data is Map<String, dynamic> && data['_response'] == true) {
-          try {
-            // Получаем результат и завершаем поток
-            final result = responseParser(data['result']);
-
-            // Отправляем событие завершения вызова метода
-            final endTime = DateTime.now().millisecondsSinceEpoch;
-            final duration = endTime - startTime;
-
-            _diagnostic?.reportTraceEvent(
-              _diagnostic!.createTraceEvent(
-                eventType: RpcTraceMetricType.methodEnd,
-                method: methodName,
-                service: serviceName,
-                requestId: requestId,
-                durationMs: duration,
-                metadata: {
-                  'streamId': effectiveStreamId,
-                  'sentMessageCount': sentMessageCount,
-                  'totalSentDataSize': totalSentDataSize,
-                },
-              ),
-            );
-
-            // Отправляем метрику задержки
-            _diagnostic?.reportLatencyMetric(
-              _diagnostic!.createLatencyMetric(
-                operationType: RpcLatencyOperationType.methodCall,
-                operation: '$serviceName.$methodName',
-                startTime: startTime,
-                endTime: endTime,
-                success: true,
-                requestId: requestId,
-                metadata: {
-                  'streamId': effectiveStreamId,
-                  'sentMessageCount': sentMessageCount,
-                },
-              ),
-            );
-
-            responseCompleter.complete(result);
-          } catch (e, stackTrace) {
-            _logger.error(
-              'Ошибка при обработке ответа: $e',
-              error: e,
-              stackTrace: stackTrace,
-            );
-
-            // Отправляем метрику об ошибке
-            _diagnostic?.reportErrorMetric(
-              _diagnostic!.createErrorMetric(
-                errorType: RpcErrorMetricType.serializationError,
-                message:
-                    'Ошибка при обработке ответа в клиентском стриме $serviceName.$methodName: $e',
-                requestId: requestId,
-                method: '$serviceName.$methodName',
-                stackTrace: stackTrace.toString(),
-                details: {'streamId': effectiveStreamId},
-              ),
-            );
-
-            responseCompleter.completeError(e);
-          }
-        }
-      },
-      onError: (error, stackTrace) {
-        _logger.error(
-          'Ошибка в потоке: $error',
-          error: error,
-          stackTrace: stackTrace,
-        );
-
-        // Отправляем метрику об ошибке
-        _diagnostic?.reportErrorMetric(
-          _diagnostic!.createErrorMetric(
-            errorType: RpcErrorMetricType.unexpectedError,
-            message:
-                'Ошибка в клиентском стриме $serviceName.$methodName: $error',
-            requestId: requestId,
-            method: '$serviceName.$methodName',
-            stackTrace: stackTrace.toString(),
-            details: {'streamId': effectiveStreamId},
-          ),
-        );
-
-        if (!responseCompleter.isCompleted) {
-          responseCompleter.completeError(error);
-        }
-      },
-      onDone: () {
-        _logger.debug(
-          'Завершение потока ответа',
-        );
-
-        if (!responseCompleter.isCompleted) {
-          responseCompleter.completeError(
-            StateError(
-              'Поток с ID $effectiveStreamId для метода $serviceName.$methodName был закрыт',
-            ),
-          );
-        }
-      },
     );
 
     // Подписываемся на запросы от клиента и отправляем их на сервер
@@ -222,7 +102,7 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
         );
       },
       onError: (error, stackTrace) {
-        _logger.error(
+        _logger?.error(
           'Ошибка при отправке запроса: $error',
           error: error,
           stackTrace: stackTrace,
@@ -245,7 +125,7 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
         final endTime = DateTime.now().millisecondsSinceEpoch;
         final duration = endTime - startTime;
 
-        _logger.debug(
+        _logger?.debug(
           'Завершение потока запросов',
         );
 
@@ -270,40 +150,55 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
           serviceName: serviceName,
           methodName: methodName,
         );
+
+        // Отправляем событие завершения вызова метода
+        _diagnostic?.reportTraceEvent(
+          _diagnostic!.createTraceEvent(
+            eventType: RpcTraceMetricType.methodEnd,
+            method: methodName,
+            service: serviceName,
+            requestId: requestId,
+            durationMs: duration,
+            metadata: {
+              'streamId': effectiveStreamId,
+              'sentMessageCount': sentMessageCount,
+              'totalSentDataSize': totalSentDataSize,
+            },
+          ),
+        );
       },
     );
 
     // Создаем BidiStream для передачи в ClientStreamingBidiStream
-    final bidiStream = BidiStream<Request, Response>(
-      responseStream: Stream.fromFuture(responseCompleter.future),
+    final bidiStream = BidiStream<Request, RpcNull>(
+      // Пустой поток ответов, так как ответ не ожидается
+      responseStream: Stream<RpcNull>.empty(),
       sendFunction: (request) => requestController.add(request),
+      finishTransferFunction: () async {
+        // При завершении передачи данных закрываем запросы, но не стрим
+        if (!requestController.isClosed) {
+          await requestController.close();
+        }
+      },
       closeFunction: () {
+        // При закрытии стрима закрываем контроллер
         requestController.close();
-        // Отменяем подписку на стрим от сервера
-        subscription.cancel().catchError((e, stackTrace) {
-          _logger.error(
-            'Ошибка при отмене подписки на серверный стрим: $e',
-            error: e,
-            stackTrace: stackTrace,
-          );
-        });
         return Future.value();
       },
     );
 
-    // Создаем ClientStreamingBidiStream с правильным конструктором
-    return ClientStreamingBidiStream<Request, Response>(bidiStream);
+    // Создаем ClientStreamingBidiStream с упрощенным конструктором
+    return ClientStreamingBidiStream<Request>(bidiStream);
   }
 
   /// Регистрирует обработчик клиентского стриминг метода
   ///
-  /// [handler] - функция обработки потока запросов, возвращающая один ответ
+  /// [handler] - функция обработки потока запросов
   /// [requestParser] - функция для преобразования JSON в объект запроса
   /// [responseParser] - функция для преобразования JSON в объект ответа
   void register<Request extends T, Response extends T>({
-    required RpcMethodClientStreamHandler<Request, Response> handler,
+    required dynamic handler,
     required RpcMethodArgumentParser<Request> requestParser,
-    required RpcMethodResponseParser<Response> responseParser,
   }) {
     // Получаем контракт сервиса
     final serviceContract = _endpoint.getServiceContract(serviceName);
@@ -318,19 +213,21 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
 
     // Если метод не найден в контракте, добавляем его
     if (existingMethod == null) {
-      serviceContract.addClientStreamingMethod<Request, Response>(
+      serviceContract.addClientStreamingMethod<Request>(
         methodName: methodName,
         handler: handler,
         argumentParser: requestParser,
-        responseParser: responseParser,
       );
     }
 
     // Получаем актуальный контракт метода
     final contract =
         getMethodContract<Request, Response>(RpcMethodType.clientStreaming);
+
+    // Создаем соответствующую реализацию метода без ожидания результата
     final implementation =
-        RpcMethodImplementation.clientStreaming(contract, handler);
+        RpcMethodImplementation<Request, Response>.clientStreaming(
+            contract, handler as RpcMethodClientStreamHandler<Request>);
 
     // Регистрируем реализацию метода
     _registrar.registerMethodImplementation(
@@ -343,200 +240,270 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
     _registrar.registerMethod(
       serviceName: serviceName,
       methodName: methodName,
-      handler: (context) async {
-        final requestId = context.messageId;
-        final startTime = DateTime.now().millisecondsSinceEpoch;
+      handler: _createHandlerFunction<Request, Response>(
+        implementation: implementation,
+        requestParser: requestParser,
+      ),
+    );
+  }
 
-        // Отправляем событие начала обработки запроса
-        _diagnostic?.reportTraceEvent(
-          _diagnostic!.createTraceEvent(
-            eventType: RpcTraceMetricType.methodStart,
-            method: methodName,
-            service: serviceName,
-            requestId: requestId,
-            metadata: context.metadata,
+  // Вспомогательный метод для создания обработчика
+  Future<dynamic> Function(RpcMethodContext)
+      _createHandlerFunction<Request extends T, Response extends T>({
+    required RpcMethodImplementation<Request, Response> implementation,
+    required RpcMethodArgumentParser<Request> requestParser,
+  }) {
+    return (context) async {
+      final requestId = context.messageId;
+      final startTime = DateTime.now().millisecondsSinceEpoch;
+
+      // Отправляем событие начала обработки запроса
+      _diagnostic?.reportTraceEvent(
+        _diagnostic!.createTraceEvent(
+          eventType: RpcTraceMetricType.methodStart,
+          method: methodName,
+          service: serviceName,
+          requestId: requestId,
+          metadata: context.metadata,
+        ),
+      );
+
+      // Счетчики для диагностики
+      var receivedMessageCount = 0;
+      var totalReceivedDataSize = 0;
+
+      try {
+        // Проверяем, что это клиентский стриминг запрос
+        final requestData = context.payload;
+        final isClientStreaming = requestData is Map<String, dynamic> &&
+            requestData['_clientStreaming'] == true;
+
+        // Получаем или создаем ID стрима
+        String effectiveStreamId;
+        if (isClientStreaming && requestData['_streamId'] != null) {
+          effectiveStreamId = requestData['_streamId'] as String;
+        } else {
+          effectiveStreamId = context.messageId;
+        }
+
+        // Отправляем метрику о создании стрима
+        _diagnostic?.reportStreamMetric(
+          _diagnostic!.createStreamMetric(
+            eventType: RpcStreamEventType.created,
+            streamId: effectiveStreamId,
+            direction: RpcStreamDirection.clientToServer,
+            method: '$serviceName.$methodName',
           ),
         );
 
-        // Счетчики для диагностики
-        var receivedMessageCount = 0;
-        var totalReceivedDataSize = 0;
+        // Получаем стрим сообщений от клиента
+        final incomingStream = _core
+            .openStream(
+          serviceName: serviceName,
+          methodName: methodName,
+          streamId: effectiveStreamId,
+        )
+            .takeWhile((data) {
+          // Останавливаем получение данных, если получаем маркер завершения
+          if (data is Map<String, dynamic> &&
+              data['_clientStreamEnd'] == true) {
+            // Отправляем метрику о закрытии входящего потока
+            _diagnostic?.reportStreamMetric(
+              _diagnostic!.createStreamMetric(
+                eventType: RpcStreamEventType.closed,
+                streamId: effectiveStreamId,
+                direction: RpcStreamDirection.clientToServer,
+                method: '$serviceName.$methodName',
+                messageCount: receivedMessageCount,
+              ),
+            );
 
-        try {
-          // Проверяем, что это клиентский стриминг запрос
-          final requestData = context.payload;
-          final isClientStreaming = requestData is Map<String, dynamic> &&
-              requestData['_clientStreaming'] == true;
-
-          // Получаем или создаем ID стрима
-          String effectiveStreamId;
-          if (isClientStreaming && requestData['_streamId'] != null) {
-            effectiveStreamId = requestData['_streamId'] as String;
-          } else {
-            effectiveStreamId = context.messageId;
+            return false;
           }
+          return true;
+        }).map((data) {
+          try {
+            // Преобразуем данные в типизированный запрос
+            final request = data is Map<String, dynamic>
+                ? requestParser(data)
+                : data as Request;
 
-          // Отправляем метрику о создании стрима
-          _diagnostic?.reportStreamMetric(
-            _diagnostic!.createStreamMetric(
-              eventType: RpcStreamEventType.created,
+            // Увеличиваем счетчики для диагностики
+            receivedMessageCount++;
+            final dataSize = data.toString().length;
+            totalReceivedDataSize += dataSize;
+
+            // Отправляем метрику о полученном сообщении
+            _diagnostic?.reportStreamMetric(
+              _diagnostic!.createStreamMetric(
+                eventType: RpcStreamEventType.messageReceived,
+                streamId: effectiveStreamId,
+                direction: RpcStreamDirection.clientToServer,
+                method: '$serviceName.$methodName',
+                dataSize: dataSize,
+                messageCount: receivedMessageCount,
+              ),
+            );
+
+            return request;
+          } catch (e, stackTrace) {
+            _logger?.error(
+              'Ошибка при обработке сообщения: $e',
+              error: e,
+              stackTrace: stackTrace,
+            );
+
+            // Отправляем метрику об ошибке
+            _diagnostic?.reportErrorMetric(
+              _diagnostic!.createErrorMetric(
+                errorType: RpcErrorMetricType.serializationError,
+                message:
+                    'Ошибка при обработке сообщения в клиентском стриме $serviceName.$methodName: $e',
+                requestId: requestId,
+                method: '$serviceName.$methodName',
+                stackTrace: stackTrace.toString(),
+                details: {'streamId': effectiveStreamId},
+              ),
+            );
+
+            rethrow;
+          }
+        });
+
+        // Запускаем обработку стрима с таймаутом и защитой от зависания
+        _logger?.debug(
+          'Начало обработки клиентского стриминга для метода $serviceName.$methodName',
+        );
+
+        // Устанавливаем таймаут обработки (30 секунд по умолчанию)
+        const handlerTimeout = Duration(seconds: 30);
+
+        // Создаем комплитер для результата с таймаутом
+        final resultCompleter = Completer<void>();
+
+        // Запускаем обработчик в отдельной зоне с таймаутом
+        Timer? timeoutTimer;
+
+        Future<void> runHandler() async {
+          try {
+            // Обрабатываем входящий поток без ожидания результата
+            await implementation.openClientStreaming(
+              stream: incomingStream,
+              metadata: context.metadata,
               streamId: effectiveStreamId,
-              direction: RpcStreamDirection.clientToServer,
-              method: '$serviceName.$methodName',
-            ),
-          );
+            );
 
-          // Получаем стрим сообщений от клиента
-          final incomingStream = _core
-              .openStream(
-            serviceName: serviceName,
-            methodName: methodName,
-            streamId: effectiveStreamId,
-          )
-              .takeWhile((data) {
-            // Останавливаем получение данных, если получаем маркер завершения
-            if (data is Map<String, dynamic> &&
-                data['_clientStreamEnd'] == true) {
-              // Отправляем метрику о закрытии входящего потока
-              _diagnostic?.reportStreamMetric(
-                _diagnostic!.createStreamMetric(
-                  eventType: RpcStreamEventType.closed,
-                  streamId: effectiveStreamId,
-                  direction: RpcStreamDirection.clientToServer,
-                  method: '$serviceName.$methodName',
-                  messageCount: receivedMessageCount,
-                ),
-              );
-
-              return false;
+            // Завершаем обработку успешно
+            if (!resultCompleter.isCompleted) {
+              resultCompleter.complete();
             }
-            return true;
-          }).map((data) {
-            try {
-              // Преобразуем данные в типизированный запрос
-              final request = data is Map<String, dynamic>
-                  ? requestParser(data)
-                  : data as Request;
+          } catch (e, stackTrace) {
+            _logger?.error(
+              'Ошибка при обработке клиентского стриминга: $e',
+              error: e,
+              stackTrace: stackTrace,
+            );
 
-              // Увеличиваем счетчики для диагностики
-              receivedMessageCount++;
-              final dataSize = data.toString().length;
-              totalReceivedDataSize += dataSize;
-
-              // Отправляем метрику о полученном сообщении
-              _diagnostic?.reportStreamMetric(
-                _diagnostic!.createStreamMetric(
-                  eventType: RpcStreamEventType.messageReceived,
-                  streamId: effectiveStreamId,
-                  direction: RpcStreamDirection.clientToServer,
-                  method: '$serviceName.$methodName',
-                  dataSize: dataSize,
-                  messageCount: receivedMessageCount,
-                ),
-              );
-
-              return request;
-            } catch (e, stackTrace) {
-              _logger.error(
-                'Ошибка при обработке сообщения: $e',
-                error: e,
-                stackTrace: stackTrace,
-              );
-
-              // Отправляем метрику об ошибке
-              _diagnostic?.reportErrorMetric(
-                _diagnostic!.createErrorMetric(
-                  errorType: RpcErrorMetricType.serializationError,
-                  message:
-                      'Ошибка при обработке сообщения в клиентском стриме $serviceName.$methodName: $e',
-                  requestId: requestId,
-                  method: '$serviceName.$methodName',
-                  stackTrace: stackTrace.toString(),
-                  details: {'streamId': effectiveStreamId},
-                ),
-              );
-
-              rethrow;
+            // Только если комплитер еще не завершен
+            if (!resultCompleter.isCompleted) {
+              resultCompleter.completeError(e, stackTrace);
             }
-          });
-
-          // Запускаем обработку стрима
-          _logger.debug(
-            'Начало обработки клиентского стриминга для метода $serviceName.$methodName',
-          );
-
-          // Обрабатываем входящий поток запросов
-          final result = await implementation.openClientStreaming(
-            stream: incomingStream,
-            metadata: context.metadata,
-            streamId: effectiveStreamId,
-          );
-
-          final endTime = DateTime.now().millisecondsSinceEpoch;
-          final duration = endTime - startTime;
-
-          // Отправляем метрику задержки
-          _diagnostic?.reportLatencyMetric(
-            _diagnostic!.createLatencyMetric(
-              operationType: RpcLatencyOperationType.requestProcessing,
-              operation: '$serviceName.$methodName',
-              startTime: startTime,
-              endTime: endTime,
-              success: true,
-              requestId: requestId,
-              metadata: {
-                'streamId': effectiveStreamId,
-                'receivedMessageCount': receivedMessageCount,
-              },
-            ),
-          );
-
-          // Отправляем событие завершения обработки запроса
-          _diagnostic?.reportTraceEvent(
-            _diagnostic!.createTraceEvent(
-              eventType: RpcTraceMetricType.methodEnd,
-              method: methodName,
-              service: serviceName,
-              requestId: requestId,
-              durationMs: duration,
-              metadata: {
-                'streamId': effectiveStreamId,
-                'receivedMessageCount': receivedMessageCount,
-                'totalReceivedDataSize': totalReceivedDataSize,
-              },
-            ),
-          );
-
-          // Возвращаем результат клиенту в специальном формате
-          final resultForTransport =
-              result is RpcMessage ? result.toJson() : result;
-
-          return {
-            '_response': true,
-            'result': resultForTransport,
-          };
-        } catch (e, stackTrace) {
-          _logger.error(
-            'Ошибка при обработке клиентского стриминга: $e',
-            error: e,
-            stackTrace: stackTrace,
-          );
-
-          // Отправляем метрику об ошибке
-          _diagnostic?.reportErrorMetric(
-            _diagnostic!.createErrorMetric(
-              errorType: RpcErrorMetricType.unexpectedError,
-              message:
-                  'Ошибка при обработке клиентского стрима $serviceName.$methodName: $e',
-              requestId: requestId,
-              method: '$serviceName.$methodName',
-              stackTrace: stackTrace.toString(),
-            ),
-          );
-
-          rethrow;
+          }
         }
-      },
-    );
+
+        // Запускаем обработчик
+        runHandler();
+
+        // Устанавливаем таймаут
+        timeoutTimer = Timer(handlerTimeout, () {
+          if (!resultCompleter.isCompleted) {
+            final timeoutError = TimeoutException(
+              'Превышено время обработки клиентского стриминга',
+              handlerTimeout,
+            );
+
+            _logger?.error(
+              'Таймаут обработки клиентского стриминга: $timeoutError',
+              error: timeoutError,
+            );
+
+            resultCompleter.completeError(timeoutError);
+          }
+        });
+
+        // Ожидаем завершение обработки
+        await resultCompleter.future.whenComplete(() {
+          timeoutTimer?.cancel();
+        });
+
+        final endTime = DateTime.now().millisecondsSinceEpoch;
+        final duration = endTime - startTime;
+
+        // Отправляем метрику задержки
+        _diagnostic?.reportLatencyMetric(
+          _diagnostic!.createLatencyMetric(
+            operationType: RpcLatencyOperationType.requestProcessing,
+            operation: '$serviceName.$methodName',
+            startTime: startTime,
+            endTime: endTime,
+            success: true,
+            requestId: requestId,
+            metadata: {
+              'streamId': effectiveStreamId,
+              'receivedMessageCount': receivedMessageCount,
+            },
+          ),
+        );
+
+        // Отправляем событие завершения обработки запроса
+        _diagnostic?.reportTraceEvent(
+          _diagnostic!.createTraceEvent(
+            eventType: RpcTraceMetricType.methodEnd,
+            method: methodName,
+            service: serviceName,
+            requestId: requestId,
+            durationMs: duration,
+            metadata: {
+              'streamId': effectiveStreamId,
+              'receivedMessageCount': receivedMessageCount,
+              'totalReceivedDataSize': totalReceivedDataSize,
+            },
+          ),
+        );
+
+        // Возвращаем служебное сообщение о успешном приеме
+        return {
+          '_response': true,
+          '_noResponse': true,
+          '_streamId': effectiveStreamId,
+        };
+      } catch (e, stackTrace) {
+        _logger?.error(
+          'Ошибка при обработке клиентского стриминга: $e',
+          error: e,
+          stackTrace: stackTrace,
+        );
+
+        // Отправляем метрику об ошибке
+        _diagnostic?.reportErrorMetric(
+          _diagnostic!.createErrorMetric(
+            errorType: RpcErrorMetricType.unexpectedError,
+            message:
+                'Ошибка при обработке клиентского стрима $serviceName.$methodName: $e',
+            requestId: requestId,
+            method: '$serviceName.$methodName',
+            stackTrace: stackTrace.toString(),
+          ),
+        );
+
+        // Возвращаем ошибку в формате, который клиент сможет понять
+        return {
+          '_response': true,
+          '_error': true,
+          'errorMessage': 'Ошибка обработки клиентского стрима: $e',
+          'errorType': 'RpcUnexpectedError',
+        };
+      }
+    };
   }
 }

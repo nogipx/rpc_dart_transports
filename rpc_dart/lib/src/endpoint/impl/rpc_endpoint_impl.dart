@@ -13,13 +13,16 @@ String _defaultUniqueIdGenerator([String? prefix]) {
 typedef RpcUniqueIdGenerator = String Function([String? prefix]);
 
 /// Типизированный Endpoint с поддержкой контрактов
-class _RpcEndpointImpl<T extends IRpcSerializableMessage>
-    implements _IRpcEndpointCore<T>, IRpcEndpoint<T> {
+class _RpcEndpointImpl
+    implements
+        _IRpcEndpointCore<IRpcSerializableMessage>,
+        IRpcEndpoint<IRpcSerializableMessage> {
   /// Делегат для базовой функциональности
-  final _RpcEndpointCoreImpl<T> _delegate;
+  final _RpcEndpointCoreImpl<IRpcSerializableMessage> _delegate;
 
   /// Зарегистрированные контракты сервисов
-  final Map<String, IRpcServiceContract<T>> _contracts = {};
+  final Map<String, IRpcServiceContract<IRpcSerializableMessage>> _contracts =
+      {};
 
   /// Зарегистрированные реализации методов
   final Map<String, Map<String, RpcMethodImplementation>> _implementations = {};
@@ -166,7 +169,7 @@ class _RpcEndpointImpl<T extends IRpcSerializableMessage>
 
   /// Регистрирует контракт сервиса
   void registerServiceContract(
-    IRpcServiceContract<T> contract,
+    IRpcServiceContract<IRpcSerializableMessage> contract,
   ) {
     // Проверяем, не зарегистрирован ли уже контракт с таким именем
     if (_contracts.containsKey(contract.serviceName)) {
@@ -180,7 +183,7 @@ class _RpcEndpointImpl<T extends IRpcSerializableMessage>
 
   /// Регистрирует методы из декларативного контракта
   void _registerContract(
-    IRpcServiceContract<T> contract,
+    IRpcServiceContract<IRpcSerializableMessage> contract,
   ) {
     _contracts[contract.serviceName] = contract;
     _implementations.putIfAbsent(contract.serviceName, () => {});
@@ -189,7 +192,7 @@ class _RpcEndpointImpl<T extends IRpcSerializableMessage>
     contract.setup();
 
     // Регистрируем все подконтракты, если они есть
-    if (contract is RpcServiceContract<T>) {
+    if (contract is RpcServiceContract) {
       for (final subContract in contract.getSubContracts()) {
         if (!_contracts.containsKey(subContract.serviceName)) {
           // Рекурсивно регистрируем подконтракт (только если он еще не зарегистрирован)
@@ -238,7 +241,6 @@ class _RpcEndpointImpl<T extends IRpcSerializableMessage>
           ).register(
             handler: handler,
             requestParser: argumentParser,
-            responseParser: responseParser,
           );
         } else if (methodType == RpcMethodType.bidirectional) {
           bidirectionalStreaming(
@@ -263,7 +265,7 @@ class _RpcEndpointImpl<T extends IRpcSerializableMessage>
 
   /// Получает контракт сервиса по имени
   @override
-  IRpcServiceContract<T>? getServiceContract(
+  IRpcServiceContract<IRpcSerializableMessage>? getServiceContract(
     String serviceName,
   ) {
     return _contracts[serviceName];
@@ -271,33 +273,38 @@ class _RpcEndpointImpl<T extends IRpcSerializableMessage>
 
   /// Создает объект унарного метода для указанного сервиса и метода
   @override
-  UnaryRequestRpcMethod<T> unaryRequest({
+  UnaryRequestRpcMethod<IRpcSerializableMessage> unaryRequest({
     required String serviceName,
     required String methodName,
   }) =>
-      UnaryRequestRpcMethod<T>(this, serviceName, methodName);
+      UnaryRequestRpcMethod<IRpcSerializableMessage>(
+          this, serviceName, methodName);
 
   /// Создает объект серверного стриминг метода для указанного сервиса и метода
   @override
-  ServerStreamingRpcMethod<T> serverStreaming({
+  ServerStreamingRpcMethod<IRpcSerializableMessage> serverStreaming({
     required String serviceName,
     required String methodName,
   }) =>
-      ServerStreamingRpcMethod<T>(this, serviceName, methodName);
+      ServerStreamingRpcMethod<IRpcSerializableMessage>(
+          this, serviceName, methodName);
 
   /// Создает объект клиентского стриминг метода для указанного сервиса и метода
   @override
-  ClientStreamingRpcMethod<T> clientStreaming({
+  ClientStreamingRpcMethod<IRpcSerializableMessage> clientStreaming({
     required String serviceName,
     required String methodName,
   }) =>
-      ClientStreamingRpcMethod<T>(this, serviceName, methodName);
+      ClientStreamingRpcMethod<IRpcSerializableMessage>(
+          this, serviceName, methodName);
 
   /// Создает объект двунаправленного стриминг метода для указанного сервиса и метода
   @override
-  BidirectionalStreamingRpcMethod<T> bidirectionalStreaming({
+  BidirectionalStreamingRpcMethod<IRpcSerializableMessage>
+      bidirectionalStreaming({
     required String serviceName,
     required String methodName,
   }) =>
-      BidirectionalStreamingRpcMethod<T>(this, serviceName, methodName);
+          BidirectionalStreamingRpcMethod<IRpcSerializableMessage>(
+              this, serviceName, methodName);
 }
