@@ -150,15 +150,6 @@ final class RpcMethodRegistry implements IRpcMethodRegistry {
           'Метод $serviceName.$methodName типа $methodType требует responseParser, но он не предоставлен');
     }
 
-    _logger.debug('Регистрация метода $serviceName.$methodName в реестре:');
-    _logger.debug('  - Handler: ${handler != null ? "Есть" : "Нет!"}');
-    _logger.debug('  - Handler type: ${handler?.runtimeType}');
-    _logger.debug('  - ArgParser: ${argumentParser != null ? "Есть" : "Нет!"}');
-    _logger.debug('  - ArgParser type: ${argumentParser?.runtimeType}');
-    _logger
-        .debug('  - RespParser: ${responseParser != null ? "Есть" : "Нет!"}');
-    _logger.debug('  - RespParser type: ${responseParser?.runtimeType}');
-
     // Создаем запись о методе в реестре
     _methods.putIfAbsent(serviceName, () => {});
 

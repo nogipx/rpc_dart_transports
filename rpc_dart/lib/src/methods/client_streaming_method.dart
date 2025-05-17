@@ -10,6 +10,46 @@ part of '_method.dart';
 /// 2. Без ответа (упрощенный режим)
 final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
     extends RpcMethod<T> {
+  /// Статическая карта для хранения активных стримов
+  /// Ключ: serviceName + methodName + идентификатор клиента (если нужно)
+  /// Значение: кешированный стрим и его метаданные
+  static final Map<String, _CachedStream> _streamCache = {};
+
+  /// Создает ключ для кеша стримов
+  String _createCacheKey<Request extends T, Response extends T>({
+    String? streamId,
+    String? clientId,
+  }) {
+    // Формируем ключ из имени сервиса и метода
+    // Можно также добавить clientId для разделения по клиентам, если нужно
+    final key = '$serviceName.$methodName';
+    if (clientId != null) {
+      return '$key.$clientId';
+    }
+    return key;
+  }
+
+  /// Периодически очищает кеш от закрытых или устаревших стримов
+  static void _cleanupCache() {
+    final keysToRemove = <String>[];
+
+    // Находим все ключи, соответствующие закрытым стримам
+    for (final entry in _streamCache.entries) {
+      final cachedStream = entry.value;
+
+      // Если стрим закрыт или истек срок жизни кеша
+      if (cachedStream.isClosed ||
+          DateTime.now().difference(cachedStream.createdAt).inMinutes > 30) {
+        keysToRemove.add(entry.key);
+      }
+    }
+
+    // Удаляем найденные ключи
+    for (final key in keysToRemove) {
+      _streamCache.remove(key);
+    }
+  }
+
   /// Создает новый объект клиентского стриминг RPC метода
   ClientStreamingRpcMethod(
     IRpcEndpoint endpoint,
@@ -24,17 +64,46 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
   ///
   /// [metadata] - метаданные запроса (опционально)
   /// [streamId] - ID стрима (опционально, генерируется автоматически)
-  /// [noResponse] - флаг, указывающий, что ответ не ожидается (по умолчанию false)
+  /// [clientId] - ID клиента (опционально, для разделения по клиентам)
+  /// [forceNewStream] - флаг создания нового стрима даже если существует активный
   ClientStreamingBidiStream<Request, Response>
       call<Request extends T, Response extends T>({
     required RpcMethodResponseParser<Response> responseParser,
     Map<String, dynamic>? metadata,
     String? streamId,
+    String? clientId,
+    bool forceNewStream = false,
   }) {
+    // Периодически очищаем кеш стримов
+    _cleanupCache();
+
+    // Создаем ключ для кеша
+    final cacheKey = _createCacheKey<Request, Response>(
+      streamId: streamId,
+      clientId: clientId,
+    );
+
+    // Проверяем, есть ли уже активный стрим в кеше, если нас не просят создать новый поток
+    if (!forceNewStream && _streamCache.containsKey(cacheKey)) {
+      final cachedStream = _streamCache[cacheKey]!;
+
+      // Если стрим активен, используем его
+      if (!cachedStream.isClosed) {
+        _logger?.debug('Переиспользуем существующий стрим из кеша: $cacheKey');
+        return cachedStream.stream
+            as ClientStreamingBidiStream<Request, Response>;
+      } else {
+        // Если стрим закрыт, удаляем его из кеша
+        _streamCache.remove(cacheKey);
+      }
+    }
+
+    // Если в кеше нет активного стрима или нужно создать новый, создаем его
     final effectiveStreamId =
         streamId ?? _endpoint.generateUniqueId('client_stream');
     final startTime = DateTime.now().millisecondsSinceEpoch;
-    final requestId = _endpoint.generateUniqueId('request');
+
+    _logger?.debug('Инициализация клиентского стрима с ID: $effectiveStreamId');
 
     // Отправляем метрику о создании стрима
     _diagnostic?.reportStreamMetric(
@@ -46,235 +115,184 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
       ),
     );
 
-    // Отправляем событие начала вызова метода
-    _diagnostic?.reportTraceEvent(
-      _diagnostic!.createTraceEvent(
-        eventType: RpcTraceMetricType.methodStart,
-        method: methodName,
-        service: serviceName,
-        requestId: requestId,
-        metadata: metadata,
-      ),
-    );
-
     // Счетчики для диагностики
     var sentMessageCount = 0;
     var totalSentDataSize = 0;
 
-    // Создаем контроллер для запросов
-    final requestController = StreamController<Request>();
-
-    // Создаем контроллер для ответа (если ожидается)
+    // Создаем контроллер для ответа
     final responseController = StreamController<Response>();
 
-    // Инициируем соединение с типизированным маркером
-    _engine
-        .invoke(
+    // Создаем маркер инициализации клиентского стрима
+    final clientStreamMarker = RpcClientStreamingMarker(
+      streamId: effectiveStreamId,
+      parameters: metadata,
+    );
+
+    // Используем единый способ инициализации через openStream с маркером
+    final responseStream = _engine.openStream(
       serviceName: serviceName,
       methodName: methodName,
-      request: RpcClientStreamingMarker(
-        streamId: effectiveStreamId,
-        parameters: metadata,
-      ),
+      request: clientStreamMarker,
       metadata: metadata,
-    )
-        .then((response) {
-      // Обрабатываем ответ от сервера после завершения стрима
-      if (response != null && !responseController.isClosed) {
-        try {
-          // Преобразуем ответ в нужный тип
-          final parsedResponse = responseParser(response);
+      streamId: effectiveStreamId,
+    );
 
-          // Добавляем ответ в контроллер
-          responseController.add(parsedResponse);
-        } catch (error, stackTrace) {
-          // В случае ошибки преобразования добавляем ошибку в контроллер
-          responseController.addError(error, stackTrace);
-        } finally {
-          // Закрываем контроллер ответов
-          responseController.close();
+    // Подписываемся на поток ответов от сервера
+    responseStream.listen(
+      (response) {
+        // Обрабатываем ответ от сервера после завершения стрима
+        if (response != null && !responseController.isClosed) {
+          try {
+            // Проверяем, не является ли ответ маркером
+            if (!RpcMarkerHandler.isServiceMarker(response)) {
+              // Преобразуем ответ в нужный тип
+              final parsedResponse = responseParser(response);
+
+              // Добавляем ответ в контроллер
+              responseController.add(parsedResponse);
+            }
+          } catch (error, stackTrace) {
+            // В случае ошибки преобразования добавляем ошибку в контроллер
+            _logger?.error(
+              'Ошибка при преобразовании ответа: $error',
+              error: error,
+              stackTrace: stackTrace,
+            );
+            responseController.addError(error, stackTrace);
+          }
         }
-      }
-    }).catchError((error, stackTrace) {
-      // В случае ошибки вызова добавляем ошибку в контроллер ответов
-      if (!responseController.isClosed) {
-        responseController.addError(error, stackTrace);
-        responseController.close();
-      }
-    });
-
-    // Подписываемся на запросы от клиента и отправляем их на сервер
-    requestController.stream.listen(
-      (request) {
-        final processedRequest =
-            request is RpcMessage ? request.toJson() : request;
-        final dataSize = processedRequest.toString().length;
-
-        _engine.sendStreamData(
-          streamId: effectiveStreamId,
-          data: processedRequest,
-          serviceName: serviceName,
-          methodName: methodName,
-        );
-
-        // Увеличиваем счетчики для диагностики
-        sentMessageCount++;
-        totalSentDataSize += dataSize;
-
-        // Отправляем метрику об отправленном сообщении
-        _diagnostic?.reportStreamMetric(
-          _diagnostic!.createStreamMetric(
-            eventType: RpcStreamEventType.messageSent,
-            streamId: effectiveStreamId,
-            direction: RpcStreamDirection.clientToServer,
-            method: '$serviceName.$methodName',
-            dataSize: dataSize,
-            messageCount: sentMessageCount,
-          ),
-        );
       },
       onError: (error, stackTrace) {
+        // В случае ошибки в потоке добавляем ошибку в контроллер ответов
         _logger?.error(
-          'Ошибка при отправке запроса: $error',
+          'Ошибка потока ответов: $error',
           error: error,
           stackTrace: stackTrace,
         );
-
-        // Отправляем метрику об ошибке
-        _diagnostic?.reportErrorMetric(
-          _diagnostic!.createErrorMetric(
-            errorType: RpcErrorMetricType.unexpectedError,
-            message:
-                'Ошибка при отправке запроса в клиентском стриме $serviceName.$methodName: $error',
-            requestId: requestId,
-            method: '$serviceName.$methodName',
-            stackTrace: stackTrace.toString(),
-            details: {'streamId': effectiveStreamId},
-          ),
-        );
+        if (!responseController.isClosed) {
+          responseController.addError(error, stackTrace);
+        }
       },
       onDone: () {
-        final endTime = DateTime.now().millisecondsSinceEpoch;
-        final duration = endTime - startTime;
+        // Закрываем контроллер ответов при завершении потока
+        if (!responseController.isClosed) {
+          responseController.close();
+        }
 
-        _logger?.debug(
-          'Завершение потока запросов',
-        );
-
-        // Отправляем метрику о закрытии потока запросов
-        _diagnostic?.reportStreamMetric(
-          _diagnostic!.createStreamMetric(
-            eventType: RpcStreamEventType.closed,
-            streamId: effectiveStreamId,
-            direction: RpcStreamDirection.clientToServer,
-            method: '$serviceName.$methodName',
-            messageCount: sentMessageCount,
-            throughput:
-                sentMessageCount > 0 ? (totalSentDataSize / duration) : 0,
-            duration: duration,
-          ),
-        );
-
-        // Отправляем типизированный маркер завершения потока запросов
-        _engine.sendServiceMarker(
-          streamId: effectiveStreamId,
-          marker: const RpcClientStreamEndMarker(),
-          serviceName: serviceName,
-          methodName: methodName,
-        );
-
-        // Отправляем событие завершения вызова метода
-        _diagnostic?.reportTraceEvent(
-          _diagnostic!.createTraceEvent(
-            eventType: RpcTraceMetricType.methodEnd,
-            method: methodName,
-            service: serviceName,
-            requestId: requestId,
-            durationMs: duration,
-            metadata: {
-              'streamId': effectiveStreamId,
-              'sentMessageCount': sentMessageCount,
-              'totalSentDataSize': totalSentDataSize,
-            },
-          ),
-        );
+        // Удаляем стрим из кеша
+        _streamCache.remove(cacheKey);
+        _logger?.debug('Удален стрим из кеша при завершении: $cacheKey');
       },
     );
 
     // Создаем BidiStream для передачи в ClientStreamingBidiStream
-    return ClientStreamingBidiStream<Request, Response>(
-      BidiStream<Request, Response>(
-        responseStream: responseController.stream,
-        sendFunction: (request) {
-          try {
-            // Преобразуем запрос в JSON, если это RpcMessage
-            final processedRequest =
-                request is RpcMessage ? request.toJson() : request;
+    final bidiStream = BidiStream<Request, Response>(
+      responseStream: responseController.stream,
+      sendFunction: (request) {
+        try {
+          // Преобразуем запрос в JSON, если это RpcMessage
+          final processedRequest =
+              request is RpcMessage ? request.toJson() : request;
 
-            // Отправляем запрос в стрим
-            _engine.sendStreamData(
+          // Отправляем запрос в стрим, используя тот же streamId
+          _engine.sendStreamData(
+            streamId: effectiveStreamId,
+            data: processedRequest,
+            serviceName: serviceName,
+            methodName: methodName,
+          );
+
+          // Увеличиваем счетчики для диагностики
+          sentMessageCount++;
+          final dataSize = processedRequest.toString().length;
+          totalSentDataSize += dataSize;
+
+          // Отправляем метрику об отправке сообщения
+          _diagnostic?.reportStreamMetric(
+            _diagnostic!.createStreamMetric(
+              eventType: RpcStreamEventType.messageSent,
               streamId: effectiveStreamId,
-              data: processedRequest,
-              serviceName: serviceName,
-              methodName: methodName,
-            );
+              direction: RpcStreamDirection.clientToServer,
+              method: '$serviceName.$methodName',
+              dataSize: dataSize,
+              messageCount: sentMessageCount,
+            ),
+          );
+        } catch (e, stackTrace) {
+          // Логируем ошибку при отправке сообщения
+          _logger?.error(
+            'Ошибка при отправке сообщения: $e',
+            error: e,
+            stackTrace: stackTrace,
+          );
+          responseController.addError(e, stackTrace);
+        }
+      },
+      // Реализуем finishTransferFunction для завершения отправки
+      finishTransferFunction: () async {
+        _logger?.debug('Вызов finishTransfer - отправка маркера завершения');
 
-            // Увеличиваем счетчики для диагностики
-            sentMessageCount++;
-            final dataSize = processedRequest.toString().length;
-            totalSentDataSize += dataSize;
+        try {
+          final endTime = DateTime.now().millisecondsSinceEpoch;
+          final duration = endTime - startTime;
 
-            // Отправляем метрику об отправке сообщения
-            _diagnostic?.reportStreamMetric(
-              _diagnostic!.createStreamMetric(
-                eventType: RpcStreamEventType.messageSent,
-                streamId: effectiveStreamId,
-                direction: RpcStreamDirection.clientToServer,
-                method: '$serviceName.$methodName',
-                dataSize: dataSize,
-                messageCount: sentMessageCount,
-              ),
-            );
-          } catch (e, stackTrace) {
-            // Логируем ошибку при отправке сообщения
-            _logger?.error(
-              'Ошибка при отправке сообщения: $e',
-              error: e,
-              stackTrace: stackTrace,
-            );
-            responseController.addError(e, stackTrace);
-          }
-        },
-        // Добавляем явно реализованный finishTransferFunction
-        finishTransferFunction: () async {
-          _logger?.debug(
-              'Вызов finishTransfer - явная отправка маркера завершения');
+          // Отправляем метрику о закрытии потока запросов
+          _diagnostic?.reportStreamMetric(
+            _diagnostic!.createStreamMetric(
+              eventType: RpcStreamEventType.closed,
+              streamId: effectiveStreamId,
+              direction: RpcStreamDirection.clientToServer,
+              method: '$serviceName.$methodName',
+              messageCount: sentMessageCount,
+              throughput:
+                  sentMessageCount > 0 ? (totalSentDataSize / duration) : 0,
+              duration: duration,
+            ),
+          );
 
-          try {
-            // Используем метод расширения для отправки маркера завершения
-            await _engine.transport.endClientStream();
+          // Отправляем типизированный маркер завершения потока запросов
+          await _engine.sendServiceMarker(
+            streamId: effectiveStreamId,
+            marker: const RpcClientStreamEndMarker(),
+            serviceName: serviceName,
+            methodName: methodName,
+          );
 
-            // Логируем для отладки
-            _logger?.debug('Маркер завершения потока отправлен');
-          } catch (e, stackTrace) {
-            _logger?.error(
-              'Ошибка при отправке маркера завершения потока: $e',
-              error: e,
-              stackTrace: stackTrace,
-            );
-          }
-        },
-        closeFunction: () async {
-          // Закрываем контроллеры при закрытии BidiStream
-          if (!requestController.isClosed) {
-            await requestController.close();
-          }
-          if (!responseController.isClosed) {
-            await responseController.close();
-          }
-        },
-      ),
+          _logger?.debug('Маркер завершения потока отправлен');
+        } catch (e, stackTrace) {
+          _logger?.error(
+            'Ошибка при отправке маркера завершения потока: $e',
+            error: e,
+            stackTrace: stackTrace,
+          );
+        }
+      },
+      closeFunction: () async {
+        // Закрываем контроллер ответов при закрытии BidiStream
+        if (!responseController.isClosed) {
+          await responseController.close();
+        }
+
+        // Удаляем стрим из кеша
+        _streamCache.remove(cacheKey);
+        _logger?.debug('Удален стрим из кеша при закрытии: $cacheKey');
+      },
     );
+
+    // Создаем и оборачиваем в ClientStreamingBidiStream
+    final streamingBidiStream =
+        ClientStreamingBidiStream<Request, Response>(bidiStream);
+
+    // Сохраняем стрим в кеше
+    _streamCache[cacheKey] = _CachedStream(
+      stream: streamingBidiStream,
+      streamId: effectiveStreamId,
+      createdAt: DateTime.now(),
+    );
+
+    _logger?.debug('Сохранен новый стрим в кеш: $cacheKey');
+
+    return streamingBidiStream;
   }
 
   /// Регистрирует обработчик клиентского стриминг метода
@@ -391,6 +409,8 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
 
         if (isClientStreaming) {
           clientStreamingMarker = marker;
+          _logger?.debug(
+              'Получен маркер инициализации клиентского стрима: ${clientStreamingMarker.streamId}');
         }
 
         // Получаем или создаем ID стрима
@@ -398,8 +418,10 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
         if (clientStreamingMarker != null) {
           // Если получили типизированный маркер, используем его streamId
           effectiveStreamId = clientStreamingMarker.streamId;
+          _logger?.debug('Используем ID из маркера: $effectiveStreamId');
         } else {
           effectiveStreamId = context.messageId;
+          _logger?.debug('Используем ID сообщения: $effectiveStreamId');
         }
 
         // Отправляем метрику о создании стрима
@@ -412,7 +434,8 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
           ),
         );
 
-        // Получаем стрим сообщений от клиента
+        // Получаем стрим сообщений от клиента - стрим уже должен быть создан
+        // при отправке маркера инициализации, просто подключаемся к нему
         final incomingStream = _engine
             .openStream(
           serviceName: serviceName,
@@ -650,5 +673,26 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
         };
       }
     };
+  }
+}
+
+/// Класс для хранения кешированного стрима и его метаданных
+class _CachedStream {
+  final dynamic stream;
+  final String streamId;
+  final DateTime createdAt;
+
+  _CachedStream({
+    required this.stream,
+    required this.streamId,
+    required this.createdAt,
+  });
+
+  /// Проверяет, закрыт ли стрим
+  bool get isClosed {
+    if (stream is ClientStreamingBidiStream) {
+      return (stream as ClientStreamingBidiStream).isClosed;
+    }
+    return false;
   }
 }

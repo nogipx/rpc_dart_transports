@@ -42,6 +42,8 @@ final class _RpcEngineImpl implements IRpcEngine {
   /// Генератор уникальных ID
   late final RpcUniqueIdGenerator _uniqueIdGenerator;
 
+  RpcLogger get _logger => RpcLogger('RpcEngineImpl[$debugLabel]');
+
   /// Создаёт новую конечную точку
   ///
   /// [transport] - транспорт для обмена сообщениями
@@ -153,7 +155,8 @@ final class _RpcEngineImpl implements IRpcEngine {
   ///
   /// [serviceName] - имя сервиса
   /// [methodName] - имя метода
-  /// [request] - начальный запрос (опционально)
+  /// [request] - начальный запрос (опционально). Если это маркер инициализации стрима,
+  ///             он будет отправлен как есть.
   /// [metadata] - дополнительные метаданные
   /// [streamId] - опциональный ID для потока, если не указан, будет сгенерирован
   /// Возвращает Stream с данными от удаленной стороны
@@ -176,6 +179,18 @@ final class _RpcEngineImpl implements IRpcEngine {
     final controller = StreamController<dynamic>.broadcast();
     _streamControllers[actualStreamId] = controller;
 
+    // Проверяем, является ли запрос маркером инициализации стрима
+    final isClientStreamInit = RpcMarkerHandler.isServiceMarker(request) &&
+        (request is Map &&
+                request['_markerType'] ==
+                    RpcMarkerType.clientStreamingInit.name ||
+            request is RpcClientStreamingMarker);
+
+    final isBidirectionalInit = RpcMarkerHandler.isServiceMarker(request) &&
+        (request is Map &&
+                request['_markerType'] == RpcMarkerType.bidirectional.name ||
+            request is RpcBidirectionalStreamingMarker);
+
     final message = RpcMessage(
       type: RpcMessageType.request,
       id: actualStreamId,
@@ -187,6 +202,14 @@ final class _RpcEngineImpl implements IRpcEngine {
     );
 
     _sendMessage(message);
+
+    // Если это инициализация стрима, логируем это для отладки
+    if (isClientStreamInit) {
+      _logger.debug('Инициализация клиентского стрима с ID: $actualStreamId');
+    } else if (isBidirectionalInit) {
+      _logger
+          .debug('Инициализация двунаправленного стрима с ID: $actualStreamId');
+    }
 
     return controller.stream;
   }
@@ -639,7 +662,7 @@ final class _RpcEngineImpl implements IRpcEngine {
         localMarkerHandler.handleMarker(marker);
       } catch (e) {
         // При ошибке парсинга маркера, логируем и продолжаем стандартную обработку
-        print('Ошибка при обработке маркера: $e');
+        _logger.error('Ошибка при обработке маркера: $e');
         controller.add(payload);
       }
 
