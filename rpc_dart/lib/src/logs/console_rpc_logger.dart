@@ -4,54 +4,42 @@
 
 part of '_logs.dart';
 
-/// Интерфейс для фильтрации логов
-abstract class LogFilter {
-  /// Проверяет, нужно ли логировать сообщение с указанным уровнем и источником
-  bool shouldLog(RpcLogLevel level, String source);
-}
+typedef DefaultRpcLogger = _ConsoleRpcLogger;
 
 /// Реализация фильтра по умолчанию, основанная на минимальном уровне логирования
-class DefaultLogFilter implements LogFilter {
-  final RpcLogLevel minLogLevel;
+class _DefaultRpcLoggerFilter implements IRpcLoggerFilter {
+  final RpcLoggerLevel minLogLevel;
 
-  DefaultLogFilter(this.minLogLevel);
+  _DefaultRpcLoggerFilter(this.minLogLevel);
 
   @override
-  bool shouldLog(RpcLogLevel level, String source) {
+  bool shouldLog(RpcLoggerLevel level, String source) {
     return level.index >= minLogLevel.index;
   }
 }
 
-/// Интерфейс для форматирования логов
-abstract class LogFormatter {
-  /// Форматирует сообщение лога
-  String format(
-      DateTime timestamp, RpcLogLevel level, String source, String message,
-      {String? context});
-}
-
 /// Реализация форматтера по умолчанию
-class DefaultLogFormatter implements LogFormatter {
-  const DefaultLogFormatter();
+class _DefaultRpcLoggerFormatter implements IRpcLoggerFormatter {
+  const _DefaultRpcLoggerFormatter();
 
   @override
   String format(
-      DateTime timestamp, RpcLogLevel level, String source, String message,
+      DateTime timestamp, RpcLoggerLevel level, String source, String message,
       {String? context}) {
     final formattedTime =
         '${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}:${timestamp.second.toString().padLeft(2, '0')}';
 
     String prefix;
     switch (level) {
-      case RpcLogLevel.debug:
+      case RpcLoggerLevel.debug:
         prefix = '🔍 DEBUG';
-      case RpcLogLevel.info:
+      case RpcLoggerLevel.info:
         prefix = '📝 INFO ';
-      case RpcLogLevel.warning:
+      case RpcLoggerLevel.warning:
         prefix = '⚠️ WARN ';
-      case RpcLogLevel.error:
+      case RpcLoggerLevel.error:
         prefix = '❌ ERROR';
-      case RpcLogLevel.critical:
+      case RpcLoggerLevel.critical:
         prefix = '🔥 CRIT ';
       default:
         prefix = '     ';
@@ -62,100 +50,75 @@ class DefaultLogFormatter implements LogFormatter {
   }
 }
 
-/// Инстанцируемый логгер для библиотеки RpcDart
-///
-/// Позволяет создавать отдельные логгеры для разных компонентов
-/// с независимыми настройками.
-///
-/// Пример использования:
-/// ```dart
-/// final logger = RpcLogger(name: 'MyComponent');
-/// logger.info(message: 'Компонент инициализирован');
-/// ```
-class RpcLogger {
-  /// Имя логгера, обычно название компонента или модуля
+/// Консольная реализация логгера
+class _ConsoleRpcLogger implements RpcLogger {
+  @override
   final String name;
 
   /// Диагностический сервис для отправки логов
-  IRpcDiagnosticService? _diagnosticService;
+  final IRpcDiagnosticService? _diagnosticService;
 
   /// Минимальный уровень логов для отправки
-  RpcLogLevel _minLogLevel;
+  final RpcLoggerLevel _minLogLevel;
 
   /// Флаг вывода логов в консоль
-  bool _consoleLoggingEnabled;
+  final bool _consoleLoggingEnabled;
 
   /// Флаг использования цветов при выводе логов в консоль
-  bool _coloredLoggingEnabled;
+  final bool _coloredLoggingEnabled;
 
   /// Настройки цветов для разных уровней логирования
-  RpcLogColors _logColors;
+  final RpcLoggerColors _logColors;
 
   /// Фильтр логов
-  LogFilter _filter;
+  final IRpcLoggerFilter _filter;
 
   /// Форматтер логов
-  LogFormatter _formatter;
+  final IRpcLoggerFormatter _formatter;
 
   /// Создает новый логгер с указанными параметрами
-  RpcLogger({
-    required this.name,
+  _ConsoleRpcLogger(
+    this.name, {
     IRpcDiagnosticService? diagnosticService,
-    RpcLogLevel minLogLevel = RpcLogLevel.info,
+    RpcLoggerLevel minLogLevel = RpcLoggerLevel.info,
     bool consoleLoggingEnabled = true,
     bool coloredLoggingEnabled = true,
-    RpcLogColors logColors = const RpcLogColors(),
-    LogFilter? filter,
-    LogFormatter? formatter,
+    RpcLoggerColors logColors = const RpcLoggerColors(),
+    IRpcLoggerFilter? filter,
+    IRpcLoggerFormatter? formatter,
   })  : _diagnosticService = diagnosticService,
         _minLogLevel = minLogLevel,
         _consoleLoggingEnabled = consoleLoggingEnabled,
         _coloredLoggingEnabled = coloredLoggingEnabled,
         _logColors = logColors,
-        _filter = filter ?? DefaultLogFilter(minLogLevel),
-        _formatter = formatter ?? const DefaultLogFormatter();
+        _filter = filter ?? _DefaultRpcLoggerFilter(minLogLevel),
+        _formatter = formatter ?? const _DefaultRpcLoggerFormatter();
 
-  /// Устанавливает диагностический сервис для логирования
-  void setDiagnosticService(IRpcDiagnosticService service) {
-    _diagnosticService = service;
+  @override
+  RpcLogger withConfig({
+    IRpcDiagnosticService? diagnosticService,
+    RpcLoggerLevel? minLogLevel,
+    bool? consoleLoggingEnabled,
+    bool? coloredLoggingEnabled,
+    RpcLoggerColors? logColors,
+    IRpcLoggerFilter? filter,
+    IRpcLoggerFormatter? formatter,
+  }) {
+    return _ConsoleRpcLogger(
+      name,
+      diagnosticService: diagnosticService ?? _diagnosticService,
+      minLogLevel: minLogLevel ?? _minLogLevel,
+      consoleLoggingEnabled: consoleLoggingEnabled ?? _consoleLoggingEnabled,
+      coloredLoggingEnabled: coloredLoggingEnabled ?? _coloredLoggingEnabled,
+      logColors: logColors ?? _logColors,
+      filter: filter ?? _filter,
+      formatter: formatter ?? _formatter,
+    );
   }
 
-  /// Устанавливает минимальный уровень логов
-  void setMinLogLevel(RpcLogLevel level) {
-    _minLogLevel = level;
-    if (_filter is DefaultLogFilter) {
-      _filter = DefaultLogFilter(level);
-    }
-  }
-
-  /// Включает/выключает вывод логов в консоль
-  void setConsoleLogging(bool enabled) {
-    _consoleLoggingEnabled = enabled;
-  }
-
-  /// Включает/выключает цветной вывод логов в консоль
-  void setColoredLogging(bool enabled) {
-    _coloredLoggingEnabled = enabled;
-  }
-
-  /// Настраивает цвета для разных уровней логирования
-  void setLogColors(RpcLogColors colors) {
-    _logColors = colors;
-  }
-
-  /// Устанавливает фильтр логов
-  void setFilter(LogFilter filter) {
-    _filter = filter;
-  }
-
-  /// Устанавливает форматтер логов
-  void setFormatter(LogFormatter formatter) {
-    _formatter = formatter;
-  }
-
-  /// Отправляет лог с указанным уровнем в сервис диагностики
+  @override
   Future<void> log({
-    required RpcLogLevel level,
+    required RpcLoggerLevel level,
     required String message,
     String? context,
     String? requestId,
@@ -198,7 +161,7 @@ class RpcLogger {
 
   /// Отображает лог в консоли
   void _logToConsole({
-    required RpcLogLevel level,
+    required RpcLoggerLevel level,
     required String message,
     String? context,
     Map<String, dynamic>? error,
@@ -215,7 +178,7 @@ class RpcLogger {
       RpcColoredLogging.logColored(
         logMessage,
         actualColor,
-        isError: level.index >= RpcLogLevel.error.index,
+        isError: level.index >= RpcLoggerLevel.error.index,
       );
 
       if (error != null) {
@@ -247,7 +210,7 @@ class RpcLogger {
     }
   }
 
-  /// Отправляет лог уровня debug
+  @override
   Future<void> debug({
     required String message,
     String? context,
@@ -256,7 +219,7 @@ class RpcLogger {
     AnsiColor? color,
   }) async {
     await log(
-      level: RpcLogLevel.debug,
+      level: RpcLoggerLevel.debug,
       message: message,
       context: context,
       requestId: requestId,
@@ -265,7 +228,7 @@ class RpcLogger {
     );
   }
 
-  /// Отправляет лог уровня info
+  @override
   Future<void> info({
     required String message,
     String? context,
@@ -274,7 +237,7 @@ class RpcLogger {
     AnsiColor? color,
   }) async {
     await log(
-      level: RpcLogLevel.info,
+      level: RpcLoggerLevel.info,
       message: message,
       context: context,
       requestId: requestId,
@@ -283,7 +246,7 @@ class RpcLogger {
     );
   }
 
-  /// Отправляет лог уровня warning
+  @override
   Future<void> warning({
     required String message,
     String? context,
@@ -292,7 +255,7 @@ class RpcLogger {
     AnsiColor? color,
   }) async {
     await log(
-      level: RpcLogLevel.warning,
+      level: RpcLoggerLevel.warning,
       message: message,
       context: context,
       requestId: requestId,
@@ -301,7 +264,7 @@ class RpcLogger {
     );
   }
 
-  /// Отправляет лог уровня error
+  @override
   Future<void> error({
     required String message,
     String? context,
@@ -312,7 +275,7 @@ class RpcLogger {
     AnsiColor? color,
   }) async {
     await log(
-      level: RpcLogLevel.error,
+      level: RpcLoggerLevel.error,
       message: message,
       context: context,
       requestId: requestId,
@@ -323,7 +286,7 @@ class RpcLogger {
     );
   }
 
-  /// Отправляет лог уровня critical
+  @override
   Future<void> critical({
     required String message,
     String? context,
@@ -334,7 +297,7 @@ class RpcLogger {
     AnsiColor? color,
   }) async {
     await log(
-      level: RpcLogLevel.critical,
+      level: RpcLoggerLevel.critical,
       message: message,
       context: context,
       requestId: requestId,

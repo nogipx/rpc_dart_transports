@@ -37,7 +37,7 @@ enum AnsiColor {
 }
 
 /// Настройки цветов для разных уровней логирования
-class RpcLogColors {
+class RpcLoggerColors {
   /// Цвет для логов уровня debug
   final AnsiColor debug;
 
@@ -54,7 +54,7 @@ class RpcLogColors {
   final AnsiColor critical;
 
   /// Создаёт настройки цветов с указанными значениями
-  const RpcLogColors({
+  const RpcLoggerColors({
     this.debug = AnsiColor.cyan,
     this.info = AnsiColor.green,
     this.warning = AnsiColor.yellow,
@@ -63,20 +63,20 @@ class RpcLogColors {
   });
 
   /// Цвета по умолчанию
-  static const defaultColors = RpcLogColors();
+  static const defaultColors = RpcLoggerColors();
 
   /// Получает цвет для указанного уровня логирования
-  AnsiColor colorForLevel(RpcLogLevel level) {
+  AnsiColor colorForLevel(RpcLoggerLevel level) {
     switch (level) {
-      case RpcLogLevel.debug:
+      case RpcLoggerLevel.debug:
         return debug;
-      case RpcLogLevel.info:
+      case RpcLoggerLevel.info:
         return info;
-      case RpcLogLevel.warning:
+      case RpcLoggerLevel.warning:
         return warning;
-      case RpcLogLevel.error:
+      case RpcLoggerLevel.error:
         return error;
-      case RpcLogLevel.critical:
+      case RpcLoggerLevel.critical:
         return critical;
       default:
         return AnsiColor.white;
@@ -87,19 +87,31 @@ class RpcLogColors {
 /// Утилиты для цветного логирования
 class RpcColoredLogging {
   /// Настройки цветов для логирования
-  static RpcLogColors logColors = RpcLogColors.defaultColors;
+  static RpcLoggerColors logColors = RpcLoggerColors.defaultColors;
 
   /// Флаг, указывающий, включено ли цветное логирование
   static bool enabled = true;
 
   /// Устанавливает новые настройки цветов
-  static void setLogColors(RpcLogColors colors) {
+  static void setLogColors(RpcLoggerColors colors) {
     logColors = colors;
   }
 
   /// Включает или выключает цветное логирование
   static void setEnabled(bool isEnabled) {
     enabled = isEnabled;
+  }
+
+  /// Настраивает поддержку ANSI цветов для текущей платформы
+  ///
+  /// На Windows нужно специально включить поддержку ANSI цветов
+  static void setupConsoleStyling() {
+    // На Windows нужно включить ANSI цвета через команду cmd
+    if (Platform.isWindows) {
+      try {
+        Process.runSync('cmd', ['/c', 'color']);
+      } catch (_) {}
+    }
   }
 
   /// Возвращает строку с применённым цветом
@@ -123,8 +135,9 @@ class RpcColoredLogging {
   }
 
   /// Выводит сообщение с цветом, соответствующим уровню логирования
-  static void logWithLevel(String message, RpcLogLevel level) {
+  static void logWithLevel(String message, RpcLoggerLevel level) {
     final color = logColors.colorForLevel(level);
-    logColored(message, color, isError: level.index >= RpcLogLevel.error.index);
+    logColored(message, color,
+        isError: level.index >= RpcLoggerLevel.error.index);
   }
 }
