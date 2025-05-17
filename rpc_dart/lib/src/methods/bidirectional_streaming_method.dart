@@ -61,11 +61,14 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
     // Создаем контроллер для исходящих сообщений
     final outgoingController = StreamController<Request>();
 
-    // Инициируем соединение
+    // Инициируем соединение с использованием типизированного маркера
     _engine.invoke(
       serviceName: serviceName,
       methodName: methodName,
-      request: {'_bidirectional': true, '_streamId': effectiveStreamId},
+      request: RpcBidirectionalStreamingMarker(
+        streamId: effectiveStreamId,
+        parameters: metadata,
+      ),
       metadata: metadata,
     );
 
@@ -84,17 +87,21 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
       streamId: effectiveStreamId,
     )
         .map((data) {
-      if (data is Map<String, dynamic>) {
-        // Проверяем маркер конца стрима
-        if (data['_clientStreamEnd'] == true) {
-          // Пропускаем маркер завершения
+      // Проверяем, является ли входящее сообщение маркером
+      final marker = RpcMarkerHandler.tryParseMarker(data);
+      if (marker != null) {
+        // Обрабатываем различные типы маркеров
+        if (marker is RpcClientStreamEndMarker) {
+          // Пропускаем маркер завершения клиентского стрима
           throw StateError('StreamEnd');
-        }
-        // Проверяем маркер закрытия канала
-        if (data['_channelClosed'] == true) {
+        } else if (marker is RpcChannelClosedMarker) {
+          // Обрабатываем закрытие канала
           throw StateError('ChannelClosed');
         }
+      }
 
+      // Если это не маркер или это маркер другого типа, обрабатываем как обычные данные
+      if (data is Map<String, dynamic>) {
         try {
           final response = responseParser(data);
 
@@ -217,10 +224,10 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
         final endTime = DateTime.now().millisecondsSinceEpoch;
         final duration = endTime - startTime;
 
-        // Маркер завершения для клиентского стрима
-        _engine.sendStreamData(
+        // Отправляем типизированный маркер завершения клиентского стрима
+        _engine.sendServiceMarker(
           streamId: effectiveStreamId,
-          data: {'_clientStreamEnd': true},
+          marker: const RpcClientStreamEndMarker(),
           serviceName: serviceName,
           methodName: methodName,
         );
@@ -339,16 +346,23 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
         try {
           // Получаем данные запроса и проверяем маркер двунаправленного стрима
           final requestData = context.payload;
-          final isBidirectional = requestData is Map<String, dynamic> &&
-              requestData['_bidirectional'] == true;
+          RpcBidirectionalStreamingMarker? bidirectionalMarker;
+
+          // Проверяем, является ли входящее сообщение маркером
+          final marker = RpcMarkerHandler.tryParseMarker(requestData);
+          final isBidirectional = marker is RpcBidirectionalStreamingMarker;
+
+          if (isBidirectional) {
+            bidirectionalMarker = marker;
+          }
 
           // Получаем или создаем ID стрима, отличный от ID сообщения
           String effectiveStreamId;
-          if (isBidirectional && requestData['_streamId'] != null) {
-            // Если клиент указал ID стрима, используем его
-            effectiveStreamId = requestData['_streamId'] as String;
+          if (bidirectionalMarker != null) {
+            // Если получили типизированный маркер, используем его streamId
+            effectiveStreamId = bidirectionalMarker.streamId;
           } else {
-            // Иначе генерируем новый ID стрима (не используем messageId как streamId)
+            // Иначе генерируем новый ID стрима
             effectiveStreamId = _endpoint.generateUniqueId('stream');
           }
 
@@ -403,9 +417,12 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
                 _logger?.debug(
                   'Получено сообщение от клиента: $data',
                 );
+
+                // Проверяем, является ли сообщение маркером
+                final marker = RpcMarkerHandler.tryParseMarker(data);
+
                 // Проверяем маркер завершения стрима
-                if (data is Map<String, dynamic> &&
-                    data['_clientStreamEnd'] == true) {
+                if (marker is RpcClientStreamEndMarker) {
                   _logger?.debug(
                     'Получен маркер завершения стрима',
                   );

@@ -115,13 +115,27 @@ final class BidiStreamGenerator<Request extends IRpcSerializableMessage,
         }
       },
       finishTransferFunction: () async {
-        // При завершении передачи данных не закрываем контроллер,
-        // просто сигнализируем, что данных больше не будет
-        // Специальный маркер завершения добавляется через sendFunction
-        // в реализациях методов высокого уровня (например, ClientStreamingRpcMethod)
+        // При завершении передачи данных просто закрываем контроллер,
+        // так как прямая отправка маркера завершения через контроллер невозможна
+        // из-за строгой типизации (мы не можем преобразовать Map<String, bool> к Request)
         if (!requestController.isClosed) {
-          // Если нужно добавить специальный маркер завершения непосредственно здесь,
-          // можно сделать это, но сейчас мы оставляем эту ответственность на более высоком уровне
+          try {
+            // Нельзя отправить маркер завершения через типизированный контроллер,
+            // это должно быть реализовано на уровне выше (в ClientStreamingRpcMethod)
+
+            // Просто закрываем контроллер
+            await requestController.close();
+
+            // Логируем для отладки
+            RpcLogger('BidiStreamGenerator')
+                .debug('Контроллер запросов закрыт в finishTransferFunction');
+          } catch (e) {
+            // Если произошла ошибка при закрытии, логируем ее
+            RpcLogger('BidiStreamGenerator').error(
+              'Ошибка при завершении потока передачи: $e',
+              error: e,
+            );
+          }
         }
       },
       closeFunction: () async {
@@ -162,6 +176,8 @@ final class BidiStreamGenerator<Request extends IRpcSerializableMessage,
   ClientStreamingBidiStream<Request, Response> createClientStreaming([
     Stream<Request>? initialRequests,
   ]) {
-    return ClientStreamingBidiStream<Request, Response>(create());
+    final bidiStream = create(initialRequests);
+
+    return ClientStreamingBidiStream<Request, Response>(bidiStream);
   }
 }

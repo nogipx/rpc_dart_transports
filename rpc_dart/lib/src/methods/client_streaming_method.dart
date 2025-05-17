@@ -27,10 +27,9 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
   /// [noResponse] - флаг, указывающий, что ответ не ожидается (по умолчанию false)
   ClientStreamingBidiStream<Request, Response>
       call<Request extends T, Response extends T>({
+    required RpcMethodResponseParser<Response> responseParser,
     Map<String, dynamic>? metadata,
     String? streamId,
-    bool noResponse = false,
-    RpcMethodResponseParser<Response>? responseParser,
   }) {
     final effectiveStreamId =
         streamId ?? _endpoint.generateUniqueId('client_stream');
@@ -68,27 +67,23 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
     // Создаем контроллер для ответа (если ожидается)
     final responseController = StreamController<Response>();
 
-    // Инициируем соединение с пустым запросом или метаданными
+    // Инициируем соединение с типизированным маркером
     _engine
         .invoke(
       serviceName: serviceName,
       methodName: methodName,
-      request: {
-        '_clientStreaming': true,
-        '_streamId': effectiveStreamId,
-        '_noResponse':
-            noResponse, // Устанавливаем флаг в зависимости от параметра
-      },
+      request: RpcClientStreamingMarker(
+        streamId: effectiveStreamId,
+        parameters: metadata,
+      ),
       metadata: metadata,
     )
         .then((response) {
       // Обрабатываем ответ от сервера после завершения стрима
-      if (!noResponse && response != null && !responseController.isClosed) {
+      if (response != null && !responseController.isClosed) {
         try {
           // Преобразуем ответ в нужный тип
-          final parsedResponse = responseParser != null
-              ? responseParser(response)
-              : response as Response;
+          final parsedResponse = responseParser(response);
 
           // Добавляем ответ в контроллер
           responseController.add(parsedResponse);
@@ -180,10 +175,10 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
           ),
         );
 
-        // Отправляем маркер завершения потока запросов
-        _engine.sendStreamData(
+        // Отправляем типизированный маркер завершения потока запросов
+        _engine.sendServiceMarker(
           streamId: effectiveStreamId,
-          data: {'_clientStreamEnd': true},
+          marker: const RpcClientStreamEndMarker(),
           serviceName: serviceName,
           methodName: methodName,
         );
@@ -207,31 +202,79 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
     );
 
     // Создаем BidiStream для передачи в ClientStreamingBidiStream
-    final bidiStream = BidiStream<Request, Response>(
-      // Поток ответов
-      responseStream: responseController.stream,
-      sendFunction: (request) => requestController.add(request),
-      finishTransferFunction: () async {
-        // При завершении передачи данных закрываем запросы, но не стрим
-        if (!requestController.isClosed) {
-          await requestController.close();
-        }
-      },
-      closeFunction: () {
-        // При закрытии стрима закрываем оба контроллера
-        if (!requestController.isClosed) {
-          requestController.close();
-        }
-        if (!responseController.isClosed) {
-          responseController.close();
-        }
-        return Future.value();
-      },
-    );
+    return ClientStreamingBidiStream<Request, Response>(
+      BidiStream<Request, Response>(
+        responseStream: responseController.stream,
+        sendFunction: (request) {
+          try {
+            // Преобразуем запрос в JSON, если это RpcMessage
+            final processedRequest =
+                request is RpcMessage ? request.toJson() : request;
 
-    // Создаем ClientStreamingBidiStream с нужным режимом ответа
-    return ClientStreamingBidiStream<Request, Response>(bidiStream,
-        expectResponse: !noResponse);
+            // Отправляем запрос в стрим
+            _engine.sendStreamData(
+              streamId: effectiveStreamId,
+              data: processedRequest,
+              serviceName: serviceName,
+              methodName: methodName,
+            );
+
+            // Увеличиваем счетчики для диагностики
+            sentMessageCount++;
+            final dataSize = processedRequest.toString().length;
+            totalSentDataSize += dataSize;
+
+            // Отправляем метрику об отправке сообщения
+            _diagnostic?.reportStreamMetric(
+              _diagnostic!.createStreamMetric(
+                eventType: RpcStreamEventType.messageSent,
+                streamId: effectiveStreamId,
+                direction: RpcStreamDirection.clientToServer,
+                method: '$serviceName.$methodName',
+                dataSize: dataSize,
+                messageCount: sentMessageCount,
+              ),
+            );
+          } catch (e, stackTrace) {
+            // Логируем ошибку при отправке сообщения
+            _logger?.error(
+              'Ошибка при отправке сообщения: $e',
+              error: e,
+              stackTrace: stackTrace,
+            );
+            responseController.addError(e, stackTrace);
+          }
+        },
+        // Добавляем явно реализованный finishTransferFunction
+        finishTransferFunction: () async {
+          _logger?.debug(
+              'Вызов finishTransfer - явная отправка маркера завершения');
+
+          try {
+            // Используем метод расширения для отправки маркера завершения
+            await _engine.transport.endClientStream();
+
+            // Логируем для отладки
+            _logger?.debug('Маркер завершения потока отправлен');
+          } catch (e, stackTrace) {
+            _logger?.error(
+              'Ошибка при отправке маркера завершения потока: $e',
+              error: e,
+              stackTrace: stackTrace,
+            );
+          }
+        },
+        closeFunction: () async {
+          // Закрываем контроллеры при закрытии BidiStream
+          if (!requestController.isClosed) {
+            await requestController.close();
+          }
+          if (!responseController.isClosed) {
+            await responseController.close();
+          }
+        },
+      ),
+    );
   }
 
   /// Регистрирует обработчик клиентского стриминг метода
@@ -340,13 +383,21 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
       try {
         // Проверяем, что это клиентский стриминг запрос
         final requestData = context.payload;
-        final isClientStreaming = requestData is Map<String, dynamic> &&
-            requestData['_clientStreaming'] == true;
+        RpcClientStreamingMarker? clientStreamingMarker;
+
+        // Проверяем, является ли входящее сообщение маркером
+        final marker = RpcMarkerHandler.tryParseMarker(requestData);
+        final isClientStreaming = marker is RpcClientStreamingMarker;
+
+        if (isClientStreaming) {
+          clientStreamingMarker = marker;
+        }
 
         // Получаем или создаем ID стрима
         String effectiveStreamId;
-        if (isClientStreaming && requestData['_streamId'] != null) {
-          effectiveStreamId = requestData['_streamId'] as String;
+        if (clientStreamingMarker != null) {
+          // Если получили типизированный маркер, используем его streamId
+          effectiveStreamId = clientStreamingMarker.streamId;
         } else {
           effectiveStreamId = context.messageId;
         }
@@ -369,9 +420,11 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
           streamId: effectiveStreamId,
         )
             .takeWhile((data) {
+          // Проверяем, является ли сообщение маркером
+          final marker = RpcMarkerHandler.tryParseMarker(data);
+
           // Останавливаем получение данных, если получаем маркер завершения
-          if (data is Map<String, dynamic> &&
-              data['_clientStreamEnd'] == true) {
+          if (marker is RpcClientStreamEndMarker) {
             // Отправляем метрику о закрытии входящего потока
             _diagnostic?.reportStreamMetric(
               _diagnostic!.createStreamMetric(

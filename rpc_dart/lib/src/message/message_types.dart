@@ -4,6 +4,9 @@
 
 /// Типы сообщений, используемые в gRPC-подобном протоколе
 enum RpcMessageType {
+  /// Неизвестный тип сообщения
+  unknown,
+
   /// Контракт с описанием возможностей
   contract,
 
@@ -27,4 +30,12 @@ enum RpcMessageType {
 
   /// Ответ на запрос проверки соединения
   pong,
+  ;
+
+  static RpcMessageType fromString(String type) {
+    return RpcMessageType.values.firstWhere(
+      (e) => e.name == type,
+      orElse: () => RpcMessageType.unknown,
+    );
+  }
 }

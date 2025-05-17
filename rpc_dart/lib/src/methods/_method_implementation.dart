@@ -28,6 +28,9 @@ final class RpcMethodImplementation<Request extends IRpcSerializableMessage,
   /// Обработчик двунаправленного стрима
   final RpcMethodBidirectionalHandler<Request, Response>? _bidirectionalHandler;
 
+  /// Completer для отслеживания инициализации обработчика клиентского стриминга
+  final Completer<void> _handlerInitCompleter = Completer<void>();
+
   /// Создает реализацию унарного метода
   RpcMethodImplementation.unary(
     this.contract,
@@ -59,10 +62,15 @@ final class RpcMethodImplementation<Request extends IRpcSerializableMessage,
   )   : type = RpcMethodType.clientStreaming,
         _unaryHandler = null,
         _serverStreamHandler = null,
-        _clientStreamHandler = null,
+        _clientStreamHandler = handler,
         _bidirectionalHandler = null,
         _logger = RpcLogger(
-            '${contract.serviceName}.${contract.methodName}.client_stream.impl');
+            '${contract.serviceName}.${contract.methodName}.client_stream.impl') {
+    // Сразу инициализируем Completer, так как обработчик уже предоставлен
+    if (!_handlerInitCompleter.isCompleted) {
+      _handlerInitCompleter.complete();
+    }
+  }
 
   /// Создает реализацию двунаправленного стрима
   RpcMethodImplementation.bidirectionalStreaming(
@@ -133,18 +141,31 @@ final class RpcMethodImplementation<Request extends IRpcSerializableMessage,
     }
   }
 
-  /// Обрабатывает клиентский стрим и возвращает результат после завершения обработки
-  ///
-  /// Используется для клиентских стримов, которые возвращают ответ после завершения обработки
-  Future<Response> openClientStreaming({
+  /// Открывает обработку клиентского стриминга
+  Future<BidiStream<Request, Response>> openClientStreaming({
     required Stream<Request> stream,
     Map<String, dynamic>? metadata,
     String? streamId,
   }) async {
-    if (_clientStreamHandler == null) {
-      throw StateError(
-        'Невозможно вызвать обработчик клиентского стрима с ответом: обработчик не установлен',
+    // Ожидаем инициализации обработчика с таймаутом
+    try {
+      await _handlerInitCompleter.future.timeout(
+        Duration(seconds: 5),
+        onTimeout: () => throw TimeoutException(
+          'Таймаут ожидания инициализации обработчика стриминга',
+        ),
       );
+    } catch (e) {
+      if (e is TimeoutException) {
+        _logger.error('Таймаут при ожидании инициализации обработчика стрима');
+      }
+
+      // Если обработчик все еще не инициализирован после ожидания
+      if (_clientStreamHandler == null) {
+        throw StateError(
+          'Невозможно вызвать обработчик клиентского стрима с ответом: обработчик не установлен',
+        );
+      }
     }
 
     // Если streamId задан, логируем его для отладки
@@ -153,17 +174,48 @@ final class RpcMethodImplementation<Request extends IRpcSerializableMessage,
     );
 
     try {
-      // Получаем поток ответов из обработчика
-      final responseStream = _clientStreamHandler!();
+      // Получаем стрим обработчик от контракта
+      final clientStream = _clientStreamHandler!();
 
-      // Ожидаем первый результат - это и будет итоговый ответ после обработки всего потока запросов
-      final response = await responseStream.first;
+      // Перенаправляем все запросы из входящего потока в стрим обработчика
+      await for (final request in stream) {
+        _logger.debug(
+          'Перенаправляем запрос в обработчик: ${request.runtimeType}',
+        );
+
+        // Отправляем запрос в обработчик
+        clientStream.send(request);
+      }
+
+      // Завершаем отправку запросов
+      await clientStream.finishSending();
+
+      // Ожидаем ответ от обработчика
+      final response = await clientStream.getResponse();
 
       _logger.debug(
-        'Получен ответ от обработчика клиентского стрима: ${response.runtimeType}',
+        'Получен ответ от обработчика клиентского стрима: ${response?.runtimeType}',
       );
 
-      return response;
+      // Создаем контроллеры для управления потоками
+      final requestController = StreamController<Request>();
+      final responseController = StreamController<Response>();
+
+      // Закрываем контроллер запросов, так как отправка завершена
+      requestController.close();
+
+      // Если есть ответ, добавляем его в контроллер ответов
+      if (response != null) {
+        responseController.add(response);
+      }
+      responseController.close();
+
+      // Создаем и возвращаем новый BidiStream
+      return BidiStream<Request, Response>(
+        responseStream: responseController.stream,
+        sendFunction: (_) => throw StateError('Отправка запросов завершена'),
+        closeFunction: () async {},
+      );
     } catch (e, stackTrace) {
       _logger.error(
         'Ошибка при обработке клиентского стрима с ответом: $e',

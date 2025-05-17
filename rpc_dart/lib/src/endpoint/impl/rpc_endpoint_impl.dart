@@ -379,4 +379,92 @@ final class _RpcEndpointImpl
       responseParser: responseParser,
     );
   }
+
+  @override
+  Future<void> sendClientStreamEnd({
+    required String streamId,
+    String? serviceName,
+    String? methodName,
+    Map<String, dynamic>? metadata,
+  }) =>
+      _engine.sendClientStreamEnd(
+        streamId: streamId,
+        serviceName: serviceName,
+        methodName: methodName,
+        metadata: metadata,
+      );
+
+  @override
+  Future<void> cancelOperation({
+    required String operationId,
+    String? reason,
+    Map<String, dynamic>? details,
+    Map<String, dynamic>? metadata,
+    String? serviceName,
+    String? methodName,
+  }) =>
+      _engine.cancelOperation(
+        operationId: operationId,
+        reason: reason,
+        details: details,
+        metadata: metadata,
+        serviceName: serviceName,
+        methodName: methodName,
+      );
+
+  @override
+  Future<Duration> sendPing({Duration? timeout}) =>
+      _engine.sendPing(timeout: timeout);
+
+  @override
+  Future<void> sendServiceMarker({
+    required String streamId,
+    required RpcServiceMarker marker,
+    String? serviceName,
+    String? methodName,
+    Map<String, dynamic>? metadata,
+  }) =>
+      _engine.sendServiceMarker(
+        streamId: streamId,
+        marker: marker,
+        serviceName: serviceName,
+        methodName: methodName,
+        metadata: metadata,
+      );
+
+  @override
+  Future<void> sendStatus({
+    required String requestId,
+    required RpcStatusCode statusCode,
+    required String message,
+    Map<String, dynamic>? details,
+    Map<String, dynamic>? metadata,
+    String? serviceName,
+    String? methodName,
+  }) =>
+      _engine.sendStatus(
+        requestId: requestId,
+        statusCode: statusCode,
+        message: message,
+        details: details,
+        metadata: metadata,
+        serviceName: serviceName,
+        methodName: methodName,
+      );
+
+  @override
+  Future<void> setDeadline({
+    required String requestId,
+    required Duration timeout,
+    Map<String, dynamic>? metadata,
+    String? serviceName,
+    String? methodName,
+  }) =>
+      _engine.setDeadline(
+        requestId: requestId,
+        timeout: timeout,
+        metadata: metadata,
+        serviceName: serviceName,
+        methodName: methodName,
+      );
 }

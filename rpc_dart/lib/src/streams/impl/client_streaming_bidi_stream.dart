@@ -14,41 +14,49 @@ class ClientStreamingBidiStream<RequestType extends IRpcSerializableMessage,
   /// Внутренний BidiStream
   final BidiStream<RequestType, ResponseType> _bidiStream;
 
-  /// Внутренний флаг завершения потока для отслеживания состояния
-  bool _isStreamFinished = false;
-
   /// Комплитер для ожидания ответа от сервера после завершения стрима
   final Completer<ResponseType?> _responseCompleter =
       Completer<ResponseType?>();
 
-  /// Флаг указывающий, ожидается ли ответ от сервера
-  final bool _expectResponse;
+  /// Подписка на поток ответов
+  StreamSubscription<ResponseType>? _subscription;
 
   /// Создает обертку для клиентского стриминга
   ///
   /// [bidiStream] - внутренний двунаправленный поток
-  /// [expectResponse] - флаг, указывающий, ожидается ли ответ от сервера (по умолчанию true)
-  ClientStreamingBidiStream(this._bidiStream, {bool expectResponse = true})
-      : _expectResponse = expectResponse,
-        super(
+  ClientStreamingBidiStream(this._bidiStream)
+      : super(
           responseStream: _bidiStream,
           closeFunction: _bidiStream.close,
         ) {
-    // Если ожидается ответ, подписываемся на первое сообщение в потоке ответов
-    if (_expectResponse) {
-      _bidiStream.first.then((response) {
+    // Подписываемся на поток ответов с полной обработкой событий
+    _subscription = _bidiStream.listen(
+      (response) {
+        // Когда получаем первое сообщение - сохраняем в комплитер
         if (!_responseCompleter.isCompleted) {
           _responseCompleter.complete(response);
+          // Отменяем подписку после получения первого сообщения
+          _subscription?.cancel();
+          _subscription = null;
         }
-      }).catchError((error) {
+      },
+      onError: (error) {
         if (!_responseCompleter.isCompleted) {
           _responseCompleter.completeError(error);
         }
-      });
-    } else {
-      // Если ответ не ожидается, сразу завершаем комплитер с null
-      _responseCompleter.complete(null);
-    }
+        _subscription?.cancel();
+        _subscription = null;
+      },
+      onDone: () {
+        // Поток завершился без сообщений - это нормальный сценарий
+        if (!_responseCompleter.isCompleted) {
+          _responseCompleter.complete(null);
+        }
+        _subscription = null;
+      },
+      // Используем cancelOnError, чтобы автоматически отменять подписку при ошибке
+      cancelOnError: true,
+    );
   }
 
   /// Отправляет запрос через внутренний BidiStream
@@ -58,20 +66,21 @@ class ClientStreamingBidiStream<RequestType extends IRpcSerializableMessage,
 
   /// Завершает отправку запросов, но не закрывает стрим
   Future<void> finishSending() async {
-    await _bidiStream.finishTransfer();
+    // Явно отправляем маркер завершения потока через _bidiStream
+    try {
+      // Если поток не завершен и не закрыт, отправляем маркер завершения
+      if (!_bidiStream.isTransferFinished && !_bidiStream.isClosed) {
+        // Используем явную реализацию finishTransfer в BidiStream
+        await _bidiStream.finishTransfer();
+      }
+    } catch (e) {
+      // В случае ошибки при отправке маркера, логируем и продолжаем
+      RpcLogger('ClientStreamingBidiStream').error(
+        'Ошибка при завершении отправки: $e',
+        error: e,
+      );
+    }
   }
-
-  /// Принудительно завершает обработку стрима и устанавливает флаг завершения
-  ///
-  /// Отличается от close() тем, что не закрывает полностью стрим,
-  /// а только устанавливает флаг завершения для предотвращения
-  /// повторной обработки сообщений
-  void markAsFinished() {
-    _isStreamFinished = true;
-  }
-
-  /// Проверяет, завершен ли стрим (логически)
-  bool get isFinished => _isStreamFinished || isClosed;
 
   /// Получает ответ от сервера после завершения обработки стрима
   ///
@@ -82,14 +91,15 @@ class ClientStreamingBidiStream<RequestType extends IRpcSerializableMessage,
     return _responseCompleter.future;
   }
 
-  /// Проверяет, ожидается ли ответ от сервера
-  bool get expectsResponse => _expectResponse;
-
   @override
   Future<void> close() async {
     if (isClosed) {
       return;
     }
+
+    // Отменяем подписку, если она еще активна
+    await _subscription?.cancel();
+    _subscription = null;
 
     // Сначала закрываем внутренний поток
     await _bidiStream.close();

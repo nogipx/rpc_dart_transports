@@ -67,6 +67,16 @@ final class UnaryRequestRpcMethod<T extends IRpcSerializableMessage>
         'Получен ответ от метода $serviceName.$methodName',
       );
 
+      // Проверяем, не является ли ответ маркером статуса с ошибкой
+      final marker = RpcMarkerHandler.tryParseMarker(responseData);
+      if (marker is RpcStatusMarker && marker.code != RpcStatusCode.ok) {
+        throw RpcStatusException(
+          code: marker.code,
+          message: marker.message,
+          details: marker.details,
+        );
+      }
+
       // Если результат - Map<String, dynamic> и предоставлен парсер, используем его
       if (responseData is Map<String, dynamic>) {
         result = responseParser(responseData);
@@ -272,7 +282,21 @@ final class UnaryRequestRpcMethod<T extends IRpcSerializableMessage>
             ),
           );
 
-          rethrow;
+          // Преобразуем ошибку в статусный маркер, если это возможно
+          if (e is RpcStatusException) {
+            // Если это уже статусное исключение, просто возвращаем его маркер
+            return e.toMarker();
+          } else {
+            // Иначе создаем общий статусный маркер с ошибкой
+            return RpcStatusMarker(
+              code: RpcStatusCode.internal,
+              message: 'Ошибка при обработке запроса: ${e.toString()}',
+              details: {
+                'errorType': e.runtimeType.toString(),
+                'stackTrace': stackTrace.toString(),
+              },
+            );
+          }
         } finally {
           final endTime = DateTime.now().millisecondsSinceEpoch;
           final duration = endTime - startTime;

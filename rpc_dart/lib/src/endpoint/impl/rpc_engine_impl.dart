@@ -130,17 +130,20 @@ final class _RpcEngineImpl implements IRpcEngine {
       debugLabel: debugLabel,
     );
 
+    // Отправляем запрос
     await _sendMessage(message);
 
+    // Если указан таймаут, устанавливаем deadline
     if (timeout != null) {
-      return completer.future.timeout(
-        timeout,
-        onTimeout: () {
-          _pendingRequests.remove(requestId);
-          throw TimeoutException(
-              'Вызов метода $serviceName.$methodName превысил время ожидания');
-        },
+      // Используем новый механизм установки дедлайна
+      await setDeadline(
+        requestId: requestId,
+        timeout: timeout,
+        serviceName: serviceName,
+        methodName: methodName,
       );
+
+      return completer.future;
     }
 
     return completer.future;
@@ -218,6 +221,9 @@ final class _RpcEngineImpl implements IRpcEngine {
       case RpcMessageType.contract:
         // Обработка контрактов будет добавлена позже
         break;
+      case RpcMessageType.unknown:
+        // Игнорируем неизвестные типы сообщений
+        break;
     }
   }
 
@@ -232,6 +238,15 @@ final class _RpcEngineImpl implements IRpcEngine {
         'Не указаны serviceName или methodName',
         message.metadata,
       );
+
+      // Отправляем статус ошибки
+      await sendStatus(
+        requestId: message.id,
+        statusCode: RpcStatusCode.invalidArgument,
+        message: 'Не указаны serviceName или methodName',
+        metadata: message.metadata,
+      );
+
       return;
     }
 
@@ -258,6 +273,15 @@ final class _RpcEngineImpl implements IRpcEngine {
         'Метод не найден: $serviceName.$methodName',
         message.metadata,
       );
+
+      // Отправляем статус ошибки
+      await sendStatus(
+        requestId: message.id,
+        statusCode: RpcStatusCode.notFound,
+        message: 'Метод не найден: $serviceName.$methodName',
+        metadata: message.metadata,
+      );
+
       return;
     }
 
@@ -308,6 +332,7 @@ final class _RpcEngineImpl implements IRpcEngine {
         RpcDataDirection.toRemote,
       );
 
+      // Отправляем ответ
       await _sendMessage(
         RpcMessage(
           type: RpcMessageType.response,
@@ -317,6 +342,16 @@ final class _RpcEngineImpl implements IRpcEngine {
           trailerMetadata: updatedContext.trailerMetadata,
           debugLabel: debugLabel,
         ),
+      );
+
+      // Отправляем статус успешного завершения
+      await sendStatus(
+        requestId: message.id,
+        statusCode: RpcStatusCode.ok,
+        message: 'OK',
+        metadata: updatedContext.headerMetadata,
+        serviceName: serviceName,
+        methodName: methodName,
       );
     } catch (e, stackTrace) {
       // Создаем контекст для ошибки
@@ -345,6 +380,35 @@ final class _RpcEngineImpl implements IRpcEngine {
           ? errorContext
           : errorContext.toMutable();
 
+      // Определяем тип ошибки для статуса
+      RpcStatusCode statusCode;
+      if (e is ArgumentError || e is FormatException) {
+        statusCode = RpcStatusCode.invalidArgument;
+      } else if (e is TimeoutException) {
+        statusCode = RpcStatusCode.deadlineExceeded;
+      } else if (e is StateError) {
+        statusCode = RpcStatusCode.failedPrecondition;
+      } else if (e is UnimplementedError) {
+        statusCode = RpcStatusCode.unimplemented;
+      } else {
+        statusCode = RpcStatusCode.internal;
+      }
+
+      // Отправляем статус ошибки
+      await sendStatus(
+        requestId: message.id,
+        statusCode: statusCode,
+        message: processedError.toString(),
+        details: {
+          'error': processedError.toString(),
+          'stackTrace': stackTrace.toString(),
+        },
+        metadata: mutableErrorContext.headerMetadata,
+        serviceName: serviceName,
+        methodName: methodName,
+      );
+
+      // Для обратной совместимости также отправляем обычное сообщение об ошибке
       await _sendErrorMessage(
         message.id,
         processedError.toString(),
@@ -357,7 +421,32 @@ final class _RpcEngineImpl implements IRpcEngine {
   /// Обрабатывает входящий ответ
   void _handleResponse(RpcMessage message) {
     final completer = _pendingRequests.remove(message.id);
-    if (completer != null && !completer.isCompleted) {
+    if (completer == null || completer.isCompleted) {
+      return;
+    }
+
+    // Проверяем, содержит ли ответ маркер статуса
+    if (message.payload is Map<String, dynamic> &&
+        message.payload['_isServiceMessage'] == true &&
+        message.payload['_markerType'] == RpcMarkerType.status.name) {
+      try {
+        // Парсим маркер статуса
+        final statusMarker = RpcStatusMarker.fromJson(message.payload);
+
+        // Если статус OK, завершаем запрос успешно с пустым результатом
+        if (statusMarker.code == RpcStatusCode.ok) {
+          completer.complete(null);
+        } else {
+          // Иначе завершаем с ошибкой
+          completer.completeError(
+              'RPC Error [${statusMarker.code.name}]: ${statusMarker.message}');
+        }
+      } catch (e) {
+        // При ошибке парсинга просто передаем payload как есть
+        completer.complete(message.payload);
+      }
+    } else {
+      // Обычный ответ - просто передаем payload
       completer.complete(message.payload);
     }
   }
@@ -365,31 +454,232 @@ final class _RpcEngineImpl implements IRpcEngine {
   /// Обрабатывает входящие данные в потоке
   void _handleStreamData(RpcMessage message) {
     final controller = _streamControllers[message.id];
-    if (controller != null && !controller.isClosed) {
-      // Обработка пустых данных для совместимости с MsgPack
-      dynamic payload = message.payload;
-      if (payload is Map && payload['_empty'] == true) {
-        payload = {}; // Преобразуем пустой маркер в пустой объект
-      }
+    if (controller == null || controller.isClosed) {
+      return; // Нет активного контроллера для этого потока
+    }
 
-      // Если известны имена сервиса и метода, применяем middleware
-      if (message.service != null && message.method != null) {
-        _middlewareChain
-            .executeStreamData(
-          message.service!,
-          message.method!,
-          payload,
-          message.id,
-          RpcDataDirection.fromRemote, // Данные получены от удаленной стороны
-        )
-            .then((processedData) {
-          controller.add(processedData);
-        }).catchError((error) {
-          controller.addError(error);
-        });
-      } else {
+    // Обработка пустых данных для совместимости с MsgPack
+    dynamic payload = message.payload;
+    if (payload is Map && payload['_empty'] == true) {
+      payload = {}; // Преобразуем пустой маркер в пустой объект
+    }
+
+    // Проверяем, является ли сообщение служебным маркером
+    if (payload is Map<String, dynamic> &&
+        payload['_isServiceMessage'] == true &&
+        payload['_markerType'] != null) {
+      try {
+        // Создаем локальный обработчик маркеров, который замыкает текущее сообщение
+        final localMarkerHandler = RpcMarkerHandler(
+          // Обработчик маркера завершения клиентского стрима
+          onClientStreamEnd: (marker) {
+            if (message.service != null && message.method != null) {
+              // Если известны имена сервиса и метода, применяем middleware
+              _middlewareChain
+                  .executeStreamEnd(
+                message.service!,
+                message.method!,
+                message.id,
+              )
+                  .then((_) {
+                // Добавляем специальное сообщение для клиентского кода
+                controller.add(marker.toJson());
+              }).catchError((error) {
+                controller.addError(error);
+              });
+            } else {
+              controller.add(marker.toJson());
+            }
+          },
+
+          // Обработчик маркера завершения серверного стрима
+          onServerStreamEnd: (marker) {
+            // Для маркера завершения серверного стрима мы просто доставляем его
+            controller.add(marker.toJson());
+          },
+
+          // Обработчик маркера пинга
+          onPing: (marker) {
+            // Создаем и отправляем ответный pong маркер
+            final pongMarker = RpcPongMarker(
+              originalTimestamp: marker.timestamp,
+            );
+
+            // Отправляем pong ответ
+            _sendMessage(
+              RpcMessage(
+                type: RpcMessageType.pong,
+                id: message.id,
+                payload: pongMarker.toJson(),
+                metadata: message.metadata,
+                debugLabel: debugLabel,
+              ),
+            );
+          },
+
+          // Обработчик маркера понга
+          onPong: (marker) {
+            // Pong сообщения обрабатываются через _pendingRequests
+            final completer = _pendingRequests[message.id];
+            if (completer != null && !completer.isCompleted) {
+              completer.complete(marker.toJson());
+            }
+          },
+
+          // Обработчик маркера статуса
+          onStatus: (marker) {
+            // Если это статус ошибки, доставляем как ошибку
+            if (marker.code != RpcStatusCode.ok) {
+              // Ищем ожидающий Completer
+              final completer = _pendingRequests.remove(message.id);
+              if (completer != null && !completer.isCompleted) {
+                // Завершаем с ошибкой
+                completer.completeError(
+                    'RPC Error [${marker.code.name}]: ${marker.message}');
+              }
+
+              // Если есть активный контроллер - добавляем ошибку
+              if (!controller.isClosed) {
+                controller.addError(
+                    'RPC Error [${marker.code.name}]: ${marker.message}');
+              }
+            } else {
+              // Если статус OK, считаем это нормальным сообщением
+              controller.add(marker.toJson());
+            }
+          },
+
+          // Обработчик маркера дедлайна
+          onDeadline: (marker) {
+            // Проверяем, не истек ли уже срок
+            if (marker.isExpired) {
+              // Если срок уже истек, немедленно отправляем статус об ошибке
+              sendStatus(
+                requestId: message.id,
+                statusCode: RpcStatusCode.deadlineExceeded,
+                message: 'Deadline already exceeded',
+                serviceName: message.service,
+                methodName: message.method,
+              );
+
+              // И закрываем поток/операцию с ошибкой
+              final completer = _pendingRequests.remove(message.id);
+              if (completer != null && !completer.isCompleted) {
+                completer.completeError('Deadline exceeded');
+              }
+
+              if (!controller.isClosed) {
+                controller.addError('Deadline exceeded');
+                controller.close();
+              }
+            } else {
+              // Если срок еще не истек, устанавливаем таймер
+              Timer(marker.remaining, () {
+                // По истечении срока отправляем статус и закрываем операцию
+                sendStatus(
+                  requestId: message.id,
+                  statusCode: RpcStatusCode.deadlineExceeded,
+                  message: 'Deadline exceeded',
+                  serviceName: message.service,
+                  methodName: message.method,
+                );
+
+                final completer = _pendingRequests.remove(message.id);
+                if (completer != null && !completer.isCompleted) {
+                  completer.completeError('Deadline exceeded');
+                }
+
+                final streamController = _streamControllers[message.id];
+                if (streamController != null && !streamController.isClosed) {
+                  streamController.addError('Deadline exceeded');
+                  streamController.close();
+                }
+              });
+
+              // Пропускаем сообщение дальше
+              controller.add(marker.toJson());
+            }
+          },
+
+          // Обработчик маркера отмены
+          onCancel: (marker) {
+            // Проверяем, относится ли отмена к текущей операции или потоку
+            final operationToCancel = marker.operationId;
+
+            // Если отмена относится к текущей операции
+            if (operationToCancel == message.id) {
+              // Отправляем статус отмены
+              sendStatus(
+                requestId: message.id,
+                statusCode: RpcStatusCode.cancelled,
+                message: marker.reason ?? 'Operation cancelled',
+                serviceName: message.service,
+                methodName: message.method,
+              );
+
+              // Завершаем операцию
+              final completer = _pendingRequests.remove(message.id);
+              if (completer != null && !completer.isCompleted) {
+                completer.completeError(marker.reason ?? 'Operation cancelled');
+              }
+
+              // Закрываем контроллер потока
+              if (!controller.isClosed) {
+                controller.addError(marker.reason ?? 'Operation cancelled');
+                controller.close();
+              }
+            } else {
+              // Если отмена относится к другой операции, просто пропускаем маркер дальше
+              controller.add(marker.toJson());
+            }
+          },
+
+          // Обработчики для других типов маркеров - просто передаем их дальше
+          onHeaders: (marker) => controller.add(marker.toJson()),
+          onTrailers: (marker) => controller.add(marker.toJson()),
+          onFlowControl: (marker) => controller.add(marker.toJson()),
+          onCompression: (marker) => controller.add(marker.toJson()),
+          onHealthCheck: (marker) => controller.add(marker.toJson()),
+          onClientStreamingInit: (marker) => controller.add(marker.toJson()),
+          onBidirectionalInit: (marker) => controller.add(marker.toJson()),
+          onChannelClosed: (marker) => controller.add(marker.toJson()),
+
+          // Универсальный обработчик для любых других типов маркеров
+          onAnyMarker:
+              null, // Не используем, так как у нас есть конкретные обработчики
+        );
+
+        // Используем статический метод для создания экземпляра маркера
+        final marker = RpcServiceMarker.fromJson(payload);
+
+        // Запускаем обработку маркера с помощью нашего локального обработчика
+        localMarkerHandler.handleMarker(marker);
+      } catch (e) {
+        // При ошибке парсинга маркера, логируем и продолжаем стандартную обработку
+        print('Ошибка при обработке маркера: $e');
         controller.add(payload);
       }
+
+      return; // Завершаем обработку после маркера
+    }
+
+    // Если известны имена сервиса и метода, применяем middleware
+    if (message.service != null && message.method != null) {
+      _middlewareChain
+          .executeStreamData(
+        message.service!,
+        message.method!,
+        payload,
+        message.id,
+        RpcDataDirection.fromRemote, // Данные получены от удаленной стороны
+      )
+          .then((processedData) {
+        controller.add(processedData);
+      }).catchError((error) {
+        controller.addError(error);
+      });
+    } else {
+      controller.add(payload);
     }
   }
 
@@ -589,15 +879,286 @@ final class _RpcEngineImpl implements IRpcEngine {
       );
     }
 
-    final message = RpcMessage(
-      type: RpcMessageType.streamEnd,
-      id: streamId,
-      service: serviceName,
-      method: methodName,
-      metadata: metadata,
-      debugLabel: debugLabel,
+    await _sendMessage(
+      RpcMessage(
+        type: RpcMessageType.streamEnd,
+        id: streamId,
+        service: serviceName,
+        method: methodName,
+        metadata: metadata,
+        debugLabel: debugLabel,
+      ),
+    );
+  }
+
+  /// Отправляет ping-сообщение для проверки соединения
+  /// Возвращает Future, который завершится когда придет ответ или произойдет таймаут
+  @override
+  Future<Duration> sendPing({Duration? timeout}) async {
+    final startTime = DateTime.now().millisecondsSinceEpoch;
+    final pingId = generateUniqueId('ping');
+    final completer = Completer<Duration>();
+
+    // Регистрируем ожидание ответа
+    _pendingRequests[pingId] = Completer<dynamic>();
+
+    // Устанавливаем таймаут (по умолчанию 5 секунд)
+    final effectiveTimeout = timeout ?? const Duration(seconds: 5);
+    final timer = Timer(effectiveTimeout, () {
+      final pendingRequest = _pendingRequests.remove(pingId);
+      if (pendingRequest != null && !pendingRequest.isCompleted) {
+        pendingRequest
+            .completeError(TimeoutException('Ping timeout', effectiveTimeout));
+
+        if (!completer.isCompleted) {
+          completer.completeError(
+              TimeoutException('Ping timeout', effectiveTimeout));
+        }
+      }
+    });
+
+    // Создаем маркер ping и отправляем через универсальный метод
+    final pingMarker = RpcPingMarker();
+    await sendServiceMarker(
+      streamId: pingId,
+      marker: pingMarker,
+      metadata: null,
     );
 
-    await _sendMessage(message);
+    // Ожидаем ответ и вычисляем RTT
+    _pendingRequests[pingId]!.future.then((response) {
+      timer.cancel();
+
+      try {
+        // Парсим ответ для получения временных меток
+        if (response is Map<String, dynamic>) {
+          final pongMarker = RpcPongMarker.fromJson(response);
+          final rtt =
+              Duration(milliseconds: pongMarker.responseTimestamp - startTime);
+
+          if (!completer.isCompleted) {
+            completer.complete(rtt);
+          }
+        } else {
+          // Некорректный формат ответа
+          if (!completer.isCompleted) {
+            completer
+                .completeError(FormatException('Invalid pong response format'));
+          }
+        }
+      } catch (e) {
+        if (!completer.isCompleted) {
+          completer.completeError(e);
+        }
+      }
+    }).catchError((error) {
+      timer.cancel();
+      if (!completer.isCompleted) {
+        completer.completeError(error);
+      }
+    });
+
+    return completer.future;
+  }
+
+  /// Отправляет маркер завершения потока в клиентском стриминге
+  /// Это специальный метод, который избегает проблем с приведением типов
+  @override
+  Future<void> sendClientStreamEnd({
+    required String streamId,
+    String? serviceName,
+    String? methodName,
+    Map<String, dynamic>? metadata,
+  }) async {
+    // Используем новый универсальный метод с маркером RpcClientStreamEndMarker
+    await sendServiceMarker(
+      streamId: streamId,
+      marker: const RpcClientStreamEndMarker(),
+      serviceName: serviceName,
+      methodName: methodName,
+      metadata: metadata,
+    );
+  }
+
+  /// Отправляет любой служебный маркер
+  /// Унифицированный метод для отправки любых типов маркеров
+  ///
+  /// [streamId] - ID потока или соединения
+  /// [marker] - служебный маркер для отправки
+  /// [serviceName] - имя сервиса (опционально, для middleware)
+  /// [methodName] - имя метода (опционально, для middleware)
+  /// [metadata] - дополнительные метаданные
+  @override
+  Future<void> sendServiceMarker({
+    required String streamId,
+    required RpcServiceMarker marker,
+    String? serviceName,
+    String? methodName,
+    Map<String, dynamic>? metadata,
+  }) async {
+    // В зависимости от типа маркера, может потребоваться специфическая логика
+    RpcMessageType messageType = RpcMessageType.streamData;
+
+    // Специальная обработка для ping маркера
+    if (marker is RpcPingMarker) {
+      messageType = RpcMessageType.ping;
+    }
+
+    // Отправляем маркер через стандартное сообщение
+    await _sendMessage(
+      RpcMessage(
+        type: messageType,
+        id: streamId,
+        service: serviceName,
+        method: methodName,
+        payload: marker.toJson(),
+        metadata: metadata,
+        debugLabel: debugLabel,
+      ),
+    );
+  }
+
+  /// Отправляет маркер статуса операции
+  ///
+  /// [requestId] - ID запроса или операции
+  /// [statusCode] - код статуса операции
+  /// [message] - описание статуса или ошибки
+  /// [details] - дополнительные детали (опционально)
+  /// [metadata] - дополнительные метаданные (опционально)
+  @override
+  Future<void> sendStatus({
+    required String requestId,
+    required RpcStatusCode statusCode,
+    required String message,
+    Map<String, dynamic>? details,
+    Map<String, dynamic>? metadata,
+    String? serviceName,
+    String? methodName,
+  }) async {
+    // Создаем маркер статуса
+    final statusMarker = RpcStatusMarker(
+      code: statusCode,
+      message: message,
+      details: details,
+    );
+
+    // Используем универсальный метод для отправки маркера
+    await sendServiceMarker(
+      streamId: requestId,
+      marker: statusMarker,
+      serviceName: serviceName,
+      methodName: methodName,
+      metadata: metadata,
+    );
+
+    // Если это ошибочный статус (не OK), также отправляем сообщение об ошибке
+    // для обратной совместимости
+    if (statusCode != RpcStatusCode.ok) {
+      await _sendErrorMessage(
+        requestId,
+        message,
+        metadata,
+        details,
+      );
+    }
+  }
+
+  /// Устанавливает deadline для операции
+  ///
+  /// [requestId] - ID запроса или операции
+  /// [timeout] - таймаут для операции
+  /// [metadata] - дополнительные метаданные (опционально)
+  @override
+  Future<void> setDeadline({
+    required String requestId,
+    required Duration timeout,
+    Map<String, dynamic>? metadata,
+    String? serviceName,
+    String? methodName,
+  }) async {
+    // Создаем маркер дедлайна
+    final deadlineMarker = RpcDeadlineMarker.fromDuration(timeout);
+
+    // Отправляем маркер
+    await sendServiceMarker(
+      streamId: requestId,
+      marker: deadlineMarker,
+      serviceName: serviceName,
+      methodName: methodName,
+      metadata: metadata,
+    );
+
+    // Устанавливаем таймер для автоматического прерывания операции
+    Timer(timeout, () {
+      // Проверяем, не завершена ли уже операция
+      final completer = _pendingRequests[requestId];
+      if (completer != null && !completer.isCompleted) {
+        // Отправляем статус о превышении времени ожидания
+        sendStatus(
+          requestId: requestId,
+          statusCode: RpcStatusCode.deadlineExceeded,
+          message: 'Превышено время ожидания (${timeout.inMilliseconds} мс)',
+          serviceName: serviceName,
+          methodName: methodName,
+        );
+
+        // Завершаем запрос с ошибкой
+        completer.completeError(TimeoutException('Deadline exceeded', timeout));
+      }
+    });
+  }
+
+  /// Отменяет операцию
+  ///
+  /// [operationId] - ID операции для отмены
+  /// [reason] - причина отмены (опционально)
+  /// [details] - дополнительные детали (опционально)
+  @override
+  Future<void> cancelOperation({
+    required String operationId,
+    String? reason,
+    Map<String, dynamic>? details,
+    Map<String, dynamic>? metadata,
+    String? serviceName,
+    String? methodName,
+  }) async {
+    // Создаем маркер отмены
+    final cancelMarker = RpcCancelMarker(
+      operationId: operationId,
+      reason: reason,
+      details: details,
+    );
+
+    // Отправляем маркер
+    await sendServiceMarker(
+      streamId: operationId,
+      marker: cancelMarker,
+      serviceName: serviceName,
+      methodName: methodName,
+      metadata: metadata,
+    );
+
+    // Отправляем статус отмены для гарантированного завершения
+    await sendStatus(
+      requestId: operationId,
+      statusCode: RpcStatusCode.cancelled,
+      message: reason ?? 'Операция отменена клиентом',
+      details: details,
+      serviceName: serviceName,
+      methodName: methodName,
+    );
+
+    // Завершаем ожидающий запрос, если он есть
+    final completer = _pendingRequests.remove(operationId);
+    if (completer != null && !completer.isCompleted) {
+      completer.completeError(reason ?? 'Operation cancelled');
+    }
+
+    // Закрываем поток, если он есть
+    final controller = _streamControllers.remove(operationId);
+    if (controller != null && !controller.isClosed) {
+      controller.addError(reason ?? 'Operation cancelled');
+      controller.close();
+    }
   }
 }

@@ -45,7 +45,7 @@ final class RpcMessage {
   /// Создает сообщение из JSON-объекта
   factory RpcMessage.fromJson(Map<String, dynamic> json) {
     return RpcMessage(
-      type: RpcMessageType.values[json['type'] as int],
+      type: RpcMessageType.fromString(json['type'] as String),
       id: json['id'] as String,
       service: json['service'] as String?,
       method: json['method'] as String?,
@@ -59,7 +59,7 @@ final class RpcMessage {
   /// Преобразует сообщение в JSON-объект
   Map<String, dynamic> toJson() {
     return {
-      'type': type.index,
+      'type': type.name,
       'id': id,
       if (service != null) 'service': service,
       if (method != null) 'method': method,

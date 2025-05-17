@@ -137,9 +137,10 @@ final class ServerStreamingRpcMethod<T extends IRpcSerializableMessage>
         final endTime = DateTime.now().millisecondsSinceEpoch;
         final duration = endTime - startTime;
 
-        // Закрываем стрим со стороны клиента
-        _engine.closeStream(
+        // Закрываем стрим со стороны клиента, отправляя типизированный маркер
+        _engine.sendServiceMarker(
           streamId: effectiveStreamId,
+          marker: const RpcServerStreamEndMarker(),
           serviceName: serviceName,
           methodName: methodName,
         );
@@ -415,9 +416,11 @@ final class ServerStreamingRpcMethod<T extends IRpcSerializableMessage>
         'Серверный стрим завершен',
       );
 
-      // Закрываем стрим с указанием serviceName и methodName для middleware
-      _engine.closeStream(
+      // Закрываем стрим с указанием serviceName и methodName для middleware,
+      // используя типизированный маркер
+      _engine.sendServiceMarker(
         streamId: messageId,
+        marker: const RpcServerStreamEndMarker(),
         serviceName: serviceName,
         methodName: methodName,
       );

@@ -67,6 +67,15 @@ abstract interface class IRpcEngine {
     String? methodName,
   });
 
+  /// Отправляет маркер завершения потока в клиентском стриминге
+  /// Это специальный метод, который избегает проблем с приведением типов
+  Future<void> sendClientStreamEnd({
+    required String streamId,
+    String? serviceName,
+    String? methodName,
+    Map<String, dynamic>? metadata,
+  });
+
   /// Закрывает поток
   Future<void> closeStream({
     required String streamId,
@@ -83,4 +92,68 @@ abstract interface class IRpcEngine {
 
   /// Генерирует уникальный ID
   String generateUniqueId([String? prefix]);
+
+  /// Отправляет ping-сообщение для проверки соединения
+  /// Возвращает Future, который завершится когда придет ответ или произойдет таймаут
+  Future<Duration> sendPing({Duration? timeout});
+
+  /// Отправляет любой служебный маркер
+  /// Унифицированный метод для отправки любых типов маркеров
+  ///
+  /// [streamId] - ID потока или соединения
+  /// [marker] - служебный маркер для отправки
+  /// [serviceName] - имя сервиса (опционально, для middleware)
+  /// [methodName] - имя метода (опционально, для middleware)
+  /// [metadata] - дополнительные метаданные
+  Future<void> sendServiceMarker({
+    required String streamId,
+    required RpcServiceMarker marker,
+    String? serviceName,
+    String? methodName,
+    Map<String, dynamic>? metadata,
+  });
+
+  /// Отправляет маркер статуса операции
+  ///
+  /// [requestId] - ID запроса или операции
+  /// [statusCode] - код статуса операции
+  /// [message] - описание статуса или ошибки
+  /// [details] - дополнительные детали (опционально)
+  /// [metadata] - дополнительные метаданные (опционально)
+  Future<void> sendStatus({
+    required String requestId,
+    required RpcStatusCode statusCode,
+    required String message,
+    Map<String, dynamic>? details,
+    Map<String, dynamic>? metadata,
+    String? serviceName,
+    String? methodName,
+  });
+
+  /// Устанавливает deadline для операции
+  ///
+  /// [requestId] - ID запроса или операции
+  /// [timeout] - таймаут для операции
+  /// [metadata] - дополнительные метаданные (опционально)
+  Future<void> setDeadline({
+    required String requestId,
+    required Duration timeout,
+    Map<String, dynamic>? metadata,
+    String? serviceName,
+    String? methodName,
+  });
+
+  /// Отменяет операцию
+  ///
+  /// [operationId] - ID операции для отмены
+  /// [reason] - причина отмены (опционально)
+  /// [details] - дополнительные детали (опционально)
+  Future<void> cancelOperation({
+    required String operationId,
+    String? reason,
+    Map<String, dynamic>? details,
+    Map<String, dynamic>? metadata,
+    String? serviceName,
+    String? methodName,
+  });
 }
