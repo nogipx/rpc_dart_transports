@@ -49,21 +49,13 @@ abstract interface class RpcLogger {
   /// Имя логгера, обычно название компонента или модуля
   String get name;
 
+  /// Диагностический клиент
+  IRpcDiagnosticClient? get diagnostic;
+
   /// Создает новый логгер с указанным именем
   factory RpcLogger(String loggerName) {
     return _RpcLoggerRegistry.instance.get(loggerName);
   }
-
-  /// Создает новый логгер с измененными настройками
-  RpcLogger withConfig({
-    IRpcDiagnosticClient? diagnosticService,
-    RpcLoggerLevel? minLogLevel,
-    bool? consoleLoggingEnabled,
-    bool? coloredLoggingEnabled,
-    RpcLoggerColors? logColors,
-    IRpcLoggerFilter? filter,
-    IRpcLoggerFormatter? formatter,
-  });
 
   /// Отправляет лог с указанным уровнем в сервис диагностики
   Future<void> log({
@@ -78,8 +70,8 @@ abstract interface class RpcLogger {
   });
 
   /// Отправляет лог уровня debug
-  Future<void> debug({
-    required String message,
+  Future<void> debug(
+    String message, {
     String? context,
     String? requestId,
     Map<String, dynamic>? data,
@@ -87,8 +79,8 @@ abstract interface class RpcLogger {
   });
 
   /// Отправляет лог уровня info
-  Future<void> info({
-    required String message,
+  Future<void> info(
+    String message, {
     String? context,
     String? requestId,
     Map<String, dynamic>? data,
@@ -96,8 +88,8 @@ abstract interface class RpcLogger {
   });
 
   /// Отправляет лог уровня warning
-  Future<void> warning({
-    required String message,
+  Future<void> warning(
+    String message, {
     String? context,
     String? requestId,
     Map<String, dynamic>? data,
@@ -105,8 +97,8 @@ abstract interface class RpcLogger {
   });
 
   /// Отправляет лог уровня error
-  Future<void> error({
-    required String message,
+  Future<void> error(
+    String message, {
     String? context,
     String? requestId,
     Object? error,
@@ -116,8 +108,8 @@ abstract interface class RpcLogger {
   });
 
   /// Отправляет лог уровня critical
-  Future<void> critical({
-    required String message,
+  Future<void> critical(
+    String message, {
     String? context,
     String? requestId,
     Object? error,

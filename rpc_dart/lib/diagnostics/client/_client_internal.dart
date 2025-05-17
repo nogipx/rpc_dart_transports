@@ -490,7 +490,8 @@ class _RpcDiagnosticClientInternal implements IRpcDiagnosticClient {
   }
 
   /// Отправить метрику лога
-  Future<void> _reportLogMetric(RpcMetric<RpcLoggerMetric> metric) async {
+  @override
+  Future<void> reportLog(RpcMetric<RpcLoggerMetric> metric) async {
     if (!_enabled || !options.loggingEnabled) return;
 
     // Проверка уровня логирования
@@ -554,18 +555,28 @@ class _RpcDiagnosticClientInternal implements IRpcDiagnosticClient {
 
   /// Создает метрику лога
   @override
-  RpcMetric<RpcLoggerMetric> createLogMetric({
+  RpcMetric<RpcLoggerMetric> createLog({
     required RpcLoggerLevel level,
     required String message,
     required String source,
     String? context,
     String? requestId,
-    Map<String, dynamic>? error,
-    String? stackTrace,
+    Object? error,
+    StackTrace? stackTrace,
     Map<String, dynamic>? data,
   }) {
     final id = _idGenerator();
     final now = DateTime.now().millisecondsSinceEpoch;
+    final stackTraceString = stackTrace?.toString();
+
+    Map<String, dynamic>? errorMap;
+    if (error is IRpcSerializableMessage) {
+      errorMap = error.toJson();
+    } else if (error is Map<String, dynamic>) {
+      errorMap = error;
+    } else if (error != null) {
+      errorMap = {'error': error.toString()};
+    }
 
     final logMetric = RpcLoggerMetric(
       id: id,
@@ -576,8 +587,8 @@ class _RpcDiagnosticClientInternal implements IRpcDiagnosticClient {
       source: source,
       context: context,
       requestId: requestId,
-      error: error,
-      stackTrace: stackTrace,
+      error: errorMap,
+      stackTrace: stackTraceString,
       data: data,
     );
 
@@ -587,140 +598,6 @@ class _RpcDiagnosticClientInternal implements IRpcDiagnosticClient {
       clientId: clientIdentity.clientId,
       content: logMetric,
     );
-  }
-
-  /// Отправляет лог сообщение с указанным уровнем
-  @override
-  Future<void> log({
-    required RpcLoggerLevel level,
-    required String message,
-    required String source,
-    String? context,
-    String? requestId,
-    Map<String, dynamic>? error,
-    String? stackTrace,
-    Map<String, dynamic>? data,
-  }) async {
-    final metric = createLogMetric(
-      level: level,
-      message: message,
-      source: source,
-      context: context,
-      requestId: requestId,
-      error: error,
-      stackTrace: stackTrace,
-      data: data,
-    );
-
-    await _reportLogMetric(metric);
-  }
-
-  /// Логирование с уровнем debug
-  @override
-  Future<void> debug({
-    required String message,
-    required String source,
-    String? context,
-    String? requestId,
-    Map<String, dynamic>? data,
-  }) {
-    return log(
-      level: RpcLoggerLevel.debug,
-      message: message,
-      source: source,
-      context: context,
-      requestId: requestId,
-      data: data,
-    );
-  }
-
-  /// Логирование с уровнем info
-  @override
-  Future<void> info({
-    required String message,
-    required String source,
-    String? context,
-    String? requestId,
-    Map<String, dynamic>? data,
-  }) {
-    return log(
-      level: RpcLoggerLevel.info,
-      message: message,
-      source: source,
-      context: context,
-      requestId: requestId,
-      data: data,
-    );
-  }
-
-  /// Логирование с уровнем warning
-  @override
-  Future<void> warning({
-    required String message,
-    required String source,
-    String? context,
-    String? requestId,
-    Map<String, dynamic>? data,
-  }) {
-    return log(
-      level: RpcLoggerLevel.warning,
-      message: message,
-      source: source,
-      context: context,
-      requestId: requestId,
-      data: data,
-    );
-  }
-
-  /// Логирование с уровнем error
-  @override
-  Future<void> error({
-    required String message,
-    required String source,
-    String? context,
-    String? requestId,
-    Map<String, dynamic>? error,
-    String? stackTrace,
-    Map<String, dynamic>? data,
-  }) {
-    return log(
-      level: RpcLoggerLevel.error,
-      message: message,
-      source: source,
-      context: context,
-      requestId: requestId,
-      error: error,
-      stackTrace: stackTrace,
-      data: data,
-    );
-  }
-
-  /// Логирование с уровнем critical
-  @override
-  Future<void> critical({
-    required String message,
-    required String source,
-    String? context,
-    String? requestId,
-    Map<String, dynamic>? error,
-    String? stackTrace,
-    Map<String, dynamic>? data,
-  }) {
-    return log(
-      level: RpcLoggerLevel.critical,
-      message: message,
-      source: source,
-      context: context,
-      requestId: requestId,
-      error: error,
-      stackTrace: stackTrace,
-      data: data,
-    );
-  }
-
-  @override
-  Future<void> reportLogMetric(RpcMetric<RpcLoggerMetric> metric) async {
-    await _reportLogMetric(metric);
   }
 
   /// Инициализация потока логов для отправки через client streaming
@@ -809,5 +686,30 @@ class _RpcDiagnosticClientInternal implements IRpcDiagnosticClient {
         await flush();
       }
     }
+  }
+
+  @override
+  Future<void> log({
+    required RpcLoggerLevel level,
+    required String message,
+    required String source,
+    String? context,
+    String? requestId,
+    Object? error,
+    StackTrace? stackTrace,
+    Map<String, dynamic>? data,
+  }) async {
+    final metric = createLog(
+      level: level,
+      message: message,
+      source: source,
+      context: context,
+      requestId: requestId,
+      error: error,
+      stackTrace: stackTrace,
+      data: data,
+    );
+
+    await reportLog(metric);
   }
 }

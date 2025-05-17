@@ -4,25 +4,13 @@
 
 part of '_logs.dart';
 
-void setLoggerFactory(RpcLoggerFactory factory) {
-  _RpcLoggerRegistry._factory = factory;
-}
-
-void removeLogger(String loggerName) {
-  _RpcLoggerRegistry.instance.remove(loggerName);
-}
-
-void clearLoggers() {
-  _RpcLoggerRegistry.instance.clear();
-}
-
 /// {@template rpc_logger_registry}
 /// Реестр логгеров для RPC библиотеки
 ///
 /// Позволяет регистрировать и получать экземпляры логгеров по имени.
 /// Также предоставляет глобальный экземпляр для удобства.
 /// {@endtemplate}
-class _RpcLoggerRegistry {
+final class _RpcLoggerRegistry {
   /// Статический фабричный метод для создания нового логгера
   static RpcLoggerFactory? _factory;
 
@@ -40,7 +28,7 @@ class _RpcLoggerRegistry {
   /// Если логгер с таким именем не найден, создает новый
   RpcLogger get(String name) {
     if (_factory == null) {
-      return _loggers[name] ??= DefaultRpcLogger(name);
+      return _loggers[name] ??= ConsoleRpcLogger(name);
     }
     return _loggers[name] ??= _factory!(name);
   }

@@ -10,14 +10,13 @@ base class DiagnosticRpcLogger implements RpcLogger {
   @override
   final String name;
 
-  /// Диагностический сервис для отправки логов
-  final IRpcDiagnosticClient _diagnosticService;
+  @override
+  IRpcDiagnosticClient? get diagnostic => RpcLoggerSettings.diagnostic;
 
-  /// Минимальный уровень логов для отправки
-  final RpcLoggerLevel _minLogLevel;
+  final ConsoleRpcLogger? _consoleLogger;
 
   /// Фильтр логов
-  final IRpcLoggerFilter _filter;
+  final IRpcLoggerFilter? _filter;
 
   /// Создает новый логгер для работы с сервисом диагностики
   ///
@@ -25,33 +24,12 @@ base class DiagnosticRpcLogger implements RpcLogger {
   /// * [diagnosticService] - сервис диагностики для отправки логов (обязательный)
   /// * [minLogLevel] - минимальный уровень логов для отправки
   /// * [filter] - пользовательский фильтр логов
-  DiagnosticRpcLogger(
+  const DiagnosticRpcLogger(
     this.name, {
-    required IRpcDiagnosticClient diagnosticService,
-    RpcLoggerLevel minLogLevel = RpcLoggerLevel.info,
     IRpcLoggerFilter? filter,
-  })  : _diagnosticService = diagnosticService,
-        _minLogLevel = minLogLevel,
-        _filter = filter ?? DefaultRpcLoggerFilter(minLogLevel);
-
-  @override
-  RpcLogger withConfig({
-    IRpcDiagnosticClient? diagnosticService,
-    RpcLoggerLevel? minLogLevel,
-    bool? consoleLoggingEnabled,
-    bool? coloredLoggingEnabled,
-    RpcLoggerColors? logColors,
-    IRpcLoggerFilter? filter,
-    IRpcLoggerFormatter? formatter,
-  }) {
-    // Параметры, связанные с консолью, игнорируются в этой реализации
-    return DiagnosticRpcLogger(
-      name,
-      diagnosticService: diagnosticService ?? _diagnosticService,
-      minLogLevel: minLogLevel ?? _minLogLevel,
-      filter: filter ?? _filter,
-    );
-  }
+    ConsoleRpcLogger? consoleLogger,
+  })  : _filter = filter,
+        _consoleLogger = consoleLogger;
 
   @override
   Future<void> log({
@@ -59,32 +37,45 @@ base class DiagnosticRpcLogger implements RpcLogger {
     required String message,
     String? context,
     String? requestId,
-    Map<String, dynamic>? error,
-    String? stackTrace,
+    Object? error,
+    StackTrace? stackTrace,
     Map<String, dynamic>? data,
     AnsiColor? color, // Этот параметр игнорируется в этой реализации
   }) async {
     // Проверяем, нужно ли логировать это сообщение
-    if (!_filter.shouldLog(level, name)) {
+    if (_filter?.shouldLog(level, name) ?? false) {
       return;
     }
 
-    // Отправляем в диагностический сервис
-    await _diagnosticService.log(
-      level: level,
-      message: message,
-      source: name,
-      context: context,
-      requestId: requestId,
-      error: error,
-      stackTrace: stackTrace,
-      data: data,
-    );
+    if (_consoleLogger != null) {
+      await _consoleLogger!.log(
+        level: level,
+        message: message,
+        context: context,
+        requestId: requestId,
+        error: error,
+        stackTrace: stackTrace,
+        data: data,
+        color: color,
+      );
+    }
+    if (diagnostic != null) {
+      await diagnostic!.log(
+        level: level,
+        message: message,
+        source: name,
+        context: context,
+        requestId: requestId,
+        error: error,
+        stackTrace: stackTrace,
+        data: data,
+      );
+    }
   }
 
   @override
-  Future<void> debug({
-    required String message,
+  Future<void> debug(
+    String message, {
     String? context,
     String? requestId,
     Map<String, dynamic>? data,
@@ -101,8 +92,8 @@ base class DiagnosticRpcLogger implements RpcLogger {
   }
 
   @override
-  Future<void> info({
-    required String message,
+  Future<void> info(
+    String message, {
     String? context,
     String? requestId,
     Map<String, dynamic>? data,
@@ -119,8 +110,8 @@ base class DiagnosticRpcLogger implements RpcLogger {
   }
 
   @override
-  Future<void> warning({
-    required String message,
+  Future<void> warning(
+    String message, {
     String? context,
     String? requestId,
     Map<String, dynamic>? data,
@@ -137,12 +128,12 @@ base class DiagnosticRpcLogger implements RpcLogger {
   }
 
   @override
-  Future<void> error({
-    required String message,
+  Future<void> error(
+    String message, {
     String? context,
     String? requestId,
-    Map<String, dynamic>? error,
-    String? stackTrace,
+    Object? error,
+    StackTrace? stackTrace,
     Map<String, dynamic>? data,
     AnsiColor? color,
   }) async {
@@ -159,12 +150,12 @@ base class DiagnosticRpcLogger implements RpcLogger {
   }
 
   @override
-  Future<void> critical({
-    required String message,
+  Future<void> critical(
+    String message, {
     String? context,
     String? requestId,
-    Map<String, dynamic>? error,
-    String? stackTrace,
+    Object? error,
+    StackTrace? stackTrace,
     Map<String, dynamic>? data,
     AnsiColor? color,
   }) async {

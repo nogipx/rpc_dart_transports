@@ -70,10 +70,6 @@ class RpcDiagnosticClient implements IRpcDiagnosticClient {
       _client.reportResourceMetric(metric);
 
   @override
-  Future<void> reportLogMetric(RpcMetric<RpcLoggerMetric> metric) =>
-      _client.reportLogMetric(metric);
-
-  @override
   Future<void> reportMetric(RpcMetric metric) => _client.reportMetric(metric);
 
   @override
@@ -214,138 +210,6 @@ class RpcDiagnosticClient implements IRpcDiagnosticClient {
       );
 
   @override
-  RpcMetric<RpcLoggerMetric> createLogMetric({
-    required RpcLoggerLevel level,
-    required String message,
-    required String source,
-    String? context,
-    String? requestId,
-    Map<String, dynamic>? error,
-    String? stackTrace,
-    Map<String, dynamic>? data,
-  }) =>
-      _client.createLogMetric(
-        level: level,
-        message: message,
-        source: source,
-        context: context,
-        requestId: requestId,
-        error: error,
-        stackTrace: stackTrace,
-        data: data,
-      );
-
-  @override
-  Future<void> log({
-    required RpcLoggerLevel level,
-    required String message,
-    required String source,
-    String? context,
-    String? requestId,
-    Map<String, dynamic>? error,
-    String? stackTrace,
-    Map<String, dynamic>? data,
-  }) =>
-      _client.log(
-        level: level,
-        message: message,
-        source: source,
-        context: context,
-        requestId: requestId,
-        error: error,
-        stackTrace: stackTrace,
-        data: data,
-      );
-
-  @override
-  Future<void> debug({
-    required String message,
-    required String source,
-    String? context,
-    String? requestId,
-    Map<String, dynamic>? data,
-  }) =>
-      _client.debug(
-        message: message,
-        source: source,
-        context: context,
-        requestId: requestId,
-        data: data,
-      );
-
-  @override
-  Future<void> info({
-    required String message,
-    required String source,
-    String? context,
-    String? requestId,
-    Map<String, dynamic>? data,
-  }) =>
-      _client.info(
-        message: message,
-        source: source,
-        context: context,
-        requestId: requestId,
-        data: data,
-      );
-
-  @override
-  Future<void> warning({
-    required String message,
-    required String source,
-    String? context,
-    String? requestId,
-    Map<String, dynamic>? data,
-  }) =>
-      _client.warning(
-        message: message,
-        source: source,
-        context: context,
-        requestId: requestId,
-        data: data,
-      );
-
-  @override
-  Future<void> error({
-    required String message,
-    required String source,
-    String? context,
-    String? requestId,
-    Map<String, dynamic>? error,
-    String? stackTrace,
-    Map<String, dynamic>? data,
-  }) =>
-      _client.error(
-        message: message,
-        source: source,
-        context: context,
-        requestId: requestId,
-        error: error,
-        stackTrace: stackTrace,
-        data: data,
-      );
-
-  @override
-  Future<void> critical({
-    required String message,
-    required String source,
-    String? context,
-    String? requestId,
-    Map<String, dynamic>? error,
-    String? stackTrace,
-    Map<String, dynamic>? data,
-  }) =>
-      _client.critical(
-        message: message,
-        source: source,
-        context: context,
-        requestId: requestId,
-        error: error,
-        stackTrace: stackTrace,
-        data: data,
-      );
-
-  @override
   Future<T> measureLatency<T>({
     required Future<T> Function() operation,
     required String operationName,
@@ -367,4 +231,53 @@ class RpcDiagnosticClient implements IRpcDiagnosticClient {
 
   @override
   Future<void> dispose() => _client.dispose();
+
+  @override
+  Future<void> log({
+    required RpcLoggerLevel level,
+    required String message,
+    required String source,
+    String? context,
+    String? requestId,
+    Object? error,
+    StackTrace? stackTrace,
+    Map<String, dynamic>? data,
+  }) =>
+      _client.log(
+        level: level,
+        message: message,
+        source: source,
+        context: context,
+        requestId: requestId,
+        error: error,
+        stackTrace: stackTrace,
+        data: data,
+      );
+
+  @override
+  RpcMetric<RpcLoggerMetric> createLog({
+    required RpcLoggerLevel level,
+    required String message,
+    required String source,
+    String? context,
+    String? requestId,
+    Object? error,
+    StackTrace? stackTrace,
+    Map<String, dynamic>? data,
+  }) {
+    return _client.createLog(
+      level: level,
+      message: message,
+      source: source,
+      context: context,
+      requestId: requestId,
+      error: error,
+      stackTrace: stackTrace,
+      data: data,
+    );
+  }
+
+  @override
+  Future<void> reportLog(RpcMetric<RpcLoggerMetric> metric) =>
+      _client.reportLog(metric);
 }

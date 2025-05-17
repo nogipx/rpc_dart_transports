@@ -14,6 +14,9 @@ abstract class IRpcDiagnosticClient {
   /// Опции диагностического сервиса
   RpcDiagnosticOptions get options;
 
+  /// Проверка, включен ли сбор метрик
+  bool get isEnabled;
+
   /// Отправить метрику трассировки
   Future<void> reportTraceEvent(RpcMetric<RpcTraceMetric> event);
 
@@ -28,9 +31,6 @@ abstract class IRpcDiagnosticClient {
 
   /// Отправить метрику ресурсов
   Future<void> reportResourceMetric(RpcMetric<RpcResourceMetric> metric);
-
-  /// Отправить лог сообщение
-  Future<void> reportLogMetric(RpcMetric<RpcLoggerMetric> metric);
 
   /// Отправить произвольную метрику
   Future<void> reportMetric(RpcMetric metric);
@@ -50,8 +50,32 @@ abstract class IRpcDiagnosticClient {
   /// Отключить сбор и отправку метрик
   void disable();
 
-  /// Проверка, включен ли сбор метрик
-  bool get isEnabled;
+  /// Быстрый метод для логирования
+  Future<void> log({
+    required RpcLoggerLevel level,
+    required String message,
+    required String source,
+    String? context,
+    String? requestId,
+    Object? error,
+    StackTrace? stackTrace,
+    Map<String, dynamic>? data,
+  });
+
+  /// Создать метрику лога
+  RpcMetric<RpcLoggerMetric> createLog({
+    required RpcLoggerLevel level,
+    required String message,
+    required String source,
+    String? context,
+    String? requestId,
+    Object? error,
+    StackTrace? stackTrace,
+    Map<String, dynamic>? data,
+  });
+
+  /// Отправить лог сообщение
+  Future<void> reportLog(RpcMetric<RpcLoggerMetric> metric);
 
   /// Создать метрику трассировки
   RpcMetric<RpcTraceMetric> createTraceEvent({
@@ -115,79 +139,6 @@ abstract class IRpcDiagnosticClient {
     int? networkOutBytes,
     int? queueSize,
     Map<String, dynamic>? additionalMetrics,
-  });
-
-  /// Создать метрику лога
-  RpcMetric<RpcLoggerMetric> createLogMetric({
-    required RpcLoggerLevel level,
-    required String message,
-    required String source,
-    String? context,
-    String? requestId,
-    Map<String, dynamic>? error,
-    String? stackTrace,
-    Map<String, dynamic>? data,
-  });
-
-  /// Быстрый метод для логирования
-  Future<void> log({
-    required RpcLoggerLevel level,
-    required String message,
-    required String source,
-    String? context,
-    String? requestId,
-    Map<String, dynamic>? error,
-    String? stackTrace,
-    Map<String, dynamic>? data,
-  });
-
-  /// Логирование с уровнем debug
-  Future<void> debug({
-    required String message,
-    required String source,
-    String? context,
-    String? requestId,
-    Map<String, dynamic>? data,
-  });
-
-  /// Логирование с уровнем info
-  Future<void> info({
-    required String message,
-    required String source,
-    String? context,
-    String? requestId,
-    Map<String, dynamic>? data,
-  });
-
-  /// Логирование с уровнем warning
-  Future<void> warning({
-    required String message,
-    required String source,
-    String? context,
-    String? requestId,
-    Map<String, dynamic>? data,
-  });
-
-  /// Логирование с уровнем error
-  Future<void> error({
-    required String message,
-    required String source,
-    String? context,
-    String? requestId,
-    Map<String, dynamic>? error,
-    String? stackTrace,
-    Map<String, dynamic>? data,
-  });
-
-  /// Логирование с уровнем critical
-  Future<void> critical({
-    required String message,
-    required String source,
-    String? context,
-    String? requestId,
-    Map<String, dynamic>? error,
-    String? stackTrace,
-    Map<String, dynamic>? data,
   });
 
   /// Измерить время выполнения функции и отправить метрику

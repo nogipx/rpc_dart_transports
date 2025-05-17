@@ -62,9 +62,6 @@ class RpcLoggerColors {
     this.critical = AnsiColor.brightRed,
   });
 
-  /// Цвета по умолчанию
-  static const defaultColors = RpcLoggerColors();
-
   /// Получает цвет для указанного уровня логирования
   AnsiColor colorForLevel(RpcLoggerLevel level) {
     switch (level) {
