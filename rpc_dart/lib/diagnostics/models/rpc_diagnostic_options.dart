@@ -5,7 +5,7 @@
 import '../_index.dart';
 
 /// Опции диагностики
-class DiagnosticOptions {
+class RpcDiagnosticOptions {
   /// Флаг, указывающий, включена ли диагностика
   final bool enabled;
 
@@ -51,7 +51,7 @@ class DiagnosticOptions {
   final bool loggingEnabled;
 
   /// Создает новый объект опций диагностики
-  const DiagnosticOptions({
+  const RpcDiagnosticOptions({
     this.enabled = true,
     this.samplingRate = 1.0,
     this.maxBufferSize = 100,

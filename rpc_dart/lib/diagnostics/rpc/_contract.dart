@@ -2,9 +2,6 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-import 'dart:async' show Timer;
-import 'dart:math' show Random;
-
 import 'package:rpc_dart/diagnostics.dart';
 import 'package:rpc_dart/rpc_dart.dart';
 
@@ -13,11 +10,8 @@ part 'subcontracts/logging.dart';
 part 'subcontracts/tracing.dart';
 part 'subcontracts/client_management.dart';
 
-part 'diagnostic_client_contract.dart';
-part 'diagnostic_server_contract.dart';
-
-part '../i_rpc_diagnostic_service.dart';
-part '../rpc_diagnostic_client.dart';
+part 'rpc_diagnostic_client_contract.dart';
+part 'rpc_diagnostic_server_contract.dart';
 
 /// Базовый контракт диагностического сервиса
 ///

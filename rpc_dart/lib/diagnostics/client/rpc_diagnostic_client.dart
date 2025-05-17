@@ -2,13 +2,11 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-import 'package:rpc_dart/diagnostics.dart';
-import 'package:rpc_dart/rpc_dart.dart';
+part of '_client.dart';
 
-/// Удобная обертка над [RpcDiagnosticClient] реализующая интерфейс [IRpcDiagnosticService]
+/// Удобная обертка над [RpcDiagnosticClient] реализующая интерфейс [IRpcDiagnosticClient]
 ///
 /// Предоставляет более удобный конструктор и делегирует все вызовы внутреннему клиенту.
-/// Рекомендуется использовать этот класс вместо прямого создания [RpcDiagnosticClient].
 ///
 /// Пример использования:
 /// ```dart
@@ -27,32 +25,29 @@ import 'package:rpc_dart/rpc_dart.dart';
 ///   source: 'MyComponent',
 /// );
 /// ```
-class RpcDiagnosticService implements IRpcDiagnosticService {
-  final RpcDiagnosticClient _client;
+class RpcDiagnosticClient implements IRpcDiagnosticClient {
+  final _RpcDiagnosticClientInternal _client;
 
   /// Создает новый экземпляр диагностического сервиса
   ///
   /// * [endpoint] - эндпоинт для отправки метрик
   /// * [clientIdentity] - идентификатор клиента
   /// * [options] - настройки диагностического сервиса
-  /// * [idGenerator] - опциональная функция для генерации идентификаторов
-  RpcDiagnosticService({
+  RpcDiagnosticClient({
     required RpcEndpoint endpoint,
     required RpcClientIdentity clientIdentity,
-    required DiagnosticOptions options,
-    String Function()? idGenerator,
-  }) : _client = RpcDiagnosticClient(
+    required RpcDiagnosticOptions options,
+  }) : _client = _RpcDiagnosticClientInternal(
           endpoint: endpoint,
           clientIdentity: clientIdentity,
           options: options,
-          idGenerator: idGenerator,
         );
 
   @override
   RpcClientIdentity get clientIdentity => _client.clientIdentity;
 
   @override
-  DiagnosticOptions get options => _client.options;
+  RpcDiagnosticOptions get options => _client.options;
 
   @override
   Future<void> reportTraceEvent(RpcMetric<RpcTraceMetric> event) =>
@@ -75,7 +70,7 @@ class RpcDiagnosticService implements IRpcDiagnosticService {
       _client.reportResourceMetric(metric);
 
   @override
-  Future<void> reportLogMetric(RpcMetric<RpcLogMetric> metric) =>
+  Future<void> reportLogMetric(RpcMetric<RpcLoggerMetric> metric) =>
       _client.reportLogMetric(metric);
 
   @override
@@ -219,8 +214,8 @@ class RpcDiagnosticService implements IRpcDiagnosticService {
       );
 
   @override
-  RpcMetric<RpcLogMetric> createLogMetric({
-    required RpcLogLevel level,
+  RpcMetric<RpcLoggerMetric> createLogMetric({
+    required RpcLoggerLevel level,
     required String message,
     required String source,
     String? context,
@@ -242,7 +237,7 @@ class RpcDiagnosticService implements IRpcDiagnosticService {
 
   @override
   Future<void> log({
-    required RpcLogLevel level,
+    required RpcLoggerLevel level,
     required String message,
     required String source,
     String? context,

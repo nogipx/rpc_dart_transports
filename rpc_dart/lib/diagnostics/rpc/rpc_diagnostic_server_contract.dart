@@ -5,8 +5,8 @@
 part of '_contract.dart';
 
 /// Серверная реализация контракта диагностического сервиса
-final class DiagnosticServerContract extends _RpcDiagnosticServiceContract {
-  DiagnosticServerContract({
+final class RpcDiagnosticServerContract extends _RpcDiagnosticServiceContract {
+  RpcDiagnosticServerContract({
     required void Function(List<RpcMetric>) onSendMetrics,
     required void Function(RpcMetric<RpcTraceMetric>) onTraceEvent,
     required void Function(RpcMetric<RpcLatencyMetric>) onLatencyMetric,
