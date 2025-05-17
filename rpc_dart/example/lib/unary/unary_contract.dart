@@ -8,25 +8,12 @@ abstract base class BasicServiceContract extends RpcServiceContract {
 
   @override
   void setup() {
-    print('Setup вызван для ${runtimeType.toString()}');
-
     // Метод работы с примитивными числовыми значениями
     addUnaryRequestMethod<ComputeRequest, ComputeResult>(
       methodName: 'compute',
       handler: compute,
       argumentParser: ComputeRequest.fromJson,
       responseParser: ComputeResult.fromJson,
-    );
-
-    print('После регистрации метода compute:');
-    print(
-      '  • Handler: ${getMethodHandler<ComputeRequest, ComputeResult>("compute") != null ? 'Есть' : 'Нет!'}',
-    );
-    print(
-      '  • ArgParser: ${getMethodArgumentParser<ComputeRequest>("compute") != null ? 'Есть' : 'Нет!'}',
-    );
-    print(
-      '  • RespParser: ${getMethodResponseParser<ComputeResult>("compute") != null ? 'Есть' : 'Нет!'}',
     );
 
     super.setup();

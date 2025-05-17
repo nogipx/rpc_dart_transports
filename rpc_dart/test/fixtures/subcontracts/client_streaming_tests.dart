@@ -97,21 +97,13 @@ class ClientStreamingTestsServer extends ClientStreamingTestsSubcontract {
       },
     );
 
-    // Создаем BidiStream
-    final bidiStream = BidiStream<ClientStreamRequest, ClientStreamResponse>(
-      responseStream: responseController.stream,
-      sendFunction: (request) => requestController.add(request),
-      closeFunction: () async {
-        await requestController.close();
-        if (!responseController.isClosed) {
-          await responseController.close();
-        }
-      },
-    );
-
-    // Оборачиваем в ClientStreamingBidiStream и возвращаем
+    // Создаем ClientStreamingBidiStream и возвращаем
     return ClientStreamingBidiStream<ClientStreamRequest, ClientStreamResponse>(
-      bidiStream,
+      BidiStreamGenerator<ClientStreamRequest, ClientStreamResponse>(
+        (request) async* {
+          yield ClientStreamResponse('response');
+        },
+      ).create(),
     );
   }
 
@@ -140,21 +132,13 @@ class ClientStreamingTestsServer extends ClientStreamingTestsSubcontract {
       },
     );
 
-    // Создаем BidiStream
-    final bidiStream = BidiStream<ClientStreamRequest, ClientStreamResponse>(
-      responseStream: responseController.stream,
-      sendFunction: (request) => requestController.add(request),
-      closeFunction: () async {
-        await requestController.close();
-        if (!responseController.isClosed) {
-          await responseController.close();
-        }
-      },
-    );
-
-    // Оборачиваем в ClientStreamingBidiStream и возвращаем
+    // Создаем ClientStreamingBidiStream и возвращаем
     return ClientStreamingBidiStream<ClientStreamRequest, ClientStreamResponse>(
-      bidiStream,
+      BidiStreamGenerator<ClientStreamRequest, ClientStreamResponse>(
+        (request) async* {
+          yield ClientStreamResponse('response');
+        },
+      ).create(),
     );
   }
 
@@ -191,21 +175,13 @@ class ClientStreamingTestsServer extends ClientStreamingTestsSubcontract {
       },
     );
 
-    // Создаем BidiStream
-    final bidiStream = BidiStream<ClientStreamRequest, ClientStreamResponse>(
-      responseStream: responseController.stream,
-      sendFunction: (request) => requestController.add(request),
-      closeFunction: () async {
-        await requestController.close();
-        if (!responseController.isClosed) {
-          await responseController.close();
-        }
-      },
-    );
-
-    // Оборачиваем в ClientStreamingBidiStream и возвращаем
+    // Создаем ClientStreamingBidiStream и возвращаем
     return ClientStreamingBidiStream<ClientStreamRequest, ClientStreamResponse>(
-      bidiStream,
+      BidiStreamGenerator<ClientStreamRequest, ClientStreamResponse>(
+        (request) async* {
+          yield ClientStreamResponse('response');
+        },
+      ).create(),
     );
   }
 }

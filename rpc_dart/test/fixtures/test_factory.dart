@@ -37,25 +37,24 @@ class TestFactory {
     required Server Function() serverFactory,
     EndpointPair? endpointPair,
   }) {
-    // Создаем реестры и транспорты
-    final clientRegistry = RpcMethodRegistry();
-    final serverRegistry = RpcMethodRegistry();
-    final endpointPair = createEndpointPair(
-      clientLabel: 'client',
-      serverLabel: 'server',
-    );
+    // Создаем транспорты и эндпоинты
+    final endpoints = endpointPair ??
+        createEndpointPair(
+          clientLabel: 'client',
+          serverLabel: 'server',
+        );
 
     // Создаем контракты через фабрики
-    final clientContract = clientFactory(endpointPair.client);
+    final clientContract = clientFactory(endpoints.client);
     final serverContract = serverFactory();
 
-    // Регистрируем контракты
-    serverRegistry.registerContract(serverContract);
-    clientRegistry.registerContract(clientContract);
+    // Регистрируем контракты непосредственно в эндпоинтах
+    endpoints.client.registerServiceContract(clientContract);
+    endpoints.server.registerServiceContract(serverContract);
 
     return TestEnvironment(
-      clientEndpoint: endpointPair.client,
-      serverEndpoint: endpointPair.server,
+      clientEndpoint: endpoints.client,
+      serverEndpoint: endpoints.server,
       clientContract: clientContract,
       serverContract: serverContract,
     );

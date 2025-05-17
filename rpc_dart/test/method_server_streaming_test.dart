@@ -94,12 +94,7 @@ abstract class TaskServiceContract extends RpcServiceContract {
 // Серверная реализация сервиса задач
 class ServerTaskService extends TaskServiceContract {
   ServerTaskService() : super() {
-    // Явно вызываем setup для инициализации методов
-    print('Debug: Инициализация ServerTaskService');
     setup();
-
-    // Выводим дополнительную информацию для отладки
-    print('Debug: methods = ${methods.map((m) => m.methodName).join(", ")}');
   }
 
   @override
@@ -142,20 +137,12 @@ class ClientTaskService extends TaskServiceContract {
   final RpcEndpoint _endpoint;
 
   ClientTaskService(this._endpoint) : super() {
-    // Явно вызываем setup для инициализации методов
-    print('Debug: Инициализация ClientTaskService');
     setup();
-
-    // Выводим дополнительную информацию для отладки
-    print('Debug: methods = ${methods.map((m) => m.methodName).join(", ")}');
   }
 
   @override
   ServerStreamingBidiStream<TaskRequest, ProgressMessage> startTask(
       TaskRequest request) {
-    print(
-        'Debug: serviceName = $serviceName, methodName = ${TaskServiceContract.startTaskMethod}');
-
     return _endpoint
         .serverStreaming(
           serviceName: serviceName,
@@ -189,15 +176,11 @@ void main() {
     late ServerTaskService serverService;
 
     setUp(() {
-      print('\nDebug: === Начало настройки теста ===');
-
       // Используем фабрику для создания тестового окружения
       final testEnv = TestFactory.setupTestContract(
         clientFactory: (endpoint) => ClientTaskService(endpoint),
         serverFactory: () => ServerTaskService(),
       );
-
-      print('Debug: Окружение теста создано');
 
       clientEndpoint = testEnv.clientEndpoint;
       serverEndpoint = testEnv.serverEndpoint;
@@ -206,8 +189,6 @@ void main() {
       clientService = testEnv.clientContract;
       serverService = testEnv.serverContract;
 
-      // Дополнительная явная регистрация метода startTask
-      print('Debug: Явная регистрация метода startTask с вызовом напрямую');
       serverEndpoint
           .serverStreaming(
             serviceName: 'TaskService',
@@ -218,10 +199,6 @@ void main() {
             requestParser: TaskRequest.fromJson,
             responseParser: ProgressMessage.fromJson,
           );
-
-      print('Debug: Клиентский сервис: ${clientService.serviceName}');
-      print('Debug: Серверный сервис: ${serverService.serviceName}');
-      print('Debug: === Завершение настройки теста ===\n');
     });
 
     tearDown(() async {

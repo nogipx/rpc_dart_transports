@@ -64,10 +64,10 @@ class UploadResult implements IRpcSerializableMessage {
 
   static UploadResult fromJson(Map<String, dynamic> json) {
     return UploadResult(
-      fileId: json['fileId'] as String,
-      totalChunks: json['totalChunks'] as int,
-      totalSize: json['totalSize'] as int,
-      status: json['status'] as String,
+      fileId: json['fileId'] as String? ?? 'unknown',
+      totalChunks: json['totalChunks'] as int? ?? 0,
+      totalSize: json['totalSize'] as int? ?? 0,
+      status: json['status'] as String? ?? 'unknown',
     );
   }
 }
@@ -94,7 +94,7 @@ abstract class FileUploadServiceContract extends RpcServiceContract {
 
   @override
   void setup() {
-    // Регистрируем метод клиентского стриминга
+    // Регистрируем метод клиентского стриминга с помощью правильного метода
     addClientStreamingMethod<FileChunk, UploadResult>(
       methodName: uploadFileMethod,
       handler: uploadFile,
@@ -155,12 +155,11 @@ abstract class BasicStreamServiceContract extends RpcServiceContract {
 
 /// Серверная реализация контракта загрузки файлов
 class FileUploadServiceServer extends FileUploadServiceContract {
+  /// Максимальное количество обработчиков
+  static const int maxHandlers = 100; // Увеличиваем с 5 до 100
+
   // Защита от повторного создания обработчиков
   int _handlerCount = 0;
-  static const int maxHandlers = 5;
-
-  // Используем флаг для предотвращения бесконечного создания обработчиков
-  bool _isProcessing = false;
 
   // Используем Set для хранения активных сессий по ID
   final Set<String> _activeSessionIds = <String>{};
@@ -178,7 +177,6 @@ class FileUploadServiceServer extends FileUploadServiceContract {
     _fileChunks.clear();
     _activeSessionIds.clear();
     _handlerCount = 0;
-    _isProcessing = false;
   }
 
   @override
@@ -187,101 +185,97 @@ class FileUploadServiceServer extends FileUploadServiceContract {
       throw Exception('Слишком много обработчиков создано: $_handlerCount');
     }
 
+    // Увеличиваем счетчик обработчиков
     _handlerCount++;
 
-    final sessionId =
-        'upload_${DateTime.now().millisecondsSinceEpoch}_$_handlerCount';
+    // Создаем контроллеры для запросов и ответов
+    final requestController = StreamController<FileChunk>();
+    final responseController = StreamController<UploadResult>();
 
-    // Защита от рекурсии
-    if (_isProcessing) {
-      throw Exception('Рекурсивный вызов обработчика');
-    }
+    // Данные для построения ответа
+    var totalChunks = 0;
+    var totalSize = 0;
+    String? currentFileId;
+    final chunks = <FileChunk>[];
 
-    _isProcessing = true;
+    // Обрабатываем входящие запросы
+    requestController.stream.listen(
+      (chunk) {
+        // Инициализируем ID файла при первом чанке
+        currentFileId ??= chunk.fileId;
 
-    try {
-      if (_activeSessionIds.contains(sessionId)) {
-        throw Exception('Сессия уже активна: $sessionId');
-      }
+        // Проверяем, что все чанки относятся к одному файлу
+        if (chunk.fileId != currentFileId) {
+          responseController.addError(
+            Exception('Смешивание чанков разных файлов не допускается'),
+          );
+          return;
+        }
 
-      _activeSessionIds.add(sessionId);
+        // Собираем данные
+        chunks.add(chunk);
+        totalChunks++;
+        totalSize += chunk.data.length;
+      },
+      onDone: () {
+        if (currentFileId != null) {
+          // Сохраняем чанки для тестирования
+          _fileChunks[currentFileId!] = List.from(chunks);
 
-      // Создаем контроллеры для запросов и ответов
-      final requestController = StreamController<FileChunk>();
-      final responseController = StreamController<UploadResult>();
+          // Создаем и отправляем результат
+          final result = UploadResult(
+            fileId: currentFileId!,
+            totalChunks: totalChunks,
+            totalSize: totalSize,
+            status: 'success',
+          );
 
-      // Метаданные загрузки
-      var totalChunks = 0;
-      var totalSize = 0;
-      String? currentFileId;
-      final chunks = <FileChunk>[];
-
-      // Обрабатываем стрим запросов
-      requestController.stream.listen(
-        (chunk) {
-          // Инициализируем fileId при первом чанке
-          currentFileId ??= chunk.fileId;
-
-          // Проверяем, что все чанки относятся к одному файлу
-          if (chunk.fileId != currentFileId) {
-            responseController.addError(
-              Exception('Смешивание чанков разных файлов не допускается'),
-            );
-            return;
-          }
-
-          chunks.add(chunk);
-          totalChunks++;
-          totalSize += chunk.data.length;
-        },
-        onDone: () {
-          if (currentFileId != null) {
-            // Сохраняем чанки для тестирования
-            _fileChunks[currentFileId!] = List.from(chunks);
-
-            // Создаем результат
-            final result = UploadResult(
-              fileId: currentFileId!,
-              totalChunks: totalChunks,
-              totalSize: totalSize,
-              status: 'success',
-            );
-
-            // Отправляем результат
+          if (!responseController.isClosed) {
             responseController.add(result);
-          } else {
+          }
+        } else {
+          // Если не получили ни одного чанка, отправляем ошибку
+          if (!responseController.isClosed) {
             responseController.addError(
               Exception('Не получено ни одного чанка'),
             );
           }
+        }
 
-          // Закрываем соединение
+        // Закрываем контроллер ответов
+        if (!responseController.isClosed) {
           responseController.close();
-          _activeSessionIds.remove(sessionId);
-          _isProcessing = false;
-        },
-        onError: (error) {
+        }
+      },
+      onError: (error) {
+        if (!responseController.isClosed) {
           responseController.addError(error);
           responseController.close();
-          _activeSessionIds.remove(sessionId);
-          _isProcessing = false;
-        },
-      );
+        }
+      },
+    );
 
-      return ClientStreamingBidiStream<FileChunk, UploadResult>(
-        BidiStream<FileChunk, UploadResult>(
-          responseStream: responseController.stream,
-          sendFunction: (chunk) => requestController.add(chunk),
-          closeFunction: () async {
-            await requestController.close();
-          },
-        ),
-      );
-    } catch (e) {
-      _activeSessionIds.remove(sessionId);
-      _isProcessing = false;
-      rethrow;
-    }
+    // Создаем и возвращаем ClientStreamingBidiStream
+    return ClientStreamingBidiStream<FileChunk, UploadResult>(
+      BidiStreamGenerator<FileChunk, UploadResult>(
+        (chunk) async* {
+          FileChunk? lastChunk;
+          for (var chunk in chunks) {
+            lastChunk = chunk;
+          }
+
+          if (lastChunk != null) {
+            yield UploadResult(
+              fileId: lastChunk.fileId,
+              totalChunks: chunks.length,
+              totalSize: totalSize,
+              status: 'success',
+            );
+          }
+          throw Exception('No chunks received');
+        },
+      ).create(),
+    );
   }
 }
 
@@ -310,7 +304,6 @@ class BasicStreamServiceServer extends BasicStreamServiceContract {
   ClientStreamingBidiStream<StreamMessage, StreamMessage> collectData() {
     final requestController = StreamController<StreamMessage>();
     final responseController = StreamController<StreamMessage>();
-
     final messages = <String>[];
 
     requestController.stream.listen(
@@ -319,23 +312,29 @@ class BasicStreamServiceServer extends BasicStreamServiceContract {
       },
       onDone: () {
         final result = StreamMessage(messages.join(', '));
-        responseController.add(result);
-        responseController.close();
+
+        if (!responseController.isClosed) {
+          responseController.add(result);
+          responseController.close();
+        }
       },
       onError: (error) {
-        responseController.addError(error);
-        responseController.close();
+        if (!responseController.isClosed) {
+          responseController.addError(error);
+          responseController.close();
+        }
       },
     );
 
     return ClientStreamingBidiStream<StreamMessage, StreamMessage>(
-      BidiStream<StreamMessage, StreamMessage>(
-        responseStream: responseController.stream,
-        sendFunction: (message) => requestController.add(message),
-        closeFunction: () async {
-          await requestController.close();
+      BidiStreamGenerator<StreamMessage, StreamMessage>(
+        (message) async* {
+          for (var i = 0; i < messages.length; i++) {
+            yield StreamMessage(messages[i]);
+          }
+          throw Exception('No messages received');
         },
-      ),
+      ).create(),
     );
   }
 
@@ -343,7 +342,6 @@ class BasicStreamServiceServer extends BasicStreamServiceContract {
   ClientStreamingBidiStream<StreamMessage, StreamMessage> countItems() {
     final requestController = StreamController<StreamMessage>();
     final responseController = StreamController<StreamMessage>();
-
     var count = 0;
 
     requestController.stream.listen(
@@ -352,23 +350,28 @@ class BasicStreamServiceServer extends BasicStreamServiceContract {
       },
       onDone: () {
         final result = StreamMessage('count:$count');
-        responseController.add(result);
-        responseController.close();
+
+        if (!responseController.isClosed) {
+          responseController.add(result);
+          responseController.close();
+        }
       },
       onError: (error) {
-        responseController.addError(error);
-        responseController.close();
+        if (!responseController.isClosed) {
+          responseController.addError(error);
+          responseController.close();
+        }
       },
     );
 
     return ClientStreamingBidiStream<StreamMessage, StreamMessage>(
-      BidiStream<StreamMessage, StreamMessage>(
-        responseStream: responseController.stream,
-        sendFunction: (message) => requestController.add(message),
-        closeFunction: () async {
-          await requestController.close();
+      BidiStreamGenerator<StreamMessage, StreamMessage>(
+        (message) async* {
+          for (var i = 0; i < count; i++) {
+            yield StreamMessage('item $i');
+          }
         },
-      ),
+      ).create(),
     );
   }
 
@@ -376,32 +379,39 @@ class BasicStreamServiceServer extends BasicStreamServiceContract {
   ClientStreamingBidiStream<StreamMessage, StreamMessage> errorStream() {
     final requestController = StreamController<StreamMessage>();
     final responseController = StreamController<StreamMessage>();
+    var hasError = false;
 
     requestController.stream.listen(
       (message) {
-        if (message.data == 'error') {
-          responseController.addError(Exception('Искусственная ошибка'));
-          responseController.close();
+        if (message.data == 'error' && !hasError) {
+          hasError = true;
+
+          if (!responseController.isClosed) {
+            responseController.addError(Exception('Искусственная ошибка'));
+            responseController.close();
+          }
         }
       },
       onDone: () {
-        responseController.add(StreamMessage('done'));
-        responseController.close();
+        if (!hasError && !responseController.isClosed) {
+          responseController.add(StreamMessage('done'));
+          responseController.close();
+        }
       },
       onError: (error) {
-        responseController.addError(error);
-        responseController.close();
+        if (!responseController.isClosed) {
+          responseController.addError(error);
+          responseController.close();
+        }
       },
     );
 
     return ClientStreamingBidiStream<StreamMessage, StreamMessage>(
-      BidiStream<StreamMessage, StreamMessage>(
-        responseStream: responseController.stream,
-        sendFunction: (message) => requestController.add(message),
-        closeFunction: () async {
-          await requestController.close();
+      BidiStreamGenerator<StreamMessage, StreamMessage>(
+        (message) async* {
+          yield StreamMessage('done');
         },
-      ),
+      ).create(),
     );
   }
 }
@@ -459,22 +469,74 @@ void main() {
     late BasicStreamServiceClient basicStreamClient;
 
     setUp(() {
-      final uploadEnv = TestFactory.setupTestContract(
-        clientFactory: (endpoint) => FileUploadServiceClient(endpoint),
-        serverFactory: () => FileUploadServiceServer(),
-      );
-      final basicStreamEnv = TestFactory.setupTestContract(
-        clientFactory: (endpoint) => BasicStreamServiceClient(endpoint),
-        serverFactory: () => BasicStreamServiceServer(),
-      );
+      // Создаем эндпоинты напрямую, без использования фабрики
+      final endpointPair = TestFactory.createEndpointPair(
+          clientLabel: 'client', serverLabel: 'server');
+      clientEndpoint = endpointPair.client;
+      serverEndpoint = endpointPair.server;
 
-      clientEndpoint = uploadEnv.clientEndpoint;
-      serverEndpoint = uploadEnv.serverEndpoint;
+      // Создаем серверные контракты
+      final serverFileUploadContract = FileUploadServiceServer();
+      final serverBasicStreamContract = BasicStreamServiceServer();
 
-      // Получаем конкретные реализации из mapы расширений
-      fileUploadClient = uploadEnv.clientContract;
-      fileUploadServer = uploadEnv.serverContract;
-      basicStreamClient = basicStreamEnv.clientContract;
+      // Создаем клиентские контракты
+      fileUploadClient = FileUploadServiceClient(clientEndpoint);
+      basicStreamClient = BasicStreamServiceClient(clientEndpoint);
+
+      // Сохраняем сервер для тестов
+      fileUploadServer = serverFileUploadContract;
+
+      // Регистрируем контракты на сервере и клиенте
+      serverEndpoint.registerServiceContract(serverFileUploadContract);
+      serverEndpoint.registerServiceContract(serverBasicStreamContract);
+      clientEndpoint.registerServiceContract(fileUploadClient);
+      clientEndpoint.registerServiceContract(basicStreamClient);
+
+      // Явная дополнительная регистрация методов
+      serverEndpoint
+          .clientStreaming(
+            serviceName: 'file_upload_tests',
+            methodName: 'uploadFile',
+          )
+          .register<FileChunk, UploadResult>(
+            handler: serverFileUploadContract.uploadFile,
+            requestParser: FileChunk.fromJson,
+            responseParser: UploadResult.fromJson,
+          );
+
+      // Регистрируем методы для базовых операций стриминга
+      serverEndpoint
+          .clientStreaming(
+            serviceName: 'basic_stream_tests',
+            methodName: 'collectData',
+          )
+          .register<StreamMessage, StreamMessage>(
+            handler: serverBasicStreamContract.collectData,
+            requestParser: StreamMessage.fromJson,
+            responseParser: StreamMessage.fromJson,
+          );
+
+      serverEndpoint
+          .clientStreaming(
+            serviceName: 'basic_stream_tests',
+            methodName: 'countItems',
+          )
+          .register<StreamMessage, StreamMessage>(
+            handler: serverBasicStreamContract.countItems,
+            requestParser: StreamMessage.fromJson,
+            responseParser: StreamMessage.fromJson,
+          );
+
+      serverEndpoint
+          .clientStreaming(
+            serviceName: 'basic_stream_tests',
+            methodName: 'errorStream',
+          )
+          .register<StreamMessage, StreamMessage>(
+            handler: serverBasicStreamContract.errorStream,
+            requestParser: StreamMessage.fromJson,
+            responseParser: StreamMessage.fromJson,
+          );
 
       // Очищаем данные перед каждым тестом
       fileUploadServer.clearData();

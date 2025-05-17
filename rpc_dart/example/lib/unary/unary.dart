@@ -42,13 +42,6 @@ Future<void> main({bool debug = false}) async {
 
     _logger.info('Контракты зарегистрированы');
 
-    _logger.info('-------------------------');
-    debugPrintRegisteredContracts(server.registry, 'Сервер');
-    debugPrintRegisteredMethods(server.registry, 'Сервер');
-    _logger.info('-------------------------');
-    debugPrintRegisteredContracts(client.registry, 'Клиент');
-    debugPrintRegisteredMethods(client.registry, 'Клиент');
-
     // Демонстрация математических операций
     await demonstrateBasicOperations(clientContract);
   } catch (e, stack) {
