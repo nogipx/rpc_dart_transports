@@ -1,14 +1,16 @@
-# Подходы к тестированию RPC библиотеки
+# Подход к тестированию RPC библиотеки
 
-В этом проекте реализовано два различных подхода к организации тестов RPC библиотеки.
+В этом проекте используется фабричный подход для организации тестов RPC библиотеки.
 
-## 1. Подход с использованием фабрики контрактов
+## Фабричный подход с использованием расширяемых контрактов
 
 Этот подход использует фабрику для динамического создания и комбинирования тестовых контрактов. Преимущества:
 
 - Легко добавлять новые типы тестовых контрактов
 - Не требуется создавать новые классы для каждой комбинации контрактов
 - Позволяет переиспользовать существующие контракты в разных комбинациях
+- Унифицированный подход ко всем тестам в библиотеке
+- Меньше дублирования кода благодаря централизованному созданию тестового окружения
 
 Ключевые компоненты:
 - `IExtensionTestContract` - интерфейс для расширяемых тестовых контрактов
@@ -23,7 +25,9 @@
 - Клиентские контракты НЕ должны быть зарегистрированы ни на каком эндпоинте
 - Клиентские контракты просто используют эндпоинты для отправки запросов
 
-Пример использования:
+## Примеры использования
+
+### Базовая настройка с одним контрактом
 
 ```dart
 // Настройка тестового окружения с фабрикой
@@ -38,73 +42,99 @@ final testEnv = TestContractFactory.setupTestEnvironment(
 );
 
 // Извлечение компонентов из тестового окружения
-clientEndpoint = testEnv.$1;
-serverEndpoint = testEnv.$2;
-clientContract = testEnv.$3;
-serverContract = testEnv.$4;
+final clientEndpoint = testEnv.clientEndpoint;
+final serverEndpoint = testEnv.serverEndpoint;
+final clientContract = testEnv.clientContract;
+final serverContract = testEnv.serverContract;
 
 // Получение конкретных реализаций из коллекции расширений
-calculatorClient = testEnv.$5.get<CalculatorTestsContract>() as CalculatorTestsClient;
-calculatorServer = testEnv.$6.get<CalculatorTestsContract>() as CalculatorTestsServer;
+final calculatorClient = 
+    testEnv.clientExtensions.get<CalculatorTestsContract>() as CalculatorTestsClient;
+final calculatorServer = 
+    testEnv.serverExtensions.get<CalculatorTestsContract>() as CalculatorTestsServer;
 ```
 
-## 2. Прямой подход с явными контрактами
-
-Этот подход не использует фабрики, а создает контракты напрямую. Преимущества:
-
-- Более простой и прямолинейный код
-- Меньше абстракций
-- Легче понять с первого взгляда
-- Не имеет зависимостей от дополнительной инфраструктуры
-
-Ключевые компоненты:
-- Конкретные классы контрактов, наследующиеся напрямую от `RpcServiceContract`
-- Явное создание экземпляров контрактов
-- Прямая регистрация контрактов в эндпоинтах
-
-Пример использования:
+### Настройка с несколькими контрактами
 
 ```dart
-// Создание транспортов и эндпоинтов
-final clientTransport = MemoryTransport('client');
-final serverTransport = MemoryTransport('server');
-
-clientTransport.connect(serverTransport);
-serverTransport.connect(clientTransport);
-
-clientEndpoint = RpcEndpoint(
-  transport: clientTransport,
-  debugLabel: 'client',
+// Настройка тестового окружения с несколькими расширениями
+final testEnv = TestContractFactory.setupTestEnvironment(
+  extensionFactories: [
+    (
+      type: CalculatorTestsContract,
+      clientFactory: (endpoint) => CalculatorTestsClient(endpoint),
+      serverFactory: () => CalculatorTestsServer(),
+    ),
+    (
+      type: LoggingTestsContract,
+      clientFactory: (endpoint) => LoggingTestsClient(endpoint),
+      serverFactory: () => LoggingTestsServer(),
+    ),
+    (
+      type: AuthTestsContract,
+      clientFactory: (endpoint) => AuthTestsClient(endpoint),
+      serverFactory: () => AuthTestsServer(),
+    ),
+  ],
 );
 
-serverEndpoint = RpcEndpoint(
-  transport: serverTransport,
-  debugLabel: 'server',
-);
-
-// Создание серверных реализаций контрактов
-fileUploadServer = FileUploadServiceServer();
-basicStreamServer = BasicStreamServiceServer();
-
-// Регистрация контрактов на сервере
-serverEndpoint.registerServiceContract(fileUploadServer);
-serverEndpoint.registerServiceContract(basicStreamServer);
-
-// Создание клиентских реализаций контрактов
-fileUploadClient = FileUploadServiceClient(clientEndpoint);
-basicStreamClient = BasicStreamServiceClient(clientEndpoint);
+// Получение конкретных реализаций
+final calculatorClient = testEnv.clientExtensions.get<CalculatorTestsContract>() as CalculatorTestsClient;
+final loggingClient = testEnv.clientExtensions.get<LoggingTestsContract>() as LoggingTestsClient;
+final authClient = testEnv.clientExtensions.get<AuthTestsContract>() as AuthTestsClient;
 ```
 
-## Рекомендации по выбору подхода
+### Использование с базовыми контрактами
 
-1. **Используйте фабрику**, если:
-   - У вас много различных типов тестов, которые нужно комбинировать
-   - Вы часто создаете одни и те же комбинации контрактов в разных тестах
-   - Важна возможность быстрого добавления новых контрактов без изменения структуры
+```dart
+// Создание тестового окружения с базовыми контрактами и дополнительными расширениями
+final testEnv = TestContractFactory.setupTestEnvironmentWithBase(
+  extensionFactories: [
+    (
+      type: CalculatorTestsContract,
+      clientFactory: (endpoint) => CalculatorTestsClient(endpoint),
+      serverFactory: () => CalculatorTestsServer(),
+    ),
+  ],
+);
 
-2. **Используйте прямой подход**, если:
-   - Тесты относительно простые и не требуют сложной инфраструктуры
-   - Вам важна ясность и прямолинейность кода
-   - У вас небольшое количество контрактов или они редко меняются
+// Доступ к базовым контрактам и расширениям
+final baseClientContract = testEnv.baseClientContract;
+final baseServerContract = testEnv.baseServerContract;
+final calculatorClient = testEnv.clientExtensions.get<CalculatorTestsContract>() as CalculatorTestsClient;
 
-В обоих случаях можно создать удобные вспомогательные методы для упрощения настройки тестового окружения. 
+// Теперь можно использовать и базовые методы, и методы из расширений
+final echoResponse = await baseClientContract.unaryTests.echoUnary(UnaryRequest("test"));
+final calcResponse = await calculatorClient.calculate(CalculationRequest(10, 5, "add"));
+```
+
+## Создание нового типа тестов
+
+Для создания нового типа тестов достаточно:
+
+1. Создать абстрактный класс, наследующий от `IExtensionTestContract`
+2. Создать серверную и клиентскую реализации этого класса
+3. Использовать фабрику для включения нового типа тестов в тестовое окружение
+
+```dart
+// Определение нового типа тестов
+abstract class AuthTestsContract extends IExtensionTestContract {
+  AuthTestsContract() : super('auth_tests');
+  
+  Future<AuthResponse> login(AuthRequest request);
+}
+
+// Использование нового типа в тестах
+final testEnv = TestContractFactory.setupTestEnvironment(
+  extensionFactories: [
+    (
+      type: AuthTestsContract,
+      clientFactory: (endpoint) => AuthTestsClient(endpoint),
+      serverFactory: () => AuthTestsServer(),
+    ),
+  ],
+);
+
+// Получение реализации
+final authClient = testEnv.clientExtensions.get<AuthTestsContract>() as AuthTestsClient;
+``` 

@@ -4,6 +4,7 @@
 
 import 'package:rpc_dart/rpc_dart.dart';
 import 'test_contract.dart';
+import 'dart:mirrors';
 
 /// Интерфейс для расширяемых тестовых контрактов
 abstract class IExtensionTestContract extends RpcServiceContract {
@@ -13,6 +14,24 @@ abstract class IExtensionTestContract extends RpcServiceContract {
 
 /// Класс для сборки тестового контракта с расширениями
 class TestContractFactory {
+  /// Отладка - получить список зарегистрированных сервисов
+  static Map<String, dynamic> debugGetRegisteredServices(RpcEndpoint endpoint) {
+    try {
+      final instanceMirror = reflect(endpoint);
+
+      // Попытка получить приватное поле _contracts
+      final field = instanceMirror.type.declarations.entries
+          .firstWhere((d) => d.key.toString() == 'Symbol("_contracts")')
+          .value as VariableMirror;
+
+      final contracts = instanceMirror.getField(field.simpleName).reflectee;
+      return contracts as Map<String, dynamic>;
+    } catch (e) {
+      print('Debug: Ошибка при использовании reflection: $e');
+      return {};
+    }
+  }
+
   /// Создает контракт с базовыми и дополнительными субконтрактами
   static RpcServiceContract _createContract({
     required String serviceName,
@@ -68,28 +87,136 @@ class TestContractFactory {
       final clientExtension = factory.clientFactory(clientEndpoint);
       final serverExtension = factory.serverFactory();
 
+      print(
+          'Debug: Регистрируем сервис с именем: ${serverExtension.serviceName}');
+
       clientExtensions[factory.type] = clientExtension;
       serverExtensions[factory.type] = serverExtension;
+
+      // Регистрируем каждый серверный контракт напрямую
+      serverEndpoint.registerServiceContract(serverExtension);
+
+      // ВАЖНО: Теперь регистрируем и клиентские контракты тоже
+      clientEndpoint.registerServiceContract(clientExtension);
+
+      // ВАЖНО: Дополнительно регистрируем методы напрямую для серверного контракта
+      for (final method in serverExtension.methods) {
+        print(
+            'Debug: Явная регистрация метода ${method.methodName} типа ${method.methodType}');
+        final methodName = method.methodName;
+
+        // Получаем обработчики напрямую из контракта
+        dynamic handler;
+        dynamic argumentParser;
+        dynamic responseParser;
+
+        try {
+          // Получение handler из контракта
+          handler = serverExtension.getMethodHandler(methodName);
+          print(
+              'Debug: Handler для метода $methodName: ${handler != null ? "найден" : "не найден"}');
+
+          // Получение argumentParser из контракта
+          argumentParser = serverExtension.getMethodArgumentParser(methodName);
+          print(
+              'Debug: ArgumentParser для метода $methodName: ${argumentParser != null ? "найден" : "не найден"}');
+
+          // Получение responseParser из контракта
+          responseParser = serverExtension.getMethodResponseParser(methodName);
+          print(
+              'Debug: ResponseParser для метода $methodName: ${responseParser != null ? "найден" : "не найден"}');
+        } catch (e) {
+          print('Debug: Ошибка при получении обработчиков: $e');
+        }
+
+        if (handler == null || argumentParser == null) {
+          print(
+              'Debug: Пропускаем метод ${method.methodName} из-за отсутствия обязательных параметров');
+          continue;
+        }
+
+        // При отсутствующем responseParser для streaming методов создадим пустую функцию
+        if (responseParser == null &&
+            (method.methodType == RpcMethodType.serverStreaming ||
+                method.methodType == RpcMethodType.bidirectional)) {
+          print(
+              'Debug: Создание пустого responseParser для метода ${method.methodName}');
+          responseParser = (dynamic json) => json;
+        }
+
+        // Явная регистрация метода в зависимости от его типа
+        try {
+          switch (method.methodType) {
+            case RpcMethodType.unary:
+              serverEndpoint
+                  .unaryRequest(
+                    serviceName: serverExtension.serviceName,
+                    methodName: methodName,
+                  )
+                  .register(
+                    handler: handler,
+                    requestParser: argumentParser,
+                    responseParser: responseParser,
+                  );
+              break;
+            case RpcMethodType.serverStreaming:
+              serverEndpoint
+                  .serverStreaming(
+                    serviceName: serverExtension.serviceName,
+                    methodName: methodName,
+                  )
+                  .register(
+                    handler: handler,
+                    requestParser: argumentParser,
+                    responseParser: responseParser,
+                  );
+              break;
+            case RpcMethodType.clientStreaming:
+              serverEndpoint
+                  .clientStreaming(
+                    serviceName: serverExtension.serviceName,
+                    methodName: methodName,
+                  )
+                  .register(
+                    handler: handler,
+                    requestParser: argumentParser,
+                  );
+              break;
+            case RpcMethodType.bidirectional:
+              serverEndpoint
+                  .bidirectionalStreaming(
+                    serviceName: serverExtension.serviceName,
+                    methodName: methodName,
+                  )
+                  .register(
+                    handler: handler,
+                    requestParser: argumentParser,
+                    responseParser: responseParser,
+                  );
+              break;
+          }
+          print('Debug: Метод ${method.methodName} успешно зарегистрирован');
+        } catch (e) {
+          print(
+              'Debug: Ошибка при регистрации метода ${method.methodName}: $e');
+        }
+      }
     }
 
-    // Создаем сервисные контракты
+    // Создаем композитный серверный контракт (для организации в тестах)
     final serverContract = _createContract(
       serviceName: 'test_composite_server',
       extensions: serverExtensions.values.toList(),
       isClient: false,
     );
 
+    // Создаем композитный клиентский контракт
     final clientContract = _createContract(
       serviceName: 'test_composite_client',
       extensions: clientExtensions.values.toList(),
       isClient: true,
       endpoint: clientEndpoint,
     );
-
-    // Регистрируем ТОЛЬКО серверный контракт
-    serverEndpoint.registerServiceContract(serverContract);
-
-    // Клиентский контракт НЕ регистрируем на эндпоинте
 
     return (
       clientEndpoint: clientEndpoint,

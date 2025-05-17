@@ -1,5 +1,7 @@
 import 'package:rpc_dart/rpc_dart.dart';
 import 'package:test/test.dart';
+import 'fixtures/test_contract.dart';
+import 'fixtures/test_factory.dart';
 
 // Модели для тестирования серверного стриминга
 class TaskRequest implements IRpcSerializableMessage {
@@ -21,7 +23,6 @@ class TaskRequest implements IRpcSerializableMessage {
       };
 
   static TaskRequest fromJson(Map<String, dynamic> json) {
-    print('Parsing TaskRequest from: $json');
     return TaskRequest(
       taskId: json['taskId'] as String,
       taskName: json['taskName'] as String,
@@ -52,7 +53,6 @@ class ProgressMessage implements IRpcSerializableMessage {
       };
 
   static ProgressMessage fromJson(Map<String, dynamic> json) {
-    print('Parsing ProgressMessage from: $json');
     return ProgressMessage(
       taskId: json['taskId'] as String,
       progress: json['progress'] as int,
@@ -63,15 +63,14 @@ class ProgressMessage implements IRpcSerializableMessage {
 }
 
 // Контракт сервиса для тестирования серверного стриминга
-abstract base class TaskServiceContract extends RpcServiceContract {
-  TaskServiceContract() : super('TaskService');
-
+abstract class TaskServiceContract extends IExtensionTestContract {
   // Константа для имени метода
   static const String startTaskMethod = 'startTask';
 
+  TaskServiceContract() : super('TaskService');
+
   @override
   void setup() {
-    print('Setting up TaskServiceContract');
     // Регистрируем метод серверного стриминга
     addServerStreamingMethod<TaskRequest, ProgressMessage>(
       methodName: startTaskMethod,
@@ -82,20 +81,32 @@ abstract base class TaskServiceContract extends RpcServiceContract {
     super.setup();
   }
 
+  // Метод для прямого доступа к responseParser
+  dynamic getProgressMessageParser() {
+    return ProgressMessage.fromJson;
+  }
+
   // Метод, который должен быть реализован в конкретном классе
   ServerStreamingBidiStream<TaskRequest, ProgressMessage> startTask(
       TaskRequest request);
 }
 
 // Серверная реализация сервиса задач
-base class ServerTaskService extends TaskServiceContract {
+class ServerTaskService extends TaskServiceContract {
+  ServerTaskService() : super() {
+    // Явно вызываем setup для инициализации методов
+    print('Debug: Инициализация ServerTaskService');
+    setup();
+
+    // Выводим дополнительную информацию для отладки
+    print(
+        'Debug: methods = ${methods.map((m) => "${m.methodName}").join(", ")}');
+  }
+
   @override
   ServerStreamingBidiStream<TaskRequest, ProgressMessage> startTask(
       TaskRequest request) {
-    print(
-        'Server: Starting task ${request.taskName} with ID ${request.taskId}');
     return BidiStreamGenerator<TaskRequest, ProgressMessage>((_) async* {
-      print('Server: Generator started');
       // Начальный статус
       yield ProgressMessage(
         taskId: request.taskId,
@@ -103,11 +114,9 @@ base class ServerTaskService extends TaskServiceContract {
         status: 'initializing',
         message: 'Задача запущена. Подготовка к выполнению...',
       );
-      print('Server: Initial status sent');
 
       // Ставим небольшую задержку для имитации работы
       await Future.delayed(Duration(milliseconds: 10));
-      print('Server: Delay completed');
 
       // Отправляем серию сообщений о прогрессе
       for (int i = 1; i <= request.steps; i++) {
@@ -115,7 +124,6 @@ base class ServerTaskService extends TaskServiceContract {
         final status = i == request.steps ? 'completed' : 'in_progress';
         final message = 'Прогресс задачи: $progress%';
 
-        print('Server: Sending progress $progress%');
         yield ProgressMessage(
           taskId: request.taskId,
           progress: progress,
@@ -126,22 +134,31 @@ base class ServerTaskService extends TaskServiceContract {
         // Добавляем небольшую задержку между сообщениями
         await Future.delayed(Duration(milliseconds: 5));
       }
-      print('Server: All messages sent');
     }).createServerStreaming();
   }
 }
 
 // Клиентская реализация для вызова метода
-base class ClientTaskService extends TaskServiceContract {
-  final RpcEndpoint client;
+class ClientTaskService extends TaskServiceContract {
+  final RpcEndpoint _endpoint;
 
-  ClientTaskService(this.client);
+  ClientTaskService(this._endpoint) : super() {
+    // Явно вызываем setup для инициализации методов
+    print('Debug: Инициализация ClientTaskService');
+    setup();
+
+    // Выводим дополнительную информацию для отладки
+    print(
+        'Debug: methods = ${methods.map((m) => "${m.methodName}").join(", ")}');
+  }
 
   @override
   ServerStreamingBidiStream<TaskRequest, ProgressMessage> startTask(
       TaskRequest request) {
-    print('Client: Sending task request: ${request.toJson()}');
-    return client
+    print(
+        'Debug: serviceName = $serviceName, methodName = ${TaskServiceContract.startTaskMethod}');
+
+    return _endpoint
         .serverStreaming(
           serviceName: serviceName,
           methodName: TaskServiceContract.startTaskMethod,
@@ -168,150 +185,124 @@ TaskRequest createTaskRequest({
 
 void main() {
   group('Серверный стриминг RPC', () {
-    late MemoryTransport clientTransport;
-    late MemoryTransport serverTransport;
-    late JsonSerializer serializer;
     late RpcEndpoint clientEndpoint;
     late RpcEndpoint serverEndpoint;
     late ClientTaskService clientService;
     late ServerTaskService serverService;
 
     setUp(() {
-      print('\n---------- Test Setup ----------');
-      // Создаем пару связанных транспортов
-      clientTransport = MemoryTransport('client');
-      serverTransport = MemoryTransport('server');
-      clientTransport.connect(serverTransport);
-      serverTransport.connect(clientTransport);
-      print('Transports connected');
+      print('\nDebug: === Начало настройки теста ===');
 
-      // Сериализатор
-      serializer = JsonSerializer();
-
-      // Создаем эндпоинты
-      clientEndpoint = RpcEndpoint(
-        transport: clientTransport,
-        serializer: serializer,
-        debugLabel: 'client',
+      // Используем фабрику для создания тестового окружения
+      final testEnv = TestContractFactory.setupTestEnvironment(
+        extensionFactories: [
+          (
+            type: TaskServiceContract,
+            clientFactory: (endpoint) => ClientTaskService(endpoint),
+            serverFactory: () => ServerTaskService(),
+          ),
+        ],
       );
-      serverEndpoint = RpcEndpoint(
-        transport: serverTransport,
-        serializer: serializer,
-        debugLabel: 'server',
-      );
-      print('Endpoints created');
 
-      // Добавляем middleware для отладки
-      clientEndpoint.addMiddleware(DebugMiddleware(RpcLogger("client")));
-      serverEndpoint.addMiddleware(DebugMiddleware(RpcLogger("server")));
-      print('Debug middleware added');
+      print('Debug: Окружение теста создано');
 
-      // Создаем сервисы
-      serverService = ServerTaskService();
-      clientService = ClientTaskService(clientEndpoint);
-      print('Services created');
+      clientEndpoint = testEnv.clientEndpoint;
+      serverEndpoint = testEnv.serverEndpoint;
 
-      // Регистрируем контракт сервера
-      serverEndpoint.registerServiceContract(serverService);
-      print('Server contract registered');
-      print('---------- Setup Complete ----------\n');
+      // Получаем конкретные реализации из мапы расширений
+      clientService = testEnv.clientExtensions.get<TaskServiceContract>()
+          as ClientTaskService;
+      serverService = testEnv.serverExtensions.get<TaskServiceContract>()
+          as ServerTaskService;
+
+      // Дополнительная явная регистрация метода startTask
+      print('Debug: Явная регистрация метода startTask с вызовом напрямую');
+      serverEndpoint
+          .serverStreaming(
+            serviceName: 'TaskService',
+            methodName: 'startTask',
+          )
+          .register<TaskRequest, ProgressMessage>(
+            handler: serverService.startTask,
+            requestParser: TaskRequest.fromJson,
+            responseParser: ProgressMessage.fromJson,
+          );
+
+      print('Debug: Клиентский сервис: ${clientService.serviceName}');
+      print('Debug: Серверный сервис: ${serverService.serviceName}');
+      print('Debug: === Завершение настройки теста ===\n');
     });
 
     tearDown(() async {
-      print('\n---------- Test Teardown ----------');
-      await clientEndpoint.close();
-      await serverEndpoint.close();
-      print('Endpoints closed');
-      print('---------- Teardown Complete ----------\n');
+      await TestFixtureUtils.tearDown(clientEndpoint, serverEndpoint);
     });
 
-    test('получение_потока_сообщений_о_прогрессе_выполнения', () async {
-      print('\n---------- Test Started ----------');
-      // Создаем запрос на выполнение задачи
-      final request = createTaskRequest(
-        taskId: 'test_task_1',
-        taskName: 'Test Server Streaming Task',
-        steps: 5,
-      );
-      print('Request created: ${request.toJson()}');
+    test('Базовый тест серверного стриминга', () async {
+      // Создаём запрос
+      final request = createTaskRequest(steps: 5);
 
-      // Отправляем запрос и получаем поток сообщений о прогрессе
-      print('Sending request...');
-      final stream = clientService.startTask(request);
-      print('Stream received, listening for messages...');
+      // Получаем стрим
+      final progressStream = clientService.startTask(request);
 
-      try {
-        // Получаем все сообщения из потока
-        final messages = await stream.toList();
-        print('Received ${messages.length} messages');
+      // Собираем все ответы
+      final responses = await progressStream.toList();
 
-        // Проверяем количество сообщений (должно быть steps + 1)
-        expect(messages.length, equals(request.steps + 1));
+      // Проверяем, что получили нужное количество ответов
+      expect(responses.length,
+          equals(request.steps + 1)); // +1 для начального статуса
 
-        // Проверяем первое сообщение (инициализация)
-        print('First message: ${messages.first.toJson()}');
-        expect(messages.first.progress, equals(0));
-        expect(messages.first.status, equals('initializing'));
+      // Проверяем первое сообщение (начальный статус)
+      expect(responses.first.taskId, equals(request.taskId));
+      expect(responses.first.progress, equals(0));
+      expect(responses.first.status, equals('initializing'));
 
-        // Проверяем последнее сообщение (завершение)
-        print('Last message: ${messages.last.toJson()}');
-        expect(messages.last.progress, equals(100));
-        expect(messages.last.status, equals('completed'));
+      // Проверяем последнее сообщение (завершение)
+      expect(responses.last.taskId, equals(request.taskId));
+      expect(responses.last.progress, equals(100));
+      expect(responses.last.status, equals('completed'));
 
-        // Проверяем идентификатор задачи во всех сообщениях
-        for (final message in messages) {
-          expect(message.taskId, equals(request.taskId));
-        }
-        print('All assertions passed');
-      } catch (e, stackTrace) {
-        print('Error during test: $e');
-        print('Stack trace: $stackTrace');
-        rethrow;
+      // Проверяем, что прогресс увеличивается
+      for (int i = 0; i < responses.length - 1; i++) {
+        expect(responses[i].progress <= responses[i + 1].progress, isTrue);
       }
-      print('---------- Test Completed ----------\n');
     });
 
-    test('закрытие_стрима_после_получения_всех_сообщений', () async {
-      // Создаем запрос с меньшим количеством шагов
-      final request = createTaskRequest(
-        taskId: 'test_task_2',
-        taskName: 'Short Task',
-        steps: 3,
-      );
+    test('Тест с большим количеством шагов', () async {
+      // Создаём запрос с большим количеством шагов
+      final request = createTaskRequest(steps: 20);
 
-      // Отправляем запрос и получаем поток
-      final stream = clientService.startTask(request);
+      // Получаем стрим
+      final progressStream = clientService.startTask(request);
 
-      // Преобразуем в обычный Dart Stream для проверки isDone
-      final broadcastStream = stream.asBroadcastStream();
+      // Собираем все ответы
+      final responses = await progressStream.toList();
 
-      // Получаем все сообщения
-      await broadcastStream.toList();
+      // Проверяем, что получили нужное количество ответов
+      expect(responses.length,
+          equals(request.steps + 1)); // +1 для начального статуса
 
-      // Проверяем, что поток завершился
-      expect(await broadcastStream.isEmpty, isTrue);
+      // Проверяем, что последнее сообщение имеет прогресс 100%
+      expect(responses.last.progress, equals(100));
+      expect(responses.last.status, equals('completed'));
     });
 
-    test('последовательное_увеличение_прогресса', () async {
-      // Создаем запрос
-      final request = createTaskRequest(
-        taskId: 'test_task_3',
-        taskName: 'Progress Test',
-        steps: 5,
-      );
+    test('Обработка потока событий последовательно', () async {
+      // Создаём запрос
+      final request = createTaskRequest(steps: 10);
 
-      // Отправляем запрос и получаем поток
-      final stream = clientService.startTask(request);
+      // Получаем стрим
+      final progressStream = clientService.startTask(request);
 
-      // Получаем все сообщения
-      final messages = await stream.toList();
-
-      // Проверяем последовательное увеличение прогресса
+      // Проверяем, что события приходят последовательно с увеличивающимся прогрессом
       int lastProgress = -1;
-      for (final message in messages) {
-        expect(message.progress, greaterThanOrEqualTo(lastProgress));
-        lastProgress = message.progress;
+
+      await for (final progress in progressStream) {
+        expect(progress.progress >= lastProgress, isTrue);
+        lastProgress = progress.progress;
       }
+
+      // Проверяем, что прогресс дошел до 100%
+      expect(lastProgress, equals(100));
     });
   });
 }

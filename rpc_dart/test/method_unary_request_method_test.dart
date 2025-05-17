@@ -2,12 +2,12 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-import 'dart:async';
-
 import 'package:rpc_dart/rpc_dart.dart';
 import 'package:test/test.dart';
+import 'fixtures/test_contract.dart';
+import 'fixtures/test_factory.dart';
 
-// Модель сообщения-запроса
+/// Специализированные сообщения для тестов калькулятора
 class CalculationRequest implements IRpcSerializableMessage {
   final int a;
   final int b;
@@ -31,7 +31,6 @@ class CalculationRequest implements IRpcSerializableMessage {
   }
 }
 
-// Модель сообщения-ответа
 class CalculationResponse implements IRpcSerializableMessage {
   final int result;
   final String error;
@@ -52,37 +51,31 @@ class CalculationResponse implements IRpcSerializableMessage {
   }
 }
 
-// Контракт сервиса калькулятора
-abstract base class CalculatorServiceContract extends RpcServiceContract {
-  CalculatorServiceContract() : super('CalculatorService');
-
-  RpcEndpoint? get client;
-
-  // Константы для имен методов
+/// Контракт для тестов калькулятора, реализующий интерфейс расширения
+abstract class CalculatorTestsContract extends IExtensionTestContract {
   static const String calculateMethod = 'calculate';
+
+  CalculatorTestsContract() : super('calculator_tests');
 
   @override
   void setup() {
-    // Унарный метод для расчетов
     addUnaryRequestMethod<CalculationRequest, CalculationResponse>(
       methodName: calculateMethod,
       handler: calculate,
       argumentParser: CalculationRequest.fromJson,
       responseParser: CalculationResponse.fromJson,
     );
+
     super.setup();
   }
 
-  // Унарный метод
   Future<CalculationResponse> calculate(CalculationRequest request);
 }
 
-// Серверная реализация
-base class ServerCalculatorService extends CalculatorServiceContract {
+/// Серверная реализация калькулятора
+class CalculatorTestsServer extends CalculatorTestsContract {
+  // История запросов для тестирования
   final List<CalculationRequest> requestHistory = [];
-
-  @override
-  RpcEndpoint? get client => null;
 
   @override
   Future<CalculationResponse> calculate(CalculationRequest request) async {
@@ -106,21 +99,20 @@ base class ServerCalculatorService extends CalculatorServiceContract {
   }
 }
 
-// Клиентская реализация
-base class ClientCalculatorService extends CalculatorServiceContract {
-  @override
-  final RpcEndpoint client;
+/// Клиентская реализация калькулятора
+class CalculatorTestsClient extends CalculatorTestsContract {
+  final RpcEndpoint _endpoint;
 
-  ClientCalculatorService(this.client);
+  CalculatorTestsClient(this._endpoint);
 
   @override
   Future<CalculationResponse> calculate(CalculationRequest request) {
-    return client
+    return _endpoint
         .unaryRequest(
           serviceName: serviceName,
-          methodName: CalculatorServiceContract.calculateMethod,
+          methodName: CalculatorTestsContract.calculateMethod,
         )
-        .call<CalculationRequest, CalculationResponse>(
+        .call(
           request: request,
           responseParser: CalculationResponse.fromJson,
         );
@@ -128,68 +120,62 @@ base class ClientCalculatorService extends CalculatorServiceContract {
 }
 
 void main() {
-  group('Тестирование унарного метода', () {
-    late MemoryTransport clientTransport;
-    late MemoryTransport serverTransport;
-    late JsonSerializer serializer;
+  group('Тестирование унарного метода калькулятора', () {
     late RpcEndpoint clientEndpoint;
     late RpcEndpoint serverEndpoint;
-    late ClientCalculatorService clientService;
-    late ServerCalculatorService serverService;
+    late RpcServiceContract clientContract;
+    late RpcServiceContract serverContract;
+    late CalculatorTestsClient calculatorClient;
+    late CalculatorTestsServer calculatorServer;
 
     setUp(() {
-      // Создаем пару связанных транспортов
-      clientTransport = MemoryTransport('client');
-      serverTransport = MemoryTransport('server');
-      clientTransport.connect(serverTransport);
-      serverTransport.connect(clientTransport);
-
-      // Сериализатор
-      serializer = JsonSerializer();
-
-      // Создаем эндпоинты
-      clientEndpoint = RpcEndpoint(
-        transport: clientTransport,
-        serializer: serializer,
-      );
-      serverEndpoint = RpcEndpoint(
-        transport: serverTransport,
-        serializer: serializer,
+      // Используем фабрику для создания тестового окружения
+      final testEnv = TestContractFactory.setupTestEnvironment(
+        extensionFactories: [
+          (
+            type: CalculatorTestsContract,
+            clientFactory: (endpoint) => CalculatorTestsClient(endpoint),
+            serverFactory: () => CalculatorTestsServer(),
+          ),
+        ],
       );
 
-      // Создаем сервисы
-      serverService = ServerCalculatorService();
-      clientService = ClientCalculatorService(clientEndpoint);
+      clientEndpoint = testEnv.clientEndpoint;
+      serverEndpoint = testEnv.serverEndpoint;
+      clientContract = testEnv.clientContract;
+      serverContract = testEnv.serverContract;
 
-      // Регистрируем контракт сервера
-      serverEndpoint.registerServiceContract(serverService);
+      // Получаем конкретные реализации из мапы расширений
+      calculatorClient = testEnv.clientExtensions.get<CalculatorTestsContract>()
+          as CalculatorTestsClient;
+      calculatorServer = testEnv.serverExtensions.get<CalculatorTestsContract>()
+          as CalculatorTestsServer;
     });
 
     tearDown(() async {
-      await clientEndpoint.close();
-      await serverEndpoint.close();
+      await TestFixtureUtils.tearDown(clientEndpoint, serverEndpoint);
     });
 
     test('успешный_вызов_унарного_метода_сложения', () async {
       // Вызываем метод сложения чисел
       final request = CalculationRequest(5, 3, 'add');
-      final response = await clientService.calculate(request);
+      final response = await calculatorClient.calculate(request);
 
       // Проверяем результат
       expect(response.result, equals(8));
       expect(response.error, isEmpty);
 
       // Проверяем, что запрос был получен сервером
-      expect(serverService.requestHistory.length, equals(1));
-      expect(serverService.requestHistory[0].a, equals(5));
-      expect(serverService.requestHistory[0].b, equals(3));
-      expect(serverService.requestHistory[0].operation, equals('add'));
+      expect(calculatorServer.requestHistory.length, equals(1));
+      expect(calculatorServer.requestHistory[0].a, equals(5));
+      expect(calculatorServer.requestHistory[0].b, equals(3));
+      expect(calculatorServer.requestHistory[0].operation, equals('add'));
     });
 
     test('успешный_вызов_унарного_метода_вычитания', () async {
       // Вызываем метод вычитания чисел
       final request = CalculationRequest(10, 4, 'subtract');
-      final response = await clientService.calculate(request);
+      final response = await calculatorClient.calculate(request);
 
       // Проверяем результат
       expect(response.result, equals(6));
@@ -199,7 +185,7 @@ void main() {
     test('успешный_вызов_унарного_метода_умножения', () async {
       // Вызываем метод умножения чисел
       final request = CalculationRequest(7, 8, 'multiply');
-      final response = await clientService.calculate(request);
+      final response = await calculatorClient.calculate(request);
 
       // Проверяем результат
       expect(response.result, equals(56));
@@ -209,7 +195,7 @@ void main() {
     test('обработка_ошибки_деления_на_ноль', () async {
       // Вызываем метод деления на ноль
       final request = CalculationRequest(42, 0, 'divide');
-      final response = await clientService.calculate(request);
+      final response = await calculatorClient.calculate(request);
 
       // Проверяем результат
       expect(response.result, equals(0));
@@ -219,7 +205,7 @@ void main() {
     test('обработка_неизвестной_операции', () async {
       // Вызываем метод с неизвестной операцией
       final request = CalculationRequest(5, 5, 'unknown');
-      final response = await clientService.calculate(request);
+      final response = await calculatorClient.calculate(request);
 
       // Проверяем результат
       expect(response.result, equals(0));
@@ -233,13 +219,13 @@ void main() {
 
       for (var i = 0; i < operations.length; i++) {
         final request = CalculationRequest(10, 5, operations[i]);
-        final response = await clientService.calculate(request);
+        final response = await calculatorClient.calculate(request);
 
         expect(response.result, equals(expected[i]));
       }
 
       // Проверяем, что все запросы были получены сервером
-      expect(serverService.requestHistory.length, equals(operations.length));
+      expect(calculatorServer.requestHistory.length, equals(operations.length));
     });
   });
 }

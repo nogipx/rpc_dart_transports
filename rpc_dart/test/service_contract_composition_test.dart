@@ -4,6 +4,7 @@
 
 import 'package:test/test.dart';
 import 'package:rpc_dart/rpc_dart.dart';
+import 'fixtures/test_contract.dart';
 
 // Определение сообщений для тестов
 class TestMessage implements IRpcSerializableMessage {
@@ -135,35 +136,18 @@ class NestedCompositionContract extends RpcServiceContract {
 
 void main() {
   group('Композиция сервисных контрактов', () {
-    late MemoryTransport clientTransport;
-    late MemoryTransport serverTransport;
     late RpcEndpoint clientEndpoint;
     late RpcEndpoint serverEndpoint;
 
     setUp(() {
-      // Создаем транспорты
-      clientTransport = MemoryTransport('client');
-      serverTransport = MemoryTransport('server');
-
-      // Соединяем транспорты
-      clientTransport.connect(serverTransport);
-      serverTransport.connect(clientTransport);
-
-      // Создаем эндпоинты
-      clientEndpoint = RpcEndpoint(
-        transport: clientTransport,
-        debugLabel: 'client',
-      );
-
-      serverEndpoint = RpcEndpoint(
-        transport: serverTransport,
-        debugLabel: 'server',
-      );
+      // Используем TestFixtureUtils для создания пары эндпоинтов
+      final endpoints = TestFixtureUtils.createEndpointPair();
+      clientEndpoint = endpoints.client;
+      serverEndpoint = endpoints.server;
     });
 
     tearDown(() async {
-      await clientEndpoint.close();
-      await serverEndpoint.close();
+      await TestFixtureUtils.tearDown(clientEndpoint, serverEndpoint);
     });
 
     test(

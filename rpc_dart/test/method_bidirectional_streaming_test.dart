@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:rpc_dart/rpc_dart.dart';
 import 'package:test/test.dart';
+import 'fixtures/test_contract.dart';
+import 'fixtures/test_factory.dart';
 
 // Модели сообщений для чата
 class ChatMessage implements IRpcSerializableMessage {
@@ -19,7 +21,6 @@ class ChatMessage implements IRpcSerializableMessage {
       };
 
   static ChatMessage fromJson(Map<String, dynamic> json) {
-    print('ChatMessage.fromJson: $json');
     return ChatMessage(
       json['sender'] as String,
       json['content'] as String,
@@ -32,17 +33,14 @@ class ChatMessage implements IRpcSerializableMessage {
 }
 
 // Контракт чат-сервиса
-abstract base class ChatServiceContract extends RpcServiceContract {
-  ChatServiceContract() : super('ChatService');
-
-  RpcEndpoint? get client;
-
+abstract class ChatServiceContract extends IExtensionTestContract {
   // Константы для имен методов
   static const String chatSessionMethod = 'chatSession';
 
+  ChatServiceContract() : super('ChatService');
+
   @override
   void setup() {
-    print('ChatServiceContract.setup()');
     // Двунаправленный стрим-метод для чата
     addBidirectionalStreamingMethod<ChatMessage, ChatMessage>(
       methodName: chatSessionMethod,
@@ -58,46 +56,34 @@ abstract base class ChatServiceContract extends RpcServiceContract {
 }
 
 // Серверная реализация
-base class ServerChatService extends ChatServiceContract {
+class ServerChatService extends ChatServiceContract {
   final List<ChatMessage> messageHistory = [];
 
   @override
-  RpcEndpoint? get client => null;
-
-  @override
   BidiStream<ChatMessage, ChatMessage> chatSession() {
-    print('ServerChatService.chatSession() - создание стрима');
     return BidiStreamGenerator<ChatMessage, ChatMessage>(
       (Stream<ChatMessage> incomingStream) {
-        print('ServerChatService - обработчик стрима запущен');
         final controller = StreamController<ChatMessage>();
 
         // Обрабатываем входящие сообщения
         incomingStream.listen((message) {
-          print('Сервер получил сообщение: $message');
           // Добавляем сообщение в историю
           messageHistory.add(message);
 
           // Отправляем эхо и подтверждение
           controller.add(message); // Эхо исходного сообщения
-          print('Сервер отправляет эхо: $message');
 
           final confirmationMsg = ChatMessage(
             'Сервер',
             'Получено сообщение от ${message.sender}: "${message.content}"',
           );
           controller.add(confirmationMsg);
-          print('Сервер отправляет подтверждение: $confirmationMsg');
         }, onDone: () {
-          print('Сервер: входящий стрим завершен');
-          // Отправляем прощальное сообщение - наш Stream закрывается до того, как это сообщение успевает дойти
-          // поэтому мы не будем его ожидать в тесте
+          // Отправляем прощальное сообщение
           final byeMsg = ChatMessage('Сервер', 'Сессия чата завершена');
           controller.add(byeMsg);
-          print('Сервер отправляет прощание: $byeMsg');
           controller.close();
         }, onError: (error) {
-          print('Сервер: ошибка в стриме - $error');
           controller.add(ChatMessage('Сервер', 'Ошибка: $error'));
           controller.close();
         });
@@ -109,16 +95,14 @@ base class ServerChatService extends ChatServiceContract {
 }
 
 // Клиентская реализация
-base class ClientChatService extends ChatServiceContract {
-  @override
-  final RpcEndpoint client;
+class ClientChatService extends ChatServiceContract {
+  final RpcEndpoint _endpoint;
 
-  ClientChatService(this.client);
+  ClientChatService(this._endpoint);
 
   @override
   BidiStream<ChatMessage, ChatMessage> chatSession() {
-    print('ClientChatService.chatSession() - вызов');
-    return client
+    return _endpoint
         .bidirectionalStreaming(
           serviceName: serviceName,
           methodName: ChatServiceContract.chatSessionMethod,
@@ -131,191 +115,165 @@ base class ClientChatService extends ChatServiceContract {
 
 void main() {
   group('Тестирование двунаправленного стриминга', () {
-    late MemoryTransport clientTransport;
-    late MemoryTransport serverTransport;
-    late JsonSerializer serializer;
     late RpcEndpoint clientEndpoint;
     late RpcEndpoint serverEndpoint;
     late ClientChatService clientService;
     late ServerChatService serverService;
 
     setUp(() {
-      print('\n======= SETUP =======');
-      // Создаем пару связанных транспортов
-      clientTransport = MemoryTransport('client');
-      serverTransport = MemoryTransport('server');
-      clientTransport.connect(serverTransport);
-      serverTransport.connect(clientTransport);
-      print('Транспорты созданы и связаны');
-
-      // Сериализатор
-      serializer = JsonSerializer();
-
-      // Создаем эндпоинты
-      clientEndpoint = RpcEndpoint(
-        transport: clientTransport,
-        serializer: serializer,
+      // Используем фабрику для создания тестового окружения
+      final testEnv = TestContractFactory.setupTestEnvironment(
+        extensionFactories: [
+          (
+            type: ChatServiceContract,
+            clientFactory: (endpoint) => ClientChatService(endpoint),
+            serverFactory: () => ServerChatService(),
+          ),
+        ],
       );
-      serverEndpoint = RpcEndpoint(
-        transport: serverTransport,
-        serializer: serializer,
-      );
-      print('Эндпоинты созданы');
 
-      // Создаем сервисы
-      serverService = ServerChatService();
-      clientService = ClientChatService(clientEndpoint);
-      print('Сервисы созданы');
+      clientEndpoint = testEnv.clientEndpoint;
+      serverEndpoint = testEnv.serverEndpoint;
 
-      // Регистрируем контракт сервера
-      serverEndpoint.registerServiceContract(serverService);
-      print('Контракт сервера зарегистрирован');
-      print('====== SETUP DONE ======\n');
+      // Получаем конкретные реализации из мапы расширений
+      clientService = testEnv.clientExtensions.get<ChatServiceContract>()
+          as ClientChatService;
+      serverService = testEnv.serverExtensions.get<ChatServiceContract>()
+          as ServerChatService;
     });
 
     tearDown(() async {
-      print('\n====== TEARDOWN ======');
-      await clientEndpoint.close();
-      await serverEndpoint.close();
-      print('Эндпоинты закрыты');
-      print('===== TEARDOWN DONE =====\n');
+      await TestFixtureUtils.tearDown(clientEndpoint, serverEndpoint);
     });
 
     test('двунаправленный_стриминг_обеспечивает_полноценный_обмен_сообщениями',
         () async {
-      print('\n====== ТЕСТ 1 НАЧАЛО ======');
       // Создаем двунаправленный канал связи
       final chatSession = clientService.chatSession();
-      print('Клиент: двунаправленный канал создан');
 
       // Создаем список для сбора всех полученных сообщений
       final receivedMessages = <ChatMessage>[];
 
       // Подписываемся на входящие сообщения
       final subscription = chatSession.listen((message) {
-        print('Клиент получил сообщение: $message');
         receivedMessages.add(message);
       });
-      print('Клиент: подписка на входящие сообщения установлена');
 
       // Отправляем несколько сообщений
-      print('Клиент отправляет сообщение 1');
-      chatSession.send(ChatMessage('Клиент', 'Привет, сервер!'));
-
-      await Future.delayed(Duration(milliseconds: 50));
-      print('Клиент отправляет сообщение 2');
+      chatSession.send(ChatMessage('Клиент', 'Привет!'));
       chatSession.send(ChatMessage('Клиент', 'Как дела?'));
+      chatSession.send(ChatMessage('Клиент', 'Что нового?'));
 
+      // Даем некоторое время на обработку
       await Future.delayed(Duration(milliseconds: 50));
-      print('Клиент отправляет сообщение 3');
-      chatSession
-          .send(ChatMessage('Клиент', 'Это тест двунаправленного стриминга'));
 
-      // Закрываем клиентский стрим после отправки сообщений
-      await Future.delayed(Duration(milliseconds: 100));
-      print('Клиент закрывает стрим');
+      // Закрываем канал отправки
       await chatSession.close();
 
-      // Ждем некоторое время, чтобы сервер успел ответить на все сообщения
-      print('Ожидание завершения обработки...');
-      await Future.delayed(Duration(milliseconds: 200));
-
-      // Отменяем подписку
+      // Ждем завершения получения всех сообщений
+      await subscription.asFuture();
       await subscription.cancel();
-      print('Подписка отменена');
 
-      // Выводим полученные сообщения
-      print('Получено сообщений: ${receivedMessages.length}');
-      for (var i = 0; i < receivedMessages.length; i++) {
-        print('  $i: ${receivedMessages[i]}');
-      }
-
-      // Выводим историю сообщений на сервере
-      print(
-          'История сообщений на сервере: ${serverService.messageHistory.length}');
-      for (var i = 0; i < serverService.messageHistory.length; i++) {
-        print('  $i: ${serverService.messageHistory[i]}');
-      }
-
-      // Проверяем, что получили сообщения (без прощального, т.к. оно может не дойти)
-      // 3 эхо + 3 подтверждения = 6 сообщений
-      expect(receivedMessages.length, equals(6));
-
-      if (receivedMessages.isNotEmpty) {
-        expect(receivedMessages[0].sender, equals('Клиент'));
-        expect(receivedMessages[0].content, equals('Привет, сервер!'));
-
-        expect(receivedMessages[1].sender, equals('Сервер'));
-        expect(receivedMessages[1].content, contains('Получено сообщение'));
-      }
-
-      // Проверяем историю сообщений на сервере
+      // Проверяем, что все отправленные сообщения отразились в истории сервера
       expect(serverService.messageHistory.length, equals(3));
-      if (serverService.messageHistory.isNotEmpty) {
-        expect(
-            serverService.messageHistory[0].content, equals('Привет, сервер!'));
-      }
-      if (serverService.messageHistory.length >= 3) {
-        expect(serverService.messageHistory[2].content,
-            equals('Это тест двунаправленного стриминга'));
-      }
+      expect(serverService.messageHistory[0].content, equals('Привет!'));
+      expect(serverService.messageHistory[1].content, equals('Как дела?'));
+      expect(serverService.messageHistory[2].content, equals('Что нового?'));
 
-      print('====== ТЕСТ 1 КОНЕЦ ======\n');
+      // Проверяем, что мы получили все ответы: для каждого сообщения должно быть эхо + подтверждение
+      expect(receivedMessages.length, equals(6));
+      expect(receivedMessages[0].sender, equals('Клиент')); // Эхо
+      expect(receivedMessages[1].sender, equals('Сервер')); // Подтверждение
+      expect(receivedMessages[2].sender, equals('Клиент')); // Эхо
+      expect(receivedMessages[3].sender, equals('Сервер')); // Подтверждение
+      expect(receivedMessages[4].sender, equals('Клиент')); // Эхо
+      expect(receivedMessages[5].sender, equals('Сервер')); // Подтверждение
     });
 
-    test('клиент_может_обрабатывать_серверные_сообщения_асинхронно', () async {
-      print('\n====== ТЕСТ 2 НАЧАЛО ======');
+    test('отправка_и_получение_многих_сообщений', () async {
       // Создаем двунаправленный канал связи
       final chatSession = clientService.chatSession();
-      print('Клиент: двунаправленный канал создан');
 
-      // Счетчики сообщений
-      int echoCount = 0;
-      int confirmationCount = 0;
+      // Счетчики для проверки
+      int messagesSent = 0;
+      int messagesReceived = 0;
 
-      // Подписываемся на входящие сообщения с фильтрацией
-      final subscription = chatSession.listen((message) {
-        print('Клиент получил сообщение: $message');
-        if (message.sender == 'Клиент') {
-          echoCount++;
-          print('  Это эхо, текущий счетчик: $echoCount');
-        } else if (message.sender == 'Сервер' &&
-            message.content.startsWith('Получено')) {
-          confirmationCount++;
-          print('  Это подтверждение, текущий счетчик: $confirmationCount');
-        }
+      // Подписываемся на входящие сообщения
+      final subscription = chatSession.listen((_) {
+        messagesReceived++;
       });
-      print('Клиент: подписка на входящие сообщения установлена');
 
-      // Отправляем сообщения с задержкой, чтобы имитировать реальное взаимодействие
-      print('Клиент отправляет сообщение 1');
-      chatSession.send(ChatMessage('Клиент', 'Сообщение 1'));
-      await Future.delayed(Duration(milliseconds: 50));
+      // Отправляем много сообщений
+      const totalMessages = 20;
+      for (int i = 0; i < totalMessages; i++) {
+        chatSession.send(
+          ChatMessage('Клиент', 'Сообщение #$i'),
+        );
+        messagesSent++;
+      }
 
-      print('Клиент отправляет сообщение 2');
-      chatSession.send(ChatMessage('Клиент', 'Сообщение 2'));
-      await Future.delayed(Duration(milliseconds: 50));
-
-      print('Клиент отправляет сообщение 3');
-      chatSession.send(ChatMessage('Клиент', 'Сообщение 3'));
+      // Даем время на обработку
       await Future.delayed(Duration(milliseconds: 100));
 
-      // Закрываем стрим и ждем завершения обработки
-      print('Клиент закрывает стрим');
+      // Закрываем канал отправки
       await chatSession.close();
-      await Future.delayed(Duration(milliseconds: 200));
 
-      print(
-          'Итоговые счетчики: эхо=$echoCount, подтверждения=$confirmationCount');
-
+      // Ждем завершения получения всех сообщений
+      await subscription.asFuture();
       await subscription.cancel();
-      print('Подписка отменена');
 
-      // Проверяем счетчики сообщений
-      expect(echoCount, equals(3));
-      expect(confirmationCount, equals(3));
+      // Проверяем, что сервер получил все сообщения
+      expect(serverService.messageHistory.length, equals(totalMessages));
 
-      print('====== ТЕСТ 2 КОНЕЦ ======\n');
+      // Проверяем, что клиент получил все ответы (эхо + подтверждение для каждого)
+      expect(messagesReceived, equals(totalMessages * 2));
+    });
+
+    test('параллельная_отправка_и_получение', () async {
+      // Создаем двунаправленный канал связи
+      final chatSession = clientService.chatSession();
+
+      // Отслеживаем прогресс
+      final receivedMessages = <ChatMessage>[];
+      final sentMessages = <ChatMessage>[];
+
+      // Подписываемся на входящие сообщения
+      final subscription = chatSession.listen((message) {
+        receivedMessages.add(message);
+      });
+
+      // Функция для отправки сообщения через промежуток времени
+      Future<void> sendDelayed(int index) async {
+        await Future.delayed(Duration(milliseconds: 5 * index));
+        final message = ChatMessage('Клиент', 'Сообщение с задержкой #$index');
+        sentMessages.add(message);
+        chatSession.send(message);
+      }
+
+      // Запускаем несколько параллельных отправок
+      final tasks = <Future>[];
+      for (int i = 0; i < 10; i++) {
+        tasks.add(sendDelayed(i));
+      }
+
+      // Ждем, когда все задачи отправки будут выполнены
+      await Future.wait(tasks);
+
+      // Даем время на получение всех ответов
+      await Future.delayed(Duration(milliseconds: 100));
+
+      // Закрываем канал отправки
+      await chatSession.close();
+
+      // Ждем завершения получения всех сообщений
+      await subscription.asFuture();
+      await subscription.cancel();
+
+      // Проверяем, что все отправленные сообщения дошли до сервера
+      expect(serverService.messageHistory.length, equals(sentMessages.length));
+
+      // Проверяем, что клиент получил все ответы
+      expect(receivedMessages.length, equals(sentMessages.length * 2));
     });
   });
 }
