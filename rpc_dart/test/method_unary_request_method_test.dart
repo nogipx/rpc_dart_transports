@@ -128,22 +128,17 @@ void main() {
 
     setUp(() {
       // Используем фабрику для создания тестового окружения
-      final testEnv = TestFactory.setupTestEnvironment(
-        contractFactories: [
-          (
-            type: CalculatorTestsContract,
-            clientFactory: (endpoint) => CalculatorTestsClient(endpoint),
-            serverFactory: () => CalculatorTestsServer(),
-          ),
-        ],
+      final testEnv = TestFactory.setupTestContract(
+        clientFactory: (endpoint) => CalculatorTestsClient(endpoint),
+        serverFactory: () => CalculatorTestsServer(),
       );
 
       clientEndpoint = testEnv.clientEndpoint;
       serverEndpoint = testEnv.serverEndpoint;
 
       // Получаем конкретные реализации из мапы расширений
-      calculatorClient = testEnv.clientContract as CalculatorTestsClient;
-      calculatorServer = testEnv.serverContract as CalculatorTestsServer;
+      calculatorClient = testEnv.clientContract;
+      calculatorServer = testEnv.serverContract;
     });
 
     tearDown(() async {

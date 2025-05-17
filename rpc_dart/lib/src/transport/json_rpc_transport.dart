@@ -32,7 +32,7 @@ class JsonRpcErrorCode {
 }
 
 /// Реализация транспорта для JSON-RPC 2.0 (только для унарных методов)
-class JsonRpcTransport implements RpcTransport {
+class JsonRpcTransport implements IRpcTransport {
   @override
   final String id;
 
@@ -41,7 +41,7 @@ class JsonRpcTransport implements RpcTransport {
       StreamController<Uint8List>.broadcast();
 
   /// Базовый транспорт для передачи данных
-  final RpcTransport _baseTransport;
+  final IRpcTransport _baseTransport;
 
   /// Подписка на входящие сообщения базового транспорта
   StreamSubscription<Uint8List>? _baseSubscription;

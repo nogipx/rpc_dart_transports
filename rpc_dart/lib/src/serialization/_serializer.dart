@@ -5,8 +5,8 @@
 import 'dart:typed_data';
 
 /// Абстракция для сериализации/десериализации сообщений
-abstract interface class RpcSerializer {
-  const RpcSerializer();
+abstract interface class IRpcSerializer {
+  const IRpcSerializer();
 
   /// Имя сериализатора (используется для отладки и логирования)
   String get name;

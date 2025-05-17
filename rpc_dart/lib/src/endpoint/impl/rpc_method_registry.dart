@@ -239,3 +239,43 @@ final class RpcMethodRegistry implements IRpcMethodRegistry {
     _methods.clear();
   }
 }
+
+/// Выводит отладочную информацию о методах в registry
+void debugPrintRegisteredMethods(IRpcMethodRegistry registry, String label) {
+  final methods = registry.getAllMethods();
+
+  print('\n=== Методы в registry: $label (${methods.length}) ===');
+  for (final method in methods) {
+    print('${method.serviceName}.${method.methodName} (${method.methodType})');
+    print('  • Handler: ${method.handler != null ? 'Есть' : 'Нет!'}');
+    print('  • ArgParser: ${method.argumentParser != null ? 'Есть' : 'Нет!'}');
+    print('  • RespParser: ${method.responseParser != null ? 'Есть' : 'Нет!'}');
+    print(
+        '  • Implementation: ${method.implementation != null ? 'Есть' : 'Нет!'}');
+  }
+  print('=====================================\n');
+}
+
+/// Выводит информацию о зарегистрированных контрактах
+void debugPrintRegisteredContracts(IRpcMethodRegistry registry, String label) {
+  final contracts = registry.getAllContracts();
+
+  print('\n=== Контракты в registry: $label (${contracts.length}) ===');
+  for (final entry in contracts.entries) {
+    final contractName = entry.key;
+    final contract = entry.value;
+
+    print('$contractName (${contract.runtimeType})');
+    print('  • Методов: ${contract.methods.length}');
+
+    if (contract is RpcServiceContract) {
+      final subContracts = contract.getSubContracts();
+      print('  • Субконтрактов: ${subContracts.length}');
+      for (final subContract in subContracts) {
+        print(
+            '    - ${subContract.serviceName} (${subContract.methods.length} методов)');
+      }
+    }
+  }
+  print('=====================================\n');
+}

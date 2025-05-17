@@ -4,161 +4,83 @@
 
 import 'package:rpc_dart/rpc_dart.dart';
 
-typedef ContractFactory<T extends RpcServiceContract> = ({
-  Type type,
-  T Function(RpcEndpoint) clientFactory,
-  T Function() serverFactory,
-});
+class EndpointPair {
+  final RpcEndpoint client;
+  final RpcEndpoint server;
 
-typedef TestEnvironment = ({
-  RpcEndpoint clientEndpoint,
-  RpcEndpoint serverEndpoint,
-  RpcServiceContract clientContract,
-  RpcServiceContract serverContract,
-  Map<Type, RpcServiceContract> clientContracts,
-  Map<Type, RpcServiceContract> serverContracts,
-  IRpcMethodRegistry clientRegistry,
-  IRpcMethodRegistry serverRegistry,
-});
+  EndpointPair({required this.client, required this.server});
+}
+
+class TestEnvironment<Client extends RpcServiceContract,
+    Server extends RpcServiceContract> {
+  final RpcEndpoint clientEndpoint;
+  final RpcEndpoint serverEndpoint;
+  final Client clientContract;
+  final Server serverContract;
+
+  TestEnvironment({
+    required this.clientEndpoint,
+    required this.serverEndpoint,
+    required this.clientContract,
+    required this.serverContract,
+  });
+}
 
 /// Фабрика для создания тестового окружения с явной регистрацией методов
 class TestFactory {
   /// Создает тестовое окружение с регистрацией методов
   ///
   /// Регистрирует только явно переданные контракты, без автоматических добавлений
-  static TestEnvironment setupTestEnvironment({
-    required List<ContractFactory> contractFactories,
+  static TestEnvironment<Client, Server> setupTestContract<
+      Client extends RpcServiceContract, Server extends RpcServiceContract>({
+    required Client Function(RpcEndpoint) clientFactory,
+    required Server Function() serverFactory,
+    EndpointPair? endpointPair,
   }) {
     // Создаем реестры и транспорты
     final clientRegistry = RpcMethodRegistry();
     final serverRegistry = RpcMethodRegistry();
-    final (clientTransport, serverTransport) = _createConnectedTransports();
-
-    // Создаем эндпоинты
-    final clientEndpoint = RpcEndpoint(
-      transport: clientTransport,
-      debugLabel: 'client',
-      methodRegistry: clientRegistry,
+    final endpointPair = createEndpointPair(
+      clientLabel: 'client',
+      serverLabel: 'server',
     );
-
-    final serverEndpoint = RpcEndpoint(
-      transport: serverTransport,
-      debugLabel: 'server',
-      methodRegistry: serverRegistry,
-    );
-
-    final clientContracts = <Type, RpcServiceContract>{};
-    final serverContracts = <Type, RpcServiceContract>{};
 
     // Создаем контракты через фабрики
-    for (final factory in contractFactories) {
-      final clientContract = factory.clientFactory(clientEndpoint);
-      final serverContract = factory.serverFactory();
+    final clientContract = clientFactory(endpointPair.client);
+    final serverContract = serverFactory();
 
-      clientContracts[factory.type] = clientContract;
-      serverContracts[factory.type] = serverContract;
+    // Регистрируем контракты
+    serverRegistry.registerContract(serverContract);
+    clientRegistry.registerContract(clientContract);
 
-      // Регистрируем контракты
-      serverRegistry.registerContract(serverContract);
-      clientRegistry.registerContract(clientContract); // Только для структуры
-    }
-
-    // Создаем композитные контракты
-    final clientContract = _CompositeServiceContract(
-      serviceName: 'fixture_contract',
-      contracts: clientContracts.values.toList(),
-    );
-
-    final serverContract = _CompositeServiceContract(
-      serviceName: 'fixture_contract',
-      contracts: serverContracts.values.toList(),
-    );
-
-    return (
-      clientEndpoint: clientEndpoint,
-      serverEndpoint: serverEndpoint,
+    return TestEnvironment(
+      clientEndpoint: endpointPair.client,
+      serverEndpoint: endpointPair.server,
       clientContract: clientContract,
       serverContract: serverContract,
-      clientContracts: clientContracts,
-      serverContracts: serverContracts,
-      clientRegistry: clientRegistry,
-      serverRegistry: serverRegistry,
     );
   }
 
-  /// Создает пару соединенных транспортов для тестирования
-  static (MemoryTransport, MemoryTransport) _createConnectedTransports() {
+  static EndpointPair createEndpointPair({
+    required String clientLabel,
+    required String serverLabel,
+  }) {
     final clientTransport = MemoryTransport('client');
     final serverTransport = MemoryTransport('server');
 
     clientTransport.connect(serverTransport);
     serverTransport.connect(clientTransport);
 
-    return (clientTransport, serverTransport);
-  }
-
-  /// Выводит отладочную информацию о методах в registry
-  static void debugPrintRegisteredMethods(
-      IRpcMethodRegistry registry, String label) {
-    final methods = registry.getAllMethods();
-
-    print('\n=== Методы в registry: $label (${methods.length}) ===');
-    for (final method in methods) {
-      print(
-          '${method.serviceName}.${method.methodName} (${method.methodType})');
-      print('  • Handler: ${method.handler != null ? 'Есть' : 'Нет!'}');
-      print(
-          '  • ArgParser: ${method.argumentParser != null ? 'Есть' : 'Нет!'}');
-      print(
-          '  • RespParser: ${method.responseParser != null ? 'Есть' : 'Нет!'}');
-      print(
-          '  • Implementation: ${method.implementation != null ? 'Есть' : 'Нет!'}');
-    }
-    print('=====================================\n');
-  }
-
-  /// Выводит информацию о зарегистрированных контрактах
-  static void debugPrintRegisteredContracts(
-      IRpcMethodRegistry registry, String label) {
-    final contracts = registry.getAllContracts();
-
-    print('\n=== Контракты в registry: $label (${contracts.length}) ===');
-    for (final entry in contracts.entries) {
-      final contractName = entry.key;
-      final contract = entry.value;
-
-      print('$contractName (${contract.runtimeType})');
-      print('  • Методов: ${contract.methods.length}');
-
-      if (contract is RpcServiceContract) {
-        final subContracts = contract.getSubContracts();
-        print('  • Субконтрактов: ${subContracts.length}');
-        for (final subContract in subContracts) {
-          print(
-              '    - ${subContract.serviceName} (${subContract.methods.length} методов)');
-        }
-      }
-    }
-    print('=====================================\n');
-  }
-}
-
-/// Композитный контракт, содержащий множество других контрактов
-class _CompositeServiceContract extends RpcServiceContract {
-  final List<RpcServiceContract> _contracts;
-
-  _CompositeServiceContract({
-    required String serviceName,
-    required List<RpcServiceContract> contracts,
-  })  : _contracts = contracts,
-        super(serviceName);
-
-  @override
-  void setup() {
-    for (final contract in _contracts) {
-      addSubContract(contract);
-    }
-    super.setup();
+    return EndpointPair(
+      client: RpcEndpoint(
+        transport: clientTransport,
+        debugLabel: clientLabel,
+      ),
+      server: RpcEndpoint(
+        transport: serverTransport,
+        debugLabel: serverLabel,
+      ),
+    );
   }
 }
 

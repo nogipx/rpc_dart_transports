@@ -10,7 +10,7 @@ import '_index.dart';
 typedef ProxyTransportSendFunction = Future<void> Function(Uint8List data);
 
 /// Транспорт-прокси для перенаправления сообщений через произвольные потоки
-class ProxyTransport implements RpcTransport {
+class ProxyTransport implements IRpcTransport {
   /// Идентификатор транспорта
   @override
   final String id;

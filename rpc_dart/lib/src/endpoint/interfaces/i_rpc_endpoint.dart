@@ -8,10 +8,13 @@ part of '../_index.dart';
 /// Предоставляет методы для вызова удаленных процедур.
 abstract interface class IRpcEndpoint {
   /// Транспорт, используемый для отправки и получения сообщений
-  RpcTransport get transport;
+  IRpcTransport get transport;
 
   /// Сериализатор для преобразования сообщений
-  RpcSerializer get serializer;
+  IRpcSerializer get serializer;
+
+  /// Реестр методов
+  IRpcMethodRegistry get registry;
 
   /// Флаг, указывающий активность эндпоинта
   bool get isActive;

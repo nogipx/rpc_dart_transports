@@ -18,7 +18,7 @@ class RpcSerializationException extends RpcCustomException {
 }
 
 /// Реализация сериализатора, использующего JSON
-class JsonSerializer implements RpcSerializer {
+class JsonSerializer implements IRpcSerializer {
   /// Создает новый экземпляр JSON сериализатора
   ///
   /// JSON сериализатор преобразует объекты Dart в JSON и обратно.

@@ -32,7 +32,7 @@ enum RpcTransportActionStatus {
 }
 
 /// Абстракция транспортного уровня для передачи данных
-abstract interface class RpcTransport {
+abstract interface class IRpcTransport {
   /// Уникальный идентификатор транспорта
   String get id;
 

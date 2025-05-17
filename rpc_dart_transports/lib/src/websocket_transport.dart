@@ -12,7 +12,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 typedef WebSocketChannelProvider = WebSocketChannel Function();
 
 /// Транспорт для обмена сообщениями через WebSocket
-class WebSocketTransport implements RpcTransport {
+class WebSocketTransport implements IRpcTransport {
   /// Идентификатор транспорта
   @override
   final String id;

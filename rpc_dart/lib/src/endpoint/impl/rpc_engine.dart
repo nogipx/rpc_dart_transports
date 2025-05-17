@@ -10,14 +10,14 @@ part of '../_index.dart';
 /// Для публичного API используйте [RpcEndpoint].
 final class _RpcEngine implements IRpcEngine {
   /// Транспорт для отправки/получения сообщений
-  final RpcTransport _transport;
+  final IRpcTransport _transport;
   @override
-  RpcTransport get transport => _transport;
+  IRpcTransport get transport => _transport;
 
   /// Сериализатор для преобразования сообщений
-  final RpcSerializer _serializer;
+  final IRpcSerializer _serializer;
   @override
-  RpcSerializer get serializer => _serializer;
+  IRpcSerializer get serializer => _serializer;
 
   /// Метка для отладки
   final String? debugLabel;

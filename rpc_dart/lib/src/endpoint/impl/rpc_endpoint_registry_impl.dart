@@ -28,8 +28,8 @@ final class _RpcEndpointRegistryImpl
 
   /// Создает новый типизированный Endpoint
   _RpcEndpointRegistryImpl({
-    required RpcTransport transport,
-    required RpcSerializer serializer,
+    required IRpcTransport transport,
+    required IRpcSerializer serializer,
     this.debugLabel,
     RpcUniqueIdGenerator? uniqueIdGenerator,
     IRpcMethodRegistry? methodRegistry,
@@ -42,10 +42,13 @@ final class _RpcEndpointRegistryImpl
         _methodRegistry = methodRegistry ?? RpcMethodRegistry();
 
   @override
-  RpcTransport get transport => _delegate.transport;
+  IRpcTransport get transport => _delegate.transport;
 
   @override
-  RpcSerializer get serializer => _delegate.serializer;
+  IRpcSerializer get serializer => _delegate.serializer;
+
+  @override
+  IRpcMethodRegistry get registry => _methodRegistry;
 
   @override
   void addMiddleware(IRpcMiddleware middleware) =>

@@ -192,14 +192,9 @@ void main() {
       print('\nDebug: === Начало настройки теста ===');
 
       // Используем фабрику для создания тестового окружения
-      final testEnv = TestFactory.setupTestEnvironment(
-        contractFactories: [
-          (
-            type: TaskServiceContract,
-            clientFactory: (endpoint) => ClientTaskService(endpoint),
-            serverFactory: () => ServerTaskService(),
-          ),
-        ],
+      final testEnv = TestFactory.setupTestContract(
+        clientFactory: (endpoint) => ClientTaskService(endpoint),
+        serverFactory: () => ServerTaskService(),
       );
 
       print('Debug: Окружение теста создано');
@@ -208,8 +203,8 @@ void main() {
       serverEndpoint = testEnv.serverEndpoint;
 
       // Получаем конкретные реализации из мапы расширений
-      clientService = testEnv.clientContract as ClientTaskService;
-      serverService = testEnv.serverContract as ServerTaskService;
+      clientService = testEnv.clientContract;
+      serverService = testEnv.serverContract;
 
       // Дополнительная явная регистрация метода startTask
       print('Debug: Явная регистрация метода startTask с вызовом напрямую');

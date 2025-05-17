@@ -10,7 +10,7 @@ import 'dart:developer' as dev;
 import 'package:rpc_dart/rpc_dart.dart';
 
 /// Реализация транспорта для коммуникации между Isolate через порты
-class IsolateTransport implements RpcTransport {
+class IsolateTransport implements IRpcTransport {
   /// Таймаут для установки соединения между изолятами (мс)
   static const _connectionTimeout = Duration(seconds: 5);
 

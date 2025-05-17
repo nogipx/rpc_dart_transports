@@ -459,29 +459,22 @@ void main() {
     late BasicStreamServiceClient basicStreamClient;
 
     setUp(() {
-      // Используем фабрику для создания тестового окружения с несколькими расширениями
-      final testEnv = TestFactory.setupTestEnvironment(
-        contractFactories: [
-          (
-            type: FileUploadServiceContract,
-            clientFactory: (endpoint) => FileUploadServiceClient(endpoint),
-            serverFactory: () => FileUploadServiceServer(),
-          ),
-          (
-            type: BasicStreamServiceContract,
-            clientFactory: (endpoint) => BasicStreamServiceClient(endpoint),
-            serverFactory: () => BasicStreamServiceServer(),
-          ),
-        ],
+      final uploadEnv = TestFactory.setupTestContract(
+        clientFactory: (endpoint) => FileUploadServiceClient(endpoint),
+        serverFactory: () => FileUploadServiceServer(),
+      );
+      final basicStreamEnv = TestFactory.setupTestContract(
+        clientFactory: (endpoint) => BasicStreamServiceClient(endpoint),
+        serverFactory: () => BasicStreamServiceServer(),
       );
 
-      clientEndpoint = testEnv.clientEndpoint;
-      serverEndpoint = testEnv.serverEndpoint;
+      clientEndpoint = uploadEnv.clientEndpoint;
+      serverEndpoint = uploadEnv.serverEndpoint;
 
       // Получаем конкретные реализации из mapы расширений
-      fileUploadClient = testEnv.clientContract as FileUploadServiceClient;
-      fileUploadServer = testEnv.serverContract as FileUploadServiceServer;
-      basicStreamClient = testEnv.clientContract as BasicStreamServiceClient;
+      fileUploadClient = uploadEnv.clientContract;
+      fileUploadServer = uploadEnv.serverContract;
+      basicStreamClient = basicStreamEnv.clientContract;
 
       // Очищаем данные перед каждым тестом
       fileUploadServer.clearData();

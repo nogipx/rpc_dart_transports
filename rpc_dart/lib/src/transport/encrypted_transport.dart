@@ -15,9 +15,9 @@ final RpcLogger _logger = RpcLogger('EncryptedTransport');
 ///
 /// Этот класс шифрует исходящие сообщения и дешифрует входящие сообщения,
 /// делегируя фактическую передачу данных базовому транспорту.
-class EncryptedTransport implements RpcTransport {
+class EncryptedTransport implements IRpcTransport {
   /// Базовый транспорт для передачи данных
-  final RpcTransport _baseTransport;
+  final IRpcTransport _baseTransport;
 
   /// Сервис шифрования
   final RpcEncryptionService _encryptionService;
@@ -44,7 +44,7 @@ class EncryptedTransport implements RpcTransport {
   /// [encryptionService] - сервис для шифрования/дешифрования данных
   /// [debug] - флаг отладки
   EncryptedTransport({
-    required RpcTransport baseTransport,
+    required IRpcTransport baseTransport,
     required RpcEncryptionService encryptionService,
     bool debug = false,
   })  : _baseTransport = baseTransport,

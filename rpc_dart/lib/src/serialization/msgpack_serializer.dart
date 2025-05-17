@@ -14,7 +14,7 @@ final RpcLogger _logger = RpcLogger('MsgPackSerializer');
 /// Реализация сериализатора, использующего MessagePack
 /// MessagePack - это бинарный формат сериализации, более компактный чем JSON
 /// https://msgpack.org/
-class MsgPackSerializer implements RpcSerializer {
+class MsgPackSerializer implements IRpcSerializer {
   /// Создает новый экземпляр MessagePack сериализатора
   ///
   /// MessagePack сериализатор преобразует объекты Dart в компактный бинарный формат.

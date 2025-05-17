@@ -122,21 +122,16 @@ void main() {
 
     setUp(() {
       // Используем фабрику для создания тестового окружения
-      final testEnv = TestFactory.setupTestEnvironment(
-        contractFactories: [
-          (
-            type: ChatServiceContract,
-            clientFactory: (endpoint) => ClientChatService(endpoint),
-            serverFactory: () => ServerChatService(),
-          ),
-        ],
+      final testEnv = TestFactory.setupTestContract(
+        clientFactory: (endpoint) => ClientChatService(endpoint),
+        serverFactory: () => ServerChatService(),
       );
 
       clientEndpoint = testEnv.clientEndpoint;
       serverEndpoint = testEnv.serverEndpoint;
 
-      clientService = testEnv.clientContract as ClientChatService;
-      serverService = testEnv.serverContract as ServerChatService;
+      clientService = testEnv.clientContract;
+      serverService = testEnv.serverContract;
     });
 
     tearDown(() async {

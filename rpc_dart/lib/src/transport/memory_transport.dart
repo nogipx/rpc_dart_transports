@@ -10,7 +10,7 @@ import '_index.dart';
 ///
 /// Используется для тестирования и для коммуникации
 /// между компонентами в рамках одного процесса
-class MemoryTransport implements RpcTransport {
+class MemoryTransport implements IRpcTransport {
   /// Идентификатор транспорта
   @override
   final String id;

@@ -260,31 +260,22 @@ void main() {
     late RpcEndpoint clientEndpoint;
     late RpcEndpoint serverEndpoint;
     late DiagnosticServiceClient diagnosticClient;
-    late IRpcMethodRegistry serverRegistry;
 
     setUp(() {
       // Используем нашу новую фабрику для создания тестового окружения
-      final testEnv = TestFactory.setupTestEnvironment(
-        contractFactories: [
-          (
-            type: DiagnosticServiceContract,
-            clientFactory: (endpoint) => DiagnosticServiceClient(endpoint),
-            serverFactory: () => DiagnosticServiceServer(),
-          ),
-        ],
+      final testEnv = TestFactory.setupTestContract(
+        clientFactory: (endpoint) => DiagnosticServiceClient(endpoint),
+        serverFactory: () => DiagnosticServiceServer(),
       );
 
       clientEndpoint = testEnv.clientEndpoint;
       serverEndpoint = testEnv.serverEndpoint;
-      serverRegistry = testEnv.serverRegistry;
 
       // Получаем реализации из мапы контрактов
-      diagnosticClient = testEnv.clientContracts
-          .get<DiagnosticServiceContract>() as DiagnosticServiceClient;
+      diagnosticClient = testEnv.clientContract;
 
       // Выводим отладочную информацию о registry
-      TestFactory.debugPrintRegisteredContracts(serverRegistry, 'Сервер');
-      TestFactory.debugPrintRegisteredMethods(serverRegistry, 'Сервер');
+      debugPrintRegisteredContracts(serverEndpoint.registry, 'Сервер');
     });
 
     tearDown(() async {

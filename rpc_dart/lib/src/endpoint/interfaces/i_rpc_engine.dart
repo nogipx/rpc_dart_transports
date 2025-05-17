@@ -10,10 +10,10 @@ part of '../_index.dart';
 /// Для типизированной реализации используйте [RpcEndpoint].
 abstract interface class IRpcEngine {
   /// Транспорт для отправки/получения сообщений
-  RpcTransport get transport;
+  IRpcTransport get transport;
 
   /// Сериализатор для преобразования сообщений
-  RpcSerializer get serializer;
+  IRpcSerializer get serializer;
 
   /// Добавляет middleware для обработки запросов и ответов
   void addMiddleware(IRpcMiddleware middleware);
