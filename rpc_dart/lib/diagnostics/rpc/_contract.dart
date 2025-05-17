@@ -6,6 +6,7 @@ import 'dart:async' show Timer;
 import 'dart:math' show Random;
 
 import 'package:rpc_dart/diagnostics.dart';
+import 'package:rpc_dart/diagnostics/rpc_diagnostic_service.dart';
 import 'package:rpc_dart/rpc_dart.dart';
 
 part 'subcontracts/metrics.dart';
@@ -16,8 +17,8 @@ part 'subcontracts/client_management.dart';
 part 'diagnostic_client_contract.dart';
 part 'diagnostic_server_contract.dart';
 
-part 'i_rpc_diagnostic_service.dart';
-part 'rpc_diagnostic_client.dart';
+part '../i_rpc_diagnostic_service.dart';
+part '../rpc_diagnostic_client.dart';
 
 /// Базовый контракт диагностического сервиса
 ///
