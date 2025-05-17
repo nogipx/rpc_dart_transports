@@ -4,8 +4,10 @@
 
 part of '_method.dart';
 
-/// Класс для работы с RPC методом типа "клиентский стриминг" (поток запросов - без ответа)
-/// Упрощенная реализация, которая не ожидает ответа от сервера
+/// Класс для работы с RPC методом типа "клиентский стриминг" (поток запросов - с ответом или без)
+/// Поддерживает два режима:
+/// 1. С ответом после завершения обработки (как в gRPC)
+/// 2. Без ответа (упрощенный режим)
 final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
     extends RpcMethod<T> {
   /// Создает новый объект клиентского стриминг RPC метода
@@ -22,9 +24,13 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
   ///
   /// [metadata] - метаданные запроса (опционально)
   /// [streamId] - ID стрима (опционально, генерируется автоматически)
-  ClientStreamingBidiStream<Request> call<Request extends T>({
+  /// [noResponse] - флаг, указывающий, что ответ не ожидается (по умолчанию false)
+  ClientStreamingBidiStream<Request, Response>
+      call<Request extends T, Response extends T>({
     Map<String, dynamic>? metadata,
     String? streamId,
+    bool noResponse = false,
+    RpcMethodResponseParser<Response>? responseParser,
   }) {
     final effectiveStreamId =
         streamId ?? _endpoint.generateUniqueId('client_stream');
@@ -59,17 +65,48 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
     // Создаем контроллер для запросов
     final requestController = StreamController<Request>();
 
+    // Создаем контроллер для ответа (если ожидается)
+    final responseController = StreamController<Response>();
+
     // Инициируем соединение с пустым запросом или метаданными
-    _core.invoke(
+    _core
+        .invoke(
       serviceName: serviceName,
       methodName: methodName,
       request: {
         '_clientStreaming': true,
         '_streamId': effectiveStreamId,
-        '_noResponse': true, // Всегда устанавливаем флаг noResponse
+        '_noResponse':
+            noResponse, // Устанавливаем флаг в зависимости от параметра
       },
       metadata: metadata,
-    );
+    )
+        .then((response) {
+      // Обрабатываем ответ от сервера после завершения стрима
+      if (!noResponse && response != null && !responseController.isClosed) {
+        try {
+          // Преобразуем ответ в нужный тип
+          final parsedResponse = responseParser != null
+              ? responseParser(response)
+              : response as Response;
+
+          // Добавляем ответ в контроллер
+          responseController.add(parsedResponse);
+        } catch (error, stackTrace) {
+          // В случае ошибки преобразования добавляем ошибку в контроллер
+          responseController.addError(error, stackTrace);
+        } finally {
+          // Закрываем контроллер ответов
+          responseController.close();
+        }
+      }
+    }).catchError((error, stackTrace) {
+      // В случае ошибки вызова добавляем ошибку в контроллер ответов
+      if (!responseController.isClosed) {
+        responseController.addError(error, stackTrace);
+        responseController.close();
+      }
+    });
 
     // Подписываемся на запросы от клиента и отправляем их на сервер
     requestController.stream.listen(
@@ -170,9 +207,9 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
     );
 
     // Создаем BidiStream для передачи в ClientStreamingBidiStream
-    final bidiStream = BidiStream<Request, RpcNull>(
-      // Пустой поток ответов, так как ответ не ожидается
-      responseStream: Stream<RpcNull>.empty(),
+    final bidiStream = BidiStream<Request, Response>(
+      // Поток ответов
+      responseStream: responseController.stream,
       sendFunction: (request) => requestController.add(request),
       finishTransferFunction: () async {
         // При завершении передачи данных закрываем запросы, но не стрим
@@ -181,14 +218,20 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
         }
       },
       closeFunction: () {
-        // При закрытии стрима закрываем контроллер
-        requestController.close();
+        // При закрытии стрима закрываем оба контроллера
+        if (!requestController.isClosed) {
+          requestController.close();
+        }
+        if (!responseController.isClosed) {
+          responseController.close();
+        }
         return Future.value();
       },
     );
 
-    // Создаем ClientStreamingBidiStream с упрощенным конструктором
-    return ClientStreamingBidiStream<Request>(bidiStream);
+    // Создаем ClientStreamingBidiStream с нужным режимом ответа
+    return ClientStreamingBidiStream<Request, Response>(bidiStream,
+        expectResponse: !noResponse);
   }
 
   /// Регистрирует обработчик клиентского стриминг метода
@@ -199,6 +242,7 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
   void register<Request extends T, Response extends T>({
     required dynamic handler,
     required RpcMethodArgumentParser<Request> requestParser,
+    RpcMethodArgumentParser<Response>? responseParser,
   }) {
     // Получаем контракт сервиса
     final serviceContract = _endpoint.getServiceContract(serviceName);
@@ -213,21 +257,37 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
 
     // Если метод не найден в контракте, добавляем его
     if (existingMethod == null) {
-      serviceContract.addClientStreamingMethod<Request>(
-        methodName: methodName,
-        handler: handler,
-        argumentParser: requestParser,
-      );
+      // Определяем тип обработчика и добавляем соответствующий метод
+      if (handler is RpcMethodClientStreamHandler<Request, Response>) {
+        // Проверяем, что передан парсер ответа
+        if (responseParser == null) {
+          throw ArgumentError(
+            'Для обработчика с ответом необходимо указать responseParser',
+          );
+        }
+
+        // Добавляем метод с ответом
+        serviceContract.addClientStreamingMethod<Request, Response>(
+          methodName: methodName,
+          handler: handler,
+          argumentParser: requestParser,
+          responseParser: responseParser,
+        );
+      } else {
+        throw ArgumentError(
+          'Неподдерживаемый тип обработчика: ${handler.runtimeType}',
+        );
+      }
     }
 
     // Получаем актуальный контракт метода
     final contract =
         getMethodContract<Request, Response>(RpcMethodType.clientStreaming);
 
-    // Создаем соответствующую реализацию метода без ожидания результата
+    // Создаем соответствующую реализацию метода, в зависимости от типа обработчика
     final implementation =
         RpcMethodImplementation<Request, Response>.clientStreaming(
-            contract, handler as RpcMethodClientStreamHandler<Request>);
+            contract, handler);
 
     // Регистрируем реализацию метода
     _registrar.registerMethodImplementation(
@@ -243,6 +303,7 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
       handler: _createHandlerFunction<Request, Response>(
         implementation: implementation,
         requestParser: requestParser,
+        responseParser: responseParser,
       ),
     );
   }
@@ -252,6 +313,7 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
       _createHandlerFunction<Request extends T, Response extends T>({
     required RpcMethodImplementation<Request, Response> implementation,
     required RpcMethodArgumentParser<Request> requestParser,
+    RpcMethodArgumentParser<Response>? responseParser,
   }) {
     return (context) async {
       final requestId = context.messageId;
@@ -379,23 +441,42 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
         const handlerTimeout = Duration(seconds: 30);
 
         // Создаем комплитер для результата с таймаутом
-        final resultCompleter = Completer<void>();
+        final resultCompleter = Completer<dynamic>();
 
         // Запускаем обработчик в отдельной зоне с таймаутом
         Timer? timeoutTimer;
 
         Future<void> runHandler() async {
           try {
-            // Обрабатываем входящий поток без ожидания результата
-            await implementation.openClientStreaming(
-              stream: incomingStream,
-              metadata: context.metadata,
-              streamId: effectiveStreamId,
-            );
+            // Определяем, есть ли обработчик с ответом
+            final hasResponseHandler =
+                implementation._clientStreamHandler != null;
 
-            // Завершаем обработку успешно
-            if (!resultCompleter.isCompleted) {
-              resultCompleter.complete();
+            // Если есть обработчик с ответом и ответ ожидается клиентом
+            if (hasResponseHandler) {
+              // Обрабатываем входящий поток и получаем ответ
+              final response = await implementation.openClientStreaming(
+                stream: incomingStream,
+                metadata: context.metadata,
+                streamId: effectiveStreamId,
+              );
+
+              // Завершаем обработку успешно с ответом
+              if (!resultCompleter.isCompleted) {
+                resultCompleter.complete(response);
+              }
+            } else {
+              // Обрабатываем входящий поток без ожидания результата
+              await implementation.openClientStreaming(
+                stream: incomingStream,
+                metadata: context.metadata,
+                streamId: effectiveStreamId,
+              );
+
+              // Завершаем обработку успешно
+              if (!resultCompleter.isCompleted) {
+                resultCompleter.complete(RpcNull());
+              }
             }
           } catch (e, stackTrace) {
             _logger?.error(
@@ -432,7 +513,7 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
         });
 
         // Ожидаем завершение обработки
-        await resultCompleter.future.whenComplete(() {
+        final result = await resultCompleter.future.whenComplete(() {
           timeoutTimer?.cancel();
         });
 
@@ -471,10 +552,18 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
           ),
         );
 
-        // Возвращаем служебное сообщение о успешном приеме
+        // Если получили результат отличный от RpcNull и ожидается ответ, возвращаем его
+        if (result != null && result is! RpcNull) {
+          // Преобразуем результат в формат для передачи
+          final response =
+              result is IRpcSerializableMessage ? result.toJson() : result;
+
+          return response;
+        }
+
+        // Иначе возвращаем служебное сообщение о успешном приеме
         return {
           '_response': true,
-          '_noResponse': true,
           '_streamId': effectiveStreamId,
         };
       } catch (e, stackTrace) {

@@ -149,16 +149,17 @@ abstract base class FileServiceContract extends RpcServiceContract {
   void setup() {
     print('Setting up FileServiceContract');
     // Регистрируем метод клиентского стриминга
-    addClientStreamingMethod<FileChunk>(
+    addClientStreamingMethod<FileChunk, UploadResult>(
       methodName: uploadFileMethod,
       handler: uploadFile,
       argumentParser: FileChunk.fromJson,
+      responseParser: UploadResult.fromJson,
     );
     super.setup();
   }
 
   // Метод, который должен быть реализован в конкретном классе
-  ClientStreamingBidiStream<FileChunk> uploadFile();
+  ClientStreamingBidiStream<FileChunk, UploadResult> uploadFile();
 }
 
 // Создадим альтернативную реализацию без ответа
@@ -172,16 +173,17 @@ abstract class FileServiceContractNoResponse extends RpcServiceContract {
   void setup() {
     print('Setting up FileServiceContractNoResponse');
     // Регистрируем метод клиентского стриминга без ответа
-    addClientStreamingMethod<FileChunk>(
+    addClientStreamingMethod<FileChunk, UploadResult>(
       methodName: uploadFileMethod,
       handler: uploadFile,
       argumentParser: FileChunk.fromJson,
+      responseParser: UploadResult.fromJson,
     );
     super.setup();
   }
 
   // Метод, который должен быть реализован в конкретном классе
-  ClientStreamingBidiStream<FileChunk> uploadFile();
+  ClientStreamingBidiStream<FileChunk, UploadResult> uploadFile();
 }
 
 // Серверная реализация сервиса файлов
@@ -217,7 +219,7 @@ base class ServerFileService extends FileServiceContract {
 
   // Метод из контракта, который вызывается клиентом
   @override
-  ClientStreamingBidiStream<FileChunk> uploadFile() {
+  ClientStreamingBidiStream<FileChunk, UploadResult> uploadFile() {
     // Увеличиваем счетчик созданных обработчиков
     _handlerCount++;
     print('Server: Handler count increased to $_handlerCount');
@@ -229,12 +231,12 @@ base class ServerFileService extends FileServiceContract {
       // Сбрасываем счетчик перед генерацией ошибки
       resetHandlerCount();
       // Генерируем ошибку чтобы прервать цикл создания обработчиков
-      final controller = StreamController<RpcNull>();
+      final controller = StreamController<UploadResult>();
       controller.addError(StateError('Exceeded maximum handler count'));
       controller.close();
 
-      return ClientStreamingBidiStream<FileChunk>(
-        BidiStream<FileChunk, RpcNull>(
+      return ClientStreamingBidiStream<FileChunk, UploadResult>(
+        BidiStream<FileChunk, UploadResult>(
           responseStream: controller.stream,
           sendFunction: (_) {},
           closeFunction: () => Future.value(),
@@ -248,12 +250,12 @@ base class ServerFileService extends FileServiceContract {
       // Сбрасываем все флаги, чтобы избежать дедлока
       resetHandlerCount();
       // Генерируем ошибку чтобы прервать цикл
-      final controller = StreamController<RpcNull>();
+      final controller = StreamController<UploadResult>();
       controller.addError(StateError('Handler already processing'));
       controller.close();
 
-      return ClientStreamingBidiStream<FileChunk>(
-        BidiStream<FileChunk, RpcNull>(
+      return ClientStreamingBidiStream<FileChunk, UploadResult>(
+        BidiStream<FileChunk, UploadResult>(
           responseStream: controller.stream,
           sendFunction: (_) {},
           closeFunction: () => Future.value(),
@@ -267,12 +269,12 @@ base class ServerFileService extends FileServiceContract {
     // Регистрируем сессию в менеджере
     if (!_sessionManager.activateSession(sessionId)) {
       print('ERROR: Failed to activate session $sessionId');
-      final controller = StreamController<RpcNull>();
+      final controller = StreamController<UploadResult>();
       controller.addError(StateError('Failed to activate session'));
       controller.close();
 
-      return ClientStreamingBidiStream<FileChunk>(
-        BidiStream<FileChunk, RpcNull>(
+      return ClientStreamingBidiStream<FileChunk, UploadResult>(
+        BidiStream<FileChunk, UploadResult>(
           responseStream: controller.stream,
           sendFunction: (_) {},
           closeFunction: () => Future.value(),
@@ -288,7 +290,7 @@ base class ServerFileService extends FileServiceContract {
 
     // Создаем потоки для запросов и ответов
     final requestController = StreamController<FileChunk>();
-    final responseController = StreamController<RpcNull>();
+    final responseController = StreamController<UploadResult>();
 
     // Создаем отметку времени для отслеживания длительности обработки
     final startTime = DateTime.now().millisecondsSinceEpoch;
@@ -412,7 +414,7 @@ base class ServerFileService extends FileServiceContract {
     processFile();
 
     // Создаем BidiStream с нашими контроллерами
-    final bidiStream = BidiStream<FileChunk, RpcNull>(
+    final bidiStream = BidiStream<FileChunk, UploadResult>(
       responseStream: responseController.stream,
       sendFunction: (chunk) {
         if (requestController.isClosed) {
@@ -446,7 +448,7 @@ base class ServerFileService extends FileServiceContract {
 
     print(
         'Server: BidiStream created for session $sessionId, wrapping in ClientStreamingBidiStream');
-    return ClientStreamingBidiStream<FileChunk>(bidiStream);
+    return ClientStreamingBidiStream<FileChunk, UploadResult>(bidiStream);
   }
 }
 
@@ -457,14 +459,16 @@ base class ClientFileService extends FileServiceContract {
   ClientFileService(this.client);
 
   @override
-  ClientStreamingBidiStream<FileChunk> uploadFile() {
+  ClientStreamingBidiStream<FileChunk, UploadResult> uploadFile() {
     print('Client: Creating file upload stream');
     return client
         .clientStreaming(
           serviceName: serviceName,
           methodName: FileServiceContract.uploadFileMethod,
         )
-        .call<FileChunk>();
+        .call<FileChunk, UploadResult>(
+          responseParser: UploadResult.fromJson,
+        );
   }
 }
 
@@ -842,8 +846,8 @@ base class ServerFileServiceWithError extends ServerFileService {
   }
 
   // Защищенная версия uploadFile для сервиса с ошибкой
-  ClientStreamingBidiStream<FileChunk> _uploadFileWithSessionError(
-      String sessionId) {
+  ClientStreamingBidiStream<FileChunk, UploadResult>
+      _uploadFileWithSessionError(String sessionId) {
     print('Error Service: Processing upload with session ID: $sessionId');
 
     // Если сессия уже существует, вернем ошибку
@@ -852,13 +856,13 @@ base class ServerFileServiceWithError extends ServerFileService {
       print(
           'ERROR: Attempting to process session $sessionId that is already active in error service!');
 
-      final controller = StreamController<RpcNull>();
+      final controller = StreamController<UploadResult>();
       controller.addError(StateError(
           'Session $sessionId already being processed in error service'));
       controller.close();
 
-      return ClientStreamingBidiStream<FileChunk>(
-        BidiStream<FileChunk, RpcNull>(
+      return ClientStreamingBidiStream<FileChunk, UploadResult>(
+        BidiStream<FileChunk, UploadResult>(
           responseStream: controller.stream,
           sendFunction: (_) {},
           closeFunction: () => Future.value(),
@@ -869,7 +873,7 @@ base class ServerFileServiceWithError extends ServerFileService {
     // Создаем контроллер для чанков
     final requestController = StreamController<FileChunk>();
     // Создаем контроллер для ответов
-    final responseController = StreamController<RpcNull>();
+    final responseController = StreamController<UploadResult>();
 
     // Создаем отметку времени для отслеживания длительности обработки
     final startTime = DateTime.now().millisecondsSinceEpoch;
@@ -953,7 +957,7 @@ base class ServerFileServiceWithError extends ServerFileService {
     processFile();
 
     // Создаем BidiStream с нашими контроллерами
-    final bidiStream = BidiStream<FileChunk, RpcNull>(
+    final bidiStream = BidiStream<FileChunk, UploadResult>(
       responseStream: responseController.stream,
       sendFunction: (chunk) {
         if (!requestController.isClosed) {
@@ -1014,11 +1018,11 @@ base class ServerFileServiceWithError extends ServerFileService {
 
     print(
         'Error Service: BidiStream created for session $sessionId, wrapping in ClientStreamingBidiStream');
-    return ClientStreamingBidiStream<FileChunk>(bidiStream);
+    return ClientStreamingBidiStream<FileChunk, UploadResult>(bidiStream);
   }
 
   @override
-  ClientStreamingBidiStream<FileChunk> uploadFile() {
+  ClientStreamingBidiStream<FileChunk, UploadResult> uploadFile() {
     // Увеличиваем счетчик созданных обработчиков
     _handlerCount++;
     print('Error Service: Handler count increased to $_handlerCount');
@@ -1030,13 +1034,13 @@ base class ServerFileServiceWithError extends ServerFileService {
       // Сбрасываем счетчик перед генерацией ошибки
       resetHandlerCount();
       // Генерируем ошибку чтобы прервать цикл создания обработчиков
-      final controller = StreamController<RpcNull>();
+      final controller = StreamController<UploadResult>();
       controller.addError(
           StateError('Exceeded maximum handler count in error service'));
       controller.close();
 
-      return ClientStreamingBidiStream<FileChunk>(
-        BidiStream<FileChunk, RpcNull>(
+      return ClientStreamingBidiStream<FileChunk, UploadResult>(
+        BidiStream<FileChunk, UploadResult>(
           responseStream: controller.stream,
           sendFunction: (_) {},
           closeFunction: () => Future.value(),
@@ -1051,12 +1055,12 @@ base class ServerFileServiceWithError extends ServerFileService {
       // Сбрасываем все флаги, чтобы избежать дедлока
       resetHandlerCount();
       // Генерируем ошибку чтобы прервать цикл
-      final controller = StreamController<RpcNull>();
+      final controller = StreamController<UploadResult>();
       controller.addError(StateError('Error handler already processing'));
       controller.close();
 
-      return ClientStreamingBidiStream<FileChunk>(
-        BidiStream<FileChunk, RpcNull>(
+      return ClientStreamingBidiStream<FileChunk, UploadResult>(
+        BidiStream<FileChunk, UploadResult>(
           responseStream: controller.stream,
           sendFunction: (_) {},
           closeFunction: () => Future.value(),
@@ -1075,13 +1079,13 @@ base class ServerFileServiceWithError extends ServerFileService {
           'WARNING: Session $sessionId already active in global manager for error service!');
 
       // Генерируем ошибку для защиты от дублирования
-      final controller = StreamController<RpcNull>();
+      final controller = StreamController<UploadResult>();
       controller.addError(StateError(
           'Session manager rejected session $sessionId for error service'));
       controller.close();
 
-      return ClientStreamingBidiStream<FileChunk>(
-        BidiStream<FileChunk, RpcNull>(
+      return ClientStreamingBidiStream<FileChunk, UploadResult>(
+        BidiStream<FileChunk, UploadResult>(
           responseStream: controller.stream,
           sendFunction: (_) {},
           closeFunction: () => Future.value(),

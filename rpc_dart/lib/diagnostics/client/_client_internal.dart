@@ -618,7 +618,8 @@ class _RpcDiagnosticClientInternal implements IRpcDiagnosticClient {
   /// await logStream.finishSending();
   /// await logStream.close();
   /// ```
-  ClientStreamingBidiStream<RpcMetric<RpcLoggerMetric>> createLogStream() {
+  ClientStreamingBidiStream<RpcMetric<RpcLoggerMetric>, RpcNull>
+      createLogStream() {
     if (!_enabled || !options.loggingEnabled) {
       throw RpcCustomException(
         customMessage: 'Логирование отключено в настройках диагностики',

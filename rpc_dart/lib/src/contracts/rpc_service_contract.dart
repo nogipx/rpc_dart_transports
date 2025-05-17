@@ -195,13 +195,15 @@ abstract class RpcServiceContract
   }
 
   @override
-  void addClientStreamingMethod<Request extends IRpcSerializableMessage>({
+  void addClientStreamingMethod<Request extends IRpcSerializableMessage,
+      Response extends IRpcSerializableMessage>({
     required String methodName,
-    required RpcMethodClientStreamHandler<Request> handler,
+    required RpcMethodClientStreamHandler<Request, Response> handler,
     required RpcMethodArgumentParser<Request> argumentParser,
+    required RpcMethodResponseParser<Response> responseParser,
   }) {
     _methods.add(
-      RpcMethodContract<Request, RpcNull>(
+      RpcMethodContract<Request, Response>(
         serviceName: serviceName,
         methodName: methodName,
         methodType: RpcMethodType.clientStreaming,
@@ -210,6 +212,7 @@ abstract class RpcServiceContract
 
     _handlers[methodName] = handler;
     _argumentParsers[methodName] = argumentParser;
+    _responseParsers[methodName] = responseParser;
   }
 
   @override

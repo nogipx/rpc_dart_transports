@@ -362,8 +362,8 @@ void main() {
 
         // Проверяем тип
         final typedClientStream = dummyStream.toClientStreaming();
-        expect(
-            typedClientStream, isA<ClientStreamingBidiStream<TestMessage>>());
+        expect(typedClientStream,
+            isA<ClientStreamingBidiStream<TestMessage, TestMessage>>());
 
         // Не закрываем контроллер сразу, чтобы ClientStreamingBidiStream мог получить ответ
       });
@@ -387,7 +387,8 @@ void main() {
             isA<ServerStreamingBidiStream<TestMessage, TestMessage>>());
 
         final clientStream = generator.createClientStreaming();
-        expect(clientStream, isA<ClientStreamingBidiStream<TestMessage>>());
+        expect(clientStream,
+            isA<ClientStreamingBidiStream<TestMessage, TestMessage>>());
       });
     });
   });

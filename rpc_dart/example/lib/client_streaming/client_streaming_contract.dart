@@ -9,6 +9,8 @@ abstract final class StreamServiceContract extends RpcServiceContract {
 
   static const nameProcessDataBlocks = 'processDataBlocks';
   static const nameProcessDataBlocksNoResponse = 'processDataBlocksNoResponse';
+  static const nameProcessDataBlocksWithResponse =
+      'processDataBlocksWithResponse';
 
   @override
   void setup() {
@@ -26,14 +28,27 @@ abstract final class StreamServiceContract extends RpcServiceContract {
       argumentParser: DataBlock.fromJson,
     );
 
+    // Метод обработки блоков данных с возвратом результата после завершения обработки
+    addClientStreamingMethod<DataBlock, DataBlockResult>(
+      methodName: nameProcessDataBlocksWithResponse,
+      handler: processDataBlocksWithResponse,
+      argumentParser: DataBlock.fromJson,
+      responseParser: DataBlockResult.fromJson,
+    );
+
     super.setup();
   }
 
   // Абстрактный метод, который должен быть реализован
-  ClientStreamingBidiStream<DataBlock> processDataBlocks();
+  ClientStreamingBidiStream<DataBlock, RpcNull> processDataBlocks();
 
   // Абстрактный метод без ожидания ответа
-  ClientStreamingBidiStream<DataBlock> processDataBlocksNoResponse();
+  ClientStreamingBidiStream<DataBlock, RpcNull> processDataBlocksNoResponse();
+
+  // Абстрактный метод с возвратом результата после обработки всех блоков
+  Stream<DataBlockResult> processDataBlocksWithResponse(
+    Stream<DataBlock> requests,
+  );
 }
 
 /// Серверная реализация StreamService
@@ -41,7 +56,7 @@ final class ServerStreamService extends StreamServiceContract {
   RpcLogger get _logger => RpcLogger('ServerStreamService');
 
   @override
-  ClientStreamingBidiStream<DataBlock> processDataBlocks() {
+  ClientStreamingBidiStream<DataBlock, RpcNull> processDataBlocks() {
     _logger.debug('Создание обработчика для блоков файла');
 
     final bidiStream =
@@ -94,11 +109,11 @@ final class ServerStreamService extends StreamServiceContract {
           }
         }).create();
 
-    return ClientStreamingBidiStream<DataBlock>(bidiStream);
+    return ClientStreamingBidiStream<DataBlock, RpcNull>(bidiStream);
   }
 
   @override
-  ClientStreamingBidiStream<DataBlock> processDataBlocksNoResponse() {
+  ClientStreamingBidiStream<DataBlock, RpcNull> processDataBlocksNoResponse() {
     _logger.debug('Создание обработчика для блоков файла без ожидания ответа');
 
     final bidiStream =
@@ -141,7 +156,67 @@ final class ServerStreamService extends StreamServiceContract {
         }).create();
 
     // Используем новую версию с упрощенным конструктором
-    return ClientStreamingBidiStream<DataBlock>(bidiStream);
+    return ClientStreamingBidiStream<DataBlock, RpcNull>(bidiStream);
+  }
+
+  @override
+  Stream<DataBlockResult> processDataBlocksWithResponse(
+    Stream<DataBlock> requests,
+  ) async* {
+    _logger.debug('Начата обработка блоков файла с возвратом результата');
+
+    // Счетчики для обработки файла
+    int blockCount = 0; // Количество блоков
+    int totalSize = 0; // Общий размер файла в байтах
+    String metadata = ''; // Метаданные файла
+    final startTime = DateTime.now();
+
+    try {
+      // Получаем блоки данных из потока
+      await for (final block in requests) {
+        blockCount++;
+        totalSize += block.data.length;
+
+        // Сохраняем метаданные из первого блока
+        if (metadata.isEmpty && block.metadata.isNotEmpty) {
+          metadata = block.metadata;
+        }
+
+        _logger.debug(
+          'Получен блок #${block.index}: ${block.data.length} байт (с ответом)',
+        );
+
+        // Имитация обработки
+        if (block.data.length > 1000) {
+          _logger.debug('Обработка большого блока данных (с ответом)...');
+          await Future.delayed(Duration(milliseconds: 15));
+        }
+      }
+
+      final endTime = DateTime.now();
+      final duration = endTime.difference(startTime);
+
+      _logger.debug(
+        'Завершена обработка $blockCount блоков, общий размер: $totalSize байт',
+      );
+
+      // Создаем и возвращаем результат обработки
+      yield DataBlockResult(
+        blockCount: blockCount,
+        totalSize: totalSize,
+        metadata: metadata,
+        processingTime: '${duration.inMilliseconds} мс',
+      );
+
+      _logger.debug('Результат обработки отправлен клиенту');
+    } catch (error, trace) {
+      _logger.error(
+        'Произошла ошибка при обработке файла с ответом',
+        error: error,
+        stackTrace: trace,
+      );
+      rethrow;
+    }
   }
 }
 
@@ -152,20 +227,42 @@ final class ClientStreamService extends StreamServiceContract {
   ClientStreamService(this._endpoint);
 
   @override
-  ClientStreamingBidiStream<DataBlock> processDataBlocks() =>
+  ClientStreamingBidiStream<DataBlock, RpcNull> processDataBlocks() =>
       _endpoint
           .clientStreaming(
             serviceName: serviceName,
             methodName: StreamServiceContract.nameProcessDataBlocks,
           )
-          .call<DataBlock>();
+          .call<DataBlock, RpcNull>();
 
   @override
-  ClientStreamingBidiStream<DataBlock> processDataBlocksNoResponse() =>
+  ClientStreamingBidiStream<DataBlock, RpcNull> processDataBlocksNoResponse() =>
       _endpoint
           .clientStreaming(
             serviceName: serviceName,
             methodName: StreamServiceContract.nameProcessDataBlocksNoResponse,
           )
-          .call<DataBlock>();
+          .call<DataBlock, RpcNull>(noResponse: true);
+
+  @override
+  Stream<DataBlockResult> processDataBlocksWithResponse(
+    Stream<DataBlock> requests,
+  ) {
+    throw UnimplementedError('Этот метод должен вызываться только на сервере');
+  }
+
+  /// Клиентский метод для отправки блоков с получением результата
+  ClientStreamingBidiStream<DataBlock, DataBlockResult>
+  processDataBlocksWithResultAfter() => _endpoint
+      .clientStreaming(
+        serviceName: serviceName,
+        methodName: StreamServiceContract.nameProcessDataBlocksWithResponse,
+      )
+      .call<DataBlock, DataBlockResult>(
+        responseParser:
+            (dynamic data) =>
+                data is Map<String, dynamic>
+                    ? DataBlockResult.fromJson(data)
+                    : data as DataBlockResult,
+      );
 }

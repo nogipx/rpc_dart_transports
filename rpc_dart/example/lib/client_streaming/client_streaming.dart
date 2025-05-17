@@ -65,6 +65,9 @@ Future<void> runClientStreamingExample({bool debug = false}) async {
 
     // Запускаем демонстрацию без ожидания ответа
     await demonstrateFileUploadWithoutResponse(clientService);
+
+    // Запускаем демонстрацию с получением результата
+    await demonstrateFileUploadWithResult(clientService);
   } catch (error, trace) {
     _logger.error('Произошла ошибка', error: error, stackTrace: trace);
     _logger.info('Закрываем эндпоинты...');
@@ -183,6 +186,78 @@ Future<void> demonstrateFileUploadWithoutResponse(
   } catch (e) {
     _logger.error(
       '❌ Ошибка при отправке файла',
+      error: {'error': e.toString()},
+    );
+  }
+}
+
+/// Демонстрирует процесс загрузки файла частями с получением результата обработки
+Future<void> demonstrateFileUploadWithResult(
+  ClientStreamService clientService,
+) async {
+  printHeader('Демонстрация загрузки файла с получением результата');
+
+  // Создаем тестовые данные (имитация большого файла)
+  _logger.info('📁 Подготовка тестовых данных...');
+  final fileData = List.generate(
+    8,
+    (i) => DataBlock(
+      index: i,
+      data: _generateData(80000, i).toList(), // 80 KB на блок
+      metadata:
+          'filename=test_file_with_result.dat;mime=application/octet-stream;chunkSize=80000',
+    ),
+  );
+
+  int totalSize = 0;
+  for (final block in fileData) {
+    totalSize += block.data.length;
+  }
+
+  try {
+    // Открываем поток для отправки данных с ожиданием результата
+    _logger.info(
+      '🔄 Открытие канала для отправки файла с ожиданием результата...',
+    );
+    final uploadStream = clientService.processDataBlocksWithResultAfter();
+
+    // Отправляем блоки файла
+    _logger.info('📤 Отправка файла частями...');
+
+    for (final block in fileData) {
+      // Отправляем каждый блок в потоке
+      uploadStream.send(block);
+      _logger.info(
+        '📦 Отправлен блок #${block.index}: ${block.data.length} байт',
+      );
+    }
+
+    // Завершаем отправку (это сигнализирует серверу, что все данные отправлены)
+    _logger.info('✅ Завершение отправки файла ($totalSize байт)');
+    await uploadStream.finishSending();
+
+    // Получаем результат обработки от сервера
+    _logger.info('⏳ Ожидание результата обработки от сервера...');
+    final result = await uploadStream.getResponse();
+
+    if (result != null) {
+      _logger.info('📊 Получен результат обработки:');
+      _logger.info('  • Количество блоков: ${result.blockCount}');
+      _logger.info('  • Общий размер: ${result.totalSize} байт');
+      _logger.info('  • Метаданные: ${result.metadata}');
+      _logger.info('  • Время обработки: ${result.processingTime}');
+    } else {
+      _logger.info('⚠️ Результат обработки не получен');
+    }
+
+    // Закрываем поток клиентской части
+    _logger.info('🔒 Канал отправки закрыт');
+    await uploadStream.close();
+
+    _logger.info('✅ Файл успешно отправлен и обработан!');
+  } catch (e) {
+    _logger.error(
+      '❌ Ошибка при отправке файла или получении результата',
       error: {'error': e.toString()},
     );
   }

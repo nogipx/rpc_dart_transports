@@ -32,9 +32,7 @@ extension BidiStreamExtensions<Request extends IRpcSerializableMessage,
   /// Преобразует двунаправленный стрим в клиентский стрим (много запросов → один ответ)
   ///
   /// Ограничивает стрим так, что он может получить только один ответ от сервера
-  ClientStreamingBidiStream<Request> toClientStreaming() {
-    return ClientStreamingBidiStream<Request>(
-      this as BidiStream<Request, RpcNull>,
-    );
+  ClientStreamingBidiStream<Request, Response> toClientStreaming() {
+    return ClientStreamingBidiStream<Request, Response>(this);
   }
 }

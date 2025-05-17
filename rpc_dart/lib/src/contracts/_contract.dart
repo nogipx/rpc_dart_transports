@@ -102,15 +102,18 @@ abstract interface class IRpcServiceContract<
     required RpcMethodResponseParser<Response> responseParser,
   });
 
-  /// Добавляет клиентский стриминговый метод в контракт
+  /// Добавляет клиентский стриминговый метод с ответом в контракт
   ///
   /// [methodName] - название метода
-  /// [handler] - обработчик, возвращающий [ClientStreamingBidiStream]
+  /// [handler] - обработчик, принимающий поток запросов и возвращающий поток ответов
   /// [argumentParser] - функция преобразования JSON в объект запроса
-  void addClientStreamingMethod<Request extends BaseMessage>({
+  /// [responseParser] - функция преобразования JSON в объект ответа
+  void addClientStreamingMethod<Request extends BaseMessage,
+      Response extends BaseMessage>({
     required String methodName,
-    required RpcMethodClientStreamHandler<Request> handler,
+    required RpcMethodClientStreamHandler<Request, Response> handler,
     required RpcMethodArgumentParser<Request> argumentParser,
+    required RpcMethodResponseParser<Response> responseParser,
   });
 
   /// Добавляет двунаправленный стриминговый метод в контракт
