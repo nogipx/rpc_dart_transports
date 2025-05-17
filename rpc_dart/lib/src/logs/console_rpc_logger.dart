@@ -7,10 +7,10 @@ part of '_logs.dart';
 typedef DefaultRpcLogger = _ConsoleRpcLogger;
 
 /// Реализация фильтра по умолчанию, основанная на минимальном уровне логирования
-class _DefaultRpcLoggerFilter implements IRpcLoggerFilter {
+class DefaultRpcLoggerFilter implements IRpcLoggerFilter {
   final RpcLoggerLevel minLogLevel;
 
-  _DefaultRpcLoggerFilter(this.minLogLevel);
+  DefaultRpcLoggerFilter(this.minLogLevel);
 
   @override
   bool shouldLog(RpcLoggerLevel level, String source) {
@@ -19,8 +19,8 @@ class _DefaultRpcLoggerFilter implements IRpcLoggerFilter {
 }
 
 /// Реализация форматтера по умолчанию
-class _DefaultRpcLoggerFormatter implements IRpcLoggerFormatter {
-  const _DefaultRpcLoggerFormatter();
+class DefaultRpcLoggerFormatter implements IRpcLoggerFormatter {
+  const DefaultRpcLoggerFormatter();
 
   @override
   String format(
@@ -56,7 +56,7 @@ class _ConsoleRpcLogger implements RpcLogger {
   final String name;
 
   /// Диагностический сервис для отправки логов
-  final IRpcDiagnosticService? _diagnosticService;
+  final IRpcDiagnosticClient? _diagnosticService;
 
   /// Минимальный уровень логов для отправки
   final RpcLoggerLevel _minLogLevel;
@@ -79,7 +79,7 @@ class _ConsoleRpcLogger implements RpcLogger {
   /// Создает новый логгер с указанными параметрами
   _ConsoleRpcLogger(
     this.name, {
-    IRpcDiagnosticService? diagnosticService,
+    IRpcDiagnosticClient? diagnosticService,
     RpcLoggerLevel minLogLevel = RpcLoggerLevel.info,
     bool consoleLoggingEnabled = true,
     bool coloredLoggingEnabled = true,
@@ -91,12 +91,12 @@ class _ConsoleRpcLogger implements RpcLogger {
         _consoleLoggingEnabled = consoleLoggingEnabled,
         _coloredLoggingEnabled = coloredLoggingEnabled,
         _logColors = logColors,
-        _filter = filter ?? _DefaultRpcLoggerFilter(minLogLevel),
-        _formatter = formatter ?? const _DefaultRpcLoggerFormatter();
+        _filter = filter ?? DefaultRpcLoggerFilter(minLogLevel),
+        _formatter = formatter ?? const DefaultRpcLoggerFormatter();
 
   @override
   RpcLogger withConfig({
-    IRpcDiagnosticService? diagnosticService,
+    IRpcDiagnosticClient? diagnosticService,
     RpcLoggerLevel? minLogLevel,
     bool? consoleLoggingEnabled,
     bool? coloredLoggingEnabled,
@@ -175,26 +175,14 @@ class _ConsoleRpcLogger implements RpcLogger {
     // Если включен цветной вывод, используем цвет
     if (_coloredLoggingEnabled) {
       final actualColor = color ?? _logColors.colorForLevel(level);
-      RpcColoredLogging.logColored(
-        logMessage,
-        actualColor,
-        isError: level.index >= RpcLoggerLevel.error.index,
-      );
+      _logColored(logMessage, actualColor);
 
       if (error != null) {
-        RpcColoredLogging.logColored(
-          '  Error details: $error',
-          actualColor,
-          isError: true,
-        );
+        _logColored('  Error details: $error', actualColor);
       }
 
       if (stackTrace != null) {
-        RpcColoredLogging.logColored(
-          '  Stack trace: \n$stackTrace',
-          actualColor,
-          isError: true,
-        );
+        _logColored('  Stack trace: \n$stackTrace', actualColor);
       }
     } else {
       // Обычный вывод без цвета
@@ -306,5 +294,18 @@ class _ConsoleRpcLogger implements RpcLogger {
       data: data,
       color: color,
     );
+  }
+
+  /// Возвращает строку с применённым цветом
+  ///
+  /// Если цветное логирование выключено, возвращает исходную строку
+  String _colorize(String message, AnsiColor color) {
+    return '${color.code}$message${AnsiColor.reset.code}';
+  }
+
+  /// Выводит сообщение в консоль с указанным цветом
+  void _logColored(String message, AnsiColor color) {
+    final coloredMessage = _colorize(message, color);
+    print(coloredMessage);
   }
 }

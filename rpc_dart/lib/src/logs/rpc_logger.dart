@@ -51,7 +51,7 @@ abstract interface class RpcLogger {
 
   /// Создает новый логгер с измененными настройками
   RpcLogger withConfig({
-    IRpcDiagnosticService? diagnosticService,
+    IRpcDiagnosticClient? diagnosticService,
     RpcLoggerLevel? minLogLevel,
     bool? consoleLoggingEnabled,
     bool? coloredLoggingEnabled,

@@ -5,12 +5,10 @@
 /// Этот файл экспортирует все компоненты системы логирования
 /// для использования внутри библиотеки и для внешних потребителей.
 
-import 'dart:io';
-
 import 'package:rpc_dart/diagnostics.dart';
 import 'package:rpc_dart/rpc_dart.dart';
 
 part 'rpc_logger.dart';
-part 'rpc_logger_style.dart';
+part 'rpc_logger_colors.dart';
 part 'console_rpc_logger.dart';
 part 'rpc_logger_metric.dart';
