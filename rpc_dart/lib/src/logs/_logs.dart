@@ -12,3 +12,4 @@ part 'rpc_logger.dart';
 part 'rpc_logger_colors.dart';
 part 'console_rpc_logger.dart';
 part 'rpc_logger_metric.dart';
+part 'rpc_logger_registry.dart';

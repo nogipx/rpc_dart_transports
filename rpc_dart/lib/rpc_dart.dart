@@ -14,3 +14,5 @@ export 'src/middleware/_index.dart';
 export 'src/serialization/_index.dart';
 export 'src/streams/_index.dart';
 export 'src/transport/_index.dart';
+
+export 'logger.dart';

@@ -49,6 +49,11 @@ abstract interface class RpcLogger {
   /// Имя логгера, обычно название компонента или модуля
   String get name;
 
+  /// Создает новый логгер с указанным именем
+  factory RpcLogger(String loggerName) {
+    return _RpcLoggerRegistry.instance.get(loggerName);
+  }
+
   /// Создает новый логгер с измененными настройками
   RpcLogger withConfig({
     IRpcDiagnosticClient? diagnosticService,
@@ -66,8 +71,8 @@ abstract interface class RpcLogger {
     required String message,
     String? context,
     String? requestId,
-    Map<String, dynamic>? error,
-    String? stackTrace,
+    Object? error,
+    StackTrace? stackTrace,
     Map<String, dynamic>? data,
     AnsiColor? color,
   });
@@ -104,8 +109,8 @@ abstract interface class RpcLogger {
     required String message,
     String? context,
     String? requestId,
-    Map<String, dynamic>? error,
-    String? stackTrace,
+    Object? error,
+    StackTrace? stackTrace,
     Map<String, dynamic>? data,
     AnsiColor? color,
   });
@@ -115,30 +120,9 @@ abstract interface class RpcLogger {
     required String message,
     String? context,
     String? requestId,
-    Map<String, dynamic>? error,
-    String? stackTrace,
+    Object? error,
+    StackTrace? stackTrace,
     Map<String, dynamic>? data,
     AnsiColor? color,
   });
-
-  /// Статический фабричный метод для создания нового логгера
-  static RpcLoggerFactory? _factory;
-
-  /// Устанавливает фабрику для создания логгеров
-  static set factory(RpcLoggerFactory newFactory) {
-    _factory = newFactory;
-  }
-
-  /// Создает новый логгер с указанным именем
-  factory RpcLogger(String loggerName) {
-    if (_factory == null) {
-      return DefaultRpcLogger(loggerName);
-    }
-    return _factory!(loggerName);
-  }
-
-  /// Получает логгер с указанным именем
-  factory RpcLogger.get(String loggerName) {
-    return RpcLogger(loggerName);
-  }
 }
