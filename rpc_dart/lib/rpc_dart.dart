@@ -9,6 +9,7 @@ library rpc_dart;
 export 'src/contracts/_index.dart';
 export 'src/endpoint/_index.dart';
 export 'src/message/_index.dart';
+export 'src/message_service/_index.dart';
 export 'src/methods/_method.dart';
 export 'src/middleware/_index.dart';
 export 'src/serialization/_index.dart';

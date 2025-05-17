@@ -32,7 +32,10 @@ enum RpcMessageType {
   pong,
   ;
 
-  static RpcMessageType fromString(String type) {
+  static RpcMessageType fromString(String? type) {
+    if (type == null) {
+      return RpcMessageType.unknown;
+    }
     return RpcMessageType.values.firstWhere(
       (e) => e.name == type,
       orElse: () => RpcMessageType.unknown,

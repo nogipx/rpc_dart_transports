@@ -250,23 +250,7 @@ final class _RpcEngineImpl implements IRpcEngine {
       return;
     }
 
-    // Добавляем логи для отладки поиска метода
-    final hasRegistryMethod =
-        _registry.findMethod(serviceName, methodName) != null;
-
-    print("\n=== DEBUG _handleRequest ===");
-    print("Поиск метода: $serviceName.$methodName");
-    print("В registry: ${hasRegistryMethod ? 'Найден' : 'Не найден'}");
-    final methods = _registry.getMethodsForService(serviceName);
-    print("Все методы в registry для $serviceName:");
-    for (final method in methods) {
-      print("  - ${method.methodName} (${method.methodType})");
-    }
-    print("==========================\n");
-
-    // Проверяем наличие обработчика сначала в реестре
     var methodHandler = _registry.findMethod(serviceName, methodName);
-
     if (methodHandler == null) {
       await _sendErrorMessage(
         message.id,
@@ -426,9 +410,10 @@ final class _RpcEngineImpl implements IRpcEngine {
     }
 
     // Проверяем, содержит ли ответ маркер статуса
-    if (message.payload is Map<String, dynamic> &&
-        message.payload['_isServiceMessage'] == true &&
-        message.payload['_markerType'] == RpcMarkerType.status.name) {
+    if (RpcServiceMarker.checkIsServiceMessage(
+      message.payload,
+      specificMarkerType: RpcMarkerType.status,
+    )) {
       try {
         // Парсим маркер статуса
         final statusMarker = RpcStatusMarker.fromJson(message.payload);
@@ -460,14 +445,12 @@ final class _RpcEngineImpl implements IRpcEngine {
 
     // Обработка пустых данных для совместимости с MsgPack
     dynamic payload = message.payload;
-    if (payload is Map && payload['_empty'] == true) {
-      payload = {}; // Преобразуем пустой маркер в пустой объект
+    if (RpcServiceMarker.checkIsEmptyServiceMessage(payload)) {
+      payload = {};
     }
 
     // Проверяем, является ли сообщение служебным маркером
-    if (payload is Map<String, dynamic> &&
-        payload['_isServiceMessage'] == true &&
-        payload['_markerType'] != null) {
+    if (RpcServiceMarker.checkIsServiceMessage(payload)) {
       try {
         // Создаем локальный обработчик маркеров, который замыкает текущее сообщение
         final localMarkerHandler = RpcMarkerHandler(
