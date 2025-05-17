@@ -63,8 +63,7 @@ class ProgressMessage implements IRpcSerializableMessage {
 }
 
 // Контракт сервиса для тестирования серверного стриминга
-abstract base class TaskServiceContract
-    extends RpcServiceContract<IRpcSerializableMessage> {
+abstract base class TaskServiceContract extends RpcServiceContract {
   TaskServiceContract() : super('TaskService');
 
   // Константа для имени метода

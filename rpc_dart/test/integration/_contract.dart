@@ -31,11 +31,10 @@ abstract base class TestRpcContract extends RpcServiceContract {
     );
 
     // Клиентский стриминг
-    addClientStreamingMethod<TestRequest, TestResponse>(
+    addClientStreamingMethod<TestRequest>(
       methodName: clientStreamMethod,
       handler: clientStreamOperation,
       argumentParser: TestRequest.fromJson,
-      responseParser: TestResponse.fromJson,
     );
 
     // Двунаправленный стриминг
@@ -51,7 +50,7 @@ abstract base class TestRpcContract extends RpcServiceContract {
   // Абстрактные методы для реализации
   Future<TestResponse> unaryRequestOperation(TestRequest request);
 
-  ClientStreamingBidiStream<TestRequest, TestResponse> clientStreamOperation();
+  ClientStreamingBidiStream<TestRequest> clientStreamOperation();
 
   ServerStreamingBidiStream<TestRequest, TestStreamResponse>
       serverStreamOperation(TestRequest request);
@@ -72,30 +71,23 @@ final class ServerTestRpcService extends TestRpcContract {
   }
 
   @override
-  ClientStreamingBidiStream<TestRequest, TestResponse> clientStreamOperation() {
+  ClientStreamingBidiStream<TestRequest> clientStreamOperation() {
     final bidiStream =
-        BidiStreamGenerator<TestRequest, TestResponse>((requestStream) async* {
-      int sum = 0;
+        BidiStreamGenerator<TestRequest, RpcNull>((requestStream) async* {
       List<String> ids = [];
 
       // Получаем поток запросов
       await for (final request in requestStream) {
-        sum += request.count;
         if (request.requestId.isNotEmpty) {
           ids.add(request.requestId);
         }
         await Future.delayed(Duration(milliseconds: 10));
       }
 
-      final response = TestResponse(
-        result: sum,
-        info: 'Получено запросов: ${ids.isEmpty ? "без ID" : ids.join(", ")}',
-      );
-
-      yield response;
+      yield RpcNull();
     }).create();
 
-    return ClientStreamingBidiStream<TestRequest, TestResponse>(bidiStream);
+    return ClientStreamingBidiStream<TestRequest>(bidiStream);
   }
 
   @override
@@ -178,15 +170,13 @@ final class ClientTestRpcService extends TestRpcContract {
   }
 
   @override
-  ClientStreamingBidiStream<TestRequest, TestResponse> clientStreamOperation() {
+  ClientStreamingBidiStream<TestRequest> clientStreamOperation() {
     return _endpoint
         .clientStreaming(
           serviceName: serviceName,
           methodName: TestRpcContract.clientStreamMethod,
         )
-        .call<TestRequest, TestResponse>(
-          responseParser: TestResponse.fromJson,
-        );
+        .call<TestRequest>();
   }
 
   @override

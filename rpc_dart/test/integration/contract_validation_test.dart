@@ -67,8 +67,7 @@ class NotificationMessage implements IRpcSerializableMessage {
 }
 
 // Контракт сервиса пользователей
-abstract base class UserServiceContract
-    extends RpcServiceContract<IRpcSerializableMessage> {
+abstract base class UserServiceContract extends RpcServiceContract {
   UserServiceContract() : super('UserService');
 
   RpcEndpoint? get client;

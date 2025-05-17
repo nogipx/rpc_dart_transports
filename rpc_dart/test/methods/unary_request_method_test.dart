@@ -53,8 +53,7 @@ class CalculationResponse implements IRpcSerializableMessage {
 }
 
 // Контракт сервиса калькулятора
-abstract base class CalculatorServiceContract
-    extends RpcServiceContract<IRpcSerializableMessage> {
+abstract base class CalculatorServiceContract extends RpcServiceContract {
   CalculatorServiceContract() : super('CalculatorService');
 
   RpcEndpoint? get client;

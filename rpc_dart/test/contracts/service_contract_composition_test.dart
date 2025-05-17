@@ -63,7 +63,7 @@ class ChildResponse extends TestMessage {
 }
 
 // Определение контрактов для тестов
-class RootContract extends RpcServiceContract<TestMessage> {
+class RootContract extends RpcServiceContract {
   RootContract() : super('RootService');
 
   @override
@@ -85,7 +85,7 @@ class RootContract extends RpcServiceContract<TestMessage> {
   }
 }
 
-class ChildContract extends RpcServiceContract<TestMessage> {
+class ChildContract extends RpcServiceContract {
   ChildContract(String serviceName) : super(serviceName);
 
   @override
@@ -103,7 +103,7 @@ class ChildContract extends RpcServiceContract<TestMessage> {
 }
 
 // Многоуровневая композиция
-class GrandchildContract extends RpcServiceContract<TestMessage> {
+class GrandchildContract extends RpcServiceContract {
   GrandchildContract() : super('GrandchildService');
 
   @override
@@ -119,7 +119,7 @@ class GrandchildContract extends RpcServiceContract<TestMessage> {
   }
 }
 
-class NestedCompositionContract extends RpcServiceContract<TestMessage> {
+class NestedCompositionContract extends RpcServiceContract {
   NestedCompositionContract() : super('NestedService');
 
   @override
@@ -137,8 +137,8 @@ void main() {
   group('Композиция сервисных контрактов', () {
     late MemoryTransport clientTransport;
     late MemoryTransport serverTransport;
-    late RpcEndpoint<TestMessage> clientEndpoint;
-    late RpcEndpoint<TestMessage> serverEndpoint;
+    late RpcEndpoint clientEndpoint;
+    late RpcEndpoint serverEndpoint;
 
     setUp(() {
       // Создаем транспорты
@@ -150,12 +150,12 @@ void main() {
       serverTransport.connect(clientTransport);
 
       // Создаем эндпоинты
-      clientEndpoint = RpcEndpoint<TestMessage>(
+      clientEndpoint = RpcEndpoint(
         transport: clientTransport,
         debugLabel: 'client',
       );
 
-      serverEndpoint = RpcEndpoint<TestMessage>(
+      serverEndpoint = RpcEndpoint(
         transport: serverTransport,
         debugLabel: 'server',
       );

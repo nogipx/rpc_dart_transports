@@ -32,8 +32,7 @@ class ChatMessage implements IRpcSerializableMessage {
 }
 
 // Контракт чат-сервиса
-abstract base class ChatServiceContract
-    extends RpcServiceContract<IRpcSerializableMessage> {
+abstract base class ChatServiceContract extends RpcServiceContract {
   ChatServiceContract() : super('ChatService');
 
   RpcEndpoint? get client;
