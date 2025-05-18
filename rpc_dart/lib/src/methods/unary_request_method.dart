@@ -161,34 +161,6 @@ final class UnaryRequestRpcMethod<T extends IRpcSerializableMessage>
     }
   }
 
-  /// Создает адаптер для хэндлера, который поможет преобразовать
-  /// ожидаемый тип запроса из контекста
-  Future<dynamic> Function(RpcMethodContext)
-      _createHandlerAdapter<Request extends T, Response extends T>(
-    RpcMethodUnaryHandler<Request, Response> handler,
-    RpcMethodArgumentParser<Request> requestParser,
-  ) {
-    return (RpcMethodContext context) async {
-      Request typedRequest;
-      if (context.payload is Map<String, dynamic>) {
-        typedRequest = requestParser(context.payload);
-      } else if (context.payload is Request) {
-        typedRequest = context.payload as Request;
-      } else {
-        _logger?.error(
-          'Ошибка при приведении типа запроса: ожидался Map<String, dynamic> или ${Request.toString()}, но получен ${context.payload.runtimeType}',
-        );
-        throw RpcCustomException(
-          customMessage:
-              'Несовместимый тип запроса: ${context.payload.runtimeType}',
-          debugLabel: 'RpcMethodUnaryHandler.handler',
-        );
-      }
-
-      return await handler(typedRequest);
-    };
-  }
-
   /// Регистрирует обработчик унарного метода
   ///
   /// [handler] - функция обработки запроса
@@ -242,7 +214,11 @@ final class UnaryRequestRpcMethod<T extends IRpcSerializableMessage>
     );
 
     // Создаем адаптер хэндлера
-    final handlerAdapter = _createHandlerAdapter(handler, requestParser);
+    final handlerAdapter = RpcMethodAdapterFactory.createUnaryHandlerAdapter(
+      handler,
+      requestParser,
+      'UnaryRequestRpcMethod.register',
+    );
 
     // Регистрируем низкоуровневый обработчик - это ключевой шаг для обеспечения
     // связи между контрактом и обработчиком вызова

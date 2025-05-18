@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-import 'package:test/test.dart';
 import 'package:rpc_dart/rpc_dart.dart';
+import 'package:test/test.dart';
 import 'fixtures/test_contract.dart';
 
 // Определение сообщений для тестов
@@ -34,6 +34,9 @@ class TestMessage implements IRpcSerializableMessage {
 class RootRequest extends TestMessage {
   RootRequest(super.data);
 
+  // Свойство payload, возвращающее сам объект для совместимости с RpcMethodContext
+  get payload => this;
+
   factory RootRequest.fromJson(Map<String, dynamic> json) {
     return RootRequest(json['data'] as String? ?? '');
   }
@@ -49,6 +52,9 @@ class RootResponse extends TestMessage {
 
 class ChildRequest extends TestMessage {
   ChildRequest(super.data);
+
+  // Свойство payload, возвращающее сам объект для совместимости с RpcMethodContext
+  get payload => this;
 
   factory ChildRequest.fromJson(Map<String, dynamic> json) {
     return ChildRequest(json['data'] as String? ?? '');
@@ -85,25 +91,9 @@ class RootContract extends RpcServiceContract {
     super.setup();
   }
 
-  Future<RootResponse> _rootMethodHandler(dynamic context) async {
-    final RootRequest req;
-
-    if (context is Map<String, dynamic>) {
-      req = RootRequest.fromJson(context);
-    } else if (context is RootRequest) {
-      req = context;
-    } else {
-      final payload = (context as dynamic).payload;
-      if (payload is RootRequest) {
-        req = payload;
-      } else if (payload is Map<String, dynamic>) {
-        req = RootRequest.fromJson(payload);
-      } else {
-        throw Exception('Неожиданный тип запроса: ${context.runtimeType}');
-      }
-    }
-
-    return RootResponse('root:${req.data}');
+  // Обновленный обработчик, который принимает уже типизированный запрос
+  Future<RootResponse> _rootMethodHandler(RootRequest request) async {
+    return RootResponse('root:${request.data}');
   }
 }
 
@@ -123,25 +113,9 @@ class ChildContract extends RpcServiceContract {
     super.setup();
   }
 
-  Future<ChildResponse> _childMethodHandler(dynamic context) async {
-    final ChildRequest req;
-
-    if (context is Map<String, dynamic>) {
-      req = ChildRequest.fromJson(context);
-    } else if (context is ChildRequest) {
-      req = context;
-    } else {
-      final payload = (context as dynamic).payload;
-      if (payload is ChildRequest) {
-        req = payload;
-      } else if (payload is Map<String, dynamic>) {
-        req = ChildRequest.fromJson(payload);
-      } else {
-        throw Exception('Неожиданный тип запроса: ${context.runtimeType}');
-      }
-    }
-
-    return ChildResponse('$serviceName:${req.data}');
+  // Обновленный обработчик, который принимает уже типизированный запрос
+  Future<ChildResponse> _childMethodHandler(ChildRequest request) async {
+    return ChildResponse('$serviceName:${request.data}');
   }
 }
 
@@ -161,25 +135,9 @@ class GrandchildContract extends RpcServiceContract {
     super.setup();
   }
 
-  Future<ChildResponse> _grandchildMethodHandler(dynamic context) async {
-    final ChildRequest req;
-
-    if (context is Map<String, dynamic>) {
-      req = ChildRequest.fromJson(context);
-    } else if (context is ChildRequest) {
-      req = context;
-    } else {
-      final payload = (context as dynamic).payload;
-      if (payload is ChildRequest) {
-        req = payload;
-      } else if (payload is Map<String, dynamic>) {
-        req = ChildRequest.fromJson(payload);
-      } else {
-        throw Exception('Неожиданный тип запроса: ${context.runtimeType}');
-      }
-    }
-
-    return ChildResponse('grandchild:${req.data}');
+  // Обновленный обработчик, который принимает уже типизированный запрос
+  Future<ChildResponse> _grandchildMethodHandler(ChildRequest request) async {
+    return ChildResponse('grandchild:${request.data}');
   }
 }
 

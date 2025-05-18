@@ -2,10 +2,34 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-import 'message_types.dart';
+import 'package:rpc_dart/rpc_dart.dart';
+
+/// Общий интерфейс для контекста RPC-операций
+abstract interface class IRpcContext {
+  /// Уникальный идентификатор сообщения/операции
+  String get messageId;
+
+  /// Имя сервиса (опционально)
+  String? get serviceName;
+
+  /// Имя метода (опционально)
+  String? get methodName;
+
+  /// Полезная нагрузка
+  dynamic get payload;
+
+  /// Метаданные сообщения
+  Map<String, dynamic>? get metadata;
+
+  /// Заголовочные метаданные
+  Map<String, dynamic>? get headerMetadata;
+
+  /// Трейлерные метаданные
+  Map<String, dynamic>? get trailerMetadata;
+}
 
 /// Класс, представляющий сообщение протокола
-final class RpcMessage {
+final class RpcMessage implements IRpcSerializableMessage, IRpcContext {
   /// Тип сообщения
   final RpcMessageType type;
 
@@ -18,13 +42,29 @@ final class RpcMessage {
   /// Имя метода (опционально)
   final String? method;
 
+  /// Методы для совместимости с IRpcContext
+  @override
+  String get messageId => id;
+
+  @override
+  String? get serviceName => service;
+
+  @override
+  String? get methodName => method;
+
+  @override
+  Map<String, dynamic>? get headerMetadata => metadata;
+
   /// Полезная нагрузка сообщения
+  @override
   final dynamic payload;
 
   /// Метаданные сообщения (заголовки)
+  @override
   final Map<String, dynamic>? metadata;
 
   /// Трейлерные метаданные сообщения (отправляются в конце)
+  @override
   final Map<String, dynamic>? trailerMetadata;
 
   /// Метка для отладки
@@ -57,6 +97,7 @@ final class RpcMessage {
   }
 
   /// Преобразует сообщение в JSON-объект
+  @override
   Map<String, dynamic> toJson() {
     return {
       'type': type.name,

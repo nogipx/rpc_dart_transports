@@ -119,6 +119,7 @@ final class RpcMethodRegistry implements IRpcMethodRegistry {
         continue;
       }
 
+      // Регистрируем метод с указанием типа для правильного создания адаптера
       registerMethod(
         serviceName: contract.serviceName,
         methodName: methodName,
@@ -158,11 +159,65 @@ final class RpcMethodRegistry implements IRpcMethodRegistry {
     // Создаем запись о методе в реестре
     _methods.putIfAbsent(serviceName, () => {});
 
+    // Оборачиваем обработчик в адаптер в зависимости от типа метода
+    dynamic adaptedHandler = handler;
+
+    // Только оборачиваем, если обработчик не является уже адаптером
+    // (проверяем по сигнатуре - адаптеры принимают RpcMethodContext)
+    if (handler != null && methodType != null && argumentParser != null) {
+      try {
+        // Используем RpcMethodAdapterFactory для создания нужного адаптера
+        switch (methodType) {
+          case RpcMethodType.unary:
+            adaptedHandler = RpcMethodAdapterFactory.createUnaryHandlerAdapter(
+              handler,
+              argumentParser as dynamic,
+              'RpcMethodRegistry.registerMethod',
+            );
+            break;
+          case RpcMethodType.serverStreaming:
+            adaptedHandler =
+                RpcMethodAdapterFactory.createServerStreamHandlerAdapter(
+              handler,
+              argumentParser as dynamic,
+              'RpcMethodRegistry.registerMethod',
+            );
+            break;
+          case RpcMethodType.clientStreaming:
+            adaptedHandler =
+                RpcMethodAdapterFactory.createClientStreamHandlerAdapter(
+              handler,
+            );
+            break;
+          case RpcMethodType.bidirectional:
+            adaptedHandler =
+                RpcMethodAdapterFactory.createBidirectionalHandlerAdapter(
+              handler,
+            );
+            break;
+          default:
+            // Если тип не известен, оставляем обработчик как есть
+            _logger.warning(
+                'Неизвестный тип метода $methodType для $serviceName.$methodName, обработчик не был обернут в адаптер');
+        }
+
+        _logger.debug(
+            'Handler для $serviceName.$methodName обернут в адаптер для типа $methodType');
+      } catch (e, stackTrace) {
+        _logger.error(
+            'Ошибка при создании адаптера для $serviceName.$methodName: $e',
+            error: e,
+            stackTrace: stackTrace);
+        // Используем исходный обработчик в случае ошибки
+        adaptedHandler = handler;
+      }
+    }
+
     final registration = MethodRegistration(
       serviceName: serviceName,
       methodName: methodName,
       methodType: methodType,
-      handler: handler,
+      handler: adaptedHandler,
       argumentParser: argumentParser,
       responseParser: responseParser,
     );

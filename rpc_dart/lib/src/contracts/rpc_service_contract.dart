@@ -217,12 +217,17 @@ abstract class RpcServiceContract
     required RpcMethodArgumentParser<Request> argumentParser,
     required RpcMethodResponseParser<Response> responseParser,
   }) {
-    // Регистрируем метод в реестре
+    final handlerAdapter = RpcMethodAdapterFactory.createUnaryHandlerAdapter(
+      handler,
+      argumentParser,
+      'RpcServiceContract.addUnaryRequestMethod',
+    );
+
     _methodRegistry.registerMethod(
       serviceName: serviceName,
       methodName: methodName,
       methodType: RpcMethodType.unary,
-      handler: handler,
+      handler: handlerAdapter,
       argumentParser: argumentParser,
       responseParser: responseParser,
     );
@@ -236,12 +241,18 @@ abstract class RpcServiceContract
     required RpcMethodArgumentParser<Request> argumentParser,
     required RpcMethodResponseParser<Response> responseParser,
   }) {
-    // Регистрируем метод в реестре
+    final handlerAdapter =
+        RpcMethodAdapterFactory.createServerStreamHandlerAdapter(
+      handler,
+      argumentParser,
+      'RpcServiceContract.addServerStreamingMethod',
+    );
+
     _methodRegistry.registerMethod(
       serviceName: serviceName,
       methodName: methodName,
       methodType: RpcMethodType.serverStreaming,
-      handler: handler,
+      handler: handlerAdapter,
       argumentParser: argumentParser,
       responseParser: responseParser,
     );
@@ -255,12 +266,16 @@ abstract class RpcServiceContract
     required RpcMethodArgumentParser<Request> argumentParser,
     required RpcMethodResponseParser<Response> responseParser,
   }) {
-    // Регистрируем метод в реестре
+    final handlerAdapter =
+        RpcMethodAdapterFactory.createClientStreamHandlerAdapter(
+      handler,
+    );
+
     _methodRegistry.registerMethod(
       serviceName: serviceName,
       methodName: methodName,
       methodType: RpcMethodType.clientStreaming,
-      handler: handler,
+      handler: handlerAdapter,
       argumentParser: argumentParser,
       responseParser: responseParser,
     );
@@ -274,12 +289,16 @@ abstract class RpcServiceContract
     required RpcMethodArgumentParser<Request> argumentParser,
     required RpcMethodResponseParser<Response> responseParser,
   }) {
-    // Регистрируем метод в реестре
+    final handlerAdapter =
+        RpcMethodAdapterFactory.createBidirectionalHandlerAdapter(
+      handler,
+    );
+
     _methodRegistry.registerMethod(
       serviceName: serviceName,
       methodName: methodName,
       methodType: RpcMethodType.bidirectional,
-      handler: handler,
+      handler: handlerAdapter,
       argumentParser: argumentParser,
       responseParser: responseParser,
     );

@@ -24,36 +24,110 @@ abstract class _RpcMetricsContract extends RpcServiceContract {
       responseParser: RpcNull.fromJson,
     );
 
+    // Для метрик задержки - используем специализированный адаптер и парсер
     addUnaryRequestMethod<RpcMetric, RpcNull>(
       methodName: methodLatencyMetric,
-      handler: (metric) => latencyMetric(metric as RpcMetric<RpcLatencyMetric>),
+      // Используем обертку для корректного приведения типа к RpcMetric<RpcLatencyMetric>
+      handler: (metric) => latencyMetric(_ensureLatencyMetric(metric)),
       argumentParser: RpcMetric.fromJson,
       responseParser: RpcNull.fromJson,
     );
 
+    // Для метрик стрима
     addUnaryRequestMethod<RpcMetric, RpcNull>(
       methodName: methodStreamMetric,
-      handler: (metric) => streamMetric(metric as RpcMetric<RpcStreamMetric>),
+      handler: (metric) => streamMetric(_ensureStreamMetric(metric)),
       argumentParser: RpcMetric.fromJson,
       responseParser: RpcNull.fromJson,
     );
 
+    // Для метрик ошибок
     addUnaryRequestMethod<RpcMetric, RpcNull>(
       methodName: methodErrorMetric,
-      handler: (metric) => errorMetric(metric as RpcMetric<RpcErrorMetric>),
+      handler: (metric) => errorMetric(_ensureErrorMetric(metric)),
       argumentParser: RpcMetric.fromJson,
       responseParser: RpcNull.fromJson,
     );
 
+    // Для метрик ресурсов
     addUnaryRequestMethod<RpcMetric, RpcNull>(
       methodName: methodResourceMetric,
-      handler: (metric) =>
-          resourceMetric(metric as RpcMetric<RpcResourceMetric>),
+      handler: (metric) => resourceMetric(_ensureResourceMetric(metric)),
       argumentParser: RpcMetric.fromJson,
       responseParser: RpcNull.fromJson,
     );
 
     super.setup();
+  }
+
+  // Вспомогательные методы для обеспечения правильных типов метрик
+
+  // Проверяет и возвращает метрику задержки с правильным типом
+  RpcMetric<RpcLatencyMetric> _ensureLatencyMetric(RpcMetric metric) {
+    if (metric is RpcMetric<RpcLatencyMetric>) {
+      return metric;
+    } else if (metric.metricType == RpcMetricType.latency) {
+      return RpcMetric<RpcLatencyMetric>(
+        id: metric.id,
+        timestamp: metric.timestamp,
+        metricType: metric.metricType,
+        clientId: metric.clientId,
+        content: metric.content as RpcLatencyMetric,
+      );
+    }
+    throw ArgumentError(
+        'Неверный тип метрики: ожидался тип latency, получен ${metric.metricType}');
+  }
+
+  // Проверяет и возвращает метрику стрима с правильным типом
+  RpcMetric<RpcStreamMetric> _ensureStreamMetric(RpcMetric metric) {
+    if (metric is RpcMetric<RpcStreamMetric>) {
+      return metric;
+    } else if (metric.metricType == RpcMetricType.stream) {
+      return RpcMetric<RpcStreamMetric>(
+        id: metric.id,
+        timestamp: metric.timestamp,
+        metricType: metric.metricType,
+        clientId: metric.clientId,
+        content: metric.content as RpcStreamMetric,
+      );
+    }
+    throw ArgumentError(
+        'Неверный тип метрики: ожидался тип stream, получен ${metric.metricType}');
+  }
+
+  // Проверяет и возвращает метрику ошибки с правильным типом
+  RpcMetric<RpcErrorMetric> _ensureErrorMetric(RpcMetric metric) {
+    if (metric is RpcMetric<RpcErrorMetric>) {
+      return metric;
+    } else if (metric.metricType == RpcMetricType.error) {
+      return RpcMetric<RpcErrorMetric>(
+        id: metric.id,
+        timestamp: metric.timestamp,
+        metricType: metric.metricType,
+        clientId: metric.clientId,
+        content: metric.content as RpcErrorMetric,
+      );
+    }
+    throw ArgumentError(
+        'Неверный тип метрики: ожидался тип error, получен ${metric.metricType}');
+  }
+
+  // Проверяет и возвращает метрику ресурсов с правильным типом
+  RpcMetric<RpcResourceMetric> _ensureResourceMetric(RpcMetric metric) {
+    if (metric is RpcMetric<RpcResourceMetric>) {
+      return metric;
+    } else if (metric.metricType == RpcMetricType.resource) {
+      return RpcMetric<RpcResourceMetric>(
+        id: metric.id,
+        timestamp: metric.timestamp,
+        metricType: metric.metricType,
+        clientId: metric.clientId,
+        content: metric.content as RpcResourceMetric,
+      );
+    }
+    throw ArgumentError(
+        'Неверный тип метрики: ожидался тип resource, получен ${metric.metricType}');
   }
 
   /// Метод для отправки пакета метрик различного типа

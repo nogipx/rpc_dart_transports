@@ -214,11 +214,26 @@ final class _RpcEngineImpl implements IRpcEngine {
     return controller.stream;
   }
 
-  /// Обрабатывает входящие бинарные данные
-  void _handleIncomingData(Uint8List data) {
-    final json = _serializer.deserialize(data);
+  /// Обрабатывает входящие данные и направляет их на обработку в соответствии с типом сообщения
+  Future<void> _handleIncomingData(Uint8List data) async {
+    // Десериализуем данные в сообщение
+    final Map<String, dynamic> json = _serializer.deserialize(data);
     final message = RpcMessage.fromJson(json);
 
+    // Логирование типа сообщения для отладки
+    _logger.debug(
+        '← Получено сообщение типа ${message.type.name} [${message.id}] '
+        '${message.service != null ? "${message.service}." : ""}${message.method ?? ""}');
+
+    // DEBUG: логирование payload для отладки ошибки
+    if (message.payload != null) {
+      _logger.debug('DEBUG: Тип payload: ${message.payload.runtimeType}, '
+          'Значение: ${message.payload.toString()}, '
+          'Имеет метод payload: ${message.payload is Map ? "да" : "нет"}'
+          '${message.payload is Map ? ", Ключи: ${(message.payload as Map).keys.toList()}" : ""}');
+    }
+
+    // Обработка сообщения в соответствии с его типом
     switch (message.type) {
       case RpcMessageType.request:
         _handleRequest(message);
@@ -233,6 +248,12 @@ final class _RpcEngineImpl implements IRpcEngine {
         _handleStreamEnd(message);
         break;
       case RpcMessageType.error:
+        // DEBUG: Дополнительный лог для отладки перед вызовом handleError
+        if (message.payload != null) {
+          _logger.debug(
+              'DEBUG перед handleError: Тип payload: ${message.payload.runtimeType}, '
+              'Значение: ${message.payload.toString()}');
+        }
         _handleError(message);
         break;
       case RpcMessageType.ping:
@@ -295,15 +316,8 @@ final class _RpcEngineImpl implements IRpcEngine {
     var direction = RpcDataDirection.fromRemote;
 
     try {
-      // Создаем контекст вызова метода
-      final context = RpcMethodContext(
-        messageId: message.id,
-        metadata: message.metadata,
-        headerMetadata: message.metadata,
-        payload: message.payload,
-        serviceName: serviceName,
-        methodName: methodName,
-      );
+      // Создаем контекст вызова метода из сообщения
+      final context = RpcMethodContext.fromMessage(message);
 
       // Применяем middleware для обработки запроса
       final requestResult = await _middlewareChain.executeRequest(
@@ -318,7 +332,17 @@ final class _RpcEngineImpl implements IRpcEngine {
       final updatedRequestContext =
           requestResult.context.withPayload(requestResult.payload);
 
+      // Проверяем наличие обработчика
+      if (methodHandler.handler == null) {
+        throw RpcCustomException(
+          customMessage:
+              'Не найден обработчик для метода $serviceName.$methodName',
+          debugLabel: 'RpcEngineImpl._handleRequest',
+        );
+      }
+
       // Вызываем обработчик с обновленным контекстом
+      // Теперь handler - это адаптер, созданный через RpcMethodAdapterFactory, который корректно обрабатывает контекст
       final result = await methodHandler.handler(updatedRequestContext);
 
       // Изменяем направление на отправку
@@ -358,15 +382,8 @@ final class _RpcEngineImpl implements IRpcEngine {
         methodName: methodName,
       );
     } catch (e, stackTrace) {
-      // Создаем контекст для ошибки
-      final errorContext = RpcMethodContext(
-        messageId: message.id,
-        metadata: message.metadata,
-        headerMetadata: message.metadata,
-        payload: message.payload,
-        serviceName: serviceName,
-        methodName: methodName,
-      );
+      // Создаем контекст для ошибки из сообщения
+      final errorContext = RpcMethodContext.fromMessage(message);
 
       // Применяем middleware для обработки ошибки
       final errorResult = await _middlewareChain.executeError(
@@ -710,14 +727,34 @@ final class _RpcEngineImpl implements IRpcEngine {
 
   /// Обрабатывает сообщение с ошибкой
   void _handleError(RpcMessage message) {
+    // Преобразуем ошибку в безопасный объект ошибки
+    Object errorObject;
+
+    try {
+      // Пытаемся безопасно использовать payload
+      if (message.payload == null) {
+        errorObject = Exception('Неизвестная ошибка');
+      } else if (message.payload is String) {
+        errorObject = Exception(message.payload);
+      } else if (message.payload is Exception || message.payload is Error) {
+        // Если это уже исключение, используем его напрямую
+        errorObject = message.payload;
+      } else {
+        // Безопасно преобразуем любой объект в исключение
+        errorObject = Exception(message.payload.toString());
+      }
+    } catch (e) {
+      errorObject = Exception('Ошибка при обработке сообщения');
+    }
+
     final completer = _pendingRequests.remove(message.id);
     if (completer != null && !completer.isCompleted) {
-      completer.completeError(message.payload ?? 'Неизвестная ошибка');
+      completer.completeError(errorObject);
     }
 
     final controller = _streamControllers[message.id];
     if (controller != null && !controller.isClosed) {
-      controller.addError(message.payload ?? 'Неизвестная ошибка');
+      controller.addError(errorObject);
     }
   }
 
