@@ -24,15 +24,6 @@ void main() async {
   final clientId = 'demo_server';
   final traceId = '${clientId}_${DateTime.now().millisecondsSinceEpoch}';
 
-  // Устанавливаем диагностический клиент в логгер для автоматической отправки логов
-  RpcLoggerSettings.setDiagnostic(factoryDiagnosticClient(
-    diagnosticUrl: Uri.parse(diagnosticUrl),
-    clientIdentity: RpcClientIdentity(
-      clientId: clientId,
-      traceId: traceId,
-    ),
-  ));
-
   // Настраиваем логирование
   RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.debug);
   final logger = DefaultRpcLogger(
@@ -75,6 +66,22 @@ void main() async {
 
   logger.info('Сервер запущен и ожидает подключений на ws://$host:$port');
   logger.info('Диагностические данные отправляются на $diagnosticUrl');
+
+  try {
+    // Устанавливаем диагностический клиент в логгер для автоматической отправки логов
+    final diagnosticClient = await factoryDiagnosticClient(
+      diagnosticUrl: Uri.parse(diagnosticUrl),
+      clientIdentity: RpcClientIdentity(
+        clientId: clientId,
+        traceId: traceId,
+      ),
+    );
+
+    RpcLoggerSettings.setDiagnostic(diagnosticClient);
+    logger.info('Диагностический клиент успешно инициализирован и подключен');
+  } catch (e) {
+    logger.error('Ошибка при инициализации диагностического клиента: $e');
+  }
 
   // Обрабатываем сигналы завершения
   ProcessSignal.sigint.watch().listen((signal) async {

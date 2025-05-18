@@ -4,7 +4,6 @@
 
 import 'dart:async';
 import 'dart:io';
-import 'dart:math';
 import 'package:rpc_dart/diagnostics/models/rpc_client_identity.dart';
 import 'package:rpc_dart/rpc_dart.dart';
 import 'package:rpc_dart_transports/rpc_dart_transports.dart';
@@ -23,15 +22,6 @@ void main() async {
   final clientId = 'demo_client';
   final traceId = '${clientId}_${DateTime.now().millisecondsSinceEpoch}';
 
-  // Устанавливаем диагностический клиент в логгер для автоматической отправки логов
-  RpcLoggerSettings.setDiagnostic(factoryDiagnosticClient(
-    diagnosticUrl: Uri.parse(diagnosticUrl),
-    clientIdentity: RpcClientIdentity(
-      clientId: clientId,
-      traceId: traceId,
-    ),
-  ));
-
   // Настраиваем логирование
   RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.debug);
   final logger = DefaultRpcLogger(
@@ -48,115 +38,108 @@ void main() async {
 
   logger.info('Запуск демонстрационного клиента...');
 
-  // Создаем RPC эндпоинт для связи с сервером
-  final rpcEndpoint = RpcEndpoint(
-    debugLabel: 'demo_client',
-    transport: ClientWebSocketTransport.fromUrl(
-      id: 'server_connection',
-      url: serverUrl,
-      autoConnect: true,
-    ),
-  );
-
-  // Создаем клиентский контракт для работы с сервером
-  final demoClient = DemoClient(rpcEndpoint);
-
-  logger.info('Подключение к серверу: $serverUrl');
-  logger.info('Подключение к сервису диагностики: $diagnosticUrl');
-
-  // Запускаем демонстрацию RPC вызовов
-  await _demonstrateRpcCalls(demoClient, logger);
-
-  // Обрабатываем сигналы завершения
-  ProcessSignal.sigint.watch().listen((signal) async {
-    logger.info('Получен сигнал завершения, закрываем клиент...');
-
-    // Закрываем все соединения
-    await rpcEndpoint.close();
-
-    logger.info('Клиент остановлен');
-    exit(0);
-  });
-}
-
-/// Демонстрирует различные RPC вызовы
-Future<void> _demonstrateRpcCalls(DemoClient client, RpcLogger logger) async {
-  final random = Random();
-
-  // Демонстрация унарного вызова - echo
-  Timer.periodic(Duration(seconds: 5), (timer) async {
-    try {
-      final request = RpcString('Привет от клиента! ${DateTime.now()}');
-
-      logger.info('Отправка унарного запроса: ${request.value}');
-      final response = await client.echo(request);
-
-      logger.info('Получен ответ: ${response.value}');
-    } catch (e) {
-      logger.error('Ошибка при выполнении echo запроса', error: e);
-    }
-  });
-
-  // Демонстрация стриминга от сервера - generateNumbers
-  Timer.periodic(Duration(seconds: 15), (timer) async {
-    try {
-      final count = random.nextInt(5) + 3; // 3-7 чисел
-      logger.info('Запрос генерации $count чисел');
-
-      final generateNumbersStream = client.generateNumbers(RpcInt(count));
-
-      // Обрабатываем стрим от сервера
-      int received = 0;
-      await for (final number in generateNumbersStream) {
-        received++;
-        logger.info('Получено число от сервера: ${number.value} ($received/$count)');
-      }
-    } catch (e) {
-      logger.error('Ошибка при получении стрима чисел', error: e);
-    }
-  });
-
-  // Демонстрация клиентского стриминга - countWords
-  Timer.periodic(Duration(seconds: 20), (timer) async {
-    try {
-      logger.info('Отправка потока слов на сервер');
-
-      // Создаем поток слов
-      final words = [
-        'Привет',
-        'мир программирования',
-        'RPC в действии',
-        'Dart это здорово',
-        'WebSocket транспорт работает'
-      ];
-
-      final countWordsStream = client.countWords();
-      for (final sentence in words) {
-        countWordsStream.send(RpcString(sentence));
-      }
-      await countWordsStream.finishSending();
-      final result = await countWordsStream.getResponse();
-
-      logger.info('Сервер насчитал ${result?.value} слов в переданном потоке');
-    } catch (e) {
-      logger.error('Ошибка при отправке стрима слов', error: e);
-    }
-  });
-
-  // Ресурсы клиента
-  Timer.periodic(Duration(seconds: 12), (timer) {
-    // Моделируем использование ресурсов
-    final memoryUsage = random.nextInt(50) + 20; // 20-70 MB
-    final cpuUsage = random.nextDouble() * 15; // 0-15%
-
-    // Отправляем метрику ресурсов
-    final resourceMetric = logger.diagnostic?.createResourceMetric(
-      memoryUsage: memoryUsage,
-      cpuUsage: cpuUsage,
+  try {
+    // Устанавливаем диагностический клиент в логгер для автоматической отправки логов
+    final diagnosticClient = await factoryDiagnosticClient(
+      diagnosticUrl: Uri.parse(diagnosticUrl),
+      clientIdentity: RpcClientIdentity(
+        clientId: clientId,
+        traceId: traceId,
+      ),
     );
 
-    logger.diagnostic?.reportResourceMetric(resourceMetric!);
+    RpcLoggerSettings.setDiagnostic(diagnosticClient);
+    logger.info('Диагностический клиент успешно инициализирован и подключен');
+  } catch (e) {
+    logger.error('Ошибка при инициализации диагностического клиента: $e');
+  }
 
-    logger.debug('Использование ресурсов: Память $memoryUsage MB, CPU $cpuUsage%');
-  });
+  // Создаем RPC эндпоинт для связи с сервером
+  final transport = ClientWebSocketTransport.fromUrl(
+    id: clientId,
+    url: serverUrl,
+  );
+
+  final endpoint = RpcEndpoint(
+    transport: transport,
+    debugLabel: clientId,
+  );
+
+  await transport.connect();
+
+  // Создаем клиента и регистрируем его методы
+  final demoClient = DemoClient(endpoint);
+
+  // Выполняем демонстрационные вызовы
+  await _runDemo(demoClient, logger);
+
+  // Закрываем соединение
+  await endpoint.close();
+  exit(0);
+}
+
+/// Демонстрационные вызовы различных RPC методов
+Future<void> _runDemo(DemoClient client, RpcLogger logger) async {
+  logger.info('=== Демо унарного вызова ===');
+  final echoResponse = await client.echo(RpcString('Привет, сервер!'));
+  logger.info('Ответ от сервера: ${echoResponse.value}');
+
+  logger.info('=== Демо серверного стриминга ===');
+  final numbersStream = client.generateNumbers(RpcInt(5));
+  // Получаем числа из серверного стрима
+  await for (final number in numbersStream) {
+    logger.info('Получено число: ${number.value}');
+  }
+  logger.info('Стрим чисел завершен');
+
+  logger.info('=== Демо клиентского стриминга ===');
+  final wordsCounter = client.countWords();
+
+  // Отправляем несколько предложений
+  final sentences = [
+    'Это первое предложение',
+    'А это второе, оно длиннее',
+    'Это последнее предложение для подсчета слов'
+  ];
+
+  for (final sentence in sentences) {
+    wordsCounter.send(RpcString(sentence));
+    logger.info('Отправлено: "$sentence"');
+  }
+
+  // Завершаем отправку
+  await wordsCounter.finishSending();
+
+  // Получаем результат
+  final wordCount = await wordsCounter.getResponse();
+  logger.info('Всего слов: ${wordCount?.value}');
+
+  logger.info('=== Демо двунаправленного стриминга ===');
+  final chat = client.chat();
+
+  // Запускаем получение сообщений в отдельном потоке
+  unawaited(_receiveMessages(chat, logger));
+
+  // Отправляем несколько сообщений
+  final messages = ['Привет, сервер!', 'Как дела?', 'Это тестирование двунаправленного стриминга'];
+
+  for (final message in messages) {
+    chat.send(RpcString(message));
+    logger.info('Клиент отправил: "$message"');
+    await Future.delayed(Duration(milliseconds: 500));
+  }
+
+  // Ждем некоторое время перед завершением
+  await Future.delayed(Duration(seconds: 1));
+
+  // Завершаем чат
+  await chat.close();
+  logger.info('Чат завершен');
+}
+
+/// Функция для получения и отображения сообщений из чата
+Future<void> _receiveMessages(BidiStream<RpcString, RpcString> chat, RpcLogger logger) async {
+  await for (final message in chat) {
+    logger.info('Получено от сервера: "${message.value}"');
+  }
 }

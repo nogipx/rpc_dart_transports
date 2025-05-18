@@ -2,14 +2,14 @@ import 'package:rpc_dart/diagnostics.dart';
 import 'package:rpc_dart/rpc_dart.dart';
 import 'package:rpc_dart_transports/rpc_dart_transports.dart';
 
-RpcDiagnosticClient factoryDiagnosticClient({
+Future<RpcDiagnosticClient> factoryDiagnosticClient({
   required Uri diagnosticUrl,
   required RpcClientIdentity clientIdentity,
-}) {
+}) async {
   final transport = ClientWebSocketTransport.fromUrl(
     id: 'diagnostic_connection_${clientIdentity.clientId}',
     url: diagnosticUrl.toString(),
-    autoConnect: true,
+    autoConnect: false, // Изменяем на false, чтобы контролировать подключение
   );
 
   // Создаем и настраиваем RPC эндпоинт для диагностики
@@ -18,7 +18,13 @@ RpcDiagnosticClient factoryDiagnosticClient({
     debugLabel: 'diagnostic_client_${clientIdentity.clientId}',
   );
 
-  return RpcDiagnosticClient(
+  // Явно подключаем транспорт и ждем успешного подключения
+  await transport.connect();
+
+  // Ждем немного для гарантированной регистрации всех контрактов
+  await Future.delayed(Duration(milliseconds: 100));
+
+  final client = RpcDiagnosticClient(
     endpoint: endpoint,
     clientIdentity: clientIdentity,
     options: RpcDiagnosticOptions(
@@ -27,6 +33,8 @@ RpcDiagnosticClient factoryDiagnosticClient({
       samplingRate: 1.0, // Отправляем все метрики
     ),
   );
+
+  return client;
 }
 
 /// Контракт для демонстрационного сервиса
