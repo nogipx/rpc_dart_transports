@@ -2,12 +2,24 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-import 'dart:async';
+import 'dart:async'
+    show
+        Completer,
+        Future,
+        Stream,
+        StreamController,
+        StreamSubscription,
+        Timer,
+        TimeoutException;
 import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:rpc_dart/rpc_dart.dart';
 
+part 'impl/_message_handler.dart';
+part 'impl/_request_manager.dart';
+part 'impl/_stream_manager.dart';
+part 'impl/_middleware_executor.dart';
 part 'impl/rpc_engine_impl.dart';
 part 'impl/rpc_endpoint_impl.dart';
 part 'impl/rpc_method_registry.dart';
