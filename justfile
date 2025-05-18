@@ -3,7 +3,13 @@
 test:
     fvm dart test
 
-setup:
+get:
+    rm -f rpc_example/pubspec.lock
+    rm -f rpc_dart_transports/pubspec.lock
+    rm -f rpc_dart/pubspec.lock
+    fvm dart pub global run packo pubget -r
+
+gen:
     rm -f rpc_example/pubspec.lock
     rm -f rpc_dart_transports/pubspec.lock
     rm -f rpc_dart/pubspec.lock

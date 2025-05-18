@@ -6,14 +6,20 @@ RpcDiagnosticClient factoryDiagnosticClient({
   required Uri diagnosticUrl,
   required RpcClientIdentity clientIdentity,
 }) {
+  final transport = ClientWebSocketTransport.fromUrl(
+    id: 'diagnostic_connection_${clientIdentity.clientId}',
+    url: diagnosticUrl.toString(),
+    autoConnect: true,
+  );
+
+  // Создаем и настраиваем RPC эндпоинт для диагностики
+  final endpoint = RpcEndpoint(
+    transport: transport,
+    debugLabel: 'diagnostic_client_${clientIdentity.clientId}',
+  );
+
   return RpcDiagnosticClient(
-    endpoint: RpcEndpoint(
-      transport: ClientWebSocketTransport.fromUrl(
-        id: 'diagnostic_connection_${clientIdentity.clientId}',
-        url: diagnosticUrl.toString(),
-        autoConnect: true,
-      ),
-    ),
+    endpoint: endpoint,
     clientIdentity: clientIdentity,
     options: RpcDiagnosticOptions(
       enabled: true,
