@@ -11,10 +11,8 @@ part of '../_index.dart';
 /// Контекст полностью иммутабельный, любые изменения создают новый экземпляр.
 class RpcMethodContext implements IRpcSerializableMessage, IRpcContext {
   /// Уникальный идентификатор сообщения
+  @override
   final String messageId;
-
-  /// Метаданные сообщения (устаревшие, используйте headerMetadata)
-  final Map<String, dynamic>? _metadata;
 
   /// Заголовочные метаданные (отправляются в начале RPC)
   final Map<String, dynamic>? _headerMetadata;
@@ -23,36 +21,36 @@ class RpcMethodContext implements IRpcSerializableMessage, IRpcContext {
   final Map<String, dynamic>? _trailerMetadata;
 
   /// Полезная нагрузка (тело запроса)
+  @override
   final dynamic payload;
 
   /// Имя сервиса
+  @override
   final String? serviceName;
 
   /// Имя метода
+  @override
   final String? methodName;
 
   /// Создает новый контекст вызова метода
   const RpcMethodContext({
     required this.messageId,
-    Map<String, dynamic>? metadata,
     Map<String, dynamic>? headerMetadata,
     Map<String, dynamic>? trailerMetadata,
     required this.payload,
     this.serviceName,
     this.methodName,
-  })  : _metadata = metadata,
-        _headerMetadata = headerMetadata ?? metadata,
+  })  : _headerMetadata = headerMetadata,
         _trailerMetadata = trailerMetadata;
 
   /// Создает контекст из сообщения
   factory RpcMethodContext.fromMessage(RpcMessage message) {
     return RpcMethodContext(
-      messageId: message.id,
+      messageId: message.messageId,
       payload: message.payload,
-      serviceName: message.service,
-      methodName: message.method,
-      metadata: message.metadata,
-      headerMetadata: message.metadata,
+      serviceName: message.serviceName,
+      methodName: message.methodName,
+      headerMetadata: message.headerMetadata,
       trailerMetadata: message.trailerMetadata,
     );
   }
@@ -64,7 +62,6 @@ class RpcMethodContext implements IRpcSerializableMessage, IRpcContext {
       payload: json['payload'],
       serviceName: json['serviceName'] as String?,
       methodName: json['methodName'] as String?,
-      metadata: json['metadata'] as Map<String, dynamic>?,
       headerMetadata: json['headerMetadata'] as Map<String, dynamic>?,
       trailerMetadata: json['trailerMetadata'] as Map<String, dynamic>?,
     );
@@ -72,12 +69,11 @@ class RpcMethodContext implements IRpcSerializableMessage, IRpcContext {
 
   /// Получает метаданные сообщения (устаревшие, используйте headerMetadata)
   @override
-  Map<String, dynamic>? get metadata => UnmodifiableMapView(_metadata ?? {});
+  Map<String, dynamic>? get headerMetadata =>
+      UnmodifiableMapView(_headerMetadata ?? {});
 
   /// Получает заголовочные метаданные
   @override
-  Map<String, dynamic>? get headerMetadata =>
-      UnmodifiableMapView(_headerMetadata ?? _metadata ?? {});
 
   /// Получает трейлерные метаданные
   @override
@@ -96,8 +92,6 @@ class RpcMethodContext implements IRpcSerializableMessage, IRpcContext {
 
     return RpcMethodContext(
       messageId: messageId,
-      metadata:
-          _metadata, // Сохраняем старые метаданные для обратной совместимости
       headerMetadata: headers,
       trailerMetadata: _trailerMetadata != null
           ? Map<String, dynamic>.from(_trailerMetadata!)
@@ -115,7 +109,6 @@ class RpcMethodContext implements IRpcSerializableMessage, IRpcContext {
 
     return RpcMethodContext(
       messageId: messageId,
-      metadata: _metadata,
       headerMetadata: _headerMetadata,
       trailerMetadata: trailers,
       payload: payload,
@@ -128,7 +121,6 @@ class RpcMethodContext implements IRpcSerializableMessage, IRpcContext {
   RpcMethodContext withPayload(dynamic newPayload) {
     return RpcMethodContext(
       messageId: messageId,
-      metadata: _metadata,
       headerMetadata: _headerMetadata,
       trailerMetadata: _trailerMetadata,
       payload: newPayload,
@@ -149,9 +141,6 @@ class RpcMethodContext implements IRpcSerializableMessage, IRpcContext {
     };
 
     // Добавляем метаданные, если они есть
-    if (_metadata != null) {
-      json['metadata'] = _metadata;
-    }
     if (_headerMetadata != null) {
       json['headerMetadata'] = _headerMetadata;
     }

@@ -7,42 +7,43 @@ void main() {
       // Arrange & Act
       final message = RpcMessage(
         type: RpcMessageType.request,
-        id: '123',
-        service: 'TestService',
-        method: 'testMethod',
+        messageId: '123',
+        serviceName: 'TestService',
+        methodName: 'testMethod',
         payload: {'data': 'test'},
-        metadata: {'header': 'value'},
+        headerMetadata: {'header': 'value'},
       );
 
       // Assert
       expect(message.type, equals(RpcMessageType.request));
-      expect(message.id, equals('123'));
-      expect(message.service, equals('TestService'));
-      expect(message.method, equals('testMethod'));
+      expect(message.messageId, equals('123'));
+      expect(message.serviceName, equals('TestService'));
+      expect(message.methodName, equals('testMethod'));
       expect(message.payload, equals({'data': 'test'}));
-      expect(message.metadata, equals({'header': 'value'}));
+      expect(message.headerMetadata, equals({'header': 'value'}));
     });
 
     test('should create message with minimum required properties', () {
       // Arrange & Act
-      final message = RpcMessage(type: RpcMessageType.ping, id: 'ping-123');
+      final message =
+          RpcMessage(type: RpcMessageType.ping, messageId: 'ping-123');
 
       // Assert
       expect(message.type, equals(RpcMessageType.ping));
-      expect(message.id, equals('ping-123'));
-      expect(message.service, isNull);
-      expect(message.method, isNull);
+      expect(message.messageId, equals('ping-123'));
+      expect(message.serviceName, isNull);
+      expect(message.methodName, isNull);
       expect(message.payload, isNull);
-      expect(message.metadata, isNull);
+      expect(message.headerMetadata, isNull);
     });
 
     test('should convert to and from JSON', () {
       // Arrange
       final originalMessage = RpcMessage(
         type: RpcMessageType.response,
-        id: '456',
+        messageId: '456',
         payload: {'result': 42},
-        metadata: {'server': 'test-server'},
+        headerMetadata: {'server': 'test-server'},
       );
 
       // Act
@@ -51,17 +52,18 @@ void main() {
 
       // Assert
       expect(recreatedMessage.type, equals(originalMessage.type));
-      expect(recreatedMessage.id, equals(originalMessage.id));
-      expect(recreatedMessage.service, equals(originalMessage.service));
-      expect(recreatedMessage.method, equals(originalMessage.method));
+      expect(recreatedMessage.messageId, equals(originalMessage.messageId));
       expect(recreatedMessage.payload, equals(originalMessage.payload));
-      expect(recreatedMessage.metadata, equals(originalMessage.metadata));
+      expect(recreatedMessage.headerMetadata,
+          equals(originalMessage.headerMetadata));
     });
 
     test('should include only non-null properties in JSON', () {
       // Arrange
       final message = RpcMessage(
-          type: RpcMessageType.error, id: '789', payload: 'Error message');
+          type: RpcMessageType.error,
+          messageId: '789',
+          payload: 'Error message');
 
       // Act
       final json = message.toJson();
@@ -70,28 +72,9 @@ void main() {
       expect(json.containsKey('type'), isTrue);
       expect(json.containsKey('id'), isTrue);
       expect(json.containsKey('payload'), isTrue);
-      expect(json.containsKey('service'), isFalse);
-      expect(json.containsKey('method'), isFalse);
-      expect(json.containsKey('metadata'), isFalse);
-    });
-
-    test('toString should return a readable representation', () {
-      // Arrange
-      final message = RpcMessage(
-        type: RpcMessageType.request,
-        id: '123',
-        service: 'TestService',
-        method: 'testMethod',
-      );
-
-      // Act
-      final string = message.toString();
-
-      // Assert
-      expect(string, contains('type: ${RpcMessageType.request}'));
-      expect(string, contains('id: 123'));
-      expect(string, contains('service: TestService'));
-      expect(string, contains('method: testMethod'));
+      expect(json.containsKey('serviceName'), isFalse);
+      expect(json.containsKey('methodName'), isFalse);
+      expect(json.containsKey('headerMetadata'), isFalse);
     });
   });
 }

@@ -50,9 +50,9 @@ void main() {
       // Act: отправляем внутреннее сообщение через JSON-RPC транспорт
       final message = RpcMessage(
         type: RpcMessageType.request,
-        id: '123',
-        service: 'example',
-        method: 'test',
+        messageId: '123',
+        serviceName: 'example',
+        methodName: 'test',
         payload: {'a': 1, 'b': 2},
       );
 
@@ -78,7 +78,7 @@ void main() {
         final jsonString = utf8.decode(data);
         final jsonData = json.decode(jsonString) as Map<String, dynamic>;
         final message = RpcMessage.fromJson(jsonData);
-        if (message.method == 'test' && message.service == 'example') {
+        if (message.methodName == 'test' && message.serviceName == 'example') {
           completer.complete(message);
         }
       });
@@ -98,10 +98,10 @@ void main() {
       final receivedMessage = await completer.future;
 
       expect(receivedMessage.type, equals(RpcMessageType.request));
-      expect(receivedMessage.service, equals('example'));
-      expect(receivedMessage.method, equals('test'));
+      expect(receivedMessage.serviceName, equals('example'));
+      expect(receivedMessage.methodName, equals('test'));
       expect(receivedMessage.payload, equals({'a': 1, 'b': 2}));
-      expect(receivedMessage.id, equals('123'));
+      expect(receivedMessage.messageId, equals('123'));
     });
 
     test('Должен обрабатывать ошибки в формате JSON-RPC', () async {
@@ -120,7 +120,7 @@ void main() {
       // Act: отправляем сообщение с ошибкой через JSON-RPC транспорт
       final message = RpcMessage(
         type: RpcMessageType.error,
-        id: '123',
+        messageId: '123',
         payload: {
           'code': 'invalidArgument',
           'message': 'Неверные аргументы',

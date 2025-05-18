@@ -35,8 +35,8 @@ class DebugMiddleware implements IRpcMiddleware {
         'ID: ${context.messageId}\n'
         'Payload: $payload';
 
-    if (context.metadata != null && context.metadata!.isNotEmpty) {
-      message += '\nMetadata: ${context.metadata}';
+    if (context.headerMetadata != null && context.headerMetadata!.isNotEmpty) {
+      message += '\nMetadata: ${context.headerMetadata}';
     }
 
     _log('$message\n');
@@ -56,8 +56,8 @@ class DebugMiddleware implements IRpcMiddleware {
         'ID: ${context.messageId}\n'
         'Response: $response';
 
-    if (context.metadata != null && context.metadata!.isNotEmpty) {
-      message += '\nMetadata: ${context.metadata}';
+    if (context.headerMetadata != null && context.headerMetadata!.isNotEmpty) {
+      message += '\nMetadata: ${context.headerMetadata}';
     }
 
     _log('$message\n');
@@ -82,8 +82,8 @@ class DebugMiddleware implements IRpcMiddleware {
       message += '\nStackTrace: $stackTrace';
     }
 
-    if (context.metadata != null && context.metadata!.isNotEmpty) {
-      message += '\nMetadata: ${context.metadata}';
+    if (context.headerMetadata != null && context.headerMetadata!.isNotEmpty) {
+      message += '\nMetadata: ${context.headerMetadata}';
     }
 
     _log('$message\n');

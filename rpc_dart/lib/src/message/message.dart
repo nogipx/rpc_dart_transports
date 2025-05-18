@@ -18,9 +18,6 @@ abstract interface class IRpcContext {
   /// Полезная нагрузка
   dynamic get payload;
 
-  /// Метаданные сообщения
-  Map<String, dynamic>? get metadata;
-
   /// Заголовочные метаданные
   Map<String, dynamic>? get headerMetadata;
 
@@ -34,26 +31,16 @@ final class RpcMessage implements IRpcSerializableMessage, IRpcContext {
   final RpcMessageType type;
 
   /// Уникальный идентификатор сообщения
-  final String id;
+  @override
+  final String messageId;
 
   /// Имя сервиса (опционально)
-  final String? service;
+  @override
+  final String? serviceName;
 
   /// Имя метода (опционально)
-  final String? method;
-
-  /// Методы для совместимости с IRpcContext
   @override
-  String get messageId => id;
-
-  @override
-  String? get serviceName => service;
-
-  @override
-  String? get methodName => method;
-
-  @override
-  Map<String, dynamic>? get headerMetadata => metadata;
+  final String? methodName;
 
   /// Полезная нагрузка сообщения
   @override
@@ -61,7 +48,7 @@ final class RpcMessage implements IRpcSerializableMessage, IRpcContext {
 
   /// Метаданные сообщения (заголовки)
   @override
-  final Map<String, dynamic>? metadata;
+  final Map<String, dynamic>? headerMetadata;
 
   /// Трейлерные метаданные сообщения (отправляются в конце)
   @override
@@ -73,11 +60,11 @@ final class RpcMessage implements IRpcSerializableMessage, IRpcContext {
   /// Создает новое сообщение
   const RpcMessage({
     required this.type,
-    required this.id,
-    this.service,
-    this.method,
+    required this.messageId,
+    this.serviceName,
+    this.methodName,
     this.payload,
-    this.metadata,
+    this.headerMetadata,
     this.trailerMetadata,
     this.debugLabel,
   });
@@ -86,11 +73,11 @@ final class RpcMessage implements IRpcSerializableMessage, IRpcContext {
   factory RpcMessage.fromJson(Map<String, dynamic> json) {
     return RpcMessage(
       type: RpcMessageType.fromString(json['type'] as String?),
-      id: json['id'] as String? ?? '',
-      service: json['service'] as String?,
-      method: json['method'] as String?,
+      messageId: json['id'] as String? ?? '',
+      serviceName: json['service'] as String?,
+      methodName: json['method'] as String?,
       payload: json['payload'],
-      metadata: json['metadata'] as Map<String, dynamic>?,
+      headerMetadata: json['headerMetadata'] as Map<String, dynamic>?,
       trailerMetadata: json['trailerMetadata'] as Map<String, dynamic>?,
       debugLabel: json['debugLabel'] as String?,
     );
@@ -101,11 +88,11 @@ final class RpcMessage implements IRpcSerializableMessage, IRpcContext {
   Map<String, dynamic> toJson() {
     return {
       'type': type.name,
-      'id': id,
-      if (service != null) 'service': service,
-      if (method != null) 'method': method,
+      'id': messageId,
+      if (serviceName != null) 'service': serviceName,
+      if (methodName != null) 'method': methodName,
       if (payload != null) 'payload': payload,
-      if (metadata != null) 'metadata': metadata,
+      if (headerMetadata != null) 'headerMetadata': headerMetadata,
       if (trailerMetadata != null) 'trailerMetadata': trailerMetadata,
       if (debugLabel != null) 'debugLabel': debugLabel,
     };
@@ -113,7 +100,7 @@ final class RpcMessage implements IRpcSerializableMessage, IRpcContext {
 
   @override
   String toString() {
-    return 'Message{debugLabel: $debugLabel, type: $type, id: $id, service: $service, method: $method, '
-        'hasMetadata: ${metadata != null}, hasTrailerMetadata: ${trailerMetadata != null}}';
+    return 'Message{debugLabel: $debugLabel, type: $type, id: $messageId, service: $serviceName, method: $methodName, '
+        'hasTrailerMetadata: ${trailerMetadata != null}, hasHeaderMetadata: ${headerMetadata != null}}';
   }
 }

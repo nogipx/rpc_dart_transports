@@ -183,10 +183,10 @@ class JsonRpcTransport implements IRpcTransport {
     // Создаем объект сообщения во внутреннем формате
     final message = RpcMessage(
       type: RpcMessageType.request,
-      id: id?.toString() ??
+      messageId: id?.toString() ??
           'notification-${DateTime.now().millisecondsSinceEpoch}',
-      service: serviceName,
-      method: methodName,
+      serviceName: serviceName,
+      methodName: methodName,
       payload: params,
     );
 
@@ -209,7 +209,7 @@ class JsonRpcTransport implements IRpcTransport {
     // Создаем объект сообщения во внутреннем формате
     final message = RpcMessage(
       type: isError ? RpcMessageType.error : RpcMessageType.response,
-      id: id?.toString() ?? 'unknown',
+      messageId: id?.toString() ?? 'unknown',
       payload: payload,
     );
 
@@ -269,7 +269,7 @@ class JsonRpcTransport implements IRpcTransport {
         jsonRpcMessage = {
           'jsonrpc': '2.0',
           'result': rpcMessage.payload,
-          'id': rpcMessage.id,
+          'id': rpcMessage.messageId,
         };
         _log('Преобразовано в ответ JSON-RPC: $jsonRpcMessage');
       }
@@ -285,22 +285,22 @@ class JsonRpcTransport implements IRpcTransport {
             'message': errorInfo['message'],
             'data': errorInfo['data'],
           },
-          'id': rpcMessage.id,
+          'id': rpcMessage.messageId,
         };
         _log('Преобразовано в ошибку JSON-RPC: $jsonRpcMessage');
       }
       // Если это запрос, создаем структуру запроса
       else if (rpcMessage.type == RpcMessageType.request) {
         // Формируем имя метода (service.method или просто method)
-        final methodName = rpcMessage.service != null
-            ? '${rpcMessage.service}.${rpcMessage.method}'
-            : rpcMessage.method;
+        final methodName = rpcMessage.serviceName != null
+            ? '${rpcMessage.serviceName}.${rpcMessage.methodName}'
+            : rpcMessage.methodName;
 
         jsonRpcMessage = {
           'jsonrpc': '2.0',
           'method': methodName,
           'params': rpcMessage.payload,
-          'id': rpcMessage.id,
+          'id': rpcMessage.messageId,
         };
         _log('Преобразовано в запрос JSON-RPC: $jsonRpcMessage');
       }

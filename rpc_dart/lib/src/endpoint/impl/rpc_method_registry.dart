@@ -195,10 +195,6 @@ final class RpcMethodRegistry implements IRpcMethodRegistry {
               handler,
             );
             break;
-          default:
-            // Если тип не известен, оставляем обработчик как есть
-            _logger.warning(
-                'Неизвестный тип метода $methodType для $serviceName.$methodName, обработчик не был обернут в адаптер');
         }
 
         _logger.debug(

@@ -124,11 +124,11 @@ final class _RpcEngineImpl implements IRpcEngine {
 
     final message = RpcMessage(
       type: RpcMessageType.request,
-      id: requestId,
-      service: serviceName,
-      method: methodName,
+      messageId: requestId,
+      serviceName: serviceName,
+      methodName: methodName,
       payload: request,
-      metadata: metadata,
+      headerMetadata: metadata,
       debugLabel: debugLabel,
     );
 
@@ -193,11 +193,11 @@ final class _RpcEngineImpl implements IRpcEngine {
 
     final message = RpcMessage(
       type: RpcMessageType.request,
-      id: actualStreamId,
-      service: serviceName,
-      method: methodName,
+      messageId: actualStreamId,
+      serviceName: serviceName,
+      methodName: methodName,
       payload: request,
-      metadata: metadata,
+      headerMetadata: metadata,
       debugLabel: debugLabel,
     );
 
@@ -222,8 +222,8 @@ final class _RpcEngineImpl implements IRpcEngine {
 
     // Логирование типа сообщения для отладки
     _logger.debug(
-        '← Получено сообщение типа ${message.type.name} [${message.id}] '
-        '${message.service != null ? "${message.service}." : ""}${message.method ?? ""}');
+        '← Получено сообщение типа ${message.type.name} [${message.messageId}] '
+        '${message.serviceName != null ? "${message.serviceName}." : ""}${message.methodName ?? ""}');
 
     // DEBUG: логирование payload для отладки ошибки
     if (message.payload != null) {
@@ -273,22 +273,22 @@ final class _RpcEngineImpl implements IRpcEngine {
 
   /// Обрабатывает входящий запрос
   Future<void> _handleRequest(RpcMessage message) async {
-    final serviceName = message.service;
-    final methodName = message.method;
+    final serviceName = message.serviceName;
+    final methodName = message.methodName;
 
     if (serviceName == null || methodName == null) {
       await _sendErrorMessage(
-        message.id,
+        message.messageId,
         'Не указаны serviceName или methodName',
-        message.metadata,
+        message.headerMetadata,
       );
 
       // Отправляем статус ошибки
       await sendStatus(
-        requestId: message.id,
+        requestId: message.messageId,
         statusCode: RpcStatusCode.invalidArgument,
         message: 'Не указаны serviceName или methodName',
-        metadata: message.metadata,
+        metadata: message.headerMetadata,
       );
 
       return;
@@ -297,17 +297,17 @@ final class _RpcEngineImpl implements IRpcEngine {
     var methodHandler = _registry.findMethod(serviceName, methodName);
     if (methodHandler == null) {
       await _sendErrorMessage(
-        message.id,
+        message.messageId,
         'Метод не найден: $serviceName.$methodName',
-        message.metadata,
+        message.headerMetadata,
       );
 
       // Отправляем статус ошибки
       await sendStatus(
-        requestId: message.id,
+        requestId: message.messageId,
         statusCode: RpcStatusCode.notFound,
         message: 'Метод не найден: $serviceName.$methodName',
-        metadata: message.metadata,
+        metadata: message.headerMetadata,
       );
 
       return;
@@ -364,9 +364,9 @@ final class _RpcEngineImpl implements IRpcEngine {
       await _sendMessage(
         RpcMessage(
           type: RpcMessageType.response,
-          id: message.id,
+          messageId: message.messageId,
           payload: responseResult.payload,
-          metadata: finalContext.headerMetadata,
+          headerMetadata: finalContext.headerMetadata,
           trailerMetadata: finalContext.trailerMetadata,
           debugLabel: debugLabel,
         ),
@@ -374,7 +374,7 @@ final class _RpcEngineImpl implements IRpcEngine {
 
       // Отправляем статус успешного завершения
       await sendStatus(
-        requestId: message.id,
+        requestId: message.messageId,
         statusCode: RpcStatusCode.ok,
         message: 'OK',
         metadata: finalContext.headerMetadata,
@@ -415,7 +415,7 @@ final class _RpcEngineImpl implements IRpcEngine {
 
       // Отправляем статус ошибки
       await sendStatus(
-        requestId: message.id,
+        requestId: message.messageId,
         statusCode: statusCode,
         message: processedError.toString(),
         details: {
@@ -429,7 +429,7 @@ final class _RpcEngineImpl implements IRpcEngine {
 
       // Для обратной совместимости также отправляем обычное сообщение об ошибке
       await _sendErrorMessage(
-        message.id,
+        message.messageId,
         processedError.toString(),
         finalErrorContext.headerMetadata,
         finalErrorContext.trailerMetadata,
@@ -439,7 +439,7 @@ final class _RpcEngineImpl implements IRpcEngine {
 
   /// Обрабатывает входящий ответ
   void _handleResponse(RpcMessage message) {
-    final completer = _pendingRequests.remove(message.id);
+    final completer = _pendingRequests.remove(message.messageId);
     if (completer == null || completer.isCompleted) {
       return;
     }
@@ -473,7 +473,7 @@ final class _RpcEngineImpl implements IRpcEngine {
 
   /// Обрабатывает входящие данные в потоке
   void _handleStreamData(RpcMessage message) {
-    final controller = _streamControllers[message.id];
+    final controller = _streamControllers[message.messageId];
     if (controller == null || controller.isClosed) {
       return; // Нет активного контроллера для этого потока
     }
@@ -491,13 +491,13 @@ final class _RpcEngineImpl implements IRpcEngine {
         final localMarkerHandler = RpcMarkerHandler(
           // Обработчик маркера завершения клиентского стрима
           onClientStreamEnd: (marker) {
-            if (message.service != null && message.method != null) {
+            if (message.serviceName != null && message.methodName != null) {
               // Если известны имена сервиса и метода, применяем middleware
               _middlewareChain
                   .executeStreamEnd(
-                message.service!,
-                message.method!,
-                message.id,
+                message.serviceName!,
+                message.methodName!,
+                message.messageId,
               )
                   .then((_) {
                 // Добавляем специальное сообщение для клиентского кода
@@ -527,9 +527,9 @@ final class _RpcEngineImpl implements IRpcEngine {
             _sendMessage(
               RpcMessage(
                 type: RpcMessageType.pong,
-                id: message.id,
+                messageId: message.messageId,
                 payload: pongMarker.toJson(),
-                metadata: message.metadata,
+                headerMetadata: message.headerMetadata,
                 debugLabel: debugLabel,
               ),
             );
@@ -538,7 +538,7 @@ final class _RpcEngineImpl implements IRpcEngine {
           // Обработчик маркера понга
           onPong: (marker) {
             // Pong сообщения обрабатываются через _pendingRequests
-            final completer = _pendingRequests[message.id];
+            final completer = _pendingRequests[message.messageId];
             if (completer != null && !completer.isCompleted) {
               completer.complete(marker.toJson());
             }
@@ -549,7 +549,7 @@ final class _RpcEngineImpl implements IRpcEngine {
             // Если это статус ошибки, доставляем как ошибку
             if (marker.code != RpcStatusCode.ok) {
               // Ищем ожидающий Completer
-              final completer = _pendingRequests.remove(message.id);
+              final completer = _pendingRequests.remove(message.messageId);
               if (completer != null && !completer.isCompleted) {
                 // Завершаем с ошибкой
                 completer.completeError(
@@ -573,15 +573,15 @@ final class _RpcEngineImpl implements IRpcEngine {
             if (marker.isExpired) {
               // Если срок уже истек, немедленно отправляем статус об ошибке
               sendStatus(
-                requestId: message.id,
+                requestId: message.messageId,
                 statusCode: RpcStatusCode.deadlineExceeded,
                 message: 'Deadline already exceeded',
-                serviceName: message.service,
-                methodName: message.method,
+                serviceName: message.serviceName,
+                methodName: message.methodName,
               );
 
               // И закрываем поток/операцию с ошибкой
-              final completer = _pendingRequests.remove(message.id);
+              final completer = _pendingRequests.remove(message.messageId);
               if (completer != null && !completer.isCompleted) {
                 completer.completeError('Deadline exceeded');
               }
@@ -595,19 +595,19 @@ final class _RpcEngineImpl implements IRpcEngine {
               Timer(marker.remaining, () {
                 // По истечении срока отправляем статус и закрываем операцию
                 sendStatus(
-                  requestId: message.id,
+                  requestId: message.messageId,
                   statusCode: RpcStatusCode.deadlineExceeded,
                   message: 'Deadline exceeded',
-                  serviceName: message.service,
-                  methodName: message.method,
+                  serviceName: message.serviceName,
+                  methodName: message.methodName,
                 );
 
-                final completer = _pendingRequests.remove(message.id);
+                final completer = _pendingRequests.remove(message.messageId);
                 if (completer != null && !completer.isCompleted) {
                   completer.completeError('Deadline exceeded');
                 }
 
-                final streamController = _streamControllers[message.id];
+                final streamController = _streamControllers[message.messageId];
                 if (streamController != null && !streamController.isClosed) {
                   streamController.addError('Deadline exceeded');
                   streamController.close();
@@ -625,18 +625,18 @@ final class _RpcEngineImpl implements IRpcEngine {
             final operationToCancel = marker.operationId;
 
             // Если отмена относится к текущей операции
-            if (operationToCancel == message.id) {
+            if (operationToCancel == message.messageId) {
               // Отправляем статус отмены
               sendStatus(
-                requestId: message.id,
+                requestId: message.messageId,
                 statusCode: RpcStatusCode.cancelled,
                 message: marker.reason ?? 'Operation cancelled',
-                serviceName: message.service,
-                methodName: message.method,
+                serviceName: message.serviceName,
+                methodName: message.methodName,
               );
 
               // Завершаем операцию
-              final completer = _pendingRequests.remove(message.id);
+              final completer = _pendingRequests.remove(message.messageId);
               if (completer != null && !completer.isCompleted) {
                 completer.completeError(marker.reason ?? 'Operation cancelled');
               }
@@ -682,13 +682,13 @@ final class _RpcEngineImpl implements IRpcEngine {
     }
 
     // Если известны имена сервиса и метода, применяем middleware
-    if (message.service != null && message.method != null) {
+    if (message.serviceName != null && message.methodName != null) {
       _middlewareChain
           .executeStreamData(
-        message.service!,
-        message.method!,
+        message.serviceName!,
+        message.methodName!,
         payload,
-        message.id,
+        message.messageId,
         RpcDataDirection.fromRemote, // Данные получены от удаленной стороны
       )
           .then((processedData) {
@@ -703,15 +703,15 @@ final class _RpcEngineImpl implements IRpcEngine {
 
   /// Обрабатывает завершение потока
   void _handleStreamEnd(RpcMessage message) {
-    final controller = _streamControllers.remove(message.id);
+    final controller = _streamControllers.remove(message.messageId);
     if (controller != null && !controller.isClosed) {
       // Если известны имена сервиса и метода, применяем middleware
-      if (message.service != null && message.method != null) {
+      if (message.serviceName != null && message.methodName != null) {
         _middlewareChain
             .executeStreamEnd(
-          message.service!,
-          message.method!,
-          message.id,
+          message.serviceName!,
+          message.methodName!,
+          message.messageId,
         )
             .then((_) {
           controller.close();
@@ -747,12 +747,12 @@ final class _RpcEngineImpl implements IRpcEngine {
       errorObject = Exception('Ошибка при обработке сообщения');
     }
 
-    final completer = _pendingRequests.remove(message.id);
+    final completer = _pendingRequests.remove(message.messageId);
     if (completer != null && !completer.isCompleted) {
       completer.completeError(errorObject);
     }
 
-    final controller = _streamControllers[message.id];
+    final controller = _streamControllers[message.messageId];
     if (controller != null && !controller.isClosed) {
       controller.addError(errorObject);
     }
@@ -763,9 +763,9 @@ final class _RpcEngineImpl implements IRpcEngine {
     await _sendMessage(
       RpcMessage(
         type: RpcMessageType.pong,
-        id: message.id,
+        messageId: message.messageId,
         payload: message.payload,
-        metadata: message.metadata,
+        headerMetadata: message.headerMetadata,
         debugLabel: debugLabel,
       ),
     );
@@ -781,9 +781,9 @@ final class _RpcEngineImpl implements IRpcEngine {
     await _sendMessage(
       RpcMessage(
         type: RpcMessageType.error,
-        id: requestId,
+        messageId: requestId,
         payload: errorMessage,
-        metadata: headerMetadata,
+        headerMetadata: headerMetadata,
         trailerMetadata: trailerMetadata,
         debugLabel: debugLabel,
       ),
@@ -862,11 +862,11 @@ final class _RpcEngineImpl implements IRpcEngine {
 
     final message = RpcMessage(
       type: RpcMessageType.streamData,
-      id: streamId,
-      service: serviceName,
-      method: methodName,
+      messageId: streamId,
+      serviceName: serviceName,
+      methodName: methodName,
       payload: processedData,
-      metadata: metadata,
+      headerMetadata: metadata,
       debugLabel: debugLabel,
     );
 
@@ -890,11 +890,11 @@ final class _RpcEngineImpl implements IRpcEngine {
   }) async {
     final message = RpcMessage(
       type: RpcMessageType.error,
-      id: streamId,
-      service: serviceName,
-      method: methodName,
+      messageId: streamId,
+      serviceName: serviceName,
+      methodName: methodName,
       payload: errorMessage,
-      metadata: metadata,
+      headerMetadata: metadata,
       debugLabel: debugLabel,
     );
 
@@ -926,10 +926,10 @@ final class _RpcEngineImpl implements IRpcEngine {
     await _sendMessage(
       RpcMessage(
         type: RpcMessageType.streamEnd,
-        id: streamId,
-        service: serviceName,
-        method: methodName,
-        metadata: metadata,
+        messageId: streamId,
+        serviceName: serviceName,
+        methodName: methodName,
+        headerMetadata: metadata,
         debugLabel: debugLabel,
       ),
     );
@@ -1052,11 +1052,11 @@ final class _RpcEngineImpl implements IRpcEngine {
     await _sendMessage(
       RpcMessage(
         type: messageType,
-        id: streamId,
-        service: serviceName,
-        method: methodName,
+        messageId: streamId,
+        serviceName: serviceName,
+        methodName: methodName,
         payload: marker.toJson(),
-        metadata: metadata,
+        headerMetadata: metadata,
         debugLabel: debugLabel,
       ),
     );
