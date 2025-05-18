@@ -17,12 +17,6 @@ prepare:
     genhtml coverage/lcov.info -o coverage/html
     open coverage/html/index.html
 
-compile:
-    cd example && rm pubspec.lock
-    cd example && fvm dart pub get
-    cd example && fvm dart compile exe bin/main.dart -o bin/examples
-    cd example && chmod +x bin/examples
-
 dry:
     fvm dart pub publish --dry-run
 
