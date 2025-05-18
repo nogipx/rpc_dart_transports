@@ -1,6 +1,7 @@
 name: rpc_dart_transports
 description: A starting point for Dart libraries or applications.
 version: 1.0.0
+publish_to: none
 # repository: https://github.com/my_org/my_repo
 
 environment:
@@ -8,12 +9,13 @@ environment:
 
 # Add regular dependencies here.
 dependencies:
-  rpc_dart: any
-  web_socket_channel: ^2.4.0
-
-dependency_overrides:
   rpc_dart:
-    path: ../rpc_dart
+    git:
+      url: https://github.com/nogipx/rpc_dart.git
+      ref: main
+      path: rpc_dart
+
+  web_socket_channel: ^2.4.0
 
 dev_dependencies:
   lints: ^5.0.0
