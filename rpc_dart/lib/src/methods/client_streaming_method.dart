@@ -318,21 +318,24 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
 
     // Если метод не найден в контракте, добавляем его
     if (existingMethod == null) {
-      // Определяем тип обработчика и добавляем соответствующий метод
-      if (handler is RpcMethodClientStreamHandler<Request, Response>) {
-        // Проверяем, что передан парсер ответа
-        if (responseParser == null) {
-          throw ArgumentError(
-            'Для обработчика с ответом необходимо указать responseParser',
-          );
-        }
+      // Получаем актуальный контракт метода
+      final contract =
+          getMethodContract<Request, Response>(RpcMethodType.clientStreaming);
 
-        // Добавляем метод с ответом
-        serviceContract.addClientStreamingMethod<Request, Response>(
+      // Проверяем тип обработчика
+      if (handler is RpcMethodClientStreamHandler<Request, Response>) {
+        // Регистрируем метод напрямую
+        _registry.registerDirectMethod<Request, Response>(
+          serviceName: serviceName,
           methodName: methodName,
+          methodType: RpcMethodType.clientStreaming,
           handler: handler,
-          argumentParser: requestParser,
-          responseParser: responseParser,
+          argumentParser: (dynamic data) =>
+              requestParser(data as Map<String, dynamic>),
+          responseParser: responseParser != null
+              ? (dynamic data) => responseParser(data as Map<String, dynamic>)
+              : null,
+          methodContract: contract,
         );
       } else {
         throw ArgumentError(
@@ -340,34 +343,6 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
         );
       }
     }
-
-    // Получаем актуальный контракт метода
-    final contract =
-        getMethodContract<Request, Response>(RpcMethodType.clientStreaming);
-
-    // Создаем соответствующую реализацию метода, в зависимости от типа обработчика
-    final implementation =
-        RpcMethodImplementation<Request, Response>.clientStreaming(
-            contract, handler);
-
-    // Регистрируем реализацию метода
-    _registry.registerMethodImplementation(
-      serviceName: serviceName,
-      methodName: methodName,
-      implementation: implementation,
-    );
-
-    // Регистрируем низкоуровневый обработчик
-    _registry.registerMethod(
-      serviceName: serviceName,
-      methodName: methodName,
-      methodType: RpcMethodType.clientStreaming,
-      argumentParser: requestParser,
-      responseParser: responseParser,
-      handler: RpcMethodAdapterFactory.createClientStreamHandlerAdapter(
-        handler,
-      ),
-    );
   }
 }
 

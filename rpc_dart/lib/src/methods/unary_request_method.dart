@@ -200,35 +200,22 @@ final class UnaryRequestRpcMethod<T extends IRpcSerializableMessage>
 
     // Получаем актуальный контракт метода
     final contract = getMethodContract<Request, Response>(RpcMethodType.unary);
-    final implementation = RpcMethodImplementation.unary(contract, handler);
 
-    // Регистрируем реализацию метода
-    _registry.registerMethodImplementation(
+    // Регистрируем метод напрямую
+    _registry.registerDirectMethod<Request, Response>(
       serviceName: serviceName,
       methodName: methodName,
-      implementation: implementation,
+      methodType: RpcMethodType.unary,
+      handler: handler,
+      argumentParser: (dynamic data) =>
+          requestParser(data as Map<String, dynamic>),
+      responseParser: (dynamic data) =>
+          responseParser(data as Map<String, dynamic>),
+      methodContract: contract,
     );
 
     _logger?.debug(
       'Зарегистрирован унарный метод $serviceName.$methodName',
-    );
-
-    // Создаем адаптер хэндлера
-    final handlerAdapter = RpcMethodAdapterFactory.createUnaryHandlerAdapter(
-      handler,
-      requestParser,
-      'UnaryRequestRpcMethod.register',
-    );
-
-    // Регистрируем низкоуровневый обработчик - это ключевой шаг для обеспечения
-    // связи между контрактом и обработчиком вызова
-    _registry.registerMethod(
-      serviceName: serviceName,
-      methodName: methodName,
-      methodType: RpcMethodType.unary,
-      argumentParser: requestParser,
-      responseParser: responseParser,
-      handler: handlerAdapter,
     );
   }
 }

@@ -181,8 +181,27 @@ void main() {
 
           final a = data['a'] as num;
           final b = data['b'] as num;
-          return {'result': a + b};
+
+          // Возвращаем правильный тип (RpcMessage)
+          return RpcMessage(
+            type: RpcMessageType.response,
+            messageId: context.messageId,
+            serviceName: 'math',
+            methodName: 'add',
+            payload: {'result': a + b},
+          );
         },
+        methodType: RpcMethodType.unary,
+        argumentParser: (Map<String, dynamic> data) => RpcMessage(
+          type: RpcMessageType.request,
+          messageId: 'test',
+          payload: data,
+        ),
+        responseParser: (Map<String, dynamic> data) => RpcMessage(
+          type: RpcMessageType.response,
+          messageId: 'test',
+          payload: data,
+        ),
       );
 
       try {
@@ -195,7 +214,13 @@ void main() {
 
         // Проверяем, что результат был получен правильно
         expect(result, isA<Map<String, dynamic>>());
-        expect(result['result'], equals(30));
+        // Результат теперь находится внутри fields[payload][result]
+        if (result is Map && result['payload'] is Map) {
+          final payload = result['payload'] as Map<String, dynamic>;
+          expect(payload['result'], equals(30));
+        } else {
+          fail('Ожидался структурированный ответ с payload');
+        }
 
         // Проверяем обработку ошибки
         try {

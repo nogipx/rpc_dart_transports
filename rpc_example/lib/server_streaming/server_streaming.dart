@@ -75,77 +75,72 @@ class ServerTaskService extends TaskServiceContract {
       'Сервер: Начинаем задачу "${request.taskName}" (ID: ${request.taskId})',
     );
 
-    final bidiStream =
-        BidiStreamGenerator<TaskRequest, ProgressMessage>((requests) async* {
-          final int steps = request.steps;
-          final List<String> stages = [
-            'initializing',
-            'in_progress',
-            'processing',
-            'analyzing',
-            'in_progress',
-          ];
-          final List<String> messages = [
-            'Инициализация анализа...',
-            'Загрузка набора данных...',
-            'Предварительная обработка...',
-            'Статистический анализ...',
-            'Обработка результатов...',
-            'Генерация отчетов...',
-            'Применение фильтров...',
-            'Оптимизация данных...',
-            'Финальная проверка...',
-            'Формирование результатов...',
-          ];
+    final bidiStream = BidiStreamGenerator<TaskRequest, ProgressMessage>((requests) async* {
+      final int steps = request.steps;
+      final List<String> stages = [
+        'initializing',
+        'in_progress',
+        'processing',
+        'analyzing',
+        'in_progress',
+      ];
+      final List<String> messages = [
+        'Инициализация анализа...',
+        'Загрузка набора данных...',
+        'Предварительная обработка...',
+        'Статистический анализ...',
+        'Обработка результатов...',
+        'Генерация отчетов...',
+        'Применение фильтров...',
+        'Оптимизация данных...',
+        'Финальная проверка...',
+        'Формирование результатов...',
+      ];
 
-          // Начальный статус
-          yield ProgressMessage(
-            taskId: request.taskId,
-            progress: 0,
-            status: 'initializing',
-            message: 'Задача запущена. Подготовка к выполнению...',
-          );
+      // Начальный статус
+      yield ProgressMessage(
+        taskId: request.taskId,
+        progress: 0,
+        status: 'initializing',
+        message: 'Задача запущена. Подготовка к выполнению...',
+      );
 
-          await Future.delayed(Duration(milliseconds: 500));
+      await Future.delayed(Duration(milliseconds: 500));
 
-          // Имитация процесса обработки
-          for (int i = 1; i <= steps; i++) {
-            final progress = (i / steps * 100).round();
-            final stageIndex = i % stages.length;
-            final messageIndex = i - 1;
-            final status = i == steps ? 'completed' : stages[stageIndex];
-            final message =
-                i == steps
-                    ? 'Обработано ${(3000 + (i * 500)).toStringAsFixed(0)} элементов данных'
-                    : messages[messageIndex];
+      // Имитация процесса обработки
+      for (int i = 1; i <= steps; i++) {
+        final progress = (i / steps * 100).round();
+        final stageIndex = i % stages.length;
+        final messageIndex = i - 1;
+        final status = i == steps ? 'completed' : stages[stageIndex];
+        final message = i == steps
+            ? 'Обработано ${(3000 + (i * 500)).toStringAsFixed(0)} элементов данных'
+            : messages[messageIndex];
 
-            // Разная задержка для разных этапов
-            final delay =
-                status == 'analyzing'
-                    ? Duration(milliseconds: 1000)
-                    : Duration(milliseconds: 500);
-            await Future.delayed(delay);
+        // Разная задержка для разных этапов
+        final delay =
+            status == 'analyzing' ? Duration(milliseconds: 1000) : Duration(milliseconds: 500);
+        await Future.delayed(delay);
 
-            yield ProgressMessage(
-              taskId: request.taskId,
-              progress: progress,
-              status: status,
-              message: message,
-            );
-          }
+        yield ProgressMessage(
+          taskId: request.taskId,
+          progress: progress,
+          status: status,
+          message: message,
+        );
+      }
 
-          _logger.info(
-            'Сервер: Задача "${request.taskName}" успешно завершена',
-          );
-        }).create();
+      _logger.info(
+        'Сервер: Задача "${request.taskName}" успешно завершена',
+      );
+    }).create();
 
     // Оборачиваем BidiStream в ServerStreamingBidiStream
-    final serverStream =
-        ServerStreamingBidiStream<TaskRequest, ProgressMessage>(
-          stream: bidiStream,
-          sendFunction: bidiStream.send,
-          closeFunction: bidiStream.close,
-        );
+    final serverStream = ServerStreamingBidiStream<TaskRequest, ProgressMessage>(
+      stream: bidiStream,
+      sendFunction: bidiStream.send,
+      closeFunction: bidiStream.close,
+    );
 
     // Отправляем начальный запрос в стрим
     serverStream.sendRequest(request);
@@ -216,7 +211,7 @@ Future<void> demonstrateTaskProgress(RpcEndpoint client) async {
   final request = TaskRequest(
     taskId: 'data-proc-${DateTime.now().millisecondsSinceEpoch}',
     taskName: 'Анализ большого набора данных',
-    steps: 10,
+    steps: 7,
   );
 
   _logger.info(
@@ -256,6 +251,9 @@ Future<void> demonstrateTaskProgress(RpcEndpoint client) async {
         _logger.info('  • Результат: ${progress.message}');
       }
     }
+
+    // Добавляем задержку после завершения для гарантии доставки всех сообщений
+    await Future.delayed(Duration(seconds: 1));
   } catch (e) {
     _logger.error(
       'Произошла ошибка при получении обновлений',

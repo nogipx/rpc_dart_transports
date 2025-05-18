@@ -6,7 +6,6 @@ import 'dart:async';
 import 'package:rpc_dart/diagnostics.dart';
 import 'package:rpc_dart/rpc_dart.dart';
 
-part '_method_implementation.dart';
 part '_method_adapter_factory.dart';
 part 'bidirectional_streaming_method.dart';
 part 'client_streaming_method.dart';

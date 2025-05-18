@@ -46,7 +46,7 @@ abstract class RpcServiceContract
           serviceName: method.serviceName,
           methodName: method.methodName,
           methodType: method.methodType,
-          handler: method.handler,
+          handler: method.getHandler(),
           argumentParser: method.argumentParser,
           responseParser: method.responseParser,
         );
@@ -101,7 +101,7 @@ abstract class RpcServiceContract
     final registeredMethods = _methodRegistry.getMethodsForService(serviceName);
 
     for (final method in registeredMethods) {
-      final methodType = method.methodType ?? RpcMethodType.unary;
+      final methodType = method.methodType;
       final contract =
           RpcMethodContract<IRpcSerializableMessage, IRpcSerializableMessage>(
         serviceName: method.serviceName,
@@ -128,7 +128,7 @@ abstract class RpcServiceContract
     // Ищем метод в реестре
     final registered = _methodRegistry.findMethod(serviceName, methodName);
     if (registered != null) {
-      final methodType = registered.methodType ?? RpcMethodType.unary;
+      final methodType = registered.methodType;
       return RpcMethodContract<Request, Response>(
         serviceName: registered.serviceName,
         methodName: registered.methodName,
@@ -153,8 +153,8 @@ abstract class RpcServiceContract
   ) {
     // Получаем обработчик из реестра
     final registered = _methodRegistry.findMethod(serviceName, methodName);
-    if (registered != null && registered.handler != null) {
-      return registered.handler;
+    if (registered != null && registered.getHandler() != null) {
+      return registered.getHandler();
     }
 
     // Ищем в подконтрактах
@@ -241,18 +241,12 @@ abstract class RpcServiceContract
     required RpcMethodArgumentParser<Request> argumentParser,
     required RpcMethodResponseParser<Response> responseParser,
   }) {
-    final handlerAdapter =
-        RpcMethodAdapterFactory.createServerStreamHandlerAdapter(
-      handler,
-      argumentParser,
-      'RpcServiceContract.addServerStreamingMethod',
-    );
-
+    // Передаем обработчик напрямую без создания адаптера
     _methodRegistry.registerMethod(
       serviceName: serviceName,
       methodName: methodName,
       methodType: RpcMethodType.serverStreaming,
-      handler: handlerAdapter,
+      handler: handler,
       argumentParser: argumentParser,
       responseParser: responseParser,
     );
@@ -266,16 +260,12 @@ abstract class RpcServiceContract
     required RpcMethodArgumentParser<Request> argumentParser,
     required RpcMethodResponseParser<Response> responseParser,
   }) {
-    final handlerAdapter =
-        RpcMethodAdapterFactory.createClientStreamHandlerAdapter(
-      handler,
-    );
-
+    // Передаем обработчик напрямую без создания адаптера
     _methodRegistry.registerMethod(
       serviceName: serviceName,
       methodName: methodName,
       methodType: RpcMethodType.clientStreaming,
-      handler: handlerAdapter,
+      handler: handler,
       argumentParser: argumentParser,
       responseParser: responseParser,
     );
@@ -289,16 +279,12 @@ abstract class RpcServiceContract
     required RpcMethodArgumentParser<Request> argumentParser,
     required RpcMethodResponseParser<Response> responseParser,
   }) {
-    final handlerAdapter =
-        RpcMethodAdapterFactory.createBidirectionalHandlerAdapter(
-      handler,
-    );
-
+    // Передаем обработчик напрямую без создания адаптера
     _methodRegistry.registerMethod(
       serviceName: serviceName,
       methodName: methodName,
       methodType: RpcMethodType.bidirectional,
-      handler: handlerAdapter,
+      handler: handler,
       argumentParser: argumentParser,
       responseParser: responseParser,
     );

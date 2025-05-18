@@ -30,24 +30,32 @@ abstract interface class IRpcMethodRegistry {
     Function? responseParser,
   });
 
-  /// Регистрирует реализацию метода (для внутреннего использования)
-  void registerMethodImplementation({
+  /// Регистрирует напрямую конкретный тип метода
+  void registerDirectMethod<Req extends IRpcSerializableMessage,
+      Resp extends IRpcSerializableMessage>({
     required String serviceName,
     required String methodName,
-    required RpcMethodImplementation implementation,
+    required RpcMethodType methodType,
+    required dynamic handler,
+    required Req Function(dynamic) argumentParser,
+    Resp Function(dynamic)? responseParser,
+    RpcMethodContract<Req, Resp>? methodContract,
   });
 
   /// Находит информацию о методе по имени сервиса и методу
-  MethodRegistration? findMethod(
+  MethodRegistration<IRpcSerializableMessage, IRpcSerializableMessage>?
+      findMethod(
     String serviceName,
     String methodName,
   );
 
   /// Возвращает список всех зарегистрированных методов
-  Iterable<MethodRegistration> getAllMethods();
+  Iterable<MethodRegistration<IRpcSerializableMessage, IRpcSerializableMessage>>
+      getAllMethods();
 
   /// Возвращает список методов для конкретного сервиса
-  Iterable<MethodRegistration> getMethodsForService(
+  Iterable<MethodRegistration<IRpcSerializableMessage, IRpcSerializableMessage>>
+      getMethodsForService(
     String serviceName,
   );
 

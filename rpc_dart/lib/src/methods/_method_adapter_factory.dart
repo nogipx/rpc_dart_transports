@@ -63,44 +63,15 @@ final class RpcMethodAdapterFactory {
   /// [handler] - Обработчик серверного стрим-метода
   /// [argumentParser] - Функция для парсинга аргументов из JSON
   /// [debugLabel] - Метка для отладки (используется в сообщениях об ошибках)
-  static Future<dynamic> Function(IRpcContext) createServerStreamHandlerAdapter<
-      Request extends IRpcSerializableMessage,
-      Response extends IRpcSerializableMessage>(
+  static RpcMethodServerStreamHandler<Request, Response>
+      createServerStreamHandlerAdapter<Request extends IRpcSerializableMessage,
+          Response extends IRpcSerializableMessage>(
     RpcMethodServerStreamHandler<Request, Response> handler,
     RpcMethodArgumentParser<Request> argumentParser,
     String debugLabel,
   ) {
-    return (IRpcContext context) async {
-      Request typedRequest;
-
-      try {
-        // Безопасное преобразование payload к типу Request
-        if (context.payload is Request) {
-          // Если payload уже имеет нужный тип - используем его напрямую
-          typedRequest = context.payload as Request;
-        } else if (context.payload is Map) {
-          // Для Map используем парсер
-          typedRequest =
-              argumentParser(Map<String, dynamic>.from(context.payload as Map));
-        } else if (context.payload == null) {
-          // Для null создаем пустой Map и используем парсер
-          typedRequest = argumentParser({});
-        } else {
-          // Для других случаев пытаемся использовать строковое представление
-          typedRequest = argumentParser({'data': context.payload.toString()});
-        }
-
-        return handler(typedRequest);
-      } catch (e, stackTrace) {
-        throw RpcCustomException(
-          customMessage:
-              'Ошибка при обработке запроса: $e\nТип payload: ${context.payload.runtimeType}',
-          debugLabel: debugLabel,
-          error: e,
-          stackTrace: stackTrace,
-        );
-      }
-    };
+    // Просто возвращаем исходный обработчик без обертки для примеров
+    return handler;
   }
 
   /// Создает адаптер для обработчика клиентского стрима
@@ -108,14 +79,13 @@ final class RpcMethodAdapterFactory {
   /// Для клиентского стрима не требуется запрос - просто вызываем обработчик
   ///
   /// [handler] - Обработчик клиентского стрим-метода
-  static Future<dynamic> Function(IRpcContext) createClientStreamHandlerAdapter<
-      Request extends IRpcSerializableMessage,
-      Response extends IRpcSerializableMessage>(
+  static RpcMethodClientStreamHandler<Request, Response>
+      createClientStreamHandlerAdapter<Request extends IRpcSerializableMessage,
+          Response extends IRpcSerializableMessage>(
     RpcMethodClientStreamHandler<Request, Response> handler,
   ) {
-    return (IRpcContext context) async {
-      return handler();
-    };
+    // Просто возвращаем исходный обработчик - нам не нужен контекст
+    return handler;
   }
 
   /// Создает адаптер для обработчика двунаправленного стрима
@@ -123,13 +93,12 @@ final class RpcMethodAdapterFactory {
   /// Для двунаправленного стрима не требуется запрос - просто вызываем обработчик
   ///
   /// [handler] - Обработчик двунаправленного стрим-метода
-  static Future<dynamic> Function(IRpcContext)
+  static RpcMethodBidirectionalHandler<Request, Response>
       createBidirectionalHandlerAdapter<Request extends IRpcSerializableMessage,
           Response extends IRpcSerializableMessage>(
     RpcMethodBidirectionalHandler<Request, Response> handler,
   ) {
-    return (IRpcContext context) async {
-      return handler();
-    };
+    // Просто возвращаем исходный обработчик - нам не нужен контекст для него
+    return handler;
   }
 }

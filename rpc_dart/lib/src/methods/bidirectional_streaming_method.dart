@@ -322,14 +322,17 @@ final class BidirectionalStreamingRpcMethod<T extends IRpcSerializableMessage>
     final contract =
         getMethodContract<Request, Response>(RpcMethodType.bidirectional);
 
-    final implementation =
-        RpcMethodImplementation.bidirectionalStreaming(contract, handler);
-
-    // Регистрируем реализацию метода
-    _registry.registerMethodImplementation(
+    // Регистрируем метод напрямую
+    _registry.registerDirectMethod<Request, Response>(
       serviceName: serviceName,
       methodName: methodName,
-      implementation: implementation,
+      methodType: RpcMethodType.bidirectional,
+      handler: handler,
+      argumentParser: (dynamic data) =>
+          requestParser(data as Map<String, dynamic>),
+      responseParser: (dynamic data) =>
+          responseParser(data as Map<String, dynamic>),
+      methodContract: contract,
     );
 
     // Регистрируем низкоуровневый обработчик

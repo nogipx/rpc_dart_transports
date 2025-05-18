@@ -236,32 +236,18 @@ final class ServerStreamingRpcMethod<T extends IRpcSerializableMessage>
     // Получаем актуальный контракт метода
     final contract =
         getMethodContract<Request, Response>(RpcMethodType.serverStreaming);
-    final implementation =
-        RpcMethodImplementation.serverStreaming(contract, handler);
 
-    // Регистрируем реализацию метода
-    _registry.registerMethodImplementation(
-      serviceName: serviceName,
-      methodName: methodName,
-      implementation: implementation,
-    );
-
-    // Создаем адаптер хэндлера
-    final handlerAdapter =
-        RpcMethodAdapterFactory.createServerStreamHandlerAdapter(
-      handler,
-      requestParser,
-      'ServerStreamingRpcMethod.register',
-    );
-
-    // Регистрируем низкоуровневый обработчик
-    _registry.registerMethod(
+    // Регистрируем метод напрямую
+    _registry.registerDirectMethod<Request, Response>(
       serviceName: serviceName,
       methodName: methodName,
       methodType: RpcMethodType.serverStreaming,
-      argumentParser: requestParser,
-      responseParser: responseParser,
-      handler: handlerAdapter,
+      handler: handler,
+      argumentParser: (dynamic data) =>
+          requestParser(data as Map<String, dynamic>),
+      responseParser: (dynamic data) =>
+          responseParser(data as Map<String, dynamic>),
+      methodContract: contract,
     );
   }
 }

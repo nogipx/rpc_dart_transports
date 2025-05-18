@@ -104,19 +104,6 @@ final class _RpcEndpointImpl
       );
 
   @override
-  void registerMethodImplementation({
-    required String serviceName,
-    required String methodName,
-    required RpcMethodImplementation implementation,
-  }) {
-    _registry.registerMethodImplementation(
-      serviceName: serviceName,
-      methodName: methodName,
-      implementation: implementation,
-    );
-  }
-
-  @override
   Future<void> sendStreamData({
     required String streamId,
     required dynamic data,
@@ -193,9 +180,9 @@ final class _RpcEndpointImpl
 
     // Для каждого метода создаем реализацию
     for (final method in registeredMethods) {
-      final methodType = method.methodType ?? RpcMethodType.unary;
+      final methodType = method.methodType;
       final methodName = method.methodName;
-      final handler = method.handler;
+      final handler = method.getHandler();
       final argumentParser = method.argumentParser;
       final responseParser = method.responseParser;
 
@@ -467,4 +454,26 @@ final class _RpcEndpointImpl
         serviceName: serviceName,
         methodName: methodName,
       );
+
+  @override
+  void registerDirectMethod<Req extends IRpcSerializableMessage,
+      Resp extends IRpcSerializableMessage>({
+    required String serviceName,
+    required String methodName,
+    required RpcMethodType methodType,
+    required handler,
+    required Req Function(dynamic p) argumentParser,
+    Resp Function(dynamic p)? responseParser,
+    RpcMethodContract<Req, Resp>? methodContract,
+  }) {
+    _registry.registerDirectMethod(
+      serviceName: serviceName,
+      methodName: methodName,
+      methodType: methodType,
+      handler: handler,
+      argumentParser: argumentParser,
+      responseParser: responseParser,
+      methodContract: methodContract,
+    );
+  }
 }

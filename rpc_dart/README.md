@@ -351,7 +351,7 @@ class LoggingMiddleware implements SimpleRpcMiddleware {
     String serviceName, 
     String methodName, 
     dynamic payload, 
-    RpcMethodContext context,
+    IRpcContext context,
     RpcDataDirection direction,
   ) {
     final directionStr = direction == RpcDataDirection.toRemote ? '→' : '←';
@@ -371,7 +371,7 @@ class AuthMiddleware implements SimpleRpcMiddleware {
     String serviceName, 
     String methodName, 
     dynamic payload, 
-    RpcMethodContext context,
+    IRpcContext context,
     RpcDataDirection direction,
   ) {
     if (direction == RpcDataDirection.toRemote) {

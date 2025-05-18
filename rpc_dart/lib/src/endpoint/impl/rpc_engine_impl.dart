@@ -42,7 +42,8 @@ final class _RpcEngineImpl implements IRpcEngine {
   /// Генератор уникальных ID
   late final RpcUniqueIdGenerator _uniqueIdGenerator;
 
-  RpcLogger get _logger => RpcLogger('RpcEngineImpl[$debugLabel]');
+  /// Логгер
+  final RpcLogger _logger = RpcLogger('RpcEngine');
 
   /// Создаёт новую конечную точку
   ///
@@ -335,7 +336,7 @@ final class _RpcEngineImpl implements IRpcEngine {
           : requestResult.context;
 
       // Проверяем наличие обработчика
-      if (methodHandler.handler == null) {
+      if (methodHandler.getHandler() == null) {
         throw RpcCustomException(
           customMessage:
               'Не найден обработчик для метода $serviceName.$methodName',
@@ -345,7 +346,58 @@ final class _RpcEngineImpl implements IRpcEngine {
 
       // Вызываем обработчик с обновленным контекстом
       // Теперь handler - это адаптер, созданный через RpcMethodAdapterFactory, который корректно обрабатывает контекст
-      final result = await methodHandler.handler(updatedRequestContext);
+      dynamic result;
+      final handler = methodHandler.getHandler();
+
+      try {
+        // Если запрос был получен в RpcMessage, пробуем сначала извлечь payload для типизированного обработчика
+        if (updatedRequestContext is RpcMessage &&
+            updatedRequestContext.payload != null &&
+            methodHandler.argumentParser != null) {
+          try {
+            final typedRequest =
+                methodHandler.argumentParser!(updatedRequestContext.payload);
+            result = await handler(typedRequest);
+          } catch (e) {
+            // Если это не сработало, пробуем вызвать как функцию с контекстом
+            result = await handler(updatedRequestContext);
+          }
+        } else {
+          // Стандартный случай - пробуем вызвать с контекстом
+          result = await handler(updatedRequestContext);
+        }
+      } catch (e) {
+        if (e is NoSuchMethodError &&
+            e.toString().contains('mismatched arguments')) {
+          // Если это ошибка несовпадения аргументов, пробуем вызвать без аргументов
+          try {
+            result = await handler();
+          } catch (innerE) {
+            if (innerE is TypeError &&
+                methodHandler.argumentParser != null &&
+                updatedRequestContext.payload != null) {
+              // Если это ошибка типа, пробуем распарсить запрос и передать его напрямую
+              try {
+                final typedRequest = methodHandler
+                    .argumentParser!(updatedRequestContext.payload);
+                result = await handler(typedRequest);
+              } catch (parsingE, parsingStackTrace) {
+                _logger.error('Ошибка при парсинге запроса: $parsingE',
+                    error: parsingE, stackTrace: parsingStackTrace);
+                rethrow;
+              }
+            } else {
+              _logger.error(
+                  'Ошибка при вызове обработчика без аргументов: $innerE',
+                  error: innerE);
+              rethrow;
+            }
+          }
+        } else {
+          // Если это другая ошибка, пробрасываем её
+          rethrow;
+        }
+      }
 
       // Изменяем направление на отправку
       direction = RpcDataDirection.toRemote;
@@ -362,17 +414,66 @@ final class _RpcEngineImpl implements IRpcEngine {
       // Используем финальный контекст после применения всех middleware
       final finalContext = responseResult.context;
 
-      // Отправляем ответ
-      await _sendMessage(
-        RpcMessage(
-          type: RpcMessageType.response,
-          messageId: message.messageId,
-          payload: responseResult.payload,
-          headerMetadata: finalContext.headerMetadata,
-          trailerMetadata: finalContext.trailerMetadata,
-          debugLabel: debugLabel,
-        ),
-      );
+      // Проверяем, является ли результат ServerStreamingBidiStream
+      if (result is ServerStreamingBidiStream) {
+        _logger.debug(
+            'Обнаружен ServerStreamingBidiStream, настраиваем обработку данных');
+
+        // Устанавливаем обработчик для данных из стрима
+        // Используем доступ к свойству responseStream в RpcStream, от которого наследуется ServerStreamingBidiStream
+        result.listen(
+          (data) async {
+            // Отправляем каждый элемент как streamData
+            await sendStreamData(
+              streamId: message.messageId,
+              data: data,
+              serviceName: serviceName,
+              methodName: methodName,
+            );
+          },
+          onError: (error) async {
+            // При ошибке отправляем сообщение об ошибке
+            await sendStreamError(
+              streamId: message.messageId,
+              errorMessage: error.toString(),
+              serviceName: serviceName,
+              methodName: methodName,
+            );
+          },
+          onDone: () async {
+            // При завершении закрываем поток
+            await closeStream(
+              streamId: message.messageId,
+              serviceName: serviceName,
+              methodName: methodName,
+            );
+          },
+        );
+
+        // Отправляем пустой ответ, стримы будут обрабатываться отдельно
+        await _sendMessage(
+          RpcMessage(
+            type: RpcMessageType.response,
+            messageId: message.messageId,
+            payload: 'Stream started',
+            headerMetadata: finalContext.headerMetadata,
+            trailerMetadata: finalContext.trailerMetadata,
+            debugLabel: debugLabel,
+          ),
+        );
+      } else {
+        // Отправляем обычный ответ
+        await _sendMessage(
+          RpcMessage(
+            type: RpcMessageType.response,
+            messageId: message.messageId,
+            payload: responseResult.payload,
+            headerMetadata: finalContext.headerMetadata,
+            trailerMetadata: finalContext.trailerMetadata,
+            debugLabel: debugLabel,
+          ),
+        );
+      }
 
       // Отправляем статус успешного завершения
       await sendStatus(

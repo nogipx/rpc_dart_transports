@@ -12,17 +12,20 @@ abstract base class ChatServiceContract extends RpcServiceContract {
 
   @override
   void setup() {
-    // Регистрируем метод для чата
+    // Использую метод из контракта напрямую
     addBidirectionalStreamingMethod<ChatMessage, ChatMessage>(
       methodName: chatMethod,
+      // Обертываем метод, чтобы он не принимал никаких параметров
       handler: chatHandler,
       argumentParser: ChatMessage.fromJson,
       responseParser: ChatMessage.fromJson,
     );
+
     super.setup();
   }
 
-  /// Обработчик сообщений чата
+  /// Обработчик сообщений чата - не принимает никаких параметров,
+  /// так как двунаправленный стрим начинается без начального сообщения
   BidiStream<ChatMessage, ChatMessage> chatHandler();
 }
 

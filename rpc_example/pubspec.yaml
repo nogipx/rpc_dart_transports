@@ -15,7 +15,7 @@ dependencies:
   args: ^2.7.0
   freezed_annotation: ^3.0.0
   json_annotation: ^4.9.0
-  
+
   rpc_dart:
     git:
       url: https://github.com/nogipx/rpc_dart.git
@@ -27,6 +27,13 @@ dependencies:
       url: https://github.com/nogipx/rpc_dart.git
       ref: main
       path: rpc_dart_transports
+
+dependency_overrides:
+  rpc_dart:
+    path: ../rpc_dart
+    
+  rpc_dart_transports:
+    path: ../rpc_dart_transports
 
 dev_dependencies:
   lints: ^5.0.0
