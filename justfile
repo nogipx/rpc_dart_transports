@@ -5,14 +5,30 @@ test:
 
 get:
     rm -f rpc_example/pubspec.lock
+    rm -rf rpc_example/.dart_tool
+
     rm -f rpc_dart_transports/pubspec.lock
+    rm -rf rpc_dart_transports/.dart_tool
+
     rm -f rpc_dart/pubspec.lock
+    rm -rf rpc_dart/.dart_tool
+
+    rm -rf .dart_tool
+
     fvm dart pub global run packo pubget -r
 
 gen:
     rm -f rpc_example/pubspec.lock
+    rm -rf rpc_example/.dart_tool
+
     rm -f rpc_dart_transports/pubspec.lock
+    rm -rf rpc_dart_transports/.dart_tool
+
     rm -f rpc_dart/pubspec.lock
+    rm -rf rpc_dart/.dart_tool
+
+    rm -rf .dart_tool
+
     fvm dart pub global run packo runner -r
 
 compile:
