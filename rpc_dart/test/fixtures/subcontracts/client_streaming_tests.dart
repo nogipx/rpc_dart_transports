@@ -71,118 +71,71 @@ abstract class ClientStreamingTestsSubcontract extends RpcServiceContract {
 
 /// Серверная реализация контракта клиентского стриминга
 class ClientStreamingTestsServer extends ClientStreamingTestsSubcontract {
+  final _logger = RpcLogger('ClientStreamingTests');
+
   @override
   ClientStreamingBidiStream<ClientStreamRequest, ClientStreamResponse>
       collectData() {
-    // Создаем контроллеры для запросов и ответов
-    final requestController = StreamController<ClientStreamRequest>();
-    final responseController = StreamController<ClientStreamResponse>();
+    _logger.info('Вызван метод collectData');
 
-    // Собираем все сообщения
-    final collected = <String>[];
+    return BidiStreamGenerator<ClientStreamRequest, ClientStreamResponse>(
+        (requestStream) async* {
+      // Собираем все данные из потока
+      final collected = <String>[];
 
-    // Обрабатываем запросы
-    requestController.stream.listen(
-      (request) {
+      await for (final request in requestStream) {
+        _logger.debug('collectData: получен запрос ${request.data}');
         collected.add(request.data);
-      },
-      onDone: () {
-        // Формируем ответ
-        responseController.add(ClientStreamResponse(collected.join(', ')));
-        responseController.close();
-      },
-      onError: (error) {
-        responseController.addError(error);
-        responseController.close();
-      },
-    );
+      }
 
-    // Создаем ClientStreamingBidiStream и возвращаем
-    return ClientStreamingBidiStream<ClientStreamRequest, ClientStreamResponse>(
-      BidiStreamGenerator<ClientStreamRequest, ClientStreamResponse>(
-        (request) async* {
-          yield ClientStreamResponse('response');
-        },
-      ).create(),
-    );
+      // После получения всех запросов возвращаем ответ
+      final result = collected.join(', ');
+      _logger.debug('collectData: отправляем ответ $result');
+      yield ClientStreamResponse(result);
+    }).createClientStreaming();
   }
 
   @override
   ClientStreamingBidiStream<ClientStreamRequest, ClientStreamResponse>
       countItems() {
-    // Создаем контроллеры для запросов и ответов
-    final requestController = StreamController<ClientStreamRequest>();
-    final responseController = StreamController<ClientStreamResponse>();
+    _logger.info('Вызван метод countItems');
 
-    var count = 0;
+    return BidiStreamGenerator<ClientStreamRequest, ClientStreamResponse>(
+        (requestStream) async* {
+      var count = 0;
 
-    // Подсчитываем количество элементов
-    requestController.stream.listen(
-      (request) {
+      await for (final request in requestStream) {
+        _logger.debug('countItems: получен запрос ${request.data}');
         count++;
-      },
-      onDone: () {
-        // Отправляем ответ с количеством
-        responseController.add(ClientStreamResponse('count:$count'));
-        responseController.close();
-      },
-      onError: (error) {
-        responseController.addError(error);
-        responseController.close();
-      },
-    );
+      }
 
-    // Создаем ClientStreamingBidiStream и возвращаем
-    return ClientStreamingBidiStream<ClientStreamRequest, ClientStreamResponse>(
-      BidiStreamGenerator<ClientStreamRequest, ClientStreamResponse>(
-        (request) async* {
-          yield ClientStreamResponse('response');
-        },
-      ).create(),
-    );
+      // Отправляем ответ с количеством элементов
+      _logger.debug('countItems: отправляем ответ count:$count');
+      yield ClientStreamResponse('count:$count');
+    }).createClientStreaming();
   }
 
   @override
   ClientStreamingBidiStream<ClientStreamRequest, ClientStreamResponse>
       errorStream() {
-    // Создаем контроллеры для запросов и ответов
-    final requestController = StreamController<ClientStreamRequest>();
-    final responseController = StreamController<ClientStreamResponse>();
+    _logger.info('Вызван метод errorStream');
 
-    // Слушаем запросы
-    requestController.stream.listen(
-      (request) {
-        // Если получили 'error', бросаем исключение
+    return BidiStreamGenerator<ClientStreamRequest, ClientStreamResponse>(
+        (requestStream) async* {
+      await for (final request in requestStream) {
+        _logger.debug('errorStream: получен запрос ${request.data}');
+
+        // Если получили 'error', генерируем ошибку
         if (request.data.toLowerCase() == 'error') {
-          responseController.addError(
-            Exception('Ошибка при обработке стрима'),
-          );
-          responseController.close();
+          _logger.debug('errorStream: генерируем ошибку');
+          throw Exception('Ошибка при обработке стрима');
         }
-      },
-      onDone: () {
-        // Отправляем успешный ответ, если не было ошибок
-        if (!responseController.isClosed) {
-          responseController.add(ClientStreamResponse('success'));
-          responseController.close();
-        }
-      },
-      onError: (error) {
-        if (!responseController.isClosed) {
-          responseController.addError(error);
-          responseController.close();
-        }
-      },
-    );
+      }
 
-    // Создаем ClientStreamingBidiStream и возвращаем
-    return ClientStreamingBidiStream<ClientStreamRequest, ClientStreamResponse>(
-      BidiStreamGenerator<ClientStreamRequest, ClientStreamResponse>(
-        (request) async* {
-          yield ClientStreamResponse('response');
-        },
-      ).create(),
-    );
+      // Если не было ошибок, отправляем успешный ответ
+      _logger.debug('errorStream: отправляем успешный ответ');
+      yield ClientStreamResponse('success');
+    }).createClientStreaming();
   }
 }
 

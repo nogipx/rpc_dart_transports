@@ -72,7 +72,7 @@ class RootContract extends RpcServiceContract {
     // Собственный метод корневого контракта
     addUnaryRequestMethod<RootRequest, RootResponse>(
       methodName: 'rootMethod',
-      handler: (req) async => RootResponse('root:${req.data}'),
+      handler: _rootMethodHandler,
       argumentParser: RootRequest.fromJson,
       responseParser: RootResponse.fromJson,
     );
@@ -84,6 +84,27 @@ class RootContract extends RpcServiceContract {
     // Важно вызвать super.setup() после добавления всех подконтрактов!
     super.setup();
   }
+
+  Future<RootResponse> _rootMethodHandler(dynamic context) async {
+    final RootRequest req;
+
+    if (context is Map<String, dynamic>) {
+      req = RootRequest.fromJson(context);
+    } else if (context is RootRequest) {
+      req = context;
+    } else {
+      final payload = (context as dynamic).payload;
+      if (payload is RootRequest) {
+        req = payload;
+      } else if (payload is Map<String, dynamic>) {
+        req = RootRequest.fromJson(payload);
+      } else {
+        throw Exception('Неожиданный тип запроса: ${context.runtimeType}');
+      }
+    }
+
+    return RootResponse('root:${req.data}');
+  }
 }
 
 class ChildContract extends RpcServiceContract {
@@ -94,12 +115,33 @@ class ChildContract extends RpcServiceContract {
     // Метод дочернего контракта
     addUnaryRequestMethod<ChildRequest, ChildResponse>(
       methodName: 'childMethod',
-      handler: (req) async => ChildResponse('$serviceName:${req.data}'),
+      handler: _childMethodHandler,
       argumentParser: ChildRequest.fromJson,
       responseParser: ChildResponse.fromJson,
     );
 
     super.setup();
+  }
+
+  Future<ChildResponse> _childMethodHandler(dynamic context) async {
+    final ChildRequest req;
+
+    if (context is Map<String, dynamic>) {
+      req = ChildRequest.fromJson(context);
+    } else if (context is ChildRequest) {
+      req = context;
+    } else {
+      final payload = (context as dynamic).payload;
+      if (payload is ChildRequest) {
+        req = payload;
+      } else if (payload is Map<String, dynamic>) {
+        req = ChildRequest.fromJson(payload);
+      } else {
+        throw Exception('Неожиданный тип запроса: ${context.runtimeType}');
+      }
+    }
+
+    return ChildResponse('$serviceName:${req.data}');
   }
 }
 
@@ -111,12 +153,33 @@ class GrandchildContract extends RpcServiceContract {
   void setup() {
     addUnaryRequestMethod<ChildRequest, ChildResponse>(
       methodName: 'grandchildMethod',
-      handler: (req) async => ChildResponse('grandchild:${req.data}'),
+      handler: _grandchildMethodHandler,
       argumentParser: ChildRequest.fromJson,
       responseParser: ChildResponse.fromJson,
     );
 
     super.setup();
+  }
+
+  Future<ChildResponse> _grandchildMethodHandler(dynamic context) async {
+    final ChildRequest req;
+
+    if (context is Map<String, dynamic>) {
+      req = ChildRequest.fromJson(context);
+    } else if (context is ChildRequest) {
+      req = context;
+    } else {
+      final payload = (context as dynamic).payload;
+      if (payload is ChildRequest) {
+        req = payload;
+      } else if (payload is Map<String, dynamic>) {
+        req = ChildRequest.fromJson(payload);
+      } else {
+        throw Exception('Неожиданный тип запроса: ${context.runtimeType}');
+      }
+    }
+
+    return ChildResponse('grandchild:${req.data}');
   }
 }
 
@@ -357,6 +420,24 @@ void main() {
 
       expect(childResponse.data, equals('ChildWithGrandchild:auto-test'));
       expect(grandchildResponse.data, equals('grandchild:auto-nested'));
+    });
+
+    test('Отладка регистрации контрактов', () {
+      // Регистрируем только корневой контракт
+      final rootContract = RootContract();
+      serverEndpoint.registerServiceContract(rootContract);
+
+      // Получаем список всех зарегистрированных контрактов
+      final allContracts = serverEndpoint.getAllContracts();
+      print('Зарегистрированные контракты:');
+      for (final entry in allContracts.entries) {
+        print('  - ${entry.key}: ${entry.value.runtimeType}');
+      }
+
+      // Проверяем, есть ли в списке подконтракты
+      expect(allContracts.containsKey('RootService'), isTrue);
+      expect(allContracts.containsKey('ChildService1'), isTrue);
+      expect(allContracts.containsKey('ChildService2'), isTrue);
     });
   });
 }

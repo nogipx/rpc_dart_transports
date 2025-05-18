@@ -71,127 +71,72 @@ abstract class ServerStreamingTestsSubcontract extends RpcServiceContract {
 
 /// Серверная реализация контракта серверного стриминга
 class ServerStreamingTestsServer extends ServerStreamingTestsSubcontract {
+  final _logger = RpcLogger('ServerStreamingTests');
+
   @override
   ServerStreamingBidiStream<ServerStreamRequest, ServerStreamResponse>
       generateItems(ServerStreamRequest request) {
-    // Создаем контроллеры для запросов и ответов
-    final requestController = StreamController<ServerStreamRequest>();
-    final responseController = StreamController<ServerStreamResponse>();
+    _logger.info('Вызван метод generateItems с запросом: ${request.data}');
 
-    // Обрабатываем запрос
-    requestController.stream.listen((req) async {
+    // Используем генератор для создания стрима
+    return BidiStreamGenerator<ServerStreamRequest, ServerStreamResponse>(
+        (requestStream) async* {
       try {
-        final count = int.tryParse(req.data) ?? 5;
+        // Получаем количество элементов из запроса
+        final count = int.tryParse(request.data) ?? 5;
+        _logger.debug('generateItems: генерируем $count элементов');
 
-        // Генерируем указанное количество элементов
+        // Генерируем элементы
         for (var i = 0; i < count; i++) {
-          if (!responseController.isClosed) {
-            responseController.add(ServerStreamResponse('item-$i'));
-            await Future.delayed(Duration(milliseconds: 50));
-          }
+          _logger.debug('generateItems: отправляем элемент item-$i');
+          yield ServerStreamResponse('item-$i');
+          await Future.delayed(Duration(milliseconds: 50));
         }
-      } finally {
-        // Закрываем контроллер ответов
-        if (!responseController.isClosed) {
-          await responseController.close();
-        }
+      } catch (e) {
+        _logger.error('Ошибка в generateItems: $e');
+        rethrow;
       }
-    });
-
-    // Создаем BidiStream
-    final bidiStream = BidiStream<ServerStreamRequest, ServerStreamResponse>(
-      responseStream: responseController.stream,
-      sendFunction: (request) => requestController.add(request),
-      closeFunction: () async {
-        await requestController.close();
-        if (!responseController.isClosed) {
-          await responseController.close();
-        }
-      },
-    );
-
-    // Оборачиваем в ServerStreamingBidiStream и возвращаем
-    return ServerStreamingBidiStream<ServerStreamRequest, ServerStreamResponse>(
-      stream: bidiStream,
-      sendFunction: bidiStream.send,
-      closeFunction: bidiStream.close,
-    );
+    }).createServerStreaming(initialRequest: request);
   }
 
   @override
   ServerStreamingBidiStream<ServerStreamRequest, ServerStreamResponse>
       echoStream(ServerStreamRequest request) {
-    // Создаем контроллеры для запросов и ответов
-    final requestController = StreamController<ServerStreamRequest>();
-    final responseController = StreamController<ServerStreamResponse>();
+    _logger.info('Вызван метод echoStream с запросом: ${request.data}');
 
-    // Обрабатываем запрос
-    requestController.stream.listen((req) {
-      // Просто эхо для одного сообщения
-      responseController.add(ServerStreamResponse(req.data));
-      responseController.close();
-    });
-
-    // Создаем BidiStream
-    final bidiStream = BidiStream<ServerStreamRequest, ServerStreamResponse>(
-      responseStream: responseController.stream,
-      sendFunction: (request) => requestController.add(request),
-      closeFunction: () async {
-        await requestController.close();
-        if (!responseController.isClosed) {
-          await responseController.close();
-        }
-      },
-    );
-
-    // Оборачиваем в ServerStreamingBidiStream и возвращаем
-    return ServerStreamingBidiStream<ServerStreamRequest, ServerStreamResponse>(
-      stream: bidiStream,
-      sendFunction: bidiStream.send,
-      closeFunction: bidiStream.close,
-    );
+    // Используем генератор для создания стрима
+    return BidiStreamGenerator<ServerStreamRequest, ServerStreamResponse>(
+        (requestStream) async* {
+      // Просто возвращаем эхо-ответ
+      _logger.debug('echoStream: отправляем эхо ${request.data}');
+      yield ServerStreamResponse(request.data);
+    }).createServerStreaming(initialRequest: request);
   }
 
   @override
   ServerStreamingBidiStream<ServerStreamRequest, ServerStreamResponse>
       errorStream(ServerStreamRequest request) {
-    // Создаем контроллеры для запросов и ответов
-    final requestController = StreamController<ServerStreamRequest>();
-    final responseController = StreamController<ServerStreamResponse>();
+    _logger.info('Вызван метод errorStream с запросом: ${request.data}');
 
-    // Обрабатываем запрос
-    requestController.stream.listen((req) {
-      // Если получили 'error', бросаем исключение
-      if (req.data.toLowerCase() == 'error') {
-        responseController.addError(Exception('Запрошена ошибка'));
-        responseController.close();
+    // Используем генератор для создания стрима
+    return BidiStreamGenerator<ServerStreamRequest, ServerStreamResponse>(
+        (requestStream) async* {
+      // Если запрос содержит "error", бросаем исключение
+      if (request.data.toLowerCase() == 'error') {
+        _logger.debug('errorStream: генерируем ошибку');
+        throw Exception('Запрошена ошибка');
       } else {
-        // Отправляем несколько сообщений, а затем ошибку
-        responseController.add(ServerStreamResponse('message 1'));
-        responseController.add(ServerStreamResponse('message 2'));
-        responseController.addError(Exception('Запланированная ошибка стрима'));
-        responseController.close();
+        // Иначе отправляем пару сообщений и затем ошибку
+        _logger.debug('errorStream: отправляем первое сообщение');
+        yield ServerStreamResponse('message 1');
+
+        _logger.debug('errorStream: отправляем второе сообщение');
+        yield ServerStreamResponse('message 2');
+
+        _logger.debug('errorStream: генерируем запланированную ошибку');
+        throw Exception('Запланированная ошибка стрима');
       }
-    });
-
-    // Создаем BidiStream
-    final bidiStream = BidiStream<ServerStreamRequest, ServerStreamResponse>(
-      responseStream: responseController.stream,
-      sendFunction: (request) => requestController.add(request),
-      closeFunction: () async {
-        await requestController.close();
-        if (!responseController.isClosed) {
-          await responseController.close();
-        }
-      },
-    );
-
-    // Оборачиваем в ServerStreamingBidiStream и возвращаем
-    return ServerStreamingBidiStream<ServerStreamRequest, ServerStreamResponse>(
-      stream: bidiStream,
-      sendFunction: bidiStream.send,
-      closeFunction: bidiStream.close,
-    );
+    }).createServerStreaming(initialRequest: request);
   }
 }
 

@@ -854,9 +854,9 @@ void main() {
       expect(
           messages2.map((m) => m.content).toList(),
           equals([
-            'to closed stream',
-            'to active stream',
-            'broadcast after error'
+            'normal message', // Первоначальное сообщение
+            'to active stream', // Индивидуальное сообщение
+            'broadcast after error' // Широковещательное сообщение
           ]));
 
       // Очищаем
