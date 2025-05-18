@@ -11,6 +11,8 @@ class RpcMetricsList implements IRpcSerializableMessage {
 
   RpcMetricsList(this.metrics);
 
+  dynamic get payload => this;
+
   @override
   Map<String, dynamic> toJson() {
     return {
