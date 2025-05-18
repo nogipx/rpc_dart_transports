@@ -49,6 +49,8 @@ class RpcClientIdentity implements IRpcSerializableMessage {
     this.properties,
   });
 
+  dynamic get payload => this;
+
   /// Преобразование в JSON
   @override
   Map<String, dynamic> toJson() => {
