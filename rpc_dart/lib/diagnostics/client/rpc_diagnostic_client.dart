@@ -230,7 +230,10 @@ class RpcDiagnosticClient implements IRpcDiagnosticClient {
       );
 
   @override
-  Future<void> dispose() => _client.dispose();
+  Future<void> dispose() async {
+    await flush();
+    await _client.dispose();
+  }
 
   @override
   Future<void> log({

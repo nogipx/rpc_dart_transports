@@ -28,7 +28,7 @@ final class _RpcLoggerRegistry {
   /// Если логгер с таким именем не найден, создает новый
   RpcLogger get(String name) {
     if (_factory == null) {
-      return _loggers[name] ??= ConsoleRpcLogger(name);
+      return _loggers[name] ??= DefaultRpcLogger(name);
     }
     return _loggers[name] ??= _factory!(name);
   }

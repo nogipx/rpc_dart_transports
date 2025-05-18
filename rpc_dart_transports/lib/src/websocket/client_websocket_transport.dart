@@ -12,7 +12,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 typedef WebSocketChannelProvider = WebSocketChannel Function();
 
 /// Транспорт для обмена сообщениями через WebSocket
-class WebSocketTransport implements IRpcTransport {
+class ClientWebSocketTransport implements IRpcTransport {
   /// Идентификатор транспорта
   @override
   final String id;
@@ -47,7 +47,7 @@ class WebSocketTransport implements IRpcTransport {
   /// [uri] - URI WebSocket сервера
   /// [autoConnect] - автоматически подключаться при создании
   /// [timeout] - таймаут для операций (по умолчанию 30 секунд)
-  WebSocketTransport._({
+  ClientWebSocketTransport._({
     required this.id,
     this.uri,
     bool autoConnect = false,
@@ -61,13 +61,13 @@ class WebSocketTransport implements IRpcTransport {
     }
   }
 
-  factory WebSocketTransport.fromUrl({
+  factory ClientWebSocketTransport.fromUrl({
     required String id,
     required String url,
     bool autoConnect = false,
     Duration timeout = const Duration(seconds: 30),
   }) {
-    return WebSocketTransport._(
+    return ClientWebSocketTransport._(
       id: id,
       autoConnect: autoConnect,
       timeout: timeout,
@@ -81,13 +81,13 @@ class WebSocketTransport implements IRpcTransport {
   /// [url] - URL WebSocket сервера в строковом формате
   /// [autoConnect] - автоматически подключаться при создании
   /// [timeout] - таймаут для операций (по умолчанию 30 секунд)
-  factory WebSocketTransport.customChannel({
+  factory ClientWebSocketTransport.customChannel({
     required String id,
     bool autoConnect = true,
     Duration timeout = const Duration(seconds: 30),
     WebSocketChannelProvider? channelProvider,
   }) {
-    return WebSocketTransport._(
+    return ClientWebSocketTransport._(
       id: id,
       autoConnect: autoConnect,
       timeout: timeout,

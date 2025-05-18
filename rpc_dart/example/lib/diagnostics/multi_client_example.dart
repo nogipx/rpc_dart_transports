@@ -101,7 +101,7 @@ Future<void> main({bool debug = true}) async {
 Future<DiagnosticServerImpl> setupDiagnosticServer(RpcEndpoint endpoint) async {
   // Создаем сервер диагностики
   final diagnosticServer = DiagnosticServerImpl(
-    ConsoleRpcLogger('diagnostic-server'),
+    DefaultRpcLogger('diagnostic-server'),
   );
 
   // Создаем и регистрируем контракт диагностики на эндпоинте
@@ -210,10 +210,7 @@ Future<ClientActor> setupClient({
   // В реальной системе это может быть переопределение RpcLog
   // для конкретного модуля
   final name = 'Client-$clientIndex';
-  final logger = DiagnosticRpcLogger(
-    name,
-    consoleLogger: ConsoleRpcLogger(name),
-  );
+  final logger = RpcLogger(name);
 
   // Проверяем соединение с сервером диагностики
   final connected = await diagnosticClient.ping();

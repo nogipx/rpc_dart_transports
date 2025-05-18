@@ -10,7 +10,7 @@ import 'package:rpc_dart/rpc_dart.dart';
 
 part 'rpc_logger.dart';
 part 'rpc_logger_colors.dart';
-part 'console_rpc_logger.dart';
+part 'default_rpc_logger.dart';
 part 'rpc_logger_metric.dart';
 part 'rpc_logger_registry.dart';
 part 'rpc_logger_settings.dart';

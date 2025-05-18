@@ -9,7 +9,7 @@ import 'client_streaming/client_streaming.dart' as client_streaming;
 import 'json_rpc/json_rpc_example.dart' as json_rpc;
 import 'server_streaming/server_streaming.dart' as server_streaming;
 import 'unary/unary.dart' as unary;
-import 'diagnostics/diagnostics_example.dart' as diagnostics;
+import 'diagnostics/advanced_diagnostics.dart' as diagnostics;
 
 final _logger = RpcLogger('ExampleRunner');
 

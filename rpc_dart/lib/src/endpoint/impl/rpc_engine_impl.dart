@@ -785,6 +785,12 @@ final class _RpcEngineImpl implements IRpcEngine {
     }
     _streamControllers.clear();
 
+    final diagnostic = RpcLoggerSettings.diagnostic;
+    if (diagnostic != null) {
+      RpcLoggerSettings.removeDiagnostic();
+      await diagnostic.dispose();
+    }
+
     await _transport.close();
   }
 

@@ -49,7 +49,7 @@ class DefaultRpcLoggerFormatter implements IRpcLoggerFormatter {
 }
 
 /// Консольная реализация логгера
-class ConsoleRpcLogger implements RpcLogger {
+class DefaultRpcLogger implements RpcLogger {
   @override
   final String name;
 
@@ -72,7 +72,7 @@ class ConsoleRpcLogger implements RpcLogger {
   final IRpcLoggerFormatter _formatter;
 
   /// Создает новый логгер с указанными параметрами
-  ConsoleRpcLogger(
+  DefaultRpcLogger(
     this.name, {
     RpcLoggerLevel? minLogLevel,
     bool consoleLoggingEnabled = true,

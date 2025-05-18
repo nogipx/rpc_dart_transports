@@ -1,5 +1,3 @@
-Платформонезависимая реализация RPC (Remote Procedure Call) протокола для Dart и Flutter.
-
 [![Pub Version](https://img.shields.io/pub/v/rpc_dart.svg)](https://pub.dev/packages/rpc_dart)
 
 ## Особенности
@@ -9,15 +7,18 @@
 - 💪 **Типобезопасность** - строгая типизация контрактов и сообщений
 - 🔄 **Поддержка всех типов RPC** - унарные вызовы, серверный стриминг, клиентский стриминг, двунаправленный стриминг
 - 🧩 **Middleware** - расширение функциональности через промежуточные обработчики
-- 📝 **Сериализация** - поддержка JSON и возможность добавления кастомных сериализаторов
+- 📝 **Сериализация** - поддержка JSON и MsgPack сериализаторов
+- 📊 **Диагностика** - встроенные инструменты для мониторинга и сбора метрик
+- 🔒 **Безопасность** - поддержка шифрованного транспорта для защиты данных
 
 ## Основные компоненты
 
 - **RpcEndpoint** - основной компонент для взаимодействия с RPC
 - **RpcTransport** - абстракция транспортного уровня (WebSocket, Memory, Isolate)
-- **RpcSerializer** - сериализация/десериализация сообщений (JSON)
+- **RpcSerializer** - сериализация/десериализация сообщений (JSON, MsgPack)
 - **RpcServiceContract** - контракты для описания API сервисов
 - **RpcMiddleware** - промежуточные обработчики для запросов/ответов
+- **RpcDiagnostics** - система мониторинга и сбора метрик
 
 ## Типы RPC взаимодействий
 
@@ -47,13 +48,11 @@ void main() async {
   // Создание RPC эндпоинтов
   final client = RpcEndpoint(
     transport: clientTransport,
-    
     debugLabel: 'client',
   );
   
   final server = RpcEndpoint(
     transport: serverTransport,
-    
     debugLabel: 'server',
   );
   
@@ -113,17 +112,20 @@ server.serverStreaming('TaskService', 'startTask').register<TaskRequest, Progres
 );
 
 // На клиенте
-final stream = client
+final streamingBidi = client
     .serverStreaming('TaskService', 'startTask')
-    .openStream<TaskRequest, ProgressMessage>(
+    .call<TaskRequest, ProgressMessage>(
       request: TaskRequest(taskId: 'task-123', taskName: 'Обработка'),
       responseParser: ProgressMessage.fromJson,
     );
 
 // Подписка на обновления
-await for (final update in stream) {
+await for (final update in streamingBidi.stream) {
   print('Прогресс: ${update.progress}%, ${update.message}');
 }
+
+// Закрываем стрим после использования
+await streamingBidi.close();
 ```
 
 #### Клиентский стриминг
@@ -151,22 +153,24 @@ server.clientStreaming('UploadService', 'uploadFile').register<FileChunk, Upload
 );
 
 // На клиенте
-final clientStream = client
+final clientStreamingBidi = client
     .clientStreaming('UploadService', 'uploadFile')
-    .openClientStream<FileChunk, UploadResult>(
+    .call<FileChunk, UploadResult>(
       responseParser: UploadResult.fromJson,
     );
 
-final controller = clientStream.controller!;
-
 // Отправка данных
-controller.add(FileChunk(data: [/* данные */], index: 1));
-controller.add(FileChunk(data: [/* данные */], index: 2));
-await controller.close();
+clientStreamingBidi.send(FileChunk(data: [/* данные */], index: 1));
+clientStreamingBidi.send(FileChunk(data: [/* данные */], index: 2));
 
-// Получение результата
-final result = await clientStream.response;
-print('Загружено ${result!.totalSize} байт в ${result.chunks} частях');
+// Завершаем отправку данных и ожидаем результат
+await clientStreamingBidi.finishTransfer();
+final result = await clientStreamingBidi.response;
+
+print('Загружено ${result.totalSize} байт в ${result.chunks} частях');
+
+// Закрываем стрим после использования
+await clientStreamingBidi.close();
 ```
 
 #### Двунаправленный стриминг
@@ -174,7 +178,7 @@ print('Загружено ${result!.totalSize} байт в ${result.chunks} ча
 ```dart
 // На сервере
 server.bidirectional('ChatService', 'chat').register<ChatMessage, ChatMessage>(
-  handler: (incomingStream, messageId) {
+  handler: (incomingStream) {
     // Обработка входящих сообщений и возврат стрима ответов
     return incomingStream.map((message) {
       return ChatMessage(
@@ -189,26 +193,26 @@ server.bidirectional('ChatService', 'chat').register<ChatMessage, ChatMessage>(
 );
 
 // На клиенте
-final channel = client
+final bidiStream = client
     .bidirectional('ChatService', 'chat')
-    .createChannel<ChatMessage, ChatMessage>(
+    .call<ChatMessage, ChatMessage>(
       responseParser: ChatMessage.fromJson,
     );
 
 // Подписка на входящие сообщения
-channel.incoming.listen((message) {
+final subscription = bidiStream.stream.listen((message) {
   print('${message.sender}: ${message.text}');
 });
 
 // Отправка сообщений
-channel.send(ChatMessage(
+bidiStream.send(ChatMessage(
   sender: 'Клиент',
   text: 'Привет!',
   timestamp: DateTime.now().toIso8601String(),
 ));
 
-// После использования закрываем канал
-await channel.close();
+// После использования закрываем поток
+await bidiStream.close();
 ```
 
 ## Контракты сервисов
@@ -279,6 +283,56 @@ client.registerServiceContract(calculator);
 // Использование
 final result = await calculator.compute(ComputeRequest(value1: 10, value2: 5));
 print('Сумма: ${result.sum}'); // Сумма: 15
+```
+
+## Диагностика
+
+Начиная с версии 0.3.0, библиотека поддерживает встроенную систему диагностики:
+
+```dart
+// Создание и настройка диагностического клиента
+final diagnosticClient = RpcDiagnosticClient(
+  // Настройка диагностического клиента
+  options: RpcDiagnosticOptions(
+    // Частота сбора метрик (от 0.0 до 1.0)
+    samplingRate: 0.1, 
+    // Максимальный размер буфера метрик
+    maxBufferSize: 100,
+    // Интервал отправки метрик (мс)
+    flushIntervalMs: 5000,
+    // Включить шифрование чувствительных данных
+    encryptionEnabled: true,
+    // Минимальный уровень логирования
+    minLogLevel: RpcLoggerLevel.info,
+    // Включить логирование в консоль
+    consoleLoggingEnabled: true,
+    // Включить сбор трассировок
+    traceEnabled: true,
+    // Включить сбор метрик задержки
+    latencyEnabled: true,
+    // Включить сбор метрик стримов
+    streamMetricsEnabled: true,
+    // Включить сбор метрик ошибок
+    errorMetricsEnabled: true,
+  ),
+);
+
+// Установка диагностического клиента
+RpcLoggerSettings.setDiagnostic(diagnosticClient);
+// Установка минимального уровня логирования
+RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.debug);
+
+// Пример пользовательского логирования
+final logger = RpcLogger('MyComponent');
+logger.info('Операция выполнена успешно');
+logger.error(
+  'Произошла ошибка',
+  error: Exception('Пример ошибки'),
+  data: {'userId': '12345'}
+);
+
+// При необходимости диагностику можно отключить
+// RpcLoggerSettings.removeDiagnostic();
 ```
 
 ## Middleware
@@ -372,6 +426,19 @@ final serverTransport = ProxyTransport(
 );
 ```
 
+### EncryptedTransport
+
+Транспорт с поддержкой шифрования для защиты передаваемых данных:
+
+```dart
+final secureTransport = EncryptedTransport(
+  baseTransport: webSocketTransport,
+  encryptionService: AesEncryptionService(
+    key: 'your-secure-key',
+  ),
+);
+```
+
 ### rpc_dart_transports
 
 Для других реализаций транспорта см. библиотеку [rpc_dart_transports](https://pub.dev/packages/rpc_dart_transports).
@@ -416,6 +483,10 @@ try {
         request: DivideRequest(a: 10, b: 0),
         responseParser: DivideResult.fromJson,
       );
+} on RpcStatusException catch (e) {
+  print('RPC ошибка: ${e.message}');
+  print('Код статуса: ${e.code}');
+  print('Детали: ${e.details}');
 } on RpcException catch (e) {
   print('RPC ошибка: ${e.message}');
   print('Код ошибки: ${e.code}');
