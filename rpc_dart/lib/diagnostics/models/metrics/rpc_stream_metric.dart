@@ -58,7 +58,7 @@ enum RpcStreamDirection {
 }
 
 /// Метрика для отслеживания событий стримов
-class RpcStreamMetric implements IRpcSerializableMessage {
+class RpcStreamMetric extends IRpcSerializableMessage {
   /// Уникальный идентификатор метрики
   final String id;
 

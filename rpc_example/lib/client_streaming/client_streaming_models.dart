@@ -6,7 +6,7 @@ part 'client_streaming_models.g.dart';
 
 /// Модель блока данных для загрузки файла
 @freezed
-abstract class DataBlock with _$DataBlock implements IRpcSerializableMessage {
+abstract class DataBlock extends IRpcSerializableMessage with _$DataBlock {
   const DataBlock._();
 
   @Implements<IRpcSerializableMessage>()
@@ -16,15 +16,12 @@ abstract class DataBlock with _$DataBlock implements IRpcSerializableMessage {
     @Default('') String metadata,
   }) = _DataBlock;
 
-  factory DataBlock.fromJson(Map<String, dynamic> json) =>
-      _$DataBlockFromJson(json);
+  factory DataBlock.fromJson(Map<String, dynamic> json) => _$DataBlockFromJson(json);
 }
 
 /// Модель результата обработки блоков данных
 @freezed
-abstract class DataBlockResult
-    with _$DataBlockResult
-    implements IRpcSerializableMessage {
+abstract class DataBlockResult extends IRpcSerializableMessage with _$DataBlockResult {
   const DataBlockResult._();
 
   @Implements<IRpcSerializableMessage>()
@@ -35,6 +32,5 @@ abstract class DataBlockResult
     @Default('') String processingTime,
   }) = _DataBlockResult;
 
-  factory DataBlockResult.fromJson(Map<String, dynamic> json) =>
-      _$DataBlockResultFromJson(json);
+  factory DataBlockResult.fromJson(Map<String, dynamic> json) => _$DataBlockResultFromJson(json);
 }

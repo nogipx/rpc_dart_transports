@@ -34,7 +34,7 @@ enum RpcMetricType {
 ///
 /// Содержит общие поля для всех типов метрик и типизированное поле контента,
 /// которое зависит от типа метрики
-class RpcMetric<T> implements IRpcSerializableMessage {
+class RpcMetric<T> extends IRpcSerializableMessage {
   /// Уникальный идентификатор метрики
   final String id;
 
@@ -57,8 +57,6 @@ class RpcMetric<T> implements IRpcSerializableMessage {
     required this.clientId,
     required this.content,
   });
-
-  dynamic get payload => this;
 
   /// Преобразование в JSON
   @override

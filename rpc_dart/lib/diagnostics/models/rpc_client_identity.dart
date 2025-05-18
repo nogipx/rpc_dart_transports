@@ -9,7 +9,7 @@ import 'package:rpc_dart/rpc_dart.dart';
 ///
 /// Используется для группировки и фильтрации метрик от разных клиентов
 /// при множественных подключениях.
-class RpcClientIdentity implements IRpcSerializableMessage {
+class RpcClientIdentity extends IRpcSerializableMessage {
   /// Уникальный идентификатор клиента
   final String clientId;
 
@@ -48,8 +48,6 @@ class RpcClientIdentity implements IRpcSerializableMessage {
     this.deploymentId,
     this.properties,
   });
-
-  dynamic get payload => this;
 
   /// Преобразование в JSON
   @override

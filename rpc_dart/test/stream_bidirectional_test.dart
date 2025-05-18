@@ -4,7 +4,7 @@ import 'package:rpc_dart/rpc_dart.dart';
 import 'package:test/test.dart';
 
 /// Тестовое сообщение
-class TestMessage implements IRpcSerializableMessage {
+class TestMessage extends IRpcSerializableMessage {
   final String text;
   final int value;
 

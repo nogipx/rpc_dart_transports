@@ -35,7 +35,7 @@ abstract interface class IRpcContext {
 }
 
 /// Класс, представляющий сообщение протокола
-final class RpcMessage implements IRpcSerializableMessage, IRpcContext {
+final class RpcMessage extends IRpcSerializableMessage implements IRpcContext {
   /// Тип сообщения
   final RpcMessageType type;
 

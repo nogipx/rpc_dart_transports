@@ -8,7 +8,7 @@ part of '_logs.dart';
 ///
 /// Может использоваться для отправки различных уровней логов
 /// от компонентов библиотеки в диагностический сервис
-class RpcLoggerMetric implements IRpcSerializableMessage {
+class RpcLoggerMetric extends IRpcSerializableMessage {
   /// Уникальный идентификатор метрики
   final String id;
 

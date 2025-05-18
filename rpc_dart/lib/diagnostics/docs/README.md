@@ -215,7 +215,7 @@ endpoint.diagnostics?.recordCustomMetric(
 #### 6.1.1. TraceEvent
 ```dart
 @freezed
-abstract class TraceEvent with _$TraceEvent implements IRpcSerializableMessage {
+abstract class TraceEvent with _$TraceEvent extends IRpcSerializableMessage {
   factory TraceEvent({
     required String traceId,
     required String serviceName,
@@ -241,7 +241,7 @@ enum TraceEventType {
 #### 6.1.2. LatencyEvent
 ```dart
 @freezed
-abstract class LatencyEvent with _$LatencyEvent implements IRpcSerializableMessage {
+abstract class LatencyEvent with _$LatencyEvent extends IRpcSerializableMessage {
   factory LatencyEvent({
     required String serviceName,
     required String methodName,
@@ -266,7 +266,7 @@ enum LatencyEventType {
 #### 6.1.3. ClientIdentity
 ```dart
 @freezed
-abstract class ClientIdentity with _$ClientIdentity implements IRpcSerializableMessage {
+abstract class ClientIdentity with _$ClientIdentity extends IRpcSerializableMessage {
   factory ClientIdentity({
     required String clientId,         // Уникальный ID клиента/экземпляра
     required String deploymentId,     // ID развертывания/установки
@@ -285,7 +285,7 @@ abstract class ClientIdentity with _$ClientIdentity implements IRpcSerializableM
 #### 6.1.4. EncryptionSetupRequest
 ```dart
 @freezed
-abstract class EncryptionSetupRequest with _$EncryptionSetupRequest implements IRpcSerializableMessage {
+abstract class EncryptionSetupRequest with _$EncryptionSetupRequest extends IRpcSerializableMessage {
   factory EncryptionSetupRequest({
     required String keyId,
     required String key,

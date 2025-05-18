@@ -39,7 +39,7 @@ enum RpcLatencyOperationType {
 }
 
 /// Метрика для отслеживания задержки/времени выполнения операций
-class RpcLatencyMetric implements IRpcSerializableMessage {
+class RpcLatencyMetric extends IRpcSerializableMessage {
   /// Уникальный идентификатор метрики
   final String id;
 

@@ -12,7 +12,7 @@ part 'string.dart';
 typedef RpcMessageProducer = String Function(String);
 
 /// Базовый класс для всех примитивных типов сообщений
-abstract class RpcPrimitiveMessage<T> implements IRpcSerializableMessage {
+abstract class RpcPrimitiveMessage<T> extends IRpcSerializableMessage {
   final T value;
 
   const RpcPrimitiveMessage(this.value);

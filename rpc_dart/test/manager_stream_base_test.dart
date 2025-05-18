@@ -4,7 +4,7 @@ import 'package:test/test.dart';
 import 'package:rpc_dart/rpc_dart.dart';
 
 // Тестовое сообщение
-class SimpleMessage implements IRpcSerializableMessage {
+class SimpleMessage extends IRpcSerializableMessage {
   final String text;
 
   SimpleMessage(this.text);

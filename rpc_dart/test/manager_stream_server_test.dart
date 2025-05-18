@@ -3,7 +3,7 @@ import 'package:rpc_dart/rpc_dart.dart';
 import 'package:test/test.dart';
 
 // Создаем тестовое сообщение для использования в тестах
-class TestMessage implements IRpcSerializableMessage {
+class TestMessage extends IRpcSerializableMessage {
   final String content;
 
   TestMessage(this.content);

@@ -200,7 +200,7 @@ SPDX-License-Identifier: LGPL-3.0-or-later
 
 ```dart
 @freezed
-class TraceEvent with _$TraceEvent implements IRpcSerializableMessage {
+class TraceEvent with _$TraceEvent extends IRpcSerializableMessage {
   factory TraceEvent({
     required String traceId,
     required String serviceName,
@@ -238,7 +238,7 @@ enum TraceEventType {
 
 ```dart
 @freezed
-class LatencyMetric with _$LatencyMetric implements IRpcSerializableMessage {
+class LatencyMetric with _$LatencyMetric extends IRpcSerializableMessage {
   factory LatencyMetric({
     required String metricName,
     required String serviceName,
@@ -262,7 +262,7 @@ class LatencyMetric with _$LatencyMetric implements IRpcSerializableMessage {
 
 ```dart
 @freezed
-class StreamMetric with _$StreamMetric implements IRpcSerializableMessage {
+class StreamMetric with _$StreamMetric extends IRpcSerializableMessage {
   factory StreamMetric({
     required String metricName,
     required String streamId,
@@ -297,7 +297,7 @@ enum StreamMetricType {
 
 ```dart
 @freezed
-class ErrorMetric with _$ErrorMetric implements IRpcSerializableMessage {
+class ErrorMetric with _$ErrorMetric extends IRpcSerializableMessage {
   factory ErrorMetric({
     required String metricName,
     required String serviceName,
@@ -324,7 +324,7 @@ class ErrorMetric with _$ErrorMetric implements IRpcSerializableMessage {
 
 ```dart
 @freezed
-class ResourceMetric with _$ResourceMetric implements IRpcSerializableMessage {
+class ResourceMetric with _$ResourceMetric extends IRpcSerializableMessage {
   factory ResourceMetric({
     required String metricName,
     required String resourceType,
@@ -348,7 +348,7 @@ class ResourceMetric with _$ResourceMetric implements IRpcSerializableMessage {
 
 ```dart
 @freezed
-class ClientIdentity with _$ClientIdentity implements IRpcSerializableMessage {
+class ClientIdentity with _$ClientIdentity extends IRpcSerializableMessage {
   factory ClientIdentity({
     required String clientId,         // Уникальный ID клиента/экземпляра
     required String deploymentId,     // ID развертывания/установки
@@ -368,7 +368,7 @@ class ClientIdentity with _$ClientIdentity implements IRpcSerializableMessage {
 
 ```dart
 @freezed
-class EncryptionInfo with _$EncryptionInfo implements IRpcSerializableMessage {
+class EncryptionInfo with _$EncryptionInfo extends IRpcSerializableMessage {
   factory EncryptionInfo({
     required String keyId,
     required EncryptionMode mode,

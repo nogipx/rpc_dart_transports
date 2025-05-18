@@ -6,7 +6,7 @@ part 'unary_models.g.dart';
 
 /// Класс запроса с числовыми параметрами
 @freezed
-abstract class ComputeRequest with _$ComputeRequest implements IRpcSerializableMessage {
+abstract class ComputeRequest extends IRpcSerializableMessage with _$ComputeRequest {
   const ComputeRequest._();
 
   @Implements<IRpcSerializableMessage>()
@@ -15,14 +15,12 @@ abstract class ComputeRequest with _$ComputeRequest implements IRpcSerializableM
     @Default(0) int value2,
   }) = _ComputeRequest;
 
-  dynamic get payload => this;
-
   factory ComputeRequest.fromJson(Map<String, dynamic> json) => _$ComputeRequestFromJson(json);
 }
 
 /// Класс ответа с результатом вычислений
 @freezed
-abstract class ComputeResult with _$ComputeResult implements IRpcSerializableMessage {
+abstract class ComputeResult extends IRpcSerializableMessage with _$ComputeResult {
   const ComputeResult._();
 
   @Implements<IRpcSerializableMessage>()

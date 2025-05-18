@@ -6,7 +6,7 @@ part of '../_index.dart';
 
 /// Обертка для сообщений, передаваемых через стрим-менеджер
 class StreamMessage<T extends IRpcSerializableMessage>
-    implements IRpcSerializableMessage {
+    extends IRpcSerializableMessage {
   /// Оригинальное сообщение
   final T message;
 

@@ -42,7 +42,7 @@ enum RpcTraceMetricType {
 ///
 /// Используется для отслеживания вызовов методов и их выполнения,
 /// а также для построения распределенных трассировок.
-class RpcTraceMetric implements IRpcSerializableMessage {
+class RpcTraceMetric extends IRpcSerializableMessage {
   /// Уникальный идентификатор метрики
   final String id;
 

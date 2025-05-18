@@ -8,7 +8,7 @@ import 'fixtures/test_contract.dart';
 import 'dart:async';
 
 // Определяем сообщения для диагностики здесь напрямую
-class DiagnosticRequest implements IRpcSerializableMessage {
+class DiagnosticRequest extends IRpcSerializableMessage {
   final String metricName;
   final Map<String, dynamic> parameters;
 
@@ -28,7 +28,7 @@ class DiagnosticRequest implements IRpcSerializableMessage {
   }
 }
 
-class DiagnosticResponse implements IRpcSerializableMessage {
+class DiagnosticResponse extends IRpcSerializableMessage {
   final bool success;
   final Map<String, dynamic> metrics;
   final String error;

@@ -131,7 +131,7 @@ class ClientEchoService extends EchoServiceContract {
 }
 
 /// Запрос для эхо-сервиса
-class EchoRequest implements IRpcSerializableMessage {
+class EchoRequest extends IRpcSerializableMessage {
   final String message;
   final String timestamp;
 
@@ -149,7 +149,7 @@ class EchoRequest implements IRpcSerializableMessage {
 }
 
 /// Ответ от эхо-сервиса
-class EchoResponse implements IRpcSerializableMessage {
+class EchoResponse extends IRpcSerializableMessage {
   final String message;
   final String serverTimestamp;
   final bool processed;
@@ -162,10 +162,10 @@ class EchoResponse implements IRpcSerializableMessage {
 
   @override
   Map<String, dynamic> toJson() => {
-    'message': message,
-    'server_timestamp': serverTimestamp,
-    'processed': processed,
-  };
+        'message': message,
+        'server_timestamp': serverTimestamp,
+        'processed': processed,
+      };
 
   static EchoResponse fromJson(Map<String, dynamic> json) {
     return EchoResponse(

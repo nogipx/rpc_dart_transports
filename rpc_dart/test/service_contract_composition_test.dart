@@ -7,7 +7,7 @@ import 'package:test/test.dart';
 import 'fixtures/test_contract.dart';
 
 // Определение сообщений для тестов
-class TestMessage implements IRpcSerializableMessage {
+class TestMessage extends IRpcSerializableMessage {
   final String data;
   const TestMessage(this.data);
 
@@ -34,9 +34,6 @@ class TestMessage implements IRpcSerializableMessage {
 class RootRequest extends TestMessage {
   RootRequest(super.data);
 
-  // Свойство payload, возвращающее сам объект для совместимости с IRpcContext
-  get payload => this;
-
   factory RootRequest.fromJson(Map<String, dynamic> json) {
     return RootRequest(json['data'] as String? ?? '');
   }
@@ -52,9 +49,6 @@ class RootResponse extends TestMessage {
 
 class ChildRequest extends TestMessage {
   ChildRequest(super.data);
-
-  // Свойство payload, возвращающее сам объект для совместимости с IRpcContext
-  get payload => this;
 
   factory ChildRequest.fromJson(Map<String, dynamic> json) {
     return ChildRequest(json['data'] as String? ?? '');

@@ -21,9 +21,7 @@ enum MessageType {
 
 /// Модель сообщения чата
 @freezed
-abstract class ChatMessage
-    with _$ChatMessage
-    implements IRpcSerializableMessage {
+abstract class ChatMessage extends IRpcSerializableMessage with _$ChatMessage {
   const ChatMessage._();
 
   @Implements<IRpcSerializableMessage>()
@@ -34,15 +32,12 @@ abstract class ChatMessage
     String? timestamp,
   }) = _ChatMessage;
 
-  factory ChatMessage.fromJson(Map<String, dynamic> json) =>
-      _$ChatMessageFromJson(json);
+  factory ChatMessage.fromJson(Map<String, dynamic> json) => _$ChatMessageFromJson(json);
 }
 
 /// Класс для простых данных сообщения
 @freezed
-abstract class SimpleMessageData
-    with _$SimpleMessageData
-    implements IRpcSerializableMessage {
+abstract class SimpleMessageData extends IRpcSerializableMessage with _$SimpleMessageData {
   const SimpleMessageData._();
 
   @Implements<IRpcSerializableMessage>()
@@ -59,7 +54,7 @@ abstract class SimpleMessageData
 
 /// Класс для конфигурационных данных
 @freezed
-abstract class ConfigData with _$ConfigData implements IRpcSerializableMessage {
+abstract class ConfigData extends IRpcSerializableMessage with _$ConfigData {
   const ConfigData._();
 
   @Implements<IRpcSerializableMessage>()
@@ -68,25 +63,23 @@ abstract class ConfigData with _$ConfigData implements IRpcSerializableMessage {
     @Default(0) int timeout,
   }) = _ConfigData;
 
-  factory ConfigData.fromJson(Map<String, dynamic> json) =>
-      _$ConfigDataFromJson(json);
+  factory ConfigData.fromJson(Map<String, dynamic> json) => _$ConfigDataFromJson(json);
 }
 
 /// Класс для списка элементов
 @freezed
-abstract class ItemList with _$ItemList implements IRpcSerializableMessage {
+abstract class ItemList extends IRpcSerializableMessage with _$ItemList {
   const ItemList._();
 
   @Implements<IRpcSerializableMessage>()
   const factory ItemList({@Default([]) List<String> items}) = _ItemList;
 
-  factory ItemList.fromJson(Map<String, dynamic> json) =>
-      _$ItemListFromJson(json);
+  factory ItemList.fromJson(Map<String, dynamic> json) => _$ItemListFromJson(json);
 }
 
 /// Класс для данных с вложенной структурой
 @freezed
-abstract class NestedData with _$NestedData implements IRpcSerializableMessage {
+abstract class NestedData extends IRpcSerializableMessage with _$NestedData {
   const NestedData._();
 
   @Implements<IRpcSerializableMessage>()
@@ -96,6 +89,5 @@ abstract class NestedData with _$NestedData implements IRpcSerializableMessage {
     String? timestamp,
   }) = _NestedData;
 
-  factory NestedData.fromJson(Map<String, dynamic> json) =>
-      _$NestedDataFromJson(json);
+  factory NestedData.fromJson(Map<String, dynamic> json) => _$NestedDataFromJson(json);
 }

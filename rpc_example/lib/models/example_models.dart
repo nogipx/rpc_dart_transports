@@ -5,7 +5,7 @@
 import 'package:rpc_dart/rpc_dart.dart';
 
 /// Базовый класс для всех сообщений в примере
-abstract class ExampleMessage implements IRpcSerializableMessage {
+abstract class ExampleMessage extends IRpcSerializableMessage {
   const ExampleMessage();
 
   @override

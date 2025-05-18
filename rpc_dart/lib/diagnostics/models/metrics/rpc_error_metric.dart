@@ -22,7 +22,7 @@ enum RpcErrorMetricType {
 }
 
 /// Метрика для отслеживания ошибок в работе RPC
-class RpcErrorMetric implements IRpcSerializableMessage {
+class RpcErrorMetric extends IRpcSerializableMessage {
   /// Тип ошибки
   final RpcErrorMetricType errorType;
 

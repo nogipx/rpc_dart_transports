@@ -20,9 +20,14 @@ enum RpcMethodType {
 }
 
 /// Интерфейс для типизированных сообщений
-abstract interface class IRpcSerializableMessage {
+abstract class IRpcSerializableMessage {
+  const IRpcSerializableMessage();
+
   /// Преобразует сообщение в JSON
   Map<String, dynamic> toJson();
+
+  /// Получает полезную нагрузку сообщения
+  dynamic get payload => this;
 }
 
 /// Базовый интерфейс для всех сервисных контрактов

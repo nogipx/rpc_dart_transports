@@ -14,7 +14,7 @@ part 'subcontracts/transport_tests.dart';
 part 'subcontracts/serialization_tests.dart';
 
 /// Базовое тестовое сообщение
-class TestMessage implements IRpcSerializableMessage {
+class TestMessage extends IRpcSerializableMessage {
   final String data;
   const TestMessage(this.data);
 

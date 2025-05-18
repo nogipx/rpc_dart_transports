@@ -6,12 +6,10 @@ import 'package:rpc_dart/diagnostics.dart';
 import 'package:rpc_dart/rpc_dart.dart';
 
 /// Простая обертка для списка метрик, которая реализует IRpcSerializableMessage
-class RpcMetricsList implements IRpcSerializableMessage {
+class RpcMetricsList extends IRpcSerializableMessage {
   final List<RpcMetric> metrics;
 
   RpcMetricsList(this.metrics);
-
-  dynamic get payload => this;
 
   @override
   Map<String, dynamic> toJson() {

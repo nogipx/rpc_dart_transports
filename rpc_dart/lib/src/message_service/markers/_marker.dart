@@ -55,7 +55,7 @@ enum RpcMarkerType {
 /// Базовый абстрактный класс для всех служебных маркеров RPC
 /// Все служебные маркеры (окончание стрима, начало транзакции и т.д.)
 /// должны расширять этот класс
-abstract class RpcServiceMarker implements IRpcSerializableMessage {
+abstract class RpcServiceMarker extends IRpcSerializableMessage {
   /// Тип маркера
   RpcMarkerType get markerType;
 

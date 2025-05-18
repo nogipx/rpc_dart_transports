@@ -5,7 +5,7 @@
 part of '_metric.dart';
 
 /// Метрика для отслеживания использования ресурсов
-class RpcResourceMetric implements IRpcSerializableMessage {
+class RpcResourceMetric extends IRpcSerializableMessage {
   /// Использование памяти в байтах
   final int? memoryUsage;
 
