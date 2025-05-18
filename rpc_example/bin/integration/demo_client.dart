@@ -23,7 +23,7 @@ void main() async {
   final traceId = '${clientId}_${DateTime.now().millisecondsSinceEpoch}';
 
   // Настраиваем логирование
-  RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.debug);
+  RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.info);
   final logger = DefaultRpcLogger(
     'DemoClient',
     coloredLoggingEnabled: true,

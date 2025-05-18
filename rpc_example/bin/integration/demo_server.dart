@@ -25,7 +25,7 @@ void main() async {
   final traceId = '${clientId}_${DateTime.now().millisecondsSinceEpoch}';
 
   // Настраиваем логирование
-  RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.debug);
+  RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.info);
   final logger = DefaultRpcLogger(
     'DemoServer',
     coloredLoggingEnabled: true,
@@ -108,7 +108,7 @@ final class DemoServer extends DemoServiceContract {
     // Создаем генератор с функцией, которая принимает стрим запросов и возвращает стрим ответов
     final generator = BidiStreamGenerator<RpcInt, RpcString>((requests) async* {
       for (int i = 1; i <= count.value; i++) {
-        await Future.delayed(Duration(milliseconds: 500));
+        await Future.delayed(Duration(milliseconds: 5000));
         yield RpcString('Число $i');
       }
     });
