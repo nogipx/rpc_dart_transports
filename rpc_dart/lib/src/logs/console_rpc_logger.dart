@@ -30,21 +30,21 @@ class DefaultRpcLoggerFormatter implements IRpcLoggerFormatter {
     String prefix;
     switch (level) {
       case RpcLoggerLevel.debug:
-        prefix = '🔍 DEBUG';
+        prefix = 'DEBUG';
       case RpcLoggerLevel.info:
-        prefix = '📝 INFO ';
+        prefix = 'INFO';
       case RpcLoggerLevel.warning:
-        prefix = '⚠️ WARN ';
+        prefix = 'WARN';
       case RpcLoggerLevel.error:
-        prefix = '❌ ERROR';
+        prefix = 'ERROR';
       case RpcLoggerLevel.critical:
-        prefix = '🔥 CRIT ';
+        prefix = 'CRIT';
       default:
-        prefix = '     ';
+        prefix = '';
     }
 
     final contextStr = context != null ? ' ($context)' : '';
-    return '[$formattedTime] $prefix [$source$contextStr] $message';
+    return '[$formattedTime] ${prefix.padRight(5)} [$source$contextStr] $message';
   }
 }
 

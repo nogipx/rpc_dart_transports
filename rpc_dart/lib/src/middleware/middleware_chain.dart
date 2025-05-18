@@ -5,6 +5,20 @@
 import 'dart:async';
 import 'package:rpc_dart/rpc_dart.dart';
 
+/// Результат выполнения middleware
+///
+/// Содержит обработанную нагрузку и обновленный контекст
+class RpcMiddlewareResult<T> {
+  /// Обработанная полезная нагрузка
+  final T payload;
+
+  /// Обновленный контекст
+  final RpcMethodContext context;
+
+  /// Создает результат выполнения middleware
+  const RpcMiddlewareResult(this.payload, this.context);
+}
+
 /// Класс для последовательного выполнения нескольких middleware
 ///
 /// Позволяет добавлять несколько middleware и выполнять их в нужном порядке.
@@ -31,29 +45,48 @@ final class RpcMiddlewareChain {
   /// [payload] - исходная полезная нагрузка
   /// [context] - контекст запроса
   ///
-  /// Возвращает обработанную полезную нагрузку
-  Future<dynamic> executeRequest(
+  /// Возвращает результат, содержащий обработанную полезную нагрузку
+  /// и обновленный контекст
+  Future<RpcMiddlewareResult<dynamic>> executeRequest(
     String serviceName,
     String methodName,
     dynamic payload,
     RpcMethodContext context,
     RpcDataDirection direction,
   ) async {
-    if (isEmpty) return payload;
+    if (isEmpty) return RpcMiddlewareResult(payload, context);
 
     dynamic currentPayload = payload;
+    RpcMethodContext currentContext = context;
 
     for (final middleware in _middlewares) {
-      currentPayload = await middleware.onRequest(
+      // Сохраняем состояние контекста до вызова middleware
+      final beforeContext = currentContext;
+
+      // Применяем middleware к текущему состоянию
+      final processedPayload = await middleware.onRequest(
         serviceName,
         methodName,
         currentPayload,
-        context,
+        currentContext,
         direction,
       );
+
+      // Обновляем payload для следующего middleware
+      currentPayload = processedPayload;
+
+      // Проверяем, не было ли изменения контекста внутри middleware
+      // Переменная currentContext должна быть равна beforeContext если контекст
+      // не был изменен внутри middleware
+      if (currentContext != beforeContext) {
+        // Middleware изменил контекст напрямую - используем обновленный
+      } else if (processedPayload != currentPayload) {
+        // Если middleware вернул другую полезную нагрузку, обновляем контекст
+        currentContext = currentContext.withPayload(processedPayload);
+      }
     }
 
-    return currentPayload;
+    return RpcMiddlewareResult(currentPayload, currentContext);
   }
 
   /// Выполняет цепочку middleware для обработки ответа
@@ -63,30 +96,43 @@ final class RpcMiddlewareChain {
   /// [response] - исходный ответ
   /// [context] - контекст запроса
   ///
-  /// Возвращает обработанный ответ
-  Future<dynamic> executeResponse(
+  /// Возвращает результат, содержащий обработанный ответ и обновленный контекст
+  Future<RpcMiddlewareResult<dynamic>> executeResponse(
     String serviceName,
     String methodName,
     dynamic response,
     RpcMethodContext context,
     RpcDataDirection direction,
   ) async {
-    if (isEmpty) return response;
+    if (isEmpty) return RpcMiddlewareResult(response, context);
 
     dynamic currentResponse = response;
+    RpcMethodContext currentContext = context;
 
     // Выполняем в обратном порядке (от самых свежих к самым ранним)
     for (final middleware in _middlewares.reversed) {
-      currentResponse = await middleware.onResponse(
+      // Сохраняем состояние контекста до вызова middleware
+      final beforeContext = currentContext;
+
+      // Применяем middleware к текущему состоянию
+      final processedResponse = await middleware.onResponse(
         serviceName,
         methodName,
         currentResponse,
-        context,
+        currentContext,
         direction,
       );
+
+      // Обновляем response для следующего middleware
+      currentResponse = processedResponse;
+
+      // Проверяем, не было ли изменения контекста внутри middleware
+      if (currentContext != beforeContext) {
+        // Middleware изменил контекст напрямую - используем обновленный
+      }
     }
 
-    return currentResponse;
+    return RpcMiddlewareResult(currentResponse, currentContext);
   }
 
   /// Выполняет цепочку middleware для обработки ошибки
@@ -97,8 +143,8 @@ final class RpcMiddlewareChain {
   /// [stackTrace] - трассировка стека (опционально)
   /// [context] - контекст запроса
   ///
-  /// Возвращает обработанную ошибку или преобразованный ответ
-  Future<dynamic> executeError(
+  /// Возвращает результат, содержащий обработанную ошибку и обновленный контекст
+  Future<RpcMiddlewareResult<dynamic>> executeError(
     String serviceName,
     String methodName,
     dynamic error,
@@ -106,27 +152,40 @@ final class RpcMiddlewareChain {
     RpcMethodContext context,
     RpcDataDirection direction,
   ) async {
-    if (isEmpty) return error;
+    if (isEmpty) return RpcMiddlewareResult(error, context);
 
     dynamic currentError = error;
     StackTrace? currentStackTrace = stackTrace;
+    RpcMethodContext currentContext = context;
 
     try {
       // Выполняем в обратном порядке (от самых свежих к самым ранним)
       for (final middleware in _middlewares.reversed) {
-        currentError = await middleware.onError(
+        // Сохраняем состояние контекста до вызова middleware
+        final beforeContext = currentContext;
+
+        // Применяем middleware к текущему состоянию
+        final processedError = await middleware.onError(
           serviceName,
           methodName,
           currentError,
           currentStackTrace,
-          context,
+          currentContext,
           direction,
         );
+
+        // Обновляем error для следующего middleware
+        currentError = processedError;
+
+        // Проверяем, не было ли изменения контекста внутри middleware
+        if (currentContext != beforeContext) {
+          // Middleware изменил контекст напрямую - используем обновленный
+        }
       }
-      return currentError;
+      return RpcMiddlewareResult(currentError, currentContext);
     } catch (e, _) {
       // Если middleware повторно бросает ошибку, используем её
-      return e;
+      return RpcMiddlewareResult(e, currentContext);
     }
   }
 

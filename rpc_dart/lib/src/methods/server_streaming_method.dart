@@ -246,6 +246,10 @@ final class ServerStreamingRpcMethod<T extends IRpcSerializableMessage>
       implementation: implementation,
     );
 
+    // Создаем адаптер хэндлера
+    final handlerAdapter =
+        _createHandlerAdapter(handler, requestParser, responseParser);
+
     // Регистрируем низкоуровневый обработчик
     _registry.registerMethod(
       serviceName: serviceName,
@@ -253,77 +257,106 @@ final class ServerStreamingRpcMethod<T extends IRpcSerializableMessage>
       methodType: RpcMethodType.serverStreaming,
       argumentParser: requestParser,
       responseParser: responseParser,
-      handler: (RpcMethodContext context) async {
-        try {
-          final requestId = context.messageId;
-          final startTime = DateTime.now().millisecondsSinceEpoch;
-
-          // Отправляем событие начала обработки запроса
-          _diagnostic?.reportTraceEvent(
-            _diagnostic!.createTraceEvent(
-              eventType: RpcTraceMetricType.methodStart,
-              method: methodName,
-              service: serviceName,
-              requestId: requestId,
-              metadata: context.metadata,
-            ),
-          );
-
-          // Конвертируем запрос в типизированный, если нужно
-          final typedRequest = (context.payload is Map<String, dynamic>)
-              ? requestParser(context.payload)
-              : context.payload;
-
-          // Получаем ID сообщения из контекста
-          final messageId = context.messageId;
-
-          // Отправляем метрику о создании стрима на стороне сервера
-          _diagnostic?.reportStreamMetric(
-            _diagnostic!.createStreamMetric(
-              eventType: RpcStreamEventType.created,
-              streamId: messageId,
-              direction: RpcStreamDirection.serverToClient,
-              method: '$serviceName.$methodName',
-            ),
-          );
-
-          // Запускаем обработку стрима в фоновом режиме
-          _activateStreamHandler<Request, Response>(
-            messageId,
-            typedRequest,
-            implementation,
-            responseParser,
-          );
-
-          // Начинаем отслеживать метрики стрима
-          _monitorStreamMetrics(messageId, startTime, requestId);
-
-          // Возвращаем только подтверждение принятия запроса
-          return {'status': 'streaming'};
-        } catch (e, stackTrace) {
-          // Логируем ошибку
-          _logger?.error(
-            'Ошибка при запуске серверного стрима: $e',
-            error: e,
-            stackTrace: stackTrace,
-          );
-
-          _diagnostic?.reportErrorMetric(
-            _diagnostic!.createErrorMetric(
-              errorType: RpcErrorMetricType.unexpectedError,
-              message:
-                  'Ошибка при запуске серверного стрима $serviceName.$methodName: $e',
-              requestId: context.messageId,
-              method: '$serviceName.$methodName',
-              stackTrace: stackTrace.toString(),
-              details: {'errorType': e.runtimeType.toString()},
-            ),
-          );
-
-          rethrow;
-        }
-      },
+      handler: handlerAdapter,
     );
+  }
+
+  /// Создает адаптер для хэндлера, который поможет преобразовать
+  /// ожидаемый тип запроса из контекста
+  Future<dynamic> Function(RpcMethodContext)
+      _createHandlerAdapter<Request extends T, Response extends T>(
+    RpcMethodServerStreamHandler<Request, Response> handler,
+    RpcMethodArgumentParser<Request> requestParser,
+    RpcMethodResponseParser<Response> responseParser,
+  ) {
+    // Получаем актуальный контракт метода и создаем имплементацию здесь
+    final contract =
+        getMethodContract<Request, Response>(RpcMethodType.serverStreaming);
+    final implementation =
+        RpcMethodImplementation.serverStreaming(contract, handler);
+
+    return (RpcMethodContext context) async {
+      try {
+        final requestId = context.messageId;
+        final startTime = DateTime.now().millisecondsSinceEpoch;
+
+        // Отправляем событие начала обработки запроса
+        _diagnostic?.reportTraceEvent(
+          _diagnostic!.createTraceEvent(
+            eventType: RpcTraceMetricType.methodStart,
+            method: methodName,
+            service: serviceName,
+            requestId: requestId,
+            metadata: context.metadata,
+          ),
+        );
+
+        // Конвертируем запрос в типизированный объект
+        Request typedRequest;
+        if (context.payload is Map<String, dynamic>) {
+          typedRequest = requestParser(context.payload);
+        } else if (context.payload is Request) {
+          typedRequest = context.payload as Request;
+        } else {
+          _logger?.error(
+            'Ошибка при приведении типа запроса: ожидался Map<String, dynamic> или ${Request.toString()}, но получен ${context.payload.runtimeType}',
+          );
+          throw RpcCustomException(
+            customMessage:
+                'Несовместимый тип запроса: ${context.payload.runtimeType}',
+            debugLabel: 'RpcMethodServerStreamHandler.handler',
+          );
+        }
+
+        // Получаем ID сообщения из контекста
+        final messageId = context.messageId;
+
+        // Отправляем метрику о создании стрима на стороне сервера
+        _diagnostic?.reportStreamMetric(
+          _diagnostic!.createStreamMetric(
+            eventType: RpcStreamEventType.created,
+            streamId: messageId,
+            direction: RpcStreamDirection.serverToClient,
+            method: '$serviceName.$methodName',
+          ),
+        );
+
+        // Запускаем обработку стрима в фоновом режиме
+        _activateStreamHandler<Request, Response>(
+          messageId,
+          typedRequest,
+          implementation,
+          responseParser, // Этот параметр будет передан при вызове адаптера
+        );
+
+        // Начинаем отслеживать метрики стрима
+        _monitorStreamMetrics(messageId, startTime, requestId);
+
+        // Возвращаем только подтверждение принятия запроса
+        return {'status': 'streaming'};
+      } catch (e, stackTrace) {
+        // Логируем ошибку
+        _logger?.error(
+          'Ошибка при запуске серверного стрима: $e',
+          error: e,
+          stackTrace: stackTrace,
+        );
+
+        _diagnostic?.reportErrorMetric(
+          _diagnostic!.createErrorMetric(
+            errorType: RpcErrorMetricType.unexpectedError,
+            message:
+                'Ошибка при запуске серверного стрима $serviceName.$methodName: $e',
+            requestId: context.messageId,
+            method: '$serviceName.$methodName',
+            stackTrace: stackTrace.toString(),
+            details: {'errorType': e.runtimeType.toString()},
+          ),
+        );
+
+        rethrow;
+      }
+    };
   }
 
   /// Активирует обработчик стрима и связывает его с транспортом

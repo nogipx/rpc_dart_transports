@@ -364,7 +364,7 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
       methodType: RpcMethodType.clientStreaming,
       argumentParser: requestParser,
       responseParser: responseParser,
-      handler: _createHandlerFunction<Request, Response>(
+      handler: _createHandlerAdapter<Request, Response>(
         implementation: implementation,
         requestParser: requestParser,
         responseParser: responseParser,
@@ -373,13 +373,15 @@ final class ClientStreamingRpcMethod<T extends IRpcSerializableMessage>
   }
 
   // Вспомогательный метод для создания обработчика
+  /// Создает адаптер для хэндлера, который поможет преобразовать
+  /// ожидаемый тип запроса из контекста
   Future<dynamic> Function(RpcMethodContext)
-      _createHandlerFunction<Request extends T, Response extends T>({
+      _createHandlerAdapter<Request extends T, Response extends T>({
     required RpcMethodImplementation<Request, Response> implementation,
     required RpcMethodArgumentParser<Request> requestParser,
     RpcMethodArgumentParser<Response>? responseParser,
   }) {
-    return (context) async {
+    return (RpcMethodContext context) async {
       final requestId = context.messageId;
       final startTime = DateTime.now().millisecondsSinceEpoch;
 

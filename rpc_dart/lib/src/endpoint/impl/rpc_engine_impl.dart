@@ -306,7 +306,7 @@ final class _RpcEngineImpl implements IRpcEngine {
       );
 
       // Применяем middleware для обработки запроса
-      dynamic processedPayload = await _middlewareChain.executeRequest(
+      final requestResult = await _middlewareChain.executeRequest(
         serviceName,
         methodName,
         message.payload,
@@ -314,39 +314,36 @@ final class _RpcEngineImpl implements IRpcEngine {
         RpcDataDirection.fromRemote,
       );
 
-      // Создаем обновленный контекст с обработанной полезной нагрузкой
-      final updatedContext = MutableRpcMethodContext(
-        messageId: message.id,
-        metadata: message.metadata,
-        headerMetadata: context.headerMetadata,
-        payload: processedPayload,
-        serviceName: serviceName,
-        methodName: methodName,
-      );
+      // Используем обновленный контекст от middleware
+      final updatedRequestContext =
+          requestResult.context.withPayload(requestResult.payload);
 
       // Вызываем обработчик с обновленным контекстом
-      final result = await methodHandler.handler(updatedContext);
+      final result = await methodHandler.handler(updatedRequestContext);
 
       // Изменяем направление на отправку
       direction = RpcDataDirection.toRemote;
 
       // Применяем middleware для обработки ответа
-      final processedResult = await _middlewareChain.executeResponse(
+      final responseResult = await _middlewareChain.executeResponse(
         serviceName,
         methodName,
         result,
-        updatedContext,
+        updatedRequestContext,
         RpcDataDirection.toRemote,
       );
+
+      // Используем финальный контекст после применения всех middleware
+      final finalContext = responseResult.context;
 
       // Отправляем ответ
       await _sendMessage(
         RpcMessage(
           type: RpcMessageType.response,
           id: message.id,
-          payload: processedResult,
-          metadata: updatedContext.headerMetadata,
-          trailerMetadata: updatedContext.trailerMetadata,
+          payload: responseResult.payload,
+          metadata: finalContext.headerMetadata,
+          trailerMetadata: finalContext.trailerMetadata,
           debugLabel: debugLabel,
         ),
       );
@@ -356,7 +353,7 @@ final class _RpcEngineImpl implements IRpcEngine {
         requestId: message.id,
         statusCode: RpcStatusCode.ok,
         message: 'OK',
-        metadata: updatedContext.headerMetadata,
+        metadata: finalContext.headerMetadata,
         serviceName: serviceName,
         methodName: methodName,
       );
@@ -372,7 +369,7 @@ final class _RpcEngineImpl implements IRpcEngine {
       );
 
       // Применяем middleware для обработки ошибки
-      final processedError = await _middlewareChain.executeError(
+      final errorResult = await _middlewareChain.executeError(
         serviceName,
         methodName,
         e,
@@ -381,11 +378,9 @@ final class _RpcEngineImpl implements IRpcEngine {
         direction,
       );
 
-      // Если errorContext был преобразован в мутабельный внутри middleware,
-      // нам нужно получить актуальные метаданные
-      final mutableErrorContext = errorContext is MutableRpcMethodContext
-          ? errorContext
-          : errorContext.toMutable();
+      // Используем финальный контекст после обработки ошибки
+      final finalErrorContext = errorResult.context;
+      final processedError = errorResult.payload;
 
       // Определяем тип ошибки для статуса
       RpcStatusCode statusCode;
@@ -410,7 +405,7 @@ final class _RpcEngineImpl implements IRpcEngine {
           'error': processedError.toString(),
           'stackTrace': stackTrace.toString(),
         },
-        metadata: mutableErrorContext.headerMetadata,
+        metadata: finalErrorContext.headerMetadata,
         serviceName: serviceName,
         methodName: methodName,
       );
@@ -419,8 +414,8 @@ final class _RpcEngineImpl implements IRpcEngine {
       await _sendErrorMessage(
         message.id,
         processedError.toString(),
-        mutableErrorContext.headerMetadata,
-        mutableErrorContext.trailerMetadata,
+        finalErrorContext.headerMetadata,
+        finalErrorContext.trailerMetadata,
       );
     }
   }

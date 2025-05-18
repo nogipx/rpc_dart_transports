@@ -77,18 +77,23 @@ final class RpcMethodRegistry implements IRpcMethodRegistry {
 
     // Если контракт имеет собственный реестр, объединяем его с текущим
     if (contract is RpcServiceContract) {
+      // Вызываем setup для инициализации всех методов
+      contract.setup();
+
+      // Объединяем реестр контракта с текущим реестром
       contract.mergeInto(this);
+
+      // Рекурсивно регистрируем все подконтракты
+      for (final subContract in contract.getSubContracts()) {
+        // Избегаем повторной регистрации
+        if (!_contracts.containsKey(subContract.serviceName)) {
+          registerContract(subContract);
+        }
+      }
     } else {
       // Для обычных контрактов продолжаем использовать прежнюю логику
       contract.setup();
       _collectAndRegisterMethods(contract);
-
-      // Рекурсивно регистрируем подконтракты, если возможно
-      if (contract is RpcServiceContract) {
-        for (final subContract in contract.getSubContracts()) {
-          registerContract(subContract);
-        }
-      }
     }
   }
 

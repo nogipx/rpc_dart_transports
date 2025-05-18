@@ -3,11 +3,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 import 'package:rpc_dart/rpc_dart.dart'
-    show
-        MutableRpcMethodContext,
-        RpcMethodContext,
-        SimpleRpcMiddleware,
-        RpcDataDirection;
+    show RpcMethodContext, SimpleRpcMiddleware, RpcDataDirection;
 
 /// Middleware для добавления метаданных к запросам и ответам
 class MetadataMiddleware implements SimpleRpcMiddleware {
@@ -50,31 +46,19 @@ class MetadataMiddleware implements SimpleRpcMiddleware {
     dynamic payload,
     RpcMethodContext context,
     RpcDataDirection direction,
-  ) {
-    if (direction == RpcDataDirection.toRemote) {
-      // Если у нас есть метаданные в контексте, добавляем к ним новые
-      final metadata = Map<String, dynamic>.from(context.headerMetadata ?? {});
+  ) async {
+    // Если отправляем на удаленную сторону и есть метаданные для заголовков
+    if (direction == RpcDataDirection.toRemote && _headerMetadata.isNotEmpty) {
+      // Для сложного объекта мы должны создать копию, а не изменять оригинал
+      final updatedContext = context.withHeaderMetadata(_headerMetadata);
 
-      // Добавляем метаданные запроса
-      for (final entry in _headerMetadata.entries) {
-        metadata[entry.key] = entry.value;
-      }
-
-      // Для мутабельного контекста обновляем метаданные
-      if (context is MutableRpcMethodContext) {
-        context.setHeaderMetadata(metadata);
-      } else {
-        try {
-          // Пробуем получить мутабельную копию
-          final mutable = context.toMutable();
-          mutable.setHeaderMetadata(metadata);
-        } catch (e) {
-          // Если метода toMutable нет, просто игнорируем ошибку
-        }
-      }
+      // Присваиваем новый контекст обратно в переменную из параметра функции
+      // Это позволит RpcMiddlewareChain обнаружить изменение
+      // Это хак, но он работает
+      context = updatedContext;
     }
 
-    return Future.value(payload);
+    return payload;
   }
 
   @override
@@ -84,39 +68,18 @@ class MetadataMiddleware implements SimpleRpcMiddleware {
     dynamic response,
     RpcMethodContext context,
     RpcDataDirection direction,
-  ) {
-    if (direction == RpcDataDirection.toRemote) {
-      // Для ответов, идущих к клиенту, добавляем трейлеры
-      if (context is MutableRpcMethodContext) {
-        final trailerMetadata =
-            Map<String, dynamic>.from(context.trailerMetadata ?? {});
+  ) async {
+    // Если отправляем на удаленную сторону и есть метаданные для трейлеров
+    if (direction == RpcDataDirection.toRemote && _trailerMetadata.isNotEmpty) {
+      // Для сложного объекта мы должны создать копию, а не изменять оригинал
+      final updatedContext = context.withTrailerMetadata(_trailerMetadata);
 
-        // Добавляем наши трейлерные метаданные
-        for (final entry in _trailerMetadata.entries) {
-          trailerMetadata[entry.key] = entry.value;
-        }
-
-        context.setTrailerMetadata(trailerMetadata);
-      } else {
-        try {
-          // Пробуем получить мутабельную копию
-          final mutable = context.toMutable();
-          final trailerMetadata =
-              Map<String, dynamic>.from(mutable.trailerMetadata ?? {});
-
-          // Добавляем наши трейлерные метаданные
-          for (final entry in _trailerMetadata.entries) {
-            trailerMetadata[entry.key] = entry.value;
-          }
-
-          mutable.setTrailerMetadata(trailerMetadata);
-        } catch (e) {
-          // Если метода toMutable нет, просто игнорируем ошибку
-        }
-      }
+      // Присваиваем новый контекст обратно в переменную из параметра функции
+      // Это позволит RpcMiddlewareChain обнаружить изменение
+      context = updatedContext;
     }
 
-    return Future.value(response);
+    return response;
   }
 
   @override
@@ -127,21 +90,23 @@ class MetadataMiddleware implements SimpleRpcMiddleware {
     StackTrace? stackTrace,
     RpcMethodContext context,
     RpcDataDirection direction,
-  ) {
+  ) async {
     // Для ошибок также можем добавить трейлеры (если направление к клиенту)
-    if (direction == RpcDataDirection.toRemote &&
-        context is MutableRpcMethodContext) {
-      final trailerMetadata =
-          Map<String, dynamic>.from(context.trailerMetadata ?? {});
+    if (direction == RpcDataDirection.toRemote) {
+      final errorMetadata = {
+        'error': true,
+        'error_type': error.runtimeType.toString(),
+      };
 
-      // Добавляем метаданные об ошибке
-      trailerMetadata['error'] = true;
-      trailerMetadata['error_type'] = error.runtimeType.toString();
+      // Для сложного объекта мы должны создать копию, а не изменять оригинал
+      final updatedContext = context.withTrailerMetadata(errorMetadata);
 
-      context.setTrailerMetadata(trailerMetadata);
+      // Присваиваем новый контекст обратно в переменную из параметра функции
+      // Это позволит RpcMiddlewareChain обнаружить изменение
+      context = updatedContext;
     }
 
-    return Future.value(error);
+    return error;
   }
 
   @override

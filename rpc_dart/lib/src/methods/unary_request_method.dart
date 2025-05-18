@@ -161,6 +161,34 @@ final class UnaryRequestRpcMethod<T extends IRpcSerializableMessage>
     }
   }
 
+  /// Создает адаптер для хэндлера, который поможет преобразовать
+  /// ожидаемый тип запроса из контекста
+  Future<dynamic> Function(RpcMethodContext)
+      _createHandlerAdapter<Request extends T, Response extends T>(
+    RpcMethodUnaryHandler<Request, Response> handler,
+    RpcMethodArgumentParser<Request> requestParser,
+  ) {
+    return (RpcMethodContext context) async {
+      Request typedRequest;
+      if (context.payload is Map<String, dynamic>) {
+        typedRequest = requestParser(context.payload);
+      } else if (context.payload is Request) {
+        typedRequest = context.payload as Request;
+      } else {
+        _logger?.error(
+          'Ошибка при приведении типа запроса: ожидался Map<String, dynamic> или ${Request.toString()}, но получен ${context.payload.runtimeType}',
+        );
+        throw RpcCustomException(
+          customMessage:
+              'Несовместимый тип запроса: ${context.payload.runtimeType}',
+          debugLabel: 'RpcMethodUnaryHandler.handler',
+        );
+      }
+
+      return await handler(typedRequest);
+    };
+  }
+
   /// Регистрирует обработчик унарного метода
   ///
   /// [handler] - функция обработки запроса
@@ -213,6 +241,9 @@ final class UnaryRequestRpcMethod<T extends IRpcSerializableMessage>
       'Зарегистрирован унарный метод $serviceName.$methodName',
     );
 
+    // Создаем адаптер хэндлера
+    final handlerAdapter = _createHandlerAdapter(handler, requestParser);
+
     // Регистрируем низкоуровневый обработчик - это ключевой шаг для обеспечения
     // связи между контрактом и обработчиком вызова
     _registry.registerMethod(
@@ -221,126 +252,7 @@ final class UnaryRequestRpcMethod<T extends IRpcSerializableMessage>
       methodType: RpcMethodType.unary,
       argumentParser: requestParser,
       responseParser: responseParser,
-      handler: (RpcMethodContext context) async {
-        final requestId = context.messageId;
-        final startTime = DateTime.now().millisecondsSinceEpoch;
-
-        // Отправляем событие начала обработки запроса
-        _diagnostic?.reportTraceEvent(
-          _diagnostic!.createTraceEvent(
-            eventType: RpcTraceMetricType.methodStart,
-            method: methodName,
-            service: serviceName,
-            requestId: requestId,
-            metadata: context.metadata,
-          ),
-        );
-
-        Object? error;
-        var success = false;
-        dynamic result;
-
-        try {
-          _logger?.debug(
-            'Обработка запроса для метода $serviceName.$methodName',
-          );
-
-          // Если request - это Map и мы получили функцию fromJson, преобразуем объект
-          final typedRequest = (context.payload is Map<String, dynamic>)
-              ? requestParser(context.payload)
-              : context.payload;
-
-          // Получаем типизированный ответ от обработчика
-          final response = await implementation.makeUnaryRequest(typedRequest);
-
-          _logger?.debug(
-            'Получен ответ от обработчика для метода $serviceName.$methodName',
-          );
-
-          // Преобразуем ответ в формат для передачи (JSON для RpcMessage)
-          result = response is RpcMessage ? response.toJson() : response;
-          success = true;
-          return result;
-        } catch (e, stackTrace) {
-          error = e;
-          _logger?.error(
-            'Ошибка при обработке унарного метода $serviceName.$methodName: $e',
-            error: e,
-            stackTrace: stackTrace,
-          );
-
-          // Отправляем метрику об ошибке
-          _diagnostic?.reportErrorMetric(
-            _diagnostic!.createErrorMetric(
-              errorType: RpcErrorMetricType.unexpectedError,
-              message:
-                  'Ошибка при обработке метода $serviceName.$methodName: $e',
-              requestId: requestId,
-              method: '$serviceName.$methodName',
-              stackTrace: stackTrace.toString(),
-              details: {'errorType': e.runtimeType.toString()},
-            ),
-          );
-
-          // Преобразуем ошибку в статусный маркер, если это возможно
-          if (e is RpcStatusException) {
-            // Если это уже статусное исключение, просто возвращаем его маркер
-            return e.toMarker();
-          } else {
-            // Иначе создаем общий статусный маркер с ошибкой
-            return RpcStatusMarker(
-              code: RpcStatusCode.internal,
-              message: 'Ошибка при обработке запроса: ${e.toString()}',
-              details: {
-                'errorType': e.runtimeType.toString(),
-                'stackTrace': stackTrace.toString(),
-              },
-            );
-          }
-        } finally {
-          final endTime = DateTime.now().millisecondsSinceEpoch;
-          final duration = endTime - startTime;
-
-          // Отправляем метрики о завершении обработки запроса
-          if (_diagnostic != null) {
-            // Событие завершения трассировки
-            unawaited(_diagnostic!.reportTraceEvent(
-              _diagnostic!.createTraceEvent(
-                eventType: success
-                    ? RpcTraceMetricType.methodEnd
-                    : RpcTraceMetricType.methodError,
-                method: methodName,
-                service: serviceName,
-                requestId: requestId,
-                durationMs: duration,
-                error: error != null
-                    ? {
-                        'error': error.toString(),
-                        'type': error.runtimeType.toString()
-                      }
-                    : null,
-                metadata: {
-                  'responseType': result?.runtimeType.toString(),
-                  ...context.metadata ?? {},
-                },
-              ),
-            ));
-
-            // Метрика задержки
-            unawaited(_diagnostic!.reportLatencyMetric(
-              _diagnostic!.createLatencyMetric(
-                operationType: RpcLatencyOperationType.requestProcessing,
-                operation: '$serviceName.$methodName',
-                startTime: startTime,
-                endTime: endTime,
-                success: success,
-                requestId: requestId,
-                error: error != null ? {'error': error.toString()} : null,
-              ),
-            ));
-          }
-        }
-      },
+      handler: handlerAdapter,
     );
   }
 }
