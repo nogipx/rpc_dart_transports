@@ -5,6 +5,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
+import 'package:rpc_dart/diagnostics/models/rpc_client_identity.dart';
 import 'package:rpc_dart/rpc_dart.dart';
 import 'package:rpc_dart_transports/rpc_dart_transports.dart';
 
@@ -28,9 +29,16 @@ void main(List<String> args) async {
 
   // Устанавливаем диагностический клиент в логгер для автоматической отправки логов
   RpcLoggerSettings.setDiagnostic(factoryDiagnosticClient(
-    serverUrl: Uri.parse(diagnosticUrl),
-    clientId: clientId,
-    traceId: traceId,
+    diagnosticUrl: Uri.parse(diagnosticUrl),
+    clientIdentity: RpcClientIdentity(
+      properties: {
+        'server_url': serverUrl,
+        'type': 'client',
+        'version': '1.0.0',
+      },
+      clientId: clientId,
+      traceId: traceId,
+    ),
   ));
 
   // Настраиваем логирование

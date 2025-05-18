@@ -4,6 +4,7 @@
 
 import 'dart:async';
 import 'dart:io';
+import 'package:rpc_dart/diagnostics/models/rpc_client_identity.dart';
 import 'package:rpc_dart/rpc_dart.dart';
 import 'package:rpc_dart_transports/rpc_dart_transports.dart';
 
@@ -30,9 +31,16 @@ void main(List<String> args) async {
 
   // Устанавливаем диагностический клиент в логгер для автоматической отправки логов
   RpcLoggerSettings.setDiagnostic(factoryDiagnosticClient(
-    serverUrl: Uri.parse(diagnosticUrl),
-    clientId: clientId,
-    traceId: traceId,
+    diagnosticUrl: Uri.parse(diagnosticUrl),
+    clientIdentity: RpcClientIdentity(
+      clientId: clientId,
+      traceId: traceId,
+      properties: {
+        'server_url': diagnosticUrl,
+        'type': 'server',
+        'version': '1.0.0',
+      },
+    ),
   ));
 
   // Настраиваем логирование
@@ -72,7 +80,7 @@ void main(List<String> args) async {
   );
 
   // Создаем сервер и регистрируем его методы
-  final demoServer = DemoServer(logger);
+  final demoServer = DemoServer();
   rpcEndpoint.registerServiceContract(demoServer);
 
   logger.info('Сервер запущен и ожидает подключений на ws://$host:$port');
@@ -91,20 +99,15 @@ void main(List<String> args) async {
 }
 
 final class DemoServer extends DemoServiceContract {
-  final RpcLogger _logger;
-
-  DemoServer(this._logger);
+  DemoServer();
 
   @override
   Future<RpcString> echo(RpcString request) async {
-    _logger.debug('Получен echo запрос: ${request.value}');
     return RpcString(request.value);
   }
 
   @override
   ServerStreamingBidiStream<RpcInt, RpcString> generateNumbers(RpcInt count) {
-    _logger.debug('Запрошена генерация ${count.value} чисел');
-
     // Создаем генератор с функцией, которая принимает стрим запросов и возвращает стрим ответов
     final generator = BidiStreamGenerator<RpcInt, RpcString>((requests) async* {
       for (int i = 1; i <= count.value; i++) {
@@ -119,8 +122,6 @@ final class DemoServer extends DemoServiceContract {
 
   @override
   ClientStreamingBidiStream<RpcString, RpcInt> countWords() {
-    _logger.debug('Запущен метод подсчета слов');
-
     // Создаем генератор для клиентского стрима
     final generator = BidiStreamGenerator<RpcString, RpcInt>((requests) async* {
       int totalWords = 0;
@@ -128,7 +129,6 @@ final class DemoServer extends DemoServiceContract {
       await for (final request in requests) {
         final words = request.value.split(' ').where((word) => word.isNotEmpty).length;
         totalWords += words;
-        _logger.debug('Получено слов: $words, всего: $totalWords');
       }
 
       // После обработки всех входящих запросов, отправляем результат
@@ -141,13 +141,10 @@ final class DemoServer extends DemoServiceContract {
 
   @override
   BidiStream<RpcString, RpcString> chat() {
-    _logger.debug('Запущен метод чата');
-
     // Создаем генератор для двунаправленного стрима
     final generator = BidiStreamGenerator<RpcString, RpcString>((requests) async* {
       // Обрабатываем все сообщения
       await for (final request in requests) {
-        _logger.debug('Получено сообщение в чате: ${request.value}');
         yield RpcString('Сервер получил: ${request.value}');
       }
     });
@@ -155,17 +152,6 @@ final class DemoServer extends DemoServiceContract {
     // Создаем и возвращаем двунаправленный стрим
     return generator.create();
   }
-}
-
-/// Вспомогательный класс для возврата информации о клиентском стриминге
-class ClientStreamingInfo<T extends IRpcSerializableMessage, R extends IRpcSerializableMessage> {
-  final StreamSink<T> stream;
-  final Future<R> result;
-
-  ClientStreamingInfo({
-    required this.stream,
-    required this.result,
-  });
 }
 
 /// Парсит аргумент из командной строки

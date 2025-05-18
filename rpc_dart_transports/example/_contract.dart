@@ -3,30 +3,21 @@ import 'package:rpc_dart/rpc_dart.dart';
 import 'package:rpc_dart_transports/rpc_dart_transports.dart';
 
 RpcDiagnosticClient factoryDiagnosticClient({
-  required Uri serverUrl,
-  required String clientId,
-  required String traceId,
+  required Uri diagnosticUrl,
+  required RpcClientIdentity clientIdentity,
 }) {
   return RpcDiagnosticClient(
     endpoint: RpcEndpoint(
       transport: ClientWebSocketTransport.fromUrl(
         id: 'server_connection',
-        url: serverUrl.toString(),
+        url: diagnosticUrl.toString(),
         autoConnect: true,
       ),
     ),
-    clientIdentity: RpcClientIdentity(
-      clientId: clientId,
-      traceId: traceId,
-      properties: {
-        'server_url': serverUrl,
-        'type': 'client',
-        'version': '1.0.0',
-      },
-    ),
+    clientIdentity: clientIdentity,
     options: RpcDiagnosticOptions(
       enabled: true,
-      flushIntervalMs: 5000, // 5 секунд
+      flushIntervalMs: 2000, // 2 секунды
       samplingRate: 1.0, // Отправляем все метрики
     ),
   );
