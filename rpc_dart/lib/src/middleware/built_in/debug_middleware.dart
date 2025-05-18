@@ -28,7 +28,7 @@ class DebugMiddleware implements IRpcMiddleware {
     String serviceName,
     String methodName,
     dynamic payload,
-    RpcMethodContext context,
+    IRpcContext context,
     RpcDataDirection direction,
   ) {
     var message = '${direction.symbol} ЗАПРОС: $serviceName.$methodName\n'
@@ -49,7 +49,7 @@ class DebugMiddleware implements IRpcMiddleware {
     String serviceName,
     String methodName,
     dynamic response,
-    RpcMethodContext context,
+    IRpcContext context,
     RpcDataDirection direction,
   ) {
     var message = '${direction.symbol} ОТВЕТ: $serviceName.$methodName\n'
@@ -71,7 +71,7 @@ class DebugMiddleware implements IRpcMiddleware {
     String methodName,
     dynamic error,
     StackTrace? stackTrace,
-    RpcMethodContext context,
+    IRpcContext context,
     RpcDataDirection direction,
   ) {
     var message = '${direction.symbol} ОШИБКА: $serviceName.$methodName\n'

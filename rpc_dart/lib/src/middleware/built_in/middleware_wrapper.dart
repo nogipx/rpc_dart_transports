@@ -32,7 +32,7 @@ class RpcMiddlewareWrapper implements SimpleRpcMiddleware {
     String serviceName,
     String methodName,
     dynamic payload,
-    RpcMethodContext context,
+    IRpcContext context,
     RpcDataDirection direction,
   )? onRequestHandler;
 
@@ -41,7 +41,7 @@ class RpcMiddlewareWrapper implements SimpleRpcMiddleware {
     String serviceName,
     String methodName,
     dynamic response,
-    RpcMethodContext context,
+    IRpcContext context,
     RpcDataDirection direction,
   )? onResponseHandler;
 
@@ -51,7 +51,7 @@ class RpcMiddlewareWrapper implements SimpleRpcMiddleware {
     String methodName,
     dynamic error,
     StackTrace? stackTrace,
-    RpcMethodContext context,
+    IRpcContext context,
     RpcDataDirection direction,
   )? onErrorHandler;
 
@@ -93,7 +93,7 @@ class RpcMiddlewareWrapper implements SimpleRpcMiddleware {
     String serviceName,
     String methodName,
     dynamic payload,
-    RpcMethodContext context,
+    IRpcContext context,
     RpcDataDirection direction,
   ) {
     return onRequestHandler?.call(
@@ -111,7 +111,7 @@ class RpcMiddlewareWrapper implements SimpleRpcMiddleware {
     String serviceName,
     String methodName,
     dynamic response,
-    RpcMethodContext context,
+    IRpcContext context,
     RpcDataDirection direction,
   ) {
     return onResponseHandler?.call(
@@ -130,7 +130,7 @@ class RpcMiddlewareWrapper implements SimpleRpcMiddleware {
     String methodName,
     dynamic error,
     StackTrace? stackTrace,
-    RpcMethodContext context,
+    IRpcContext context,
     RpcDataDirection direction,
   ) {
     return onErrorHandler?.call(

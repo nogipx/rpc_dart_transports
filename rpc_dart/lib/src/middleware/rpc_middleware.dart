@@ -36,7 +36,7 @@ abstract interface class IRpcMiddleware {
     String serviceName,
     String methodName,
     dynamic payload,
-    RpcMethodContext context,
+    IRpcContext context,
     RpcDataDirection direction,
   );
 
@@ -52,7 +52,7 @@ abstract interface class IRpcMiddleware {
     String serviceName,
     String methodName,
     dynamic response,
-    RpcMethodContext context,
+    IRpcContext context,
     RpcDataDirection direction,
   );
 
@@ -70,7 +70,7 @@ abstract interface class IRpcMiddleware {
     String methodName,
     dynamic error,
     StackTrace? stackTrace,
-    RpcMethodContext context,
+    IRpcContext context,
     RpcDataDirection direction,
   );
 
@@ -112,7 +112,7 @@ abstract class SimpleRpcMiddleware implements IRpcMiddleware {
     String serviceName,
     String methodName,
     dynamic payload,
-    RpcMethodContext context,
+    IRpcContext context,
     RpcDataDirection direction,
   ) =>
       payload;
@@ -122,7 +122,7 @@ abstract class SimpleRpcMiddleware implements IRpcMiddleware {
     String serviceName,
     String methodName,
     dynamic response,
-    RpcMethodContext context,
+    IRpcContext context,
     RpcDataDirection direction,
   ) =>
       response;
@@ -133,7 +133,7 @@ abstract class SimpleRpcMiddleware implements IRpcMiddleware {
     String methodName,
     dynamic error,
     StackTrace? stackTrace,
-    RpcMethodContext context,
+    IRpcContext context,
     RpcDataDirection direction,
   ) =>
       error;

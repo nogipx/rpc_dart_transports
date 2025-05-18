@@ -163,7 +163,7 @@ final class RpcMethodRegistry implements IRpcMethodRegistry {
     dynamic adaptedHandler = handler;
 
     // Только оборачиваем, если обработчик не является уже адаптером
-    // (проверяем по сигнатуре - адаптеры принимают RpcMethodContext)
+    // (проверяем по сигнатуре - адаптеры принимают IRpcContext)
     if (handler != null && methodType != null && argumentParser != null) {
       try {
         // Используем RpcMethodAdapterFactory для создания нужного адаптера

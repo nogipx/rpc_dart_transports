@@ -34,7 +34,7 @@ class TestMessage implements IRpcSerializableMessage {
 class RootRequest extends TestMessage {
   RootRequest(super.data);
 
-  // Свойство payload, возвращающее сам объект для совместимости с RpcMethodContext
+  // Свойство payload, возвращающее сам объект для совместимости с IRpcContext
   get payload => this;
 
   factory RootRequest.fromJson(Map<String, dynamic> json) {
@@ -53,7 +53,7 @@ class RootResponse extends TestMessage {
 class ChildRequest extends TestMessage {
   ChildRequest(super.data);
 
-  // Свойство payload, возвращающее сам объект для совместимости с RpcMethodContext
+  // Свойство payload, возвращающее сам объект для совместимости с IRpcContext
   get payload => this;
 
   factory ChildRequest.fromJson(Map<String, dynamic> json) {

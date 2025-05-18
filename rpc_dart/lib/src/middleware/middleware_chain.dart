@@ -13,7 +13,7 @@ class RpcMiddlewareResult<T> {
   final T payload;
 
   /// Обновленный контекст
-  final RpcMethodContext context;
+  final IRpcContext context;
 
   /// Создает результат выполнения middleware
   const RpcMiddlewareResult(this.payload, this.context);
@@ -51,13 +51,13 @@ final class RpcMiddlewareChain {
     String serviceName,
     String methodName,
     dynamic payload,
-    RpcMethodContext context,
+    IRpcContext context,
     RpcDataDirection direction,
   ) async {
     if (isEmpty) return RpcMiddlewareResult(payload, context);
 
     dynamic currentPayload = payload;
-    RpcMethodContext currentContext = context;
+    IRpcContext currentContext = context;
 
     for (final middleware in _middlewares) {
       // Сохраняем состояние контекста до вызова middleware
@@ -82,7 +82,9 @@ final class RpcMiddlewareChain {
         // Middleware изменил контекст напрямую - используем обновленный
       } else if (processedPayload != currentPayload) {
         // Если middleware вернул другую полезную нагрузку, обновляем контекст
-        currentContext = currentContext.withPayload(processedPayload);
+        if (currentContext is RpcMessage) {
+          currentContext = currentContext.withPayload(processedPayload);
+        }
       }
     }
 
@@ -101,13 +103,13 @@ final class RpcMiddlewareChain {
     String serviceName,
     String methodName,
     dynamic response,
-    RpcMethodContext context,
+    IRpcContext context,
     RpcDataDirection direction,
   ) async {
     if (isEmpty) return RpcMiddlewareResult(response, context);
 
     dynamic currentResponse = response;
-    RpcMethodContext currentContext = context;
+    IRpcContext currentContext = context;
 
     // Выполняем в обратном порядке (от самых свежих к самым ранним)
     for (final middleware in _middlewares.reversed) {
@@ -149,14 +151,14 @@ final class RpcMiddlewareChain {
     String methodName,
     dynamic error,
     StackTrace? stackTrace,
-    RpcMethodContext context,
+    IRpcContext context,
     RpcDataDirection direction,
   ) async {
     if (isEmpty) return RpcMiddlewareResult(error, context);
 
     dynamic currentError = error;
     StackTrace? currentStackTrace = stackTrace;
-    RpcMethodContext currentContext = context;
+    IRpcContext currentContext = context;
 
     try {
       // Выполняем в обратном порядке (от самых свежих к самым ранним)

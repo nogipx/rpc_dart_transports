@@ -316,8 +316,8 @@ final class _RpcEngineImpl implements IRpcEngine {
     var direction = RpcDataDirection.fromRemote;
 
     try {
-      // Создаем контекст вызова метода из сообщения
-      final context = RpcMethodContext.fromMessage(message);
+      // Используем само сообщение как контекст
+      final IRpcContext context = message;
 
       // Применяем middleware для обработки запроса
       final requestResult = await _middlewareChain.executeRequest(
@@ -329,8 +329,10 @@ final class _RpcEngineImpl implements IRpcEngine {
       );
 
       // Используем обновленный контекст от middleware
-      final updatedRequestContext =
-          requestResult.context.withPayload(requestResult.payload);
+      final updatedRequestContext = requestResult.context is RpcMessage
+          ? (requestResult.context as RpcMessage)
+              .withPayload(requestResult.payload)
+          : requestResult.context;
 
       // Проверяем наличие обработчика
       if (methodHandler.handler == null) {
@@ -383,7 +385,7 @@ final class _RpcEngineImpl implements IRpcEngine {
       );
     } catch (e, stackTrace) {
       // Создаем контекст для ошибки из сообщения
-      final errorContext = RpcMethodContext.fromMessage(message);
+      final errorContext = message;
 
       // Применяем middleware для обработки ошибки
       final errorResult = await _middlewareChain.executeError(

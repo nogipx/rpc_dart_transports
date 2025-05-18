@@ -7,7 +7,7 @@ part of '_method.dart';
 /// Фабрика для создания адаптеров методов
 ///
 /// Предоставляет набор методов для создания адаптеров, преобразующих
-/// методы для работы с [RpcMethodContext]
+/// методы для работы с [IRpcContext]
 final class RpcMethodAdapterFactory {
   /// Создает адаптер для унарного обработчика
   ///
@@ -16,14 +16,14 @@ final class RpcMethodAdapterFactory {
   /// [handler] - Обработчик унарного метода
   /// [argumentParser] - Функция для парсинга аргументов из JSON
   /// [debugLabel] - Метка для отладки (используется в сообщениях об ошибках)
-  static Future<dynamic> Function(RpcMethodContext) createUnaryHandlerAdapter<
+  static Future<dynamic> Function(IRpcContext) createUnaryHandlerAdapter<
       Request extends IRpcSerializableMessage,
       Response extends IRpcSerializableMessage>(
     RpcMethodUnaryHandler<Request, Response> handler,
     RpcMethodArgumentParser<Request> argumentParser,
     String debugLabel,
   ) {
-    return (RpcMethodContext context) async {
+    return (IRpcContext context) async {
       Request typedRequest;
 
       try {
@@ -63,14 +63,14 @@ final class RpcMethodAdapterFactory {
   /// [handler] - Обработчик серверного стрим-метода
   /// [argumentParser] - Функция для парсинга аргументов из JSON
   /// [debugLabel] - Метка для отладки (используется в сообщениях об ошибках)
-  static Future<dynamic> Function(RpcMethodContext)
-      createServerStreamHandlerAdapter<Request extends IRpcSerializableMessage,
-          Response extends IRpcSerializableMessage>(
+  static Future<dynamic> Function(IRpcContext) createServerStreamHandlerAdapter<
+      Request extends IRpcSerializableMessage,
+      Response extends IRpcSerializableMessage>(
     RpcMethodServerStreamHandler<Request, Response> handler,
     RpcMethodArgumentParser<Request> argumentParser,
     String debugLabel,
   ) {
-    return (RpcMethodContext context) async {
+    return (IRpcContext context) async {
       Request typedRequest;
 
       try {
@@ -108,12 +108,12 @@ final class RpcMethodAdapterFactory {
   /// Для клиентского стрима не требуется запрос - просто вызываем обработчик
   ///
   /// [handler] - Обработчик клиентского стрим-метода
-  static Future<dynamic> Function(RpcMethodContext)
-      createClientStreamHandlerAdapter<Request extends IRpcSerializableMessage,
-          Response extends IRpcSerializableMessage>(
+  static Future<dynamic> Function(IRpcContext) createClientStreamHandlerAdapter<
+      Request extends IRpcSerializableMessage,
+      Response extends IRpcSerializableMessage>(
     RpcMethodClientStreamHandler<Request, Response> handler,
   ) {
-    return (RpcMethodContext context) async {
+    return (IRpcContext context) async {
       return handler();
     };
   }
@@ -123,12 +123,12 @@ final class RpcMethodAdapterFactory {
   /// Для двунаправленного стрима не требуется запрос - просто вызываем обработчик
   ///
   /// [handler] - Обработчик двунаправленного стрим-метода
-  static Future<dynamic> Function(RpcMethodContext)
+  static Future<dynamic> Function(IRpcContext)
       createBidirectionalHandlerAdapter<Request extends IRpcSerializableMessage,
           Response extends IRpcSerializableMessage>(
     RpcMethodBidirectionalHandler<Request, Response> handler,
   ) {
-    return (RpcMethodContext context) async {
+    return (IRpcContext context) async {
       return handler();
     };
   }

@@ -4,10 +4,10 @@
 
 import 'package:rpc_dart/rpc_dart.dart'
     show
+        IRpcContext,
         RpcDataDirection,
         RpcLogger,
         RpcLoggerLevel,
-        RpcMethodContext,
         SimpleRpcMiddleware;
 
 /// Уровень логирования
@@ -113,7 +113,7 @@ class LoggingMiddleware implements SimpleRpcMiddleware {
     String serviceName,
     String methodName,
     dynamic payload,
-    RpcMethodContext context,
+    IRpcContext context,
     RpcDataDirection direction,
   ) {
     _info('[REQ ${direction.symbol}] $serviceName.$methodName: $payload');
@@ -125,7 +125,7 @@ class LoggingMiddleware implements SimpleRpcMiddleware {
     String serviceName,
     String methodName,
     dynamic response,
-    RpcMethodContext context,
+    IRpcContext context,
     RpcDataDirection direction,
   ) {
     _info('[RES ${direction.symbol}] $serviceName.$methodName: $response');
@@ -138,7 +138,7 @@ class LoggingMiddleware implements SimpleRpcMiddleware {
     String methodName,
     dynamic error,
     StackTrace? stackTrace,
-    RpcMethodContext context,
+    IRpcContext context,
     RpcDataDirection direction,
   ) {
     _error(

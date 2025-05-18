@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 import 'package:rpc_dart/rpc_dart.dart'
-    show RpcMethodContext, SimpleRpcMiddleware, RpcDataDirection;
+    show IRpcContext, RpcDataDirection, SimpleRpcMiddleware;
 
 /// Middleware для добавления метаданных к запросам и ответам
 class MetadataMiddleware implements SimpleRpcMiddleware {
@@ -44,7 +44,7 @@ class MetadataMiddleware implements SimpleRpcMiddleware {
     String serviceName,
     String methodName,
     dynamic payload,
-    RpcMethodContext context,
+    IRpcContext context,
     RpcDataDirection direction,
   ) async {
     // Если отправляем на удаленную сторону и есть метаданные для заголовков
@@ -66,7 +66,7 @@ class MetadataMiddleware implements SimpleRpcMiddleware {
     String serviceName,
     String methodName,
     dynamic response,
-    RpcMethodContext context,
+    IRpcContext context,
     RpcDataDirection direction,
   ) async {
     // Если отправляем на удаленную сторону и есть метаданные для трейлеров
@@ -88,7 +88,7 @@ class MetadataMiddleware implements SimpleRpcMiddleware {
     String methodName,
     dynamic error,
     StackTrace? stackTrace,
-    RpcMethodContext context,
+    IRpcContext context,
     RpcDataDirection direction,
   ) async {
     // Для ошибок также можем добавить трейлеры (если направление к клиенту)

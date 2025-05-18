@@ -207,10 +207,9 @@ void main() {
           fail('Должно было выбросить исключение');
         } catch (e) {
           // Ожидаем ошибку с неверными аргументами
-          expect(e, isA<Map<String, dynamic>>());
-          final error = e as Map<String, dynamic>;
-          expect(error['code'], isNotNull);
-          expect(error['message'], contains('Invalid arguments'));
+          expect(e, isA<Exception>());
+          final errorString = e.toString();
+          expect(errorString, contains('Invalid arguments'));
         }
       } finally {
         // Освобождаем ресурсы

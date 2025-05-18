@@ -23,6 +23,15 @@ abstract interface class IRpcContext {
 
   /// Трейлерные метаданные
   Map<String, dynamic>? get trailerMetadata;
+
+  /// Создает новый экземпляр сообщения с обновленной полезной нагрузкой
+  RpcMessage withPayload(dynamic newPayload);
+
+  /// Создает новый экземпляр сообщения с обновленными заголовочными метаданными
+  RpcMessage withHeaderMetadata(Map<String, dynamic> newMetadata);
+
+  /// Создает новый экземпляр сообщения с обновленными трейлерными метаданными
+  RpcMessage withTrailerMetadata(Map<String, dynamic> newMetadata);
 }
 
 /// Класс, представляющий сообщение протокола
@@ -80,6 +89,57 @@ final class RpcMessage implements IRpcSerializableMessage, IRpcContext {
       headerMetadata: json['headerMetadata'] as Map<String, dynamic>?,
       trailerMetadata: json['trailerMetadata'] as Map<String, dynamic>?,
       debugLabel: json['debugLabel'] as String?,
+    );
+  }
+
+  /// Создает новый экземпляр сообщения с обновленной полезной нагрузкой
+  @override
+  RpcMessage withPayload(dynamic newPayload) {
+    return RpcMessage(
+      type: type,
+      messageId: messageId,
+      serviceName: serviceName,
+      methodName: methodName,
+      payload: newPayload,
+      headerMetadata: headerMetadata,
+      trailerMetadata: trailerMetadata,
+      debugLabel: debugLabel,
+    );
+  }
+
+  /// Создает новый экземпляр сообщения с обновленными заголовочными метаданными
+  @override
+  RpcMessage withHeaderMetadata(Map<String, dynamic> newMetadata) {
+    final headers = Map<String, dynamic>.from(headerMetadata ?? {})
+      ..addAll(newMetadata);
+
+    return RpcMessage(
+      type: type,
+      messageId: messageId,
+      serviceName: serviceName,
+      methodName: methodName,
+      payload: payload,
+      headerMetadata: headers,
+      trailerMetadata: trailerMetadata,
+      debugLabel: debugLabel,
+    );
+  }
+
+  /// Создает новый экземпляр сообщения с обновленными трейлерными метаданными
+  @override
+  RpcMessage withTrailerMetadata(Map<String, dynamic> newMetadata) {
+    final trailers = Map<String, dynamic>.from(trailerMetadata ?? {})
+      ..addAll(newMetadata);
+
+    return RpcMessage(
+      type: type,
+      messageId: messageId,
+      serviceName: serviceName,
+      methodName: methodName,
+      payload: payload,
+      headerMetadata: headerMetadata,
+      trailerMetadata: trailers,
+      debugLabel: debugLabel,
     );
   }
 

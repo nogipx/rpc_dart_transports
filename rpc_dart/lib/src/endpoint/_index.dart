@@ -3,13 +3,11 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 import 'dart:async';
-import 'dart:collection';
 import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:rpc_dart/rpc_dart.dart';
 
-part 'impl/method_context.dart';
 part 'impl/rpc_engine_impl.dart';
 part 'impl/rpc_endpoint_impl.dart';
 part 'impl/rpc_method_registry.dart';
