@@ -108,6 +108,8 @@ class ClientWebSocketTransport implements IRpcTransport {
         _channel = _channelProvider!();
       }
 
+      await _channel?.ready.timeout(const Duration(seconds: 30));
+
       if (_channel == null) {
         throw Exception('Ошибка при создании WebSocketChannel');
       }

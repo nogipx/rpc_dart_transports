@@ -11,17 +11,10 @@ import 'package:rpc_dart_transports/rpc_dart_transports.dart';
 ///
 /// Запускает WebSocket сервер, к которому могут подключаться клиенты и серверы
 /// для отправки диагностических данных.
-///
-/// Аргументы запуска:
-/// --host=0.0.0.0 - хост для привязки WebSocket сервера (по умолчанию 0.0.0.0)
-/// --port=8080 - порт для WebSocket сервера (по умолчанию 8080)
-///
-/// Пример запуска:
-/// dart diagnostic_service.dart --host=0.0.0.0 --port=8080
-void main(List<String> args) async {
+void main() async {
   // Парсим аргументы
-  final host = _parseArg(args, 'host', '0.0.0.0');
-  final port = int.tryParse(_parseArg(args, 'port', '8080')) ?? 8080;
+  final host = '0.0.0.0';
+  final port = 30000;
 
   // Настраиваем логирование
   RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.debug);
@@ -206,14 +199,4 @@ void _processMetric(RpcMetric metric, String clientId, RpcLogger logger) {
     default:
       logger.debug('Неизвестная метрика от $clientId: ${metric.metricType}');
   }
-}
-
-/// Парсит аргумент из командной строки
-String _parseArg(List<String> args, String name, String defaultValue) {
-  for (final arg in args) {
-    if (arg.startsWith('--$name=')) {
-      return arg.substring(arg.indexOf('=') + 1);
-    }
-  }
-  return defaultValue;
 }

@@ -9,7 +9,7 @@ RpcDiagnosticClient factoryDiagnosticClient({
   return RpcDiagnosticClient(
     endpoint: RpcEndpoint(
       transport: ClientWebSocketTransport.fromUrl(
-        id: 'server_connection',
+        id: 'diagnostic_connection_${clientIdentity.clientId}',
         url: diagnosticUrl.toString(),
         autoConnect: true,
       ),
@@ -69,7 +69,7 @@ abstract class DemoServiceContract extends RpcServiceContract {
 
   ClientStreamingBidiStream<RpcString, RpcInt> countWords();
 
-  ServerStreamingBidiStream<RpcInt, RpcString> generateNumbers(RpcInt p1);
+  ServerStreamingBidiStream<RpcInt, RpcString> generateNumbers(RpcInt _);
 
   BidiStream<RpcString, RpcString> chat();
 }

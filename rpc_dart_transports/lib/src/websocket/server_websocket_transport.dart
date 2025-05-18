@@ -73,7 +73,7 @@ class ServerWebSocketTransport implements IRpcTransport {
   /// [onClientConnected] - обработчик для новых соединений
   /// [onClientDisconnected] - обработчик для отключений клиентов
   static Future<ServerWebSocketTransport> create({
-    String host = 'localhost',
+    required String host,
     required int port,
     required String id,
     String Function()? clientIdGenerator,

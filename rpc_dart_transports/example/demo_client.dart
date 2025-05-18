@@ -14,14 +14,10 @@ import '_contract.dart';
 /// Демонстрационный клиент
 ///
 /// Отправляет RPC-запросы серверу и диагностические данные в сервис диагностики.
-///
-/// Аргументы запуска:
-/// --server-url=ws://localhost:8888 - URL RPC-сервера (по умолчанию ws://localhost:8888)
-/// --diagnostic-url=ws://localhost:8080 - URL сервиса диагностики (по умолчанию ws://localhost:8080)
-void main(List<String> args) async {
+void main() async {
   // Парсим аргументы
-  final serverUrl = _parseArg(args, 'server-url', 'ws://localhost:8888');
-  final diagnosticUrl = _parseArg(args, 'diagnostic-url', 'ws://localhost:8080');
+  final serverUrl = 'ws://192.168.1.118:31000';
+  final diagnosticUrl = 'ws://192.168.1.118:30000';
 
   // Создаем клиент диагностики
   final clientId = 'demo_client';
@@ -31,11 +27,6 @@ void main(List<String> args) async {
   RpcLoggerSettings.setDiagnostic(factoryDiagnosticClient(
     diagnosticUrl: Uri.parse(diagnosticUrl),
     clientIdentity: RpcClientIdentity(
-      properties: {
-        'server_url': serverUrl,
-        'type': 'client',
-        'version': '1.0.0',
-      },
       clientId: clientId,
       traceId: traceId,
     ),
@@ -168,14 +159,4 @@ Future<void> _demonstrateRpcCalls(DemoClient client, RpcLogger logger) async {
 
     logger.debug('Использование ресурсов: Память $memoryUsage MB, CPU $cpuUsage%');
   });
-}
-
-/// Парсит аргумент из командной строки
-String _parseArg(List<String> args, String name, String defaultValue) {
-  for (final arg in args) {
-    if (arg.startsWith('--$name=')) {
-      return arg.substring(arg.indexOf('=') + 1);
-    }
-  }
-  return defaultValue;
 }

@@ -14,16 +14,11 @@ import '_contract.dart';
 ///
 /// Обрабатывает RPC-запросы от клиентов и отправляет диагностические данные
 /// в сервис диагностики.
-///
-/// Аргументы запуска:
-/// --host=0.0.0.0 - хост для RPC-сервера (по умолчанию localhost)
-/// --port=8888 - порт для RPC-сервера (по умолчанию 8888)
-/// --diagnostic-url=ws://localhost:8080 - URL сервиса диагностики (по умолчанию ws://localhost:8080)
-void main(List<String> args) async {
+void main() async {
   // Парсим аргументы
-  final host = _parseArg(args, 'host', 'localhost');
-  final port = int.tryParse(_parseArg(args, 'port', '8888')) ?? 8888;
-  final diagnosticUrl = _parseArg(args, 'diagnostic-url', 'ws://localhost:8080');
+  final host = '0.0.0.0';
+  final port = 31000;
+  final diagnosticUrl = 'ws://192.168.1.118:30000';
 
   // Создаем клиент диагностики
   final clientId = 'demo_server';
@@ -35,11 +30,6 @@ void main(List<String> args) async {
     clientIdentity: RpcClientIdentity(
       clientId: clientId,
       traceId: traceId,
-      properties: {
-        'server_url': diagnosticUrl,
-        'type': 'server',
-        'version': '1.0.0',
-      },
     ),
   ));
 
@@ -152,14 +142,4 @@ final class DemoServer extends DemoServiceContract {
     // Создаем и возвращаем двунаправленный стрим
     return generator.create();
   }
-}
-
-/// Парсит аргумент из командной строки
-String _parseArg(List<String> args, String name, String defaultValue) {
-  for (final arg in args) {
-    if (arg.startsWith('--$name=')) {
-      return arg.substring(arg.indexOf('=') + 1);
-    }
-  }
-  return defaultValue;
 }
