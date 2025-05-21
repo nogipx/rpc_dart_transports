@@ -14,13 +14,16 @@ class IsolateRpcExample {
     final receivePort = ReceivePort();
 
     // Запускаем серверный изолят
-    await Isolate.spawn(
+    final serverIsolate = await Isolate.spawn(
       _startServerIsolate,
       receivePort.sendPort,
     );
 
     // Ждем ответа от сервера с транспортом
-    final serverTransport = await receivePort.first as SendPort;
+    final serverTransport = await receivePort.firstWhere(
+      (message) => message is SendPort,
+      orElse: () => throw Exception('Не удалось получить транспорт от сервера'),
+    ) as SendPort;
 
     // Создаем клиентский транспорт
     final clientTransport = IsolateTransport(serverTransport);
@@ -58,6 +61,7 @@ class IsolateRpcExample {
 
     await subscription.cancel();
     await client.close();
+    serverIsolate.kill();
 
     // Завершаем работу
     print('Клиент завершил работу');

@@ -1,4 +1,4 @@
-part of '_index.dart';
+part of '../_index.dart';
 
 /// Интерфейс для кодирования и декодирования сообщений.
 ///
@@ -23,12 +23,12 @@ abstract class IRpcSerializer<T> {
 ///
 /// Представляет различные типы сообщений, которые могут передаваться
 /// через транспортный уровень, включая метаданные и полезную нагрузку.
-class RpcTransportMessage<T> {
+final class RpcTransportMessage<T> {
   /// Полезная нагрузка сообщения (данные)
   final T? payload;
 
   /// Связанные метаданные
-  final Metadata? metadata;
+  final RpcMetadata? metadata;
 
   /// Флаг, указывающий, что это последнее сообщение в потоке
   final bool isEndOfStream;
@@ -59,7 +59,7 @@ abstract class IRpcTransport {
   ///
   /// [metadata] Метаданные для отправки
   /// [endStream] Флаг завершения потока данных
-  Future<void> sendMetadata(Metadata metadata, {bool endStream = false});
+  Future<void> sendMetadata(RpcMetadata metadata, {bool endStream = false});
 
   /// Отправляет сообщение через транспортный уровень.
   ///

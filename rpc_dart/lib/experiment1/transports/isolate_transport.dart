@@ -1,4 +1,4 @@
-part of '_index.dart';
+part of '../_index.dart';
 
 /// Сообщение, передаваемое между изолятами.
 ///
@@ -31,7 +31,7 @@ class IsolateMessage {
   });
 
   /// Фабричный метод для создания сообщения с метаданными
-  static IsolateMessage metadata(List<Header> headers,
+  static IsolateMessage metadata(List<RpcHeader> headers,
       {bool isEndOfStream = false}) {
     return IsolateMessage(
       type: 'metadata',
@@ -111,12 +111,12 @@ class IsolateTransport implements IRpcTransport {
 
       if (type == 'metadata') {
         final metadataEntries = (data['metadataEntries'] as List?)
-            ?.map((entry) => Header(entry['name'], entry['value']))
+            ?.map((entry) => RpcHeader(entry['name'], entry['value']))
             .toList();
 
         if (metadataEntries != null) {
           _messageController.add(RpcTransportMessage<Uint8List>(
-            metadata: Metadata(metadataEntries),
+            metadata: RpcMetadata(metadataEntries),
             isEndOfStream: isEndOfStream,
           ));
         }
@@ -142,7 +142,8 @@ class IsolateTransport implements IRpcTransport {
       _messageController.stream;
 
   @override
-  Future<void> sendMetadata(Metadata metadata, {bool endStream = false}) async {
+  Future<void> sendMetadata(RpcMetadata metadata,
+      {bool endStream = false}) async {
     if (_sendingFinished) return;
 
     _sendPort.send(IsolateMessage.metadata(

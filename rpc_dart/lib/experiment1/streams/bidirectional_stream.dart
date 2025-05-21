@@ -1,4 +1,4 @@
-part of '_index.dart';
+part of '../_index.dart';
 
 /// Клиентская реализация двунаправленного стрима gRPC.
 ///
@@ -26,8 +26,8 @@ final class BidirectionalStreamClient<TRequest, TResponse> {
       StreamController<TRequest>();
 
   /// Контроллер потока входящих ответов
-  final StreamController<GrpcMessage<TResponse>> _responseController =
-      StreamController<GrpcMessage<TResponse>>();
+  final StreamController<RpcMessage<TResponse>> _responseController =
+      StreamController<RpcMessage<TResponse>>();
 
   /// Парсер для обработки фрагментированных сообщений
   final RpcMessageParser _parser = RpcMessageParser();
@@ -44,7 +44,7 @@ final class BidirectionalStreamClient<TRequest, TResponse> {
   ///
   /// Поток завершается при получении трейлера с END_STREAM
   /// или при возникновении ошибки.
-  Stream<GrpcMessage<TResponse>> get responses => _responseController.stream;
+  Stream<RpcMessage<TResponse>> get responses => _responseController.stream;
 
   /// Создает новый клиентский двунаправленный стрим.
   ///
@@ -104,7 +104,7 @@ final class BidirectionalStreamClient<TRequest, TResponse> {
           }
 
           // Передаем метаданные в поток ответов
-          _responseController.add(GrpcMessage<TResponse>(
+          _responseController.add(RpcMessage<TResponse>(
             metadata: message.metadata,
             isMetadataOnly: true,
             isEndOfStream: message.isEndOfStream,
@@ -116,7 +116,7 @@ final class BidirectionalStreamClient<TRequest, TResponse> {
 
           for (var msgBytes in messages) {
             final response = _responseSerializer.deserialize(msgBytes);
-            _responseController.add(GrpcMessage.withPayload(response));
+            _responseController.add(RpcMessage.withPayload(response));
           }
         }
       },
@@ -232,7 +232,7 @@ final class BidirectionalStreamServer<TRequest, TResponse> {
   /// 3. Настраивает обработку входящих сообщений от клиента
   void _setupStreams() async {
     // Отправляем начальные заголовки
-    final initialHeaders = Metadata.forServerInitialResponse();
+    final initialHeaders = RpcMetadata.forServerInitialResponse();
     await _transport.sendMetadata(initialHeaders);
     _headersSent = true;
 
@@ -245,7 +245,7 @@ final class BidirectionalStreamServer<TRequest, TResponse> {
       },
       onDone: () async {
         // Отправляем трейлер при завершении отправки ответов
-        final trailers = Metadata.forTrailer(GrpcStatus.OK);
+        final trailers = RpcMetadata.forTrailer(GrpcStatus.OK);
         await _transport.sendMetadata(trailers, endStream: true);
       },
     );
@@ -308,7 +308,7 @@ final class BidirectionalStreamServer<TRequest, TResponse> {
       _responseController.close();
     }
 
-    final trailers = Metadata.forTrailer(statusCode, message: message);
+    final trailers = RpcMetadata.forTrailer(statusCode, message: message);
     await _transport.sendMetadata(trailers, endStream: true);
   }
 
