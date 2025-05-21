@@ -91,27 +91,86 @@ final class BidiStreamGenerator<Request extends IRpcSerializableMessage,
   /// Создает BidiStream из текущего генератора и начального стрима запросов
   BidiStream<Request, Response> create([Stream<Request>? initialRequests]) {
     // Создаем контроллер для запросов
-    final requestController = StreamController<Request>();
+    final requestController = StreamController<Request>.broadcast();
+    final logger = RpcLogger('BidiStreamGenerator');
+
+    logger.debug(
+        'ДИАГНОСТИКА: создание BidiStream, initialRequests: ${initialRequests != null}');
 
     // Если есть начальные запросы, перенаправляем их в контроллер
     if (initialRequests != null) {
+      logger.debug('ДИАГНОСТИКА: подписка на initialRequests');
       initialRequests.listen(
-        (request) => requestController.add(request),
-        onError: (error) => requestController.addError(error),
-        onDone:
-            () {}, // Не закрываем контроллер, так как через него можно будет отправлять запросы позже
+        (request) {
+          logger.debug('ДИАГНОСТИКА: получен initialRequest: $request');
+          requestController.add(request);
+        },
+        onError: (error) {
+          logger.error('ДИАГНОСТИКА: ошибка в initialRequests: $error');
+          requestController.addError(error);
+        },
+        onDone: () {
+          logger.debug(
+              'ДИАГНОСТИКА: initialRequests завершен, но контроллер остается открытым');
+        },
       );
     }
 
+    // Перехватываем сообщения от клиента для логирования
+    // и обеспечиваем правильное преобразование типов
+    final trackedStream = requestController.stream
+        .asBroadcastStream()
+        .asyncMap<Request>((dynamic request) async {
+      logger.debug(
+          'ДИАГНОСТИКА: получен запрос: $request, тип: ${request.runtimeType}');
+
+      // Если у нас карта, нужно ее преобразовать в запрос
+      if (request is Map<String, dynamic>) {
+        logger.debug('ДИАГНОСТИКА: преобразование Map в Request: $request');
+        try {
+          // Предполагаем, что генерик Request имеет метод fromJson
+          // либо преобразование типа
+          if (request.containsKey('v') && Request == RpcString) {
+            logger.debug('ДИАГНОСТИКА: создание RpcString из ${request['v']}');
+            return RpcString(request['v']) as Request;
+          }
+          final typedRequest = request as Request;
+          logger.debug('ДИАГНОСТИКА: преобразовано в Request: $typedRequest');
+          return typedRequest;
+        } catch (e, stackTrace) {
+          logger.error('ДИАГНОСТИКА: ошибка преобразования запроса: $e',
+              error: e, stackTrace: stackTrace);
+          // Если не удалось преобразовать, возвращаем как есть
+          return request as Request;
+        }
+      }
+
+      return request as Request;
+    });
+
     // Генерируем ответы с помощью переданного генератора
-    final responseStream = _generator(requestController.stream);
+    logger.debug('ДИАГНОСТИКА: запуск функции-генератора с trackedStream');
+    final responseStream = _generator(trackedStream).asyncMap((response) {
+      logger.debug(
+          'ДИАГНОСТИКА: ПОЛУЧЕН ОТВЕТ ОТ ГЕНЕРАТОРА: $response, тип: ${response.runtimeType}');
+      return response;
+    });
+    logger.debug(
+        'ДИАГНОСТИКА: функция-генератор запущена, получен responseStream');
 
     // Создаем BidiStream
+    logger
+        .debug('ДИАГНОСТИКА: создание экземпляра BidiStream с responseStream');
     return BidiStream<Request, Response>(
       responseStream: responseStream,
       sendFunction: (request) {
         if (!requestController.isClosed) {
+          logger.debug(
+              'ДИАГНОСТИКА: отправка запроса через BidiStream: $request');
           requestController.add(request);
+        } else {
+          logger.error(
+              'ДИАГНОСТИКА: попытка отправить запрос в закрытый контроллер: $request');
         }
       },
       finishTransferFunction: () async {
@@ -124,22 +183,26 @@ final class BidiStreamGenerator<Request extends IRpcSerializableMessage,
             // это должно быть реализовано на уровне выше (в ClientStreamingRpcMethod)
 
             // Просто закрываем контроллер
+            logger.debug(
+                'ДИАГНОСТИКА: закрытие контроллера в finishTransferFunction');
             await requestController.close();
 
             // Логируем для отладки
-            RpcLogger('BidiStreamGenerator')
-                .debug('Контроллер запросов закрыт в finishTransferFunction');
-          } catch (e) {
+            logger.debug(
+                'ДИАГНОСТИКА: контроллер запросов закрыт в finishTransferFunction');
+          } catch (e, stackTrace) {
             // Если произошла ошибка при закрытии, логируем ее
-            RpcLogger('BidiStreamGenerator').error(
-              'Ошибка при завершении потока передачи: $e',
+            logger.error(
+              'ДИАГНОСТИКА: ошибка при завершении потока передачи: $e',
               error: e,
+              stackTrace: stackTrace,
             );
           }
         }
       },
       closeFunction: () async {
         if (!requestController.isClosed) {
+          logger.debug('ДИАГНОСТИКА: закрытие контроллера в closeFunction');
           await requestController.close();
         }
       },

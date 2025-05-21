@@ -153,7 +153,7 @@ final class _RpcEngineImpl implements IRpcEngine {
     return completer.future;
   }
 
-  /// Открывает поток данных от удаленной стороны
+  /// Открывает поток для обмена данными с удаленной стороной
   ///
   /// [serviceName] - имя сервиса
   /// [methodName] - имя метода
@@ -173,8 +173,21 @@ final class _RpcEngineImpl implements IRpcEngine {
     // Используем переданный streamId или генерируем новый
     final actualStreamId = streamId ?? generateUniqueId('stream');
 
+    // Создаем logger для отладки
+    final logger = RpcLogger('RpcEngine.openStream');
+    logger
+        .debug('Открытие потока $actualStreamId для $serviceName.$methodName');
+
     // Получаем или создаем поток
     final stream = _streamManager.getOrCreateStream(actualStreamId);
+
+    // Если стрим уже существует, убедимся что контроллер не закрыт
+    if (!_streamManager.hasStream(actualStreamId)) {
+      logger.debug('Контроллер для $actualStreamId не найден, создаем новый');
+      _streamManager.getOrCreateStream(actualStreamId);
+    } else {
+      logger.debug('Контроллер для $actualStreamId уже существует');
+    }
 
     // Проверяем, является ли запрос маркером инициализации стрима
     final isClientStreamInit = RpcMarkerHandler.isServiceMarker(request) &&
@@ -188,6 +201,12 @@ final class _RpcEngineImpl implements IRpcEngine {
                 request['_markerType'] == RpcMarkerType.bidirectional.name ||
             request is RpcBidirectionalStreamingMarker);
 
+    // Для bidirectional и client streaming маркеров мы отдельно регистрируем контроллер
+    if (isClientStreamInit || isBidirectionalInit) {
+      logger.debug(
+          'Обнаружен маркер инициализации стрима: ${isClientStreamInit ? 'клиентский' : 'двунаправленный'}');
+    }
+
     final message = RpcMessage(
       type: RpcMessageType.request,
       messageId: actualStreamId,
@@ -199,14 +218,6 @@ final class _RpcEngineImpl implements IRpcEngine {
     );
 
     _sendMessage(message);
-
-    // Если это инициализация стрима, логируем это для отладки
-    if (isClientStreamInit) {
-      _logger.debug('Инициализация клиентского стрима с ID: $actualStreamId');
-    } else if (isBidirectionalInit) {
-      _logger
-          .debug('Инициализация двунаправленного стрима с ID: $actualStreamId');
-    }
 
     return stream;
   }

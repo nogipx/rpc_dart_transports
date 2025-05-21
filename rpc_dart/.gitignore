@@ -5,9 +5,7 @@ build/
 pubspec.lock
 **/examples
 
-coverage/html/
-coverage/test/
-coverage/coverage.json
+coverage/
 
 *.bin
 *.pem

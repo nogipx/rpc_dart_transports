@@ -154,6 +154,71 @@ final class _RequestMessageHandler implements _IMessageHandler {
             debugLabel: _engine.debugLabel,
           ),
         );
+      }
+      // Проверяем, является ли результат ClientStreamingBidiStream
+      else if (result is ClientStreamingBidiStream) {
+        _logger.debug(
+            'Обнаружен ClientStreamingBidiStream, настраиваем обработку данных');
+
+        // Для ClientStreamingBidiStream не нужно подписываться на стрим,
+        // так как он уже имеет внутренний механизм обработки.
+        // Просто отправляем пустой ответ, чтобы подтвердить инициализацию стрима.
+        await _engine._sendMessage(
+          RpcMessage(
+            type: RpcMessageType.response,
+            messageId: message.messageId,
+            payload: 'Stream started',
+            headerMetadata: finalContext.headerMetadata,
+            trailerMetadata: finalContext.trailerMetadata,
+            debugLabel: _engine.debugLabel,
+          ),
+        );
+      }
+      // Проверяем, является ли результат BidiStream
+      else if (result is BidiStream) {
+        _logger.debug('Обнаружен BidiStream, настраиваем обработку данных');
+
+        // Устанавливаем обработчик для данных из стрима
+        result.listen(
+          (data) async {
+            // Отправляем каждый элемент как streamData
+            await _engine.sendStreamData(
+              streamId: message.messageId,
+              data: data,
+              serviceName: serviceName,
+              methodName: methodName,
+            );
+          },
+          onError: (error) async {
+            // При ошибке отправляем сообщение об ошибке
+            await _engine.sendStreamError(
+              streamId: message.messageId,
+              errorMessage: error.toString(),
+              serviceName: serviceName,
+              methodName: methodName,
+            );
+          },
+          onDone: () async {
+            // При завершении закрываем поток
+            await _engine.closeStream(
+              streamId: message.messageId,
+              serviceName: serviceName,
+              methodName: methodName,
+            );
+          },
+        );
+
+        // Отправляем пустой ответ, стримы будут обрабатываться отдельно
+        await _engine._sendMessage(
+          RpcMessage(
+            type: RpcMessageType.response,
+            messageId: message.messageId,
+            payload: 'Stream started',
+            headerMetadata: finalContext.headerMetadata,
+            trailerMetadata: finalContext.trailerMetadata,
+            debugLabel: _engine.debugLabel,
+          ),
+        );
       } else {
         // Отправляем обычный ответ
         await _engine._sendMessage(
@@ -187,53 +252,219 @@ final class _RequestMessageHandler implements _IMessageHandler {
   Future<dynamic> _callMethodHandler(MethodRegistration methodHandler,
       IRpcContext updatedRequestContext) async {
     final handler = methodHandler.getHandler();
+    _logger.debug(
+        'ДИАГНОСТИКА: _callMethodHandler: Вызов обработчика ${methodHandler.methodName}, тип метода: ${methodHandler.methodType}');
 
     try {
-      // Если запрос был получен в RpcMessage, пробуем сначала извлечь payload для типизированного обработчика
-      if (updatedRequestContext is RpcMessage &&
-          updatedRequestContext.payload != null &&
-          methodHandler.argumentParser != null) {
-        try {
-          final typedRequest =
-              methodHandler.argumentParser!(updatedRequestContext.payload);
-          return await handler(typedRequest);
-        } catch (e) {
-          // Если это не сработало, пробуем вызвать как функцию с контекстом
-          return await handler(updatedRequestContext);
+      // Проверяем, является ли контекст RpcMessage
+      if (updatedRequestContext is RpcMessage) {
+        final payload = updatedRequestContext.payload;
+        _logger.debug(
+            'ДИАГНОСТИКА: _callMethodHandler: Контекст является RpcMessage, payload: $payload');
+
+        // Проверяем, является ли payload маркером двунаправленного стрима
+        if (payload is Map<String, dynamic> &&
+            payload['_bidirectional'] == true &&
+            methodHandler.methodType == RpcMethodType.bidirectional) {
+          // Это маркер инициализации двунаправленного стрима
+          _logger.debug(
+              'ДИАГНОСТИКА: _callMethodHandler: Обнаружен маркер двунаправленного стриминга, вызываем invokeBidirectional');
+
+          // Важно: убедимся, что у нас есть контроллер для этого стрима
+          if (payload['_streamId'] != null) {
+            final streamId = payload['_streamId'] as String;
+            _logger.debug(
+                'ДИАГНОСТИКА: _callMethodHandler: Проверяем наличие контроллера для стрима $streamId');
+
+            if (!_engine._streamManager.hasStream(streamId)) {
+              _logger.debug(
+                  'ДИАГНОСТИКА: _callMethodHandler: Создаем контроллер для двунаправленного стрима: $streamId');
+              _engine._streamManager.getOrCreateStream(streamId);
+            } else {
+              _logger.debug(
+                  'ДИАГНОСТИКА: _callMethodHandler: Контроллер для стрима $streamId уже существует');
+            }
+          }
+
+          try {
+            final result = methodHandler.invokeBidirectional();
+            _logger.debug(
+                'ДИАГНОСТИКА: _callMethodHandler: invokeBidirectional успешно вызван, результат: ${result.runtimeType}');
+            return result;
+          } catch (e) {
+            _logger.error(
+                'ДИАГНОСТИКА: _callMethodHandler: Ошибка при вызове invokeBidirectional: $e');
+            rethrow;
+          }
+        }
+
+        // Если это обычное сообщение для двунаправленного стрима, перенаправляем его в контроллер
+        if (methodHandler.methodType == RpcMethodType.bidirectional &&
+            updatedRequestContext is RpcMessage &&
+            updatedRequestContext.messageId != null) {
+          _logger.debug(
+              'ДИАГНОСТИКА: _callMethodHandler: Перенаправляем обычное сообщение в двунаправленный стрим: ${updatedRequestContext.messageId}');
+
+          // Проверяем наличие контроллера для этого стрима
+          final streamId = updatedRequestContext.messageId;
+          if (_engine._streamManager.hasStream(streamId)) {
+            _logger.debug(
+                'ДИАГНОСТИКА: _callMethodHandler: Найден контроллер для стрима: $streamId');
+
+            // Получаем контроллер и отправляем сообщение
+            final controller =
+                _engine._streamManager.getStreamController(streamId);
+            if (controller != null && !controller.isClosed) {
+              _logger.debug(
+                  'ДИАГНОСТИКА: _callMethodHandler: Добавляем данные в контроллер: $payload');
+              controller.add(payload);
+
+              // Возвращаем пустой результат, так как данные были обработаны
+              _logger.debug(
+                  'ДИАГНОСТИКА: _callMethodHandler: Сообщение успешно перенаправлено в стрим');
+              return null;
+            } else {
+              _logger.error(
+                  'ДИАГНОСТИКА: _callMethodHandler: Контроллер для стрима $streamId закрыт или null');
+            }
+          } else {
+            // Не удалось найти контроллер, что странно - логируем и продолжаем стандартную обработку
+            _logger.error(
+                'ДИАГНОСТИКА: _callMethodHandler: Не найден контроллер для стрима: $streamId');
+          }
+        }
+
+        // Проверяем, является ли payload маркером клиентского стрима
+        if (payload is Map<String, dynamic> &&
+            payload['_clientStreaming'] == true &&
+            methodHandler.methodType == RpcMethodType.clientStreaming) {
+          // Это маркер инициализации клиентского стрима
+          _logger.debug(
+              'ДИАГНОСТИКА: _callMethodHandler: Обнаружен маркер клиентского стриминга, вызываем invokeClientStreaming');
+
+          // Важно: убедимся, что у нас есть контроллер для этого стрима
+          if (payload['_streamId'] != null) {
+            final streamId = payload['_streamId'] as String;
+            _logger.debug(
+                'ДИАГНОСТИКА: _callMethodHandler: Проверяем наличие контроллера для стрима $streamId');
+
+            if (!_engine._streamManager.hasStream(streamId)) {
+              _logger.debug(
+                  'ДИАГНОСТИКА: _callMethodHandler: Создаем контроллер для клиентского стрима: $streamId');
+              _engine._streamManager.getOrCreateStream(streamId);
+            } else {
+              _logger.debug(
+                  'ДИАГНОСТИКА: _callMethodHandler: Контроллер для стрима $streamId уже существует');
+            }
+          }
+
+          try {
+            final result = methodHandler.invokeClientStreaming();
+            _logger.debug(
+                'ДИАГНОСТИКА: _callMethodHandler: invokeClientStreaming успешно вызван, результат: ${result.runtimeType}');
+            return result;
+          } catch (e) {
+            _logger.error(
+                'ДИАГНОСТИКА: _callMethodHandler: Ошибка при вызове invokeClientStreaming: $e');
+            rethrow;
+          }
+        }
+
+        // Если запрос был получен в RpcMessage, пробуем сначала извлечь payload для типизированного обработчика
+        if (payload != null && methodHandler.argumentParser != null) {
+          try {
+            _logger.debug(
+                'ДИАГНОСТИКА: _callMethodHandler: Попытка парсинга типизированного запроса');
+            final typedRequest = methodHandler.argumentParser!(payload);
+            _logger.debug(
+                'ДИАГНОСТИКА: _callMethodHandler: Запрос успешно приведен к типу: ${typedRequest.runtimeType}');
+            final result = await handler(typedRequest);
+            _logger.debug(
+                'ДИАГНОСТИКА: _callMethodHandler: Вызов обработчика с типизированным запросом успешен, результат: ${result?.runtimeType}');
+            return result;
+          } catch (e) {
+            // Если это не сработало, пробуем вызвать как функцию с контекстом
+            _logger.debug(
+                'ДИАГНОСТИКА: _callMethodHandler: Ошибка типизированного вызова: $e, пробуем с контекстом');
+            final result = await handler(updatedRequestContext);
+            _logger.debug(
+                'ДИАГНОСТИКА: _callMethodHandler: Вызов с контекстом успешен, результат: ${result?.runtimeType}');
+            return result;
+          }
+        } else {
+          // Стандартный случай - пробуем вызвать с контекстом
+          _logger.debug(
+              'ДИАГНОСТИКА: _callMethodHandler: Вызов обработчика со стандартным контекстом');
+          final result = await handler(updatedRequestContext);
+          _logger.debug(
+              'ДИАГНОСТИКА: _callMethodHandler: Вызов со стандартным контекстом успешен, результат: ${result?.runtimeType}');
+          return result;
         }
       } else {
         // Стандартный случай - пробуем вызвать с контекстом
-        return await handler(updatedRequestContext);
+        _logger.debug(
+            'ДИАГНОСТИКА: _callMethodHandler: Вызов обработчика с нестандартным контекстом типа: ${updatedRequestContext.runtimeType}');
+        final result = await handler(updatedRequestContext);
+        _logger.debug(
+            'ДИАГНОСТИКА: _callMethodHandler: Вызов с нестандартным контекстом успешен, результат: ${result?.runtimeType}');
+        return result;
       }
-    } catch (e) {
+    } catch (e, stack) {
+      _logger.error(
+          'ДИАГНОСТИКА: _callMethodHandler: Ошибка при вызове обработчика: $e',
+          error: e,
+          stackTrace: stack);
       if (e is NoSuchMethodError &&
           e.toString().contains('mismatched arguments')) {
         // Если это ошибка несовпадения аргументов, пробуем вызвать без аргументов
+        _logger.debug(
+            'ДИАГНОСТИКА: _callMethodHandler: Обнаружена ошибка несовпадения аргументов, пробуем вызвать без аргументов');
         try {
-          return await handler();
-        } catch (innerE) {
+          final result = await handler();
+          _logger.debug(
+              'ДИАГНОСТИКА: _callMethodHandler: Вызов без аргументов успешен, результат: ${result?.runtimeType}');
+          return result;
+        } catch (innerE, innerStack) {
+          _logger.error(
+              'ДИАГНОСТИКА: _callMethodHandler: Ошибка при вызове без аргументов: $innerE',
+              error: innerE,
+              stackTrace: innerStack);
           if (innerE is TypeError &&
               methodHandler.argumentParser != null &&
               updatedRequestContext.payload != null) {
             // Если это ошибка типа, пробуем распарсить запрос и передать его напрямую
+            _logger.debug(
+                'ДИАГНОСТИКА: _callMethodHandler: Обнаружена ошибка типа, пробуем парсинг запроса');
             try {
               final typedRequest =
                   methodHandler.argumentParser!(updatedRequestContext.payload);
-              return await handler(typedRequest);
+              _logger.debug(
+                  'ДИАГНОСТИКА: _callMethodHandler: Парсинг запроса успешен: ${typedRequest.runtimeType}');
+              final result = await handler(typedRequest);
+              _logger.debug(
+                  'ДИАГНОСТИКА: _callMethodHandler: Вызов с типизированным запросом успешен, результат: ${result?.runtimeType}');
+              return result;
             } catch (parsingE, parsingStackTrace) {
-              _logger.error('Ошибка при парсинге запроса: $parsingE',
-                  error: parsingE, stackTrace: parsingStackTrace);
+              _logger.error(
+                  'ДИАГНОСТИКА: _callMethodHandler: Ошибка при парсинге запроса: $parsingE',
+                  error: parsingE,
+                  stackTrace: parsingStackTrace);
               rethrow;
             }
           } else {
             _logger.error(
-                'Ошибка при вызове обработчика без аргументов: $innerE',
-                error: innerE);
+                'ДИАГНОСТИКА: _callMethodHandler: Ошибка при вызове обработчика без аргументов: $innerE',
+                error: innerE,
+                stackTrace: innerStack);
             rethrow;
           }
         }
       } else {
         // Если это другая ошибка, пробрасываем её
+        _logger.error(
+            'ДИАГНОСТИКА: _callMethodHandler: Пробрасываем ошибку: $e',
+            error: e,
+            stackTrace: stack);
         rethrow;
       }
     }
@@ -357,241 +588,191 @@ final class _StreamDataMessageHandler implements _IMessageHandler {
     final controller =
         _engine._streamManager.getStreamController(message.messageId);
     if (controller == null || controller.isClosed) {
+      _logger.debug(
+          'StreamData: Контроллер для ${message.messageId} не найден или закрыт');
+
+      // Попробуем создать контроллер, если его нет
+      if (message.serviceName != null && message.methodName != null) {
+        _logger.debug(
+            'StreamData: Пытаемся создать новый контроллер для ${message.messageId}');
+        final newController = StreamController<dynamic>.broadcast();
+        _engine._streamManager._streamControllers[message.messageId] =
+            newController;
+        // Продолжаем с новым контроллером
+        await _processStreamDataMessage(message, newController);
+      }
+
       return; // Нет активного контроллера для этого потока
     }
+
+    await _processStreamDataMessage(message, controller);
+  }
+
+  /// Обрабатывает сообщение streamData с переданным контроллером
+  Future<void> _processStreamDataMessage(
+      RpcMessage message, StreamController<dynamic> controller) async {
+    _logger.debug(
+        'StreamData: Получено сообщение типа ${message.type} для стрима ${message.messageId}');
+    _logger.debug(
+        'StreamData: Payload=${message.payload}, metadata=${message.headerMetadata}');
 
     // Обработка пустых данных для совместимости с MsgPack
     dynamic payload = message.payload;
     if (RpcServiceMarker.checkIsEmptyServiceMessage(payload)) {
+      _logger.debug('StreamData: Пустые данные, заменяем на пустой объект');
       payload = {};
     }
 
     // Проверяем, является ли сообщение служебным маркером
     if (RpcServiceMarker.checkIsServiceMessage(payload)) {
+      _logger.debug(
+          'StreamData: Обнаружен служебный маркер в payload типа: ${payload.runtimeType}');
       await _handleMarker(message, controller, payload);
       return; // Завершаем обработку после маркера
     }
 
+    _logger.debug('StreamData: Перенаправляем данные в стрим: $payload');
+
     // Если известны имена сервиса и метода, применяем middleware
     if (message.serviceName != null && message.methodName != null) {
-      _engine._middlewareExecutor
-          .executeStreamData(
-        message.serviceName!,
-        message.methodName!,
-        payload,
-        message.messageId,
-        RpcDataDirection.fromRemote, // Данные получены от удаленной стороны
-      )
-          .then((processedData) {
+      _logger.debug(
+          'StreamData: Вызов middleware для ${message.serviceName}.${message.methodName}');
+      try {
+        final processedData =
+            await _engine._middlewareExecutor.executeStreamData(
+          message.serviceName!,
+          message.methodName!,
+          payload,
+          message.messageId,
+          RpcDataDirection.fromRemote, // Данные получены от удаленной стороны
+        );
+
+        _logger.debug(
+            'StreamData: Middleware применен успешно, результат: $processedData');
+        _logger.debug(
+            'StreamData: Добавляем данные в контроллер ${message.messageId}');
         controller.add(processedData);
-      }).catchError((error) {
-        controller.addError(error);
-      });
+      } catch (error, stackTrace) {
+        _logger.error('StreamData: Ошибка в middleware: $error',
+            error: error, stackTrace: stackTrace);
+        controller.addError(error, stackTrace);
+      }
     } else {
+      _logger.debug(
+          'StreamData: Не указаны serviceName/methodName, отправляем данные напрямую');
       controller.add(payload);
     }
   }
 
-  /// Обрабатывает служебные маркеры в потоке данных
-  Future<void> _handleMarker(RpcMessage message,
-      StreamController<dynamic> controller, dynamic payload) async {
-    try {
-      // Создаем локальный обработчик маркеров, который замыкает текущее сообщение
-      final localMarkerHandler = RpcMarkerHandler(
-        // Обработчик маркера завершения клиентского стрима
-        onClientStreamEnd: (marker) {
-          if (message.serviceName != null && message.methodName != null) {
-            // Если известны имена сервиса и метода, применяем middleware
-            _engine._middlewareExecutor
-                .executeStreamEnd(
-              message.serviceName!,
-              message.methodName!,
-              message.messageId,
-            )
-                .then((_) {
-              // Добавляем специальное сообщение для клиентского кода
-              controller.add(marker.toJson());
-            }).catchError((error) {
-              controller.addError(error);
-            });
-          } else {
-            controller.add(marker.toJson());
+  /// Обрабатывает маркеры в потоке данных
+  Future<void> _handleMarker(
+    RpcMessage message,
+    StreamController<dynamic> controller,
+    dynamic payload,
+  ) async {
+    _logger.debug(
+        'ДИАГНОСТИКА: _handleMarker: Начало обработки маркера для ${message.messageId}');
+
+    // Проверяем тип маркера
+    if (payload is Map<String, dynamic>) {
+      _logger.debug('ДИАГНОСТИКА: _handleMarker: Содержимое маркера: $payload');
+
+      // Если есть ключ _markerType, выводим его
+      if (payload.containsKey('_markerType')) {
+        _logger.debug(
+            'ДИАГНОСТИКА: _handleMarker: Тип маркера: ${payload['_markerType']}');
+      }
+
+      // Обработка маркера завершения потока
+      if (payload['_endOfStream'] == true) {
+        _logger.debug(
+            'ДИАГНОСТИКА: _handleMarker: Обработка маркера завершения стрима ${message.messageId}');
+        // Закрываем контроллер, если еще не закрыт
+        if (!controller.isClosed) {
+          _logger.debug(
+              'ДИАГНОСТИКА: _handleMarker: Закрываем контроллер ${message.messageId}');
+          await controller.close();
+          _logger.debug(
+              'ДИАГНОСТИКА: _handleMarker: Контроллер ${message.messageId} закрыт');
+        } else {
+          _logger.debug(
+              'ДИАГНОСТИКА: _handleMarker: Контроллер ${message.messageId} уже был закрыт');
+        }
+        // Удаляем контроллер из менеджера
+        _logger.debug(
+            'ДИАГНОСТИКА: _handleMarker: Удаляем контроллер ${message.messageId} из менеджера');
+        _engine._streamManager.removeStreamController(message.messageId);
+        _logger.debug(
+            'ДИАГНОСТИКА: _handleMarker: Контроллер ${message.messageId} удален');
+        return;
+      }
+
+      // Обработка маркера ошибки
+      if (payload['_error'] != null) {
+        _logger.debug(
+            'ДИАГНОСТИКА: _handleMarker: Обработка маркера ошибки для ${message.messageId}');
+        final errorMessage = payload['_error'];
+        final errorDetails = payload['_errorDetails'];
+        _logger.debug(
+            'ДИАГНОСТИКА: _handleMarker: Сообщение ошибки: $errorMessage, детали: $errorDetails');
+
+        // Исправляем создание RpcException согласно API класса
+        // Используем строку ошибки напрямую вместо создания объекта
+        final error =
+            'RPC Error: $errorMessage ${errorDetails != null ? "(details: $errorDetails)" : ""}';
+        // Добавляем ошибку в контроллер, если он еще не закрыт
+        if (!controller.isClosed) {
+          _logger.debug(
+              'ДИАГНОСТИКА: _handleMarker: Добавляем ошибку в контроллер ${message.messageId}');
+          controller.addError(error);
+          _logger.debug(
+              'ДИАГНОСТИКА: _handleMarker: Ошибка добавлена в контроллер ${message.messageId}');
+        } else {
+          _logger.debug(
+              'ДИАГНОСТИКА: _handleMarker: Контроллер ${message.messageId} закрыт, ошибка игнорируется');
+        }
+        return;
+      }
+
+      // Проверка на маркер статуса, эти тоже нужно обрабатывать
+      if (payload['_markerType'] == 'status') {
+        _logger.debug(
+            'ДИАГНОСТИКА: _handleMarker: Обработка маркера статуса для ${message.messageId}');
+        final statusCode = payload['code'];
+        final statusMessage = payload['message'];
+        _logger.debug(
+            'ДИАГНОСТИКА: _handleMarker: Код статуса: $statusCode, сообщение: $statusMessage');
+
+        // Если статус не OK, добавляем ошибку
+        if (statusCode != 0) {
+          _logger.debug(
+              'ДИАГНОСТИКА: _handleMarker: Статус не OK, добавляем ошибку в контроллер ${message.messageId}');
+          if (!controller.isClosed) {
+            controller.addError(
+                'RPC Status Error: $statusMessage (code: $statusCode)');
+            _logger.debug(
+                'ДИАГНОСТИКА: _handleMarker: Ошибка статуса добавлена в контроллер ${message.messageId}');
           }
-        },
+        } else {
+          _logger.debug(
+              'ДИАГНОСТИКА: _handleMarker: Статус OK, игнорируем для ${message.messageId}');
+        }
+        return;
+      }
 
-        // Обработчик маркера завершения серверного стрима
-        onServerStreamEnd: (marker) {
-          // Для маркера завершения серверного стрима мы просто доставляем его
-          controller.add(marker.toJson());
-        },
-
-        // Обработчик маркера пинга
-        onPing: (marker) {
-          // Создаем и отправляем ответный pong маркер
-          final pongMarker = RpcPongMarker(
-            originalTimestamp: marker.timestamp,
-          );
-
-          // Отправляем pong ответ
-          _engine._sendMessage(
-            RpcMessage(
-              type: RpcMessageType.pong,
-              messageId: message.messageId,
-              payload: pongMarker.toJson(),
-              headerMetadata: message.headerMetadata,
-              debugLabel: _engine.debugLabel,
-            ),
-          );
-        },
-
-        // Обработчик маркера понга
-        onPong: (marker) {
-          // Pong сообщения обрабатываются через _pendingRequests
-          final completer =
-              _engine._requestManager.getRequest(message.messageId);
-          if (completer != null && !completer.isCompleted) {
-            completer.complete(marker.toJson());
-          }
-        },
-
-        // Обработчик маркера статуса
-        onStatus: (marker) {
-          // Если это статус ошибки, доставляем как ошибку
-          if (marker.code != RpcStatusCode.ok) {
-            // Ищем ожидающий Completer
-            final completer =
-                _engine._requestManager.getAndRemoveRequest(message.messageId);
-            if (completer != null && !completer.isCompleted) {
-              // Завершаем с ошибкой
-              completer.completeError(
-                  'RPC Error [${marker.code.name}]: ${marker.message}');
-            }
-
-            // Если есть активный контроллер - добавляем ошибку
-            if (!controller.isClosed) {
-              controller.addError(
-                  'RPC Error [${marker.code.name}]: ${marker.message}');
-            }
-          } else {
-            // Если статус OK, считаем это нормальным сообщением
-            controller.add(marker.toJson());
-          }
-        },
-
-        // Обработчик маркера дедлайна
-        onDeadline: (marker) {
-          // Проверяем, не истек ли уже срок
-          if (marker.isExpired) {
-            // Если срок уже истек, немедленно отправляем статус об ошибке
-            _engine.sendStatus(
-              requestId: message.messageId,
-              statusCode: RpcStatusCode.deadlineExceeded,
-              message: 'Deadline already exceeded',
-              serviceName: message.serviceName,
-              methodName: message.methodName,
-            );
-
-            // И закрываем поток/операцию с ошибкой
-            final completer =
-                _engine._requestManager.getAndRemoveRequest(message.messageId);
-            if (completer != null && !completer.isCompleted) {
-              completer.completeError('Deadline exceeded');
-            }
-
-            if (!controller.isClosed) {
-              controller.addError('Deadline exceeded');
-              controller.close();
-            }
-          } else {
-            // Если срок еще не истек, устанавливаем таймер
-            Timer(marker.remaining, () {
-              // По истечении срока отправляем статус и закрываем операцию
-              _engine.sendStatus(
-                requestId: message.messageId,
-                statusCode: RpcStatusCode.deadlineExceeded,
-                message: 'Deadline exceeded',
-                serviceName: message.serviceName,
-                methodName: message.methodName,
-              );
-
-              final completer = _engine._requestManager
-                  .getAndRemoveRequest(message.messageId);
-              if (completer != null && !completer.isCompleted) {
-                completer.completeError('Deadline exceeded');
-              }
-
-              final streamController =
-                  _engine._streamManager.getStreamController(message.messageId);
-              if (streamController != null && !streamController.isClosed) {
-                streamController.addError('Deadline exceeded');
-                streamController.close();
-              }
-            });
-
-            // Пропускаем сообщение дальше
-            controller.add(marker.toJson());
-          }
-        },
-
-        // Обработчик маркера отмены
-        onCancel: (marker) {
-          // Проверяем, относится ли отмена к текущей операции или потоку
-          final operationToCancel = marker.operationId;
-
-          // Если отмена относится к текущей операции
-          if (operationToCancel == message.messageId) {
-            // Отправляем статус отмены
-            _engine.sendStatus(
-              requestId: message.messageId,
-              statusCode: RpcStatusCode.cancelled,
-              message: marker.reason ?? 'Operation cancelled',
-              serviceName: message.serviceName,
-              methodName: message.methodName,
-            );
-
-            // Завершаем операцию
-            final completer =
-                _engine._requestManager.getAndRemoveRequest(message.messageId);
-            if (completer != null && !completer.isCompleted) {
-              completer.completeError(marker.reason ?? 'Operation cancelled');
-            }
-
-            // Закрываем контроллер потока
-            if (!controller.isClosed) {
-              controller.addError(marker.reason ?? 'Operation cancelled');
-              controller.close();
-            }
-          } else {
-            // Если отмена относится к другой операции, просто пропускаем маркер дальше
-            controller.add(marker.toJson());
-          }
-        },
-
-        // Обработчики для других типов маркеров - просто передаем их дальше
-        onHeaders: (marker) => controller.add(marker.toJson()),
-        onTrailers: (marker) => controller.add(marker.toJson()),
-        onFlowControl: (marker) => controller.add(marker.toJson()),
-        onCompression: (marker) => controller.add(marker.toJson()),
-        onHealthCheck: (marker) => controller.add(marker.toJson()),
-        onClientStreamingInit: (marker) => controller.add(marker.toJson()),
-        onBidirectionalInit: (marker) => controller.add(marker.toJson()),
-        onChannelClosed: (marker) => controller.add(marker.toJson()),
-
-        // Универсальный обработчик для любых других типов маркеров
-        onAnyMarker:
-            null, // Не используем, так как у нас есть конкретные обработчики
-      );
-
-      // Используем статический метод для создания экземпляра маркера
-      final marker = RpcServiceMarker.fromJson(payload);
-
-      // Запускаем обработку маркера с помощью нашего локального обработчика
-      localMarkerHandler.handleMarker(marker);
-    } catch (e) {
-      // При ошибке парсинга маркера, логируем и продолжаем стандартную обработку
-      _logger.error('Ошибка при обработке маркера: $e');
-      controller.add(payload);
+      // Для других типов маркеров (инициализация и т.д.)
+      // Игнорируем их в потоке streamData, так как они уже были обработаны
+      _logger.debug(
+          'ДИАГНОСТИКА: _handleMarker: Игнорирование служебного маркера для ${message.messageId}');
+      return;
     }
+
+    // Если это не распознанный маркер, обрабатываем как обычные данные
+    _logger.debug(
+        'ДИАГНОСТИКА: _handleMarker: Необрабатываемый маркер, передаем как данные: $payload');
+    controller.add(payload);
+    _logger.debug(
+        'ДИАГНОСТИКА: _handleMarker: Данные добавлены в контроллер ${message.messageId}');
   }
 }
 
