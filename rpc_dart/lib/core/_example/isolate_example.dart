@@ -11,22 +11,16 @@ class IsolateRpcExample {
   /// двунаправленный стрим, используя транспорт на основе изолятов.
   static Future<void> run() async {
     // Создаем порт для получения транспорта от серверного изолята
-    final receivePort = ReceivePort();
+    final pair = IsolateTransportPair.create();
 
     // Запускаем серверный изолят
     final serverIsolate = await Isolate.spawn(
       _startServerIsolate,
-      receivePort.sendPort,
+      pair.$1,
     );
 
-    // Ждем ответа от сервера с транспортом
-    final serverTransport = await receivePort.firstWhere(
-      (message) => message is SendPort,
-      orElse: () => throw Exception('Не удалось получить транспорт от сервера'),
-    ) as SendPort;
-
     // Создаем клиентский транспорт
-    final clientTransport = IsolateTransport(serverTransport);
+    final clientTransport = pair.$2;
 
     // Создаем сериализаторы для запросов и ответов
     final stringSerializer = StringSerializer();
@@ -66,48 +60,42 @@ class IsolateRpcExample {
     // Завершаем работу
     print('Клиент завершил работу');
   }
+}
 
-  /// Функция для запуска серверного изолята.
-  ///
-  /// [sendPort] Порт для отправки транспорта клиентскому изоляту
-  static void _startServerIsolate(SendPort sendPort) async {
-    // Создаем пару связанных транспортов
-    final receivePort = ReceivePort();
-    final serverTransport = IsolateTransport(sendPort);
+/// Функция для запуска серверного изолята.
+///
+/// [sendPort] Порт для отправки транспорта клиентскому изоляту
+@pragma('vm:entry-point')
+void _startServerIsolate(IsolateTransport serverTransport) async {
+  // Создаем сериализаторы
+  final stringSerializer = StringSerializer();
 
-    // Отправляем клиенту порт для связи с сервером
-    sendPort.send(receivePort.sendPort);
+  // Создаем серверный обработчик стрима
+  final server = BidirectionalStreamServer<String, String>(
+    transport: serverTransport,
+    requestSerializer: stringSerializer,
+    responseSerializer: stringSerializer,
+  );
 
-    // Создаем сериализаторы
-    final stringSerializer = StringSerializer();
+  // Создаем эхо-обработчик, который отвечает на каждый запрос
+  server.requests.listen((request) {
+    print('Сервер получил: $request');
 
-    // Создаем серверный обработчик стрима
-    final server = BidirectionalStreamServer<String, String>(
-      transport: serverTransport,
-      requestSerializer: stringSerializer,
-      responseSerializer: stringSerializer,
-    );
+    // Отвечаем на запрос
+    if (request == 'Привет, сервер!') {
+      server.send('Привет, клиент!');
+    } else if (request == 'Как дела?') {
+      server.send('Отлично! У меня много памяти и CPU времени!');
+    } else if (request == 'Завершаю работу') {
+      server.send('До свидания! Буду ждать следующего подключения.');
 
-    // Создаем эхо-обработчик, который отвечает на каждый запрос
-    server.requests.listen((request) {
-      print('Сервер получил: $request');
+      // Завершаем отправку ответов
+      server.finishSending();
+    }
+  });
 
-      // Отвечаем на запрос
-      if (request == 'Привет, сервер!') {
-        server.send('Привет, клиент!');
-      } else if (request == 'Как дела?') {
-        server.send('Отлично! У меня много памяти и CPU времени!');
-      } else if (request == 'Завершаю работу') {
-        server.send('До свидания! Буду ждать следующего подключения.');
-
-        // Завершаем отправку ответов
-        server.finishSending();
-      }
-    });
-
-    // Ждем завершения работы
-    await Future.delayed(Duration(seconds: 60));
-  }
+  // Ждем завершения работы
+  await Future.delayed(Duration(seconds: 60));
 }
 
 /// Простой сериализатор строк.
