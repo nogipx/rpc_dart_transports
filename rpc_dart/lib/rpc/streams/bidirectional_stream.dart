@@ -76,7 +76,7 @@ final class BidirectionalStreamClient<TRequest, TResponse> {
     _requestController.stream.listen(
       (request) async {
         final serialized = _requestSerializer.serialize(request);
-        final framedMessage = GrpcMessageFrame.encode(serialized);
+        final framedMessage = RpcMessageFrame.encode(serialized);
         await _transport.sendMessage(framedMessage);
         _logger?.debug('Отправлено сообщение через транспорт: $framedMessage');
       },
@@ -91,8 +91,8 @@ final class BidirectionalStreamClient<TRequest, TResponse> {
       (message) {
         if (message.isMetadataOnly) {
           // Обрабатываем метаданные
-          final statusCode = message.metadata
-              ?.getHeaderValue(GrpcConstants.GRPC_STATUS_HEADER);
+          final statusCode =
+              message.metadata?.getHeaderValue(RpcConstants.GRPC_STATUS_HEADER);
 
           if (statusCode != null) {
             _logger?.debug('Получен статус: $statusCode');
@@ -103,9 +103,9 @@ final class BidirectionalStreamClient<TRequest, TResponse> {
           if (statusCode != null) {
             // Это трейлер, проверяем статус
             final code = int.parse(statusCode);
-            if (code != GrpcStatus.OK) {
+            if (code != RpcStatus.OK) {
               final errorMessage = message.metadata
-                      ?.getHeaderValue(GrpcConstants.GRPC_MESSAGE_HEADER) ??
+                      ?.getHeaderValue(RpcConstants.GRPC_MESSAGE_HEADER) ??
                   '';
               _logger?.error('Ошибка gRPC: $code - $errorMessage');
               _responseController
@@ -284,7 +284,7 @@ final class BidirectionalStreamServer<TRequest, TResponse> {
     _responseController.stream.listen(
       (response) async {
         final serialized = _responseSerializer.serialize(response);
-        final framedMessage = GrpcMessageFrame.encode(serialized);
+        final framedMessage = RpcMessageFrame.encode(serialized);
         await _transport.sendMessage(framedMessage);
         _logger?.debug(
           'Ответ фреймирован, размер: ${framedMessage.length} байт',
@@ -292,7 +292,7 @@ final class BidirectionalStreamServer<TRequest, TResponse> {
       },
       onDone: () async {
         // Отправляем трейлер при завершении отправки ответов
-        final trailers = RpcMetadata.forTrailer(GrpcStatus.OK);
+        final trailers = RpcMetadata.forTrailer(RpcStatus.OK);
         await _transport.sendMetadata(trailers, endStream: true);
         _logger?.debug('Трейлер отправлен');
       },
@@ -325,7 +325,7 @@ final class BidirectionalStreamServer<TRequest, TResponse> {
         _logger?.error('Ошибка от транспорта: $error', error: error);
         _requestController.addError(error);
         _requestController.close();
-        sendError(GrpcStatus.INTERNAL, 'Внутренняя ошибка: $error');
+        sendError(RpcStatus.INTERNAL, 'Внутренняя ошибка: $error');
       },
       onDone: () {
         _logger?.debug('Транспорт завершил поток сообщений');

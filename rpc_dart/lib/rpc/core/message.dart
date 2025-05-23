@@ -43,7 +43,9 @@ final class RpcMetadata {
       RpcHeader(':scheme', 'http'),
       RpcHeader(':authority', host),
       RpcHeader(
-          GrpcConstants.CONTENT_TYPE_HEADER, GrpcConstants.GRPC_CONTENT_TYPE),
+        RpcConstants.CONTENT_TYPE_HEADER,
+        RpcConstants.GRPC_CONTENT_TYPE,
+      ),
       RpcHeader('te', 'trailers'),
     ]);
   }
@@ -57,8 +59,8 @@ final class RpcMetadata {
     return RpcMetadata([
       RpcHeader(':status', '200'),
       RpcHeader(
-        GrpcConstants.CONTENT_TYPE_HEADER,
-        GrpcConstants.GRPC_CONTENT_TYPE,
+        RpcConstants.CONTENT_TYPE_HEADER,
+        RpcConstants.GRPC_CONTENT_TYPE,
       ),
     ]);
   }
@@ -73,14 +75,14 @@ final class RpcMetadata {
   static RpcMetadata forTrailer(int statusCode, {String message = ''}) {
     final headers = [
       RpcHeader(
-        GrpcConstants.GRPC_STATUS_HEADER,
+        RpcConstants.GRPC_STATUS_HEADER,
         statusCode.toString(),
       ),
     ];
 
     if (message.isNotEmpty) {
       headers.add(RpcHeader(
-        GrpcConstants.GRPC_MESSAGE_HEADER,
+        RpcConstants.GRPC_MESSAGE_HEADER,
         message,
       ));
     }

@@ -64,7 +64,7 @@ class InMemoryRpcExample {
         print('Клиент получил: ${message.payload}');
       } else if (message.metadata != null) {
         final statusCode =
-            message.metadata!.getHeaderValue(GrpcConstants.GRPC_STATUS_HEADER);
+            message.metadata!.getHeaderValue(RpcConstants.GRPC_STATUS_HEADER);
 
         if (statusCode != null && message.isEndOfStream) {
           print('Соединение завершено со статусом: $statusCode');

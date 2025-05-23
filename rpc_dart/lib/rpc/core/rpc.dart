@@ -6,7 +6,7 @@ part of '../_index.dart';
 ///
 /// Содержит все фиксированные значения, используемые в протоколе gRPC,
 /// что обеспечивает единообразие и устраняет "магические числа" в коде.
-abstract interface class GrpcConstants {
+abstract interface class RpcConstants {
   /// Размер префикса сообщения в байтах (1 байт флаг + 4 байта длина)
   static const int MESSAGE_PREFIX_SIZE = 5;
 
@@ -44,7 +44,7 @@ abstract interface class GrpcConstants {
 /// - DEADLINE_EXCEEDED (4): превышено время ожидания
 /// - INTERNAL (13): внутренняя ошибка сервера
 /// - UNAVAILABLE (14): сервис недоступен
-abstract interface class GrpcStatus {
+abstract interface class RpcStatus {
   /// Успешное выполнение
   static const int OK = 0;
 
@@ -106,7 +106,7 @@ abstract interface class GrpcStatus {
 /// Формат префикса:
 /// - 1-й байт: флаг сжатия (0 или 1)
 /// - 2-5-й байты: длина сообщения (uint32, big-endian)
-abstract interface class GrpcMessageFrame {
+abstract interface class RpcMessageFrame {
   /// Упаковывает сообщение в формат gRPC с 5-байтным префиксом.
   ///
   /// Добавляет к сериализованному сообщению стандартный 5-байтный префикс,
@@ -120,22 +120,22 @@ abstract interface class GrpcMessageFrame {
     bool compressed = false,
   }) {
     final result = List<int>.filled(
-        GrpcConstants.MESSAGE_PREFIX_SIZE + messageBytes.length, 0);
+        RpcConstants.MESSAGE_PREFIX_SIZE + messageBytes.length, 0);
 
     // Устанавливаем флаг сжатия
-    result[GrpcConstants.COMPRESSION_FLAG_INDEX] =
-        compressed ? GrpcConstants.COMPRESSED : GrpcConstants.NO_COMPRESSION;
+    result[RpcConstants.COMPRESSION_FLAG_INDEX] =
+        compressed ? RpcConstants.COMPRESSED : RpcConstants.NO_COMPRESSION;
 
     // Устанавливаем длину сообщения (big-endian)
     final length = messageBytes.length;
-    result[GrpcConstants.MESSAGE_LENGTH_INDEX] = (length >> 24) & 0xFF;
-    result[GrpcConstants.MESSAGE_LENGTH_INDEX + 1] = (length >> 16) & 0xFF;
-    result[GrpcConstants.MESSAGE_LENGTH_INDEX + 2] = (length >> 8) & 0xFF;
-    result[GrpcConstants.MESSAGE_LENGTH_INDEX + 3] = length & 0xFF;
+    result[RpcConstants.MESSAGE_LENGTH_INDEX] = (length >> 24) & 0xFF;
+    result[RpcConstants.MESSAGE_LENGTH_INDEX + 1] = (length >> 16) & 0xFF;
+    result[RpcConstants.MESSAGE_LENGTH_INDEX + 2] = (length >> 8) & 0xFF;
+    result[RpcConstants.MESSAGE_LENGTH_INDEX + 3] = length & 0xFF;
 
     // Копируем данные сообщения
     for (int i = 0; i < messageBytes.length; i++) {
-      result[GrpcConstants.MESSAGE_PREFIX_SIZE + i] = messageBytes[i];
+      result[RpcConstants.MESSAGE_PREFIX_SIZE + i] = messageBytes[i];
     }
 
     return Uint8List.fromList(result);
@@ -149,20 +149,20 @@ abstract interface class GrpcMessageFrame {
   /// [headerBytes] Байты, содержащие префикс сообщения (должно быть >= 5 байт)
   /// Возвращает структуру с информацией о сжатии и длине сообщения
   /// Выбрасывает Exception при неверной длине входных данных
-  static GrpcMessageHeader parseHeader(Uint8List headerBytes) {
-    if (headerBytes.length < GrpcConstants.MESSAGE_PREFIX_SIZE) {
+  static RpcMessageHeader parseHeader(Uint8List headerBytes) {
+    if (headerBytes.length < RpcConstants.MESSAGE_PREFIX_SIZE) {
       throw Exception('Неверная длина заголовка сообщения');
     }
 
-    final isCompressed = headerBytes[GrpcConstants.COMPRESSION_FLAG_INDEX] ==
-        GrpcConstants.COMPRESSED;
+    final isCompressed = headerBytes[RpcConstants.COMPRESSION_FLAG_INDEX] ==
+        RpcConstants.COMPRESSED;
 
-    final length = (headerBytes[GrpcConstants.MESSAGE_LENGTH_INDEX] << 24) |
-        (headerBytes[GrpcConstants.MESSAGE_LENGTH_INDEX + 1] << 16) |
-        (headerBytes[GrpcConstants.MESSAGE_LENGTH_INDEX + 2] << 8) |
-        headerBytes[GrpcConstants.MESSAGE_LENGTH_INDEX + 3];
+    final length = (headerBytes[RpcConstants.MESSAGE_LENGTH_INDEX] << 24) |
+        (headerBytes[RpcConstants.MESSAGE_LENGTH_INDEX + 1] << 16) |
+        (headerBytes[RpcConstants.MESSAGE_LENGTH_INDEX + 2] << 8) |
+        headerBytes[RpcConstants.MESSAGE_LENGTH_INDEX + 3];
 
-    return GrpcMessageHeader(isCompressed, length);
+    return RpcMessageHeader(isCompressed, length);
   }
 }
 
@@ -170,7 +170,7 @@ abstract interface class GrpcMessageFrame {
 ///
 /// Хранит данные о сжатии и длине сообщения, полученные при
 /// парсинге префикса сообщения.
-final class GrpcMessageHeader {
+final class RpcMessageHeader {
   /// Флаг, указывающий, сжато ли сообщение
   final bool isCompressed;
 
@@ -178,5 +178,5 @@ final class GrpcMessageHeader {
   final int messageLength;
 
   /// Создает объект с информацией о заголовке сообщения
-  GrpcMessageHeader(this.isCompressed, this.messageLength);
+  RpcMessageHeader(this.isCompressed, this.messageLength);
 }

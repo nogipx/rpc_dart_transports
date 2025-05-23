@@ -2,10 +2,10 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'dart:isolate';
 
-import 'package:rpc_dart/core/_example/isolate_example.dart';
+import 'package:rpc_dart/rpc/_example/isolate_example.dart';
 import 'package:rpc_dart/rpc_dart.dart';
 
-part 'core/grpc.dart';
+part 'core/rpc.dart';
 part 'core/message.dart';
 part 'core/parser.dart';
 part 'core/transport.dart';
