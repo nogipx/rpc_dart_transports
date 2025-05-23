@@ -17,7 +17,7 @@ Future<void> main({bool debug = true}) async {
   final logger = DefaultRpcLogger(
     'DiagnosticsDemo',
     coloredLoggingEnabled: true,
-    logColors: RpcLoggerColors(
+    colors: RpcLoggerColors(
       debug: AnsiColor.cyan,
       info: AnsiColor.brightGreen,
       warning: AnsiColor.brightYellow,
@@ -203,8 +203,7 @@ int calculatePercentile(List<int> values, int percentile) {
   if (k >= sortedValues.length - 1) return sortedValues.last;
 
   // Линейная интерполяция
-  return (sortedValues[k] + d * (sortedValues[k + 1] - sortedValues[k]))
-      .round();
+  return (sortedValues[k] + d * (sortedValues[k + 1] - sortedValues[k])).round();
 }
 
 /// Имитирует операцию, которая может завершиться с ошибкой
@@ -238,9 +237,7 @@ Future<void> executeWithTracing(
   RpcLogger logger,
   int depth,
 ) async {
-  final serviceName =
-      ['AuthService', 'UserService', 'DatabaseService', 'CacheService'][depth %
-          4];
+  final serviceName = ['AuthService', 'UserService', 'DatabaseService', 'CacheService'][depth % 4];
   final methodName = ['validate', 'getProfile', 'query', 'fetch'][depth % 4];
 
   logger.debug(

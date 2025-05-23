@@ -12,6 +12,8 @@ part of '../_index.dart';
 /// - Автоматическая сериализация/десериализация сообщений
 /// - Корректная обработка заголовков и трейлеров gRPC
 final class BidirectionalStreamClient<TRequest, TResponse> {
+  final RpcLogger? _logger;
+
   /// Базовый транспорт для обмена данными
   final IRpcTransport _transport;
 
@@ -30,7 +32,7 @@ final class BidirectionalStreamClient<TRequest, TResponse> {
       StreamController<RpcMessage<TResponse>>();
 
   /// Парсер для обработки фрагментированных сообщений
-  final RpcMessageParser _parser = RpcMessageParser();
+  late final RpcMessageParser _parser;
 
   /// Поток для отправки запросов (для внутреннего использования)
   Stream<TRequest> get requestStream => _requestController.stream;
@@ -48,16 +50,19 @@ final class BidirectionalStreamClient<TRequest, TResponse> {
 
   /// Создает новый клиентский двунаправленный стрим.
   ///
-  /// [_transport] Транспортный уровень
-  /// [_requestCodec] Кодек для сериализации запросов
-  /// [_responseCodec] Кодек для десериализации ответов
+  /// [transport] Транспортный уровень
+  /// [requestSerializer] Кодек для сериализации запросов
+  /// [responseSerializer] Кодек для десериализации ответов
   BidirectionalStreamClient({
     required IRpcTransport transport,
     required IRpcSerializer<TRequest> requestSerializer,
     required IRpcSerializer<TResponse> responseSerializer,
+    RpcLogger? logger,
   })  : _transport = transport,
         _requestSerializer = requestSerializer,
-        _responseSerializer = responseSerializer {
+        _responseSerializer = responseSerializer,
+        _parser = RpcMessageParser(logger: logger),
+        _logger = logger {
     _setupStreams();
   }
 
@@ -71,18 +76,12 @@ final class BidirectionalStreamClient<TRequest, TResponse> {
     _requestController.stream.listen(
       (request) async {
         final serialized = _requestSerializer.serialize(request);
-        print(
-            '[BidirectionalStreamClient] Сериализован запрос размером: ${serialized.length} байт');
         final framedMessage = GrpcMessageFrame.encode(serialized);
-        print(
-            '[BidirectionalStreamClient] Фреймирован в сообщение размером: ${framedMessage.length} байт');
         await _transport.sendMessage(framedMessage);
-        print(
-            '[BidirectionalStreamClient] Отправлено сообщение через транспорт');
+        _logger?.debug('Отправлено сообщение через транспорт: $framedMessage');
       },
       onDone: () async {
-        print(
-            '[BidirectionalStreamClient] Поток запросов завершен, вызываем finishSending()');
+        _logger?.debug('Поток запросов завершен, вызываем finishSending()');
         await _transport.finishSending();
       },
     );
@@ -90,33 +89,31 @@ final class BidirectionalStreamClient<TRequest, TResponse> {
     // Настраиваем прием ответов
     _transport.incomingMessages.listen(
       (message) {
-        print(
-            '[BidirectionalStreamClient] Получено сообщение от транспорта: ${message.runtimeType}');
-
         if (message.isMetadataOnly) {
-          print(
-              '[BidirectionalStreamClient] Получены метаданные от транспорта');
           // Обрабатываем метаданные
           final statusCode = message.metadata
               ?.getHeaderValue(GrpcConstants.GRPC_STATUS_HEADER);
 
           if (statusCode != null) {
-            print('[BidirectionalStreamClient] Получен статус: $statusCode');
+            _logger?.debug('Получен статус: $statusCode');
+          } else {
+            _logger?.debug('Получены метаданные от транспорта');
+          }
+
+          if (statusCode != null) {
             // Это трейлер, проверяем статус
             final code = int.parse(statusCode);
             if (code != GrpcStatus.OK) {
               final errorMessage = message.metadata
                       ?.getHeaderValue(GrpcConstants.GRPC_MESSAGE_HEADER) ??
                   '';
-              print(
-                  '[BidirectionalStreamClient] Ошибка gRPC: $code - $errorMessage');
+              _logger?.error('Ошибка gRPC: $code - $errorMessage');
               _responseController
                   .addError(Exception('gRPC error $code: $errorMessage'));
             }
 
             if (message.isEndOfStream) {
-              print(
-                  '[BidirectionalStreamClient] Получен END_STREAM, закрываем контроллер');
+              _logger?.debug('Получен END_STREAM, закрываем контроллер');
               _responseController.close();
             }
           }
@@ -127,77 +124,49 @@ final class BidirectionalStreamClient<TRequest, TResponse> {
             isMetadataOnly: true,
             isEndOfStream: message.isEndOfStream,
           );
-          print(
-              '[BidirectionalStreamClient] Создано сообщение с метаданными: $metadataMessage');
-          print(
-              '[BidirectionalStreamClient] _responseController.isClosed: ${_responseController.isClosed}');
-          print(
-              '[BidirectionalStreamClient] Существуют ли подписки: ${_responseController.hasListener}');
 
           _responseController.add(metadataMessage);
-          print(
-              '[BidirectionalStreamClient] Метаданные переданы в responseController');
         } else if (message.payload != null) {
           // Обрабатываем сообщения
           final messageBytes = message.payload!;
-          print(
-              '[BidirectionalStreamClient] Получено сообщение от транспорта размером: ${messageBytes.length} байт');
-
-          // Дебаг: выводим первые 20 байт сообщения в HEX
-          final hexBytes = messageBytes
-              .take(20)
-              .map((b) => b.toRadixString(16).padLeft(2, '0'))
-              .join(' ');
-          print(
-              '[BidirectionalStreamClient] Первые байты сообщения (HEX): $hexBytes');
+          _logger?.debug(
+            'Получено сообщение от транспорта размером: ${messageBytes.length} байт',
+          );
 
           final messages = _parser(messageBytes);
-          print(
-              '[BidirectionalStreamClient] Распарсено сообщений: ${messages.length}');
 
           for (var msgBytes in messages) {
-            print(
-                '[BidirectionalStreamClient] Обработка сообщения размером: ${msgBytes.length} байт');
             try {
               final response = _responseSerializer.deserialize(msgBytes);
-              print(
-                  '[BidirectionalStreamClient] Десериализовано в: "$response"');
-
               final responseMessage = RpcMessage.withPayload(response);
-              print(
-                  '[BidirectionalStreamClient] Создано сообщение с полезной нагрузкой: $responseMessage');
-              print(
-                  '[BidirectionalStreamClient] _responseController.isClosed: ${_responseController.isClosed}');
-              print(
-                  '[BidirectionalStreamClient] Существуют ли подписки: ${_responseController.hasListener}');
-
               _responseController.add(responseMessage);
-              print(
-                  '[BidirectionalStreamClient] Сообщение десериализовано и добавлено в responseController');
             } catch (e, stackTrace) {
-              print(
-                  '[BidirectionalStreamClient] ОШИБКА при десериализации: $e');
-              print('[BidirectionalStreamClient] Стек ошибки: $stackTrace');
+              _logger?.error(
+                'Ошибка при десериализации: $e',
+                error: e,
+                stackTrace: stackTrace,
+              );
               _responseController.addError(e, stackTrace);
             }
           }
         }
       },
       onError: (error, stackTrace) {
-        print('[BidirectionalStreamClient] Ошибка от транспорта: $error');
-        print('[BidirectionalStreamClient] Стек ошибки: $stackTrace');
+        _logger?.error(
+          'Ошибка от транспорта: $error',
+          error: error,
+          stackTrace: stackTrace,
+        );
         _responseController.addError(error, stackTrace);
         _responseController.close();
       },
       onDone: () {
-        print('[BidirectionalStreamClient] Транспорт завершил поток сообщений');
+        _logger?.debug('Транспорт завершил поток сообщений');
         if (!_responseController.isClosed) {
           _responseController.close();
         }
       },
     );
-
-    print('[BidirectionalStreamClient] Потоковые обработчики настроены');
   }
 
   /// Отправляет запрос серверу.
@@ -248,6 +217,8 @@ final class BidirectionalStreamClient<TRequest, TResponse> {
 /// - Автоматическая сериализация/десериализация сообщений
 /// - Управление статусами и ошибками gRPC
 final class BidirectionalStreamServer<TRequest, TResponse> {
+  final RpcLogger? _logger;
+
   /// Базовый транспорт для обмена данными
   final IRpcTransport _transport;
 
@@ -266,7 +237,7 @@ final class BidirectionalStreamServer<TRequest, TResponse> {
       StreamController<TResponse>();
 
   /// Парсер для обработки фрагментированных сообщений
-  final RpcMessageParser _parser = RpcMessageParser();
+  late final RpcMessageParser _parser;
 
   /// Флаг, указывающий, были ли отправлены начальные заголовки
   // ignore: unused_field
@@ -281,16 +252,19 @@ final class BidirectionalStreamServer<TRequest, TResponse> {
 
   /// Создает новый серверный двунаправленный стрим.
   ///
-  /// [_transport] Транспортный уровень
-  /// [_requestSerializer] Кодек для десериализации запросов
-  /// [_responseSerializer] Кодек для сериализации ответов
+  /// [transport] Транспортный уровень
+  /// [requestSerializer] Кодек для десериализации запросов
+  /// [responseSerializer] Кодек для сериализации ответов
   BidirectionalStreamServer({
     required IRpcTransport transport,
     required IRpcSerializer<TRequest> requestSerializer,
     required IRpcSerializer<TResponse> responseSerializer,
+    RpcLogger? logger,
   })  : _transport = transport,
         _requestSerializer = requestSerializer,
-        _responseSerializer = responseSerializer {
+        _responseSerializer = responseSerializer,
+        _parser = RpcMessageParser(logger: logger),
+        _logger = logger {
     _setupStreams();
   }
 
@@ -302,31 +276,25 @@ final class BidirectionalStreamServer<TRequest, TResponse> {
   void _setupStreams() async {
     // Отправляем начальные заголовки
     final initialHeaders = RpcMetadata.forServerInitialResponse();
-    print('[BidirectionalStreamServer] Отправка начальных заголовков');
     await _transport.sendMetadata(initialHeaders);
     _headersSent = true;
-    print('[BidirectionalStreamServer] Начальные заголовки отправлены');
+    _logger?.debug('Начальные заголовки отправлены');
 
     // Настраиваем отправку ответов
     _responseController.stream.listen(
       (response) async {
-        print('[BidirectionalStreamServer] Отправка ответа');
         final serialized = _responseSerializer.serialize(response);
-        print(
-            '[BidirectionalStreamServer] Ответ сериализован, размер: ${serialized.length} байт');
         final framedMessage = GrpcMessageFrame.encode(serialized);
-        print(
-            '[BidirectionalStreamServer] Ответ фреймирован, размер: ${framedMessage.length} байт');
         await _transport.sendMessage(framedMessage);
-        print('[BidirectionalStreamServer] Ответ отправлен через транспорт');
+        _logger?.debug(
+          'Ответ фреймирован, размер: ${framedMessage.length} байт',
+        );
       },
       onDone: () async {
         // Отправляем трейлер при завершении отправки ответов
-        print(
-            '[BidirectionalStreamServer] Поток ответов завершен, отправка трейлера');
         final trailers = RpcMetadata.forTrailer(GrpcStatus.OK);
         await _transport.sendMetadata(trailers, endStream: true);
-        print('[BidirectionalStreamServer] Трейлер отправлен');
+        _logger?.debug('Трейлер отправлен');
       },
     );
 
@@ -336,37 +304,31 @@ final class BidirectionalStreamServer<TRequest, TResponse> {
         if (!message.isMetadataOnly && message.payload != null) {
           // Обрабатываем сообщения
           final messageBytes = message.payload!;
-          print(
-              '[BidirectionalStreamServer] Получено сообщение от транспорта размером: ${messageBytes.length} байт');
+          _logger?.debug(
+            'Получено сообщение от транспорта размером: ${messageBytes.length} байт',
+          );
           final messages = _parser(messageBytes);
-          print(
-              '[BidirectionalStreamServer] Распарсено сообщений: ${messages.length}');
 
           for (var msgBytes in messages) {
-            print(
-                '[BidirectionalStreamServer] Обработка сообщения размером: ${msgBytes.length} байт');
             final request = _requestSerializer.deserialize(msgBytes);
             _requestController.add(request);
-            print(
-                '[BidirectionalStreamServer] Запрос десериализован и добавлен в requestController');
           }
         }
 
         // Если это конец потока запросов, закрываем контроллер
         if (message.isEndOfStream) {
-          print(
-              '[BidirectionalStreamServer] Получен END_STREAM, закрываем контроллер запросов');
+          _logger?.debug('Получен END_STREAM, закрываем контроллер запросов');
           _requestController.close();
         }
       },
       onError: (error) {
-        print('[BidirectionalStreamServer] Ошибка от транспорта: $error');
+        _logger?.error('Ошибка от транспорта: $error', error: error);
         _requestController.addError(error);
         _requestController.close();
         sendError(GrpcStatus.INTERNAL, 'Внутренняя ошибка: $error');
       },
       onDone: () {
-        print('[BidirectionalStreamServer] Транспорт завершил поток сообщений');
+        _logger?.debug('Транспорт завершил поток сообщений');
         if (!_requestController.isClosed) {
           _requestController.close();
         }

@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'dart:isolate';
 
 import 'package:rpc_dart/core/_example/isolate_example.dart';
+import 'package:rpc_dart/rpc_dart.dart';
 
 part 'core/grpc.dart';
 part 'core/message.dart';

@@ -22,7 +22,10 @@ enum RpcLoggerLevel {
   }
 }
 
-typedef RpcLoggerFactory = RpcLogger Function(String loggerName);
+typedef RpcLoggerFactory = RpcLogger Function(
+  String loggerName, {
+  RpcLoggerColors? colors,
+});
 
 /// Интерфейс для фильтрации логов
 abstract interface class IRpcLoggerFilter {
@@ -53,8 +56,11 @@ abstract interface class RpcLogger {
   IRpcDiagnosticClient? get diagnostic;
 
   /// Создает новый логгер с указанным именем
-  factory RpcLogger(String loggerName) {
-    return _RpcLoggerRegistry.instance.get(loggerName);
+  factory RpcLogger(
+    String loggerName, {
+    RpcLoggerColors? colors,
+  }) {
+    return _RpcLoggerRegistry.instance.get(loggerName, colors: colors);
   }
 
   /// Отправляет лог с указанным уровнем в сервис диагностики

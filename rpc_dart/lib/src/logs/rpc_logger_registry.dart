@@ -26,11 +26,13 @@ final class _RpcLoggerRegistry {
   /// Получает логгер с указанным именем
   ///
   /// Если логгер с таким именем не найден, создает новый
-  RpcLogger get(String name) {
+  RpcLogger get(String name, {RpcLoggerColors? colors}) {
     if (_factory == null) {
-      return _loggers[name] ??= DefaultRpcLogger(name);
+      return _loggers[name] ??=
+          DefaultRpcLogger(name, colors: colors ?? const RpcLoggerColors());
     }
-    return _loggers[name] ??= _factory!(name);
+    return _loggers[name] ??=
+        _factory!(name, colors: colors ?? const RpcLoggerColors());
   }
 
   /// Удаляет логгер с указанным именем

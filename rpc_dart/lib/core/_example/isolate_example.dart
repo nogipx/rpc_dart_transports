@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:rpc_dart/logger.dart';
+
 import '../_index.dart';
 
 /// Пример использования изолята с пользовательской entrypoint функцией
@@ -20,22 +22,21 @@ void main() async {
     debugName: 'EchoServer Isolate',
   );
 
-  final transport = result.transport;
   final killIsolate = result.kill;
 
   print('Изолят запущен, настраиваем клиент...');
 
-  // Создаем сериализатор
-  final serializer = SimpleStringSerializer();
-
-  // Даем изоляту время на инициализацию
-  await Future.delayed(Duration(milliseconds: 500));
+  RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.debug);
 
   // Создаем клиент для двустороннего потока
   final client = BidirectionalStreamClient<String, String>(
-    transport: transport,
-    requestSerializer: serializer,
-    responseSerializer: serializer,
+    transport: result.transport,
+    requestSerializer: const SimpleStringSerializer(),
+    responseSerializer: const SimpleStringSerializer(),
+    logger: RpcLogger(
+      "Host",
+      colors: RpcLoggerColors.singleColor(AnsiColor.brightMagenta),
+    ),
   );
 
   // Подписываемся на ответы
@@ -71,7 +72,7 @@ void main() async {
 
   // Завершаем работу
   print('\nЗавершаем работу транспорта...');
-  await transport.close();
+  await client.close();
 
   // Убиваем изолят
   killIsolate();
@@ -92,11 +93,17 @@ void customEchoServer(
   // Создаем сериализатор
   final serializer = SimpleStringSerializer();
 
+  RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.debug);
+
   // Создаем двунаправленный стрим-сервер
   final server = BidirectionalStreamServer<String, String>(
     transport: transport,
     requestSerializer: serializer,
     responseSerializer: serializer,
+    logger: RpcLogger(
+      "Isolate",
+      colors: RpcLoggerColors.singleColor(AnsiColor.brightGreen),
+    ),
   );
 
   // Настраиваем префикс для ответов
@@ -118,6 +125,8 @@ void customEchoServer(
 
 /// Простой сериализатор строк
 class SimpleStringSerializer implements IRpcSerializer<String> {
+  const SimpleStringSerializer();
+
   @override
   String deserialize(Uint8List bytes) {
     return utf8.decode(bytes);

@@ -62,6 +62,13 @@ class RpcLoggerColors {
     this.critical = AnsiColor.brightRed,
   });
 
+  const RpcLoggerColors.singleColor(AnsiColor color)
+      : debug = color,
+        info = color,
+        warning = color,
+        error = color,
+        critical = color;
+
   /// Получает цвет для указанного уровня логирования
   AnsiColor colorForLevel(RpcLoggerLevel level) {
     switch (level) {

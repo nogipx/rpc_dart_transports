@@ -27,7 +27,7 @@ void main() async {
   final logger = DefaultRpcLogger(
     'DemoClient',
     coloredLoggingEnabled: true,
-    logColors: RpcLoggerColors(
+    colors: RpcLoggerColors(
       debug: AnsiColor.cyan,
       info: AnsiColor.brightGreen,
       warning: AnsiColor.brightYellow,

@@ -93,7 +93,7 @@ void main() async {
   final customLogger = DefaultRpcLogger(
     'ColorLogger',
     coloredLoggingEnabled: true,
-    logColors: RpcLoggerColors(
+    colors: RpcLoggerColors(
       debug: AnsiColor.cyan,
       info: AnsiColor.brightGreen,
       warning: AnsiColor.brightYellow,

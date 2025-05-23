@@ -63,7 +63,7 @@ class DefaultRpcLogger implements RpcLogger {
   final bool _coloredLoggingEnabled;
 
   /// Настройки цветов для разных уровней логирования
-  final RpcLoggerColors _logColors;
+  final RpcLoggerColors _colors;
 
   /// Фильтр логов
   final IRpcLoggerFilter _filter;
@@ -74,15 +74,15 @@ class DefaultRpcLogger implements RpcLogger {
   /// Создает новый логгер с указанными параметрами
   DefaultRpcLogger(
     this.name, {
+    RpcLoggerColors colors = const RpcLoggerColors(),
     RpcLoggerLevel? minLogLevel,
     bool consoleLoggingEnabled = true,
     bool coloredLoggingEnabled = true,
-    RpcLoggerColors logColors = const RpcLoggerColors(),
     IRpcLoggerFilter? filter,
     IRpcLoggerFormatter? formatter,
   })  : _consoleLoggingEnabled = consoleLoggingEnabled,
         _coloredLoggingEnabled = coloredLoggingEnabled,
-        _logColors = logColors,
+        _colors = colors,
         _formatter = formatter ?? const DefaultRpcLoggerFormatter(),
         _filter = filter ??
             DefaultRpcLoggerFilter(
@@ -147,7 +147,7 @@ class DefaultRpcLogger implements RpcLogger {
 
     // Если включен цветной вывод, используем цвет
     if (_coloredLoggingEnabled) {
-      final actualColor = color ?? _logColors.colorForLevel(level);
+      final actualColor = color ?? _colors.colorForLevel(level);
       _logColored(logMessage, actualColor);
 
       if (error != null) {
