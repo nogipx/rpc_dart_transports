@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'dart:isolate';
 
+import 'package:rpc_dart/core/_example/isolate_example.dart';
+
 part 'core/grpc.dart';
 part 'core/message.dart';
 part 'core/parser.dart';
@@ -10,7 +12,6 @@ part 'core/transport.dart';
 part 'transports/isolate_transport.dart';
 part 'transports/in_memory_transport.dart';
 
-part '_example/isolate_example.dart';
 part '_example/in_memory_example.dart';
 
 part 'streams/bidirectional_stream.dart';

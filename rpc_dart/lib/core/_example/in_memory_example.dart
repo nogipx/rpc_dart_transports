@@ -16,7 +16,7 @@ class InMemoryRpcExample {
     final (clientTransport, serverTransport) = InMemoryTransportPair.create();
 
     // Создаем сериализаторы для строк
-    final stringSerializer = StringSerializer();
+    final stringSerializer = SimpleStringSerializer();
 
     // Инициализируем серверную часть
     final server = BidirectionalStreamServer<String, String>(

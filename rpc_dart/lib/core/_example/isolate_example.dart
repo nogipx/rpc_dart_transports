@@ -1,123 +1,130 @@
-part of '../_index.dart';
+import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 
-/// Пример использования транспорта через изоляты.
-///
-/// Демонстрирует, как настроить клиент и сервер в разных изолятах
-/// и организовать взаимодействие между ними с помощью IsolateTransport.
-class IsolateRpcExample {
-  /// Запускает демонстрацию работы RPC через изоляты.
-  ///
-  /// Создает сервер в отдельном изоляте и взаимодействует с ним через
-  /// двунаправленный стрим, используя транспорт на основе изолятов.
-  static Future<void> run() async {
-    // Создаем порт для получения транспорта от серверного изолята
-    final pair = IsolateTransportPair.create();
+import '../_index.dart';
 
-    // Запускаем серверный изолят
-    final serverIsolate = await Isolate.spawn(
-      _startServerIsolate,
-      pair.$1,
-    );
+/// Пример использования изолята с пользовательской entrypoint функцией
+void main() async {
+  print('\n=== Запуск примера с пользовательским entrypoint ===\n');
 
-    // Создаем клиентский транспорт
-    final clientTransport = pair.$2;
-
-    // Создаем сериализаторы для запросов и ответов
-    final stringSerializer = StringSerializer();
-
-    // Создаем двунаправленный клиент
-    final client = BidirectionalStreamClient<String, String>(
-      transport: clientTransport,
-      requestSerializer: stringSerializer,
-      responseSerializer: stringSerializer,
-    );
-
-    // Подписываемся на ответы от сервера
-    final subscription = client.responses.listen((message) {
-      if (!message.isMetadataOnly) {
-        print('Клиент получил: ${message.payload}');
-      }
-    });
-
-    // Отправляем несколько запросов
-    client.send('Привет, сервер!');
-    await Future.delayed(Duration(milliseconds: 100));
-
-    client.send('Как дела?');
-    await Future.delayed(Duration(milliseconds: 100));
-
-    client.send('Завершаю работу');
-    await Future.delayed(Duration(milliseconds: 100));
-
-    // Завершаем отправку и закрываем клиент
-    client.finishSending();
-    await Future.delayed(Duration(milliseconds: 500));
-
-    await subscription.cancel();
-    await client.close();
-    serverIsolate.kill();
-
-    // Завершаем работу
-    print('Клиент завершил работу');
-  }
-}
-
-/// Функция для запуска серверного изолята.
-///
-/// [sendPort] Порт для отправки транспорта клиентскому изоляту
-@pragma('vm:entry-point')
-void _startServerIsolate(IsolateTransport serverTransport) async {
-  // Создаем сериализаторы
-  final stringSerializer = StringSerializer();
-
-  // Создаем серверный обработчик стрима
-  final server = BidirectionalStreamServer<String, String>(
-    transport: serverTransport,
-    requestSerializer: stringSerializer,
-    responseSerializer: stringSerializer,
+  // Запускаем изолят с пользовательской entrypoint функцией
+  final result = await RpcIsolateTransport.spawn(
+    entrypoint: customEchoServer,
+    customParams: {
+      'log': (String message) => print('rpc customlog: $message'),
+      'serverName': 'CustomEchoServer',
+      'messagePrefix': '[ECHO]: ',
+    },
+    isolateId: 'echo-server',
+    debugName: 'EchoServer Isolate',
   );
 
-  // Создаем эхо-обработчик, который отвечает на каждый запрос
-  server.requests.listen((request) {
-    print('Сервер получил: $request');
+  final transport = result.transport;
+  final killIsolate = result.kill;
 
-    // Отвечаем на запрос
-    if (request == 'Привет, сервер!') {
-      server.send('Привет, клиент!');
-    } else if (request == 'Как дела?') {
-      server.send('Отлично! У меня много памяти и CPU времени!');
-    } else if (request == 'Завершаю работу') {
-      server.send('До свидания! Буду ждать следующего подключения.');
+  print('Изолят запущен, настраиваем клиент...');
 
-      // Завершаем отправку ответов
-      server.finishSending();
-    }
+  // Создаем сериализатор
+  final serializer = SimpleStringSerializer();
+
+  // Даем изоляту время на инициализацию
+  await Future.delayed(Duration(milliseconds: 500));
+
+  // Создаем клиент для двустороннего потока
+  final client = BidirectionalStreamClient<String, String>(
+    transport: transport,
+    requestSerializer: serializer,
+    responseSerializer: serializer,
+  );
+
+  // Подписываемся на ответы
+  final subscription = client.responses.listen((message) {
+    print('КЛИЕНТ: Получен ответ: "${message.payload}"');
+  }, onError: (error) {
+    print('КЛИЕНТ: Ошибка: $error');
   });
 
-  // Ждем завершения работы
-  await Future.delayed(Duration(seconds: 60));
+  // Отправляем запросы
+  print('\nОтправляем запрос: "Привет, сервер!"');
+  client.send('Привет, сервер!');
+
+  await Future.delayed(Duration(milliseconds: 500));
+
+  print('\nОтправляем запрос: "Как дела?"');
+  client.send('Как дела?');
+
+  await Future.delayed(Duration(milliseconds: 500));
+
+  print('\nОтправляем запрос: "Проверка эхо"');
+  client.send('Проверка эхо');
+
+  // Ждем обработки сообщений
+  await Future.delayed(Duration(seconds: 1));
+
+  // Завершаем отправку
+  print('\nЗавершаем отправку...');
+  client.finishSending();
+
+  // Отменяем подписку на ответы
+  await subscription.cancel();
+
+  // Завершаем работу
+  print('\nЗавершаем работу транспорта...');
+  await transport.close();
+
+  // Убиваем изолят
+  killIsolate();
+
+  print('\n=== Пример завершен ===');
 }
 
-/// Простой сериализатор строк.
-///
-/// Преобразует строки в UTF-8 байты и обратно.
-class StringSerializer implements IRpcSerializer<String> {
-  @override
-  Uint8List serialize(String message) {
-    return Uint8List.fromList(message.codeUnits);
-  }
+/// Пользовательская функция сервера, получающая готовый транспорт
+@pragma('vm:entry-point')
+void customEchoServer(
+  IRpcTransport transport,
+  Map<String, dynamic> customParams,
+) {
+  print('customParams: $customParams');
+  print('СЕРВЕР: Запущен эхо-сервер с новым API');
+  final log = customParams['log'] as void Function(String);
 
+  // Создаем сериализатор
+  final serializer = SimpleStringSerializer();
+
+  // Создаем двунаправленный стрим-сервер
+  final server = BidirectionalStreamServer<String, String>(
+    transport: transport,
+    requestSerializer: serializer,
+    responseSerializer: serializer,
+  );
+
+  // Настраиваем префикс для ответов
+  const messagePrefix = '[ECHO]: ';
+
+  // Слушаем входящие запросы
+  server.requests.listen((request) {
+    final requestStr = request.toString();
+    log('СЕРВЕР: Получен запрос: "$requestStr"');
+
+    // Обработка запроса и отправка эхо-ответа
+    final response = '$messagePrefix$requestStr';
+    log('СЕРВЕР: Отправляем ответ: "$response"');
+    server.send(response);
+  });
+
+  log('СЕРВЕР: Эхо-сервер запущен и готов к обработке запросов');
+}
+
+/// Простой сериализатор строк
+class SimpleStringSerializer implements IRpcSerializer<String> {
   @override
   String deserialize(Uint8List bytes) {
-    return String.fromCharCodes(bytes);
+    return utf8.decode(bytes);
   }
-}
 
-/// Пример запуска RPC через изоляты.
-///
-/// Запускает пример и выводит результат в консоль.
-Future<void> runIsolateExample() async {
-  print('Запуск примера RPC через изоляты...');
-  await IsolateRpcExample.run();
-  print('Пример завершен.');
+  @override
+  Uint8List serialize(String message) {
+    return Uint8List.fromList(utf8.encode(message));
+  }
 }
