@@ -9,6 +9,7 @@ part 'isolate_example.dart';
 part 'stream_types_example.dart';
 
 void main() async {
-  // Запускаем все примеры
+  await runInMemoryExample();
+  await runIsolateExample();
   await runStreamTypesExample();
 }

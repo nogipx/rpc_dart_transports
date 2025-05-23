@@ -17,7 +17,7 @@ class StreamTypesExample {
     print('\n=== Пример серверного стриминга (1 запрос -> N ответов) ===\n');
 
     // Создаем пару соединенных транспортов
-    final (clientTransport, serverTransport) = InMemoryTransportPair.create();
+    final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
 
     // Создаем сериализаторы для строк
     final stringSerializer = const SimpleStringSerializer();
@@ -94,7 +94,7 @@ class StreamTypesExample {
     print('\n=== Пример клиентского стриминга (N запросов -> 1 ответ) ===\n');
 
     // Создаем пару соединенных транспортов
-    final (clientTransport, serverTransport) = InMemoryTransportPair.create();
+    final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
 
     // Создаем сериализаторы для строк
     final stringSerializer = const SimpleStringSerializer();

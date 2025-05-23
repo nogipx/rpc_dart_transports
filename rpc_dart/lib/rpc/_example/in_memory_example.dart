@@ -13,7 +13,7 @@ class InMemoryRpcExample {
     print('Запуск примера двунаправленного стрима через транспорт в памяти...');
 
     // Создаем пару соединенных транспортов для клиента и сервера
-    final (clientTransport, serverTransport) = InMemoryTransportPair.create();
+    final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
 
     // Создаем сериализаторы для строк
     final stringSerializer = SimpleStringSerializer();

@@ -155,13 +155,25 @@ final class ClientStreamServer<TRequest, TResponse> {
   Future<void> _setupRequestHandler(
     Future<TResponse> Function(Stream<TRequest> requests) handler,
   ) async {
-    try {
-      final response = await handler(_innerServer.requests);
+    // Создаем контроллер, который будет управлять потоком запросов
+    final requestsController = StreamController<TRequest>();
+
+    // Перенаправляем запросы из внутреннего сервера в контроллер
+    _innerServer.requests.listen((request) => requestsController.add(request),
+        onDone: () => requestsController.close(),
+        onError: (e) {
+          requestsController.addError(e);
+          requestsController.close();
+        });
+
+    // Запускаем обработчик асинхронно
+    handler(requestsController.stream).then((response) async {
+      // Когда ответ готов, отправляем его
       await _innerServer.send(response);
       await _innerServer.finishReceiving();
-    } catch (e) {
+    }).catchError((e) async {
       await _innerServer.sendError(RpcStatus.INTERNAL, e.toString());
-    }
+    });
   }
 
   /// Закрывает стрим и освобождает ресурсы
