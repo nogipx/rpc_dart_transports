@@ -1,4 +1,4 @@
-part of '../_index.dart';
+part of '_index.dart';
 
 /// Пример использования двунаправленного стрима через транспорт в памяти.
 ///
@@ -44,7 +44,7 @@ class InMemoryRpcExample {
         case 'завершить':
           server.send('Сервер завершает работу...');
           // Завершаем отправку с успешным статусом
-          server.finishSending();
+          server.finishReceiving();
           break;
         default:
           server.send('Эхо: $request');

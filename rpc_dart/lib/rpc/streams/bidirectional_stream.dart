@@ -35,7 +35,7 @@ final class BidirectionalStreamClient<TRequest, TResponse> {
   late final RpcMessageParser _parser;
 
   /// Поток для отправки запросов (для внутреннего использования)
-  Stream<TRequest> get requestStream => _requestController.stream;
+  Stream<TRequest> get requests => _requestController.stream;
 
   /// Поток входящих ответов от сервера.
   ///
@@ -63,7 +63,7 @@ final class BidirectionalStreamClient<TRequest, TResponse> {
         _responseSerializer = responseSerializer,
         _parser = RpcMessageParser(logger: logger),
         _logger = logger {
-    _setupStreams();
+    unawaited(_setupStreams());
   }
 
   /// Настраивает потоки данных между приложением и транспортом.
@@ -71,7 +71,7 @@ final class BidirectionalStreamClient<TRequest, TResponse> {
   /// Создает два пайплайна:
   /// 1. От приложения к сети: сериализация и отправка запросов
   /// 2. От сети к приложению: получение, парсинг и десериализация ответов
-  void _setupStreams() {
+  Future<void> _setupStreams() async {
     // Настраиваем отправку запросов
     _requestController.stream.listen(
       (request) async {
@@ -86,9 +86,27 @@ final class BidirectionalStreamClient<TRequest, TResponse> {
       },
     );
 
+    add(RpcMessage<TResponse> response) {
+      if (!_responseController.isClosed) {
+        _responseController.add(response);
+      }
+    }
+
+    error(Object error, [StackTrace? stackTrace]) {
+      if (!_responseController.isClosed) {
+        _responseController.addError(error, stackTrace);
+      }
+    }
+
+    done() async {
+      if (!_responseController.isClosed) {
+        await _responseController.close();
+      }
+    }
+
     // Настраиваем прием ответов
     _transport.incomingMessages.listen(
-      (message) {
+      (message) async {
         if (message.isMetadataOnly) {
           // Обрабатываем метаданные
           final statusCode =
@@ -108,13 +126,12 @@ final class BidirectionalStreamClient<TRequest, TResponse> {
                       ?.getHeaderValue(RpcConstants.GRPC_MESSAGE_HEADER) ??
                   '';
               _logger?.error('Ошибка gRPC: $code - $errorMessage');
-              _responseController
-                  .addError(Exception('gRPC error $code: $errorMessage'));
+              error(Exception('gRPC error $code: $errorMessage'));
             }
 
             if (message.isEndOfStream) {
               _logger?.debug('Получен END_STREAM, закрываем контроллер');
-              _responseController.close();
+              await done();
             }
           }
 
@@ -125,7 +142,7 @@ final class BidirectionalStreamClient<TRequest, TResponse> {
             isEndOfStream: message.isEndOfStream,
           );
 
-          _responseController.add(metadataMessage);
+          add(metadataMessage);
         } else if (message.payload != null) {
           // Обрабатываем сообщения
           final messageBytes = message.payload!;
@@ -139,32 +156,30 @@ final class BidirectionalStreamClient<TRequest, TResponse> {
             try {
               final response = _responseSerializer.deserialize(msgBytes);
               final responseMessage = RpcMessage.withPayload(response);
-              _responseController.add(responseMessage);
+              add(responseMessage);
             } catch (e, stackTrace) {
               _logger?.error(
                 'Ошибка при десериализации: $e',
                 error: e,
                 stackTrace: stackTrace,
               );
-              _responseController.addError(e, stackTrace);
+              error(e, stackTrace);
             }
           }
         }
       },
-      onError: (error, stackTrace) {
+      onError: (e, stackTrace) async {
         _logger?.error(
-          'Ошибка от транспорта: $error',
-          error: error,
+          'Ошибка от транспорта: $e',
+          error: e,
           stackTrace: stackTrace,
         );
-        _responseController.addError(error, stackTrace);
-        _responseController.close();
+        error(e, stackTrace);
+        await done();
       },
-      onDone: () {
+      onDone: () async {
         _logger?.debug('Транспорт завершил поток сообщений');
-        if (!_responseController.isClosed) {
-          _responseController.close();
-        }
+        await done();
       },
     );
   }
@@ -176,7 +191,7 @@ final class BidirectionalStreamClient<TRequest, TResponse> {
   /// пока не вызван метод finishSending().
   ///
   /// [request] Объект запроса для отправки
-  void send(TRequest request) {
+  Future<void> send(TRequest request) async {
     if (!_requestController.isClosed) {
       _requestController.add(request);
     }
@@ -187,9 +202,9 @@ final class BidirectionalStreamClient<TRequest, TResponse> {
   /// Сигнализирует серверу, что клиент закончил отправку запросов.
   /// После вызова этого метода новые запросы отправлять нельзя,
   /// но можно продолжать получать ответы от сервера.
-  void finishSending() {
+  Future<void> finishSending() async {
     if (!_requestController.isClosed) {
-      _requestController.close();
+      await _requestController.close();
     }
   }
 
@@ -265,7 +280,7 @@ final class BidirectionalStreamServer<TRequest, TResponse> {
         _responseSerializer = responseSerializer,
         _parser = RpcMessageParser(logger: logger),
         _logger = logger {
-    _setupStreams();
+    unawaited(_setupStreams());
   }
 
   /// Настраивает потоки данных для обработки запросов и отправки ответов.
@@ -273,7 +288,7 @@ final class BidirectionalStreamServer<TRequest, TResponse> {
   /// 1. Инициализирует отправку начальных заголовков клиенту
   /// 2. Настраивает пайплайн для отправки ответов
   /// 3. Настраивает обработку входящих сообщений от клиента
-  void _setupStreams() async {
+  Future<void> _setupStreams() async {
     // Отправляем начальные заголовки
     final initialHeaders = RpcMetadata.forServerInitialResponse();
     await _transport.sendMetadata(initialHeaders);
@@ -343,7 +358,7 @@ final class BidirectionalStreamServer<TRequest, TResponse> {
   /// пока не вызван метод finishSending().
   ///
   /// [response] Объект ответа для отправки
-  void send(TResponse response) {
+  Future<void> send(TResponse response) async {
     if (!_responseController.isClosed) {
       _responseController.add(response);
     }
@@ -371,9 +386,9 @@ final class BidirectionalStreamServer<TRequest, TResponse> {
   /// Сигнализирует клиенту, что сервер закончил отправку ответов.
   /// Автоматически отправляет трейлер с успешным статусом.
   /// После вызова этого метода новые ответы отправлять нельзя.
-  void finishSending() {
+  Future<void> finishReceiving() async {
     if (!_responseController.isClosed) {
-      _responseController.close();
+      await _responseController.close();
     }
   }
 
@@ -384,7 +399,7 @@ final class BidirectionalStreamServer<TRequest, TResponse> {
   /// - Закрывает транспортное соединение
   /// - Отменяет все подписки
   Future<void> close() async {
-    finishSending();
+    await finishReceiving();
     await _transport.close();
   }
 }

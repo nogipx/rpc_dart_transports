@@ -1,13 +1,7 @@
-import 'dart:async';
-import 'dart:convert';
-import 'dart:typed_data';
-
-import 'package:rpc_dart/logger.dart';
-
-import '../_index.dart';
+part of '_index.dart';
 
 /// Пример использования изолята с пользовательской entrypoint функцией
-void main() async {
+Future<void> runIsolateExample() async {
   print('\n=== Запуск примера с пользовательским entrypoint ===\n');
 
   // Запускаем изолят с пользовательской entrypoint функцией

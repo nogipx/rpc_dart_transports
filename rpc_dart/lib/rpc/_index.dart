@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'dart:isolate';
 
-import 'package:rpc_dart/rpc/_example/isolate_example.dart';
 import 'package:rpc_dart/rpc_dart.dart';
 
 part 'core/rpc.dart';
@@ -13,9 +12,9 @@ part 'core/transport.dart';
 part 'transports/isolate_transport.dart';
 part 'transports/in_memory_transport.dart';
 
-part '_example/in_memory_example.dart';
-
 part 'streams/bidirectional_stream.dart';
+part 'streams/server_stream.dart';
+part 'streams/client_stream.dart';
 
 /// Фабрика для создания обработчиков двунаправленных стримов.
 ///
