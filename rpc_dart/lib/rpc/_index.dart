@@ -11,10 +11,12 @@ part 'core/transport.dart';
 
 part 'transports/isolate_transport.dart';
 part 'transports/in_memory_transport.dart';
+part 'transports/multiplex_transport.dart';
 
 part 'streams/bidirectional_stream.dart';
 part 'streams/server_stream.dart';
 part 'streams/client_stream.dart';
+part 'streams/unary.dart';
 
 /// Фабрика для создания обработчиков двунаправленных стримов.
 ///
