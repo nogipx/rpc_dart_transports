@@ -22,119 +22,6 @@ abstract interface class IRpcSerializableMessage {
   Map<String, dynamic> toJson();
 }
 
-/// Внутренняя обертка для запросов (только для библиотеки)
-class RpcRequestEnvelope<T extends IRpcSerializableMessage> {
-  final T payload;
-  final String requestId;
-  final Map<String, dynamic>? metadata;
-
-  RpcRequestEnvelope({
-    required this.payload,
-    required this.requestId,
-    this.metadata,
-  });
-
-  factory RpcRequestEnvelope.auto(T payload, {Map<String, dynamic>? metadata}) {
-    return RpcRequestEnvelope(
-      payload: payload,
-      requestId: _generateRequestId(),
-      metadata: metadata,
-    );
-  }
-
-  static String _generateRequestId() {
-    return 'req_${DateTime.now().millisecondsSinceEpoch}_${_counter++}';
-  }
-
-  static int _counter = 0;
-
-  Map<String, dynamic> toJson() {
-    return {
-      'payload': payload.toJson(),
-      'requestId': requestId,
-      if (metadata != null) 'metadata': metadata,
-    };
-  }
-
-  static RpcRequestEnvelope<T> fromJson<T extends IRpcSerializableMessage>(
-    Map<String, dynamic> json,
-    T Function(dynamic) payloadParser,
-  ) {
-    return RpcRequestEnvelope<T>(
-      payload: payloadParser(json['payload']),
-      requestId: json['requestId'],
-      metadata: json['metadata'],
-    );
-  }
-}
-
-/// Внутренняя обертка для ответов (только для библиотеки)
-class RpcResponseEnvelope<T extends IRpcSerializableMessage> {
-  final T? payload;
-  final String requestId;
-  final bool isSuccess;
-  final String? errorMessage;
-  final Map<String, dynamic>? metadata;
-
-  const RpcResponseEnvelope({
-    this.payload,
-    required this.requestId,
-    this.isSuccess = true,
-    this.errorMessage,
-    this.metadata,
-  });
-
-  factory RpcResponseEnvelope.success(T payload, String requestId,
-      {Map<String, dynamic>? metadata}) {
-    return RpcResponseEnvelope(
-      payload: payload,
-      requestId: requestId,
-      isSuccess: true,
-      metadata: metadata,
-    );
-  }
-
-  factory RpcResponseEnvelope.error(String requestId, String errorMessage,
-      {Map<String, dynamic>? metadata}) {
-    return RpcResponseEnvelope<T>(
-      payload: null,
-      requestId: requestId,
-      isSuccess: false,
-      errorMessage: errorMessage,
-      metadata: metadata,
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      if (payload != null) 'payload': payload!.toJson(),
-      'requestId': requestId,
-      'isSuccess': isSuccess,
-      if (errorMessage != null) 'errorMessage': errorMessage,
-      if (metadata != null) 'metadata': metadata,
-    };
-  }
-
-  static RpcResponseEnvelope<T> fromJson<T extends IRpcSerializableMessage>(
-    Map<String, dynamic> json,
-    T Function(dynamic)? payloadParser,
-  ) {
-    return RpcResponseEnvelope<T>(
-      payload: json['payload'] != null && payloadParser != null
-          ? payloadParser(json['payload'])
-          : null,
-      requestId: json['requestId'],
-      isSuccess: json['isSuccess'] ?? true,
-      errorMessage: json['errorMessage'],
-      metadata: json['metadata'],
-    );
-  }
-}
-
-// ============================================
-/// ВАЛИДАЦИЯ
-// ============================================
-
 /// Результат валидации
 sealed class ValidationResult {
   const ValidationResult();
@@ -148,10 +35,6 @@ final class ValidationFailure extends ValidationResult {
   final List<String> errors;
   const ValidationFailure(this.errors);
 }
-
-/// ============================================
-/// ТИПЫ МЕТОДОВ И МЕТАДАННЫЕ
-/// ============================================
 
 /// Типы RPC методов
 enum RpcMethodType {
@@ -429,17 +312,8 @@ class RpcSerializer<T extends IRpcSerializableMessage>
 
   @override
   Uint8List serialize(T message) {
-    final envelope = RpcRequestEnvelope(
-      payload: message,
-      requestId: RpcRequestEnvelope._generateRequestId(),
-    );
-
-    final envelopeJson = {
-      'payload': message.toJson(),
-      'requestId': envelope.requestId,
-    };
-
-    final jsonString = jsonEncode(envelopeJson);
+    final messageJson = message.toJson();
+    final jsonString = jsonEncode(messageJson);
     return Uint8List.fromList(utf8.encode(jsonString));
   }
 
