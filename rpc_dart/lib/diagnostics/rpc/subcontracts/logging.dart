@@ -5,7 +5,7 @@
 part of '../_contract.dart';
 
 /// Контракт для работы с логами
-abstract class _RpcLoggingContract extends RpcServiceContract {
+abstract class _RpcLoggingContract extends OldRpcServiceContract {
   // Константы для имен методов
   static const methodLogMetric = 'logMetric';
   static const methodStreamLogs = 'streamLogs';

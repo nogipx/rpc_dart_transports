@@ -7,7 +7,7 @@ import 'package:rpc_dart/rpc_dart.dart';
 
 import '../models/example_models.dart';
 
-final class ContractModuleExample extends RpcServiceContract {
+final class ContractModuleExample extends OldRpcServiceContract {
   ContractModuleExample() : super('AppService');
 
   @override
@@ -18,7 +18,7 @@ final class ContractModuleExample extends RpcServiceContract {
   }
 }
 
-class UserContract extends RpcServiceContract {
+class UserContract extends OldRpcServiceContract {
   UserContract() : super('UserService');
 
   @override
@@ -33,7 +33,7 @@ class UserContract extends RpcServiceContract {
   }
 }
 
-class AuthContract extends RpcServiceContract {
+class AuthContract extends OldRpcServiceContract {
   AuthContract() : super('AuthService');
 
   @override
@@ -84,7 +84,7 @@ void useModularApproach() {
 }
 
 // Добавляет методы для пользователей напрямую в контракт с префиксом
-void _addUserModule(RpcServiceContract contract, {String? prefix}) {
+void _addUserModule(OldRpcServiceContract contract, {String? prefix}) {
   final methodPrefix = prefix != null ? '$prefix.' : '';
 
   contract.addUnaryRequestMethod<UserRequest, UserResponse>(
@@ -126,7 +126,7 @@ void _addUserModule(RpcServiceContract contract, {String? prefix}) {
 
 // Вспомогательные методы для настройки контрактов
 
-void _setupAuthContract(RpcServiceContract contract) {
+void _setupAuthContract(OldRpcServiceContract contract) {
   contract.addUnaryRequestMethod<AuthRequest, AuthResponse>(
     methodName: 'login',
     handler: (req) async => AuthResponse(),

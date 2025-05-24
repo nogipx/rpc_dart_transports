@@ -3,7 +3,7 @@ import 'package:rpc_dart/rpc_dart.dart';
 import 'unary_models.dart';
 
 /// Базовый контракт для базовых операций
-abstract base class BasicServiceContract extends RpcServiceContract {
+abstract base class BasicServiceContract extends OldRpcServiceContract {
   BasicServiceContract() : super('BasicService');
 
   @override

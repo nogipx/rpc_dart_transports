@@ -5,7 +5,7 @@
 part of '../test_contract.dart';
 
 /// Контракт для тестирования сериализации
-abstract class SerializationTestsSubcontract extends RpcServiceContract {
+abstract class SerializationTestsSubcontract extends OldRpcServiceContract {
   // Константы для имен методов
   static const methodJsonSerialization = 'jsonSerialization';
   static const methodMsgPackSerialization = 'msgPackSerialization';

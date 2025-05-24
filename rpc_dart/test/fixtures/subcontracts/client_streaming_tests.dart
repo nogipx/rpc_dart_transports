@@ -22,7 +22,7 @@ class ClientStreamResponse extends TestMessage {
 }
 
 /// Контракт для тестирования клиентского стриминга
-abstract class ClientStreamingTestsSubcontract extends RpcServiceContract {
+abstract class ClientStreamingTestsSubcontract extends OldRpcServiceContract {
   // Константы для имен методов
   static const methodCollectData = 'collectData';
   static const methodCountItems = 'countItems';

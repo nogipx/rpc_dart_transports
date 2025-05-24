@@ -22,7 +22,7 @@ class ServerStreamResponse extends TestMessage {
 }
 
 /// Контракт для тестирования серверного стриминга
-abstract class ServerStreamingTestsSubcontract extends RpcServiceContract {
+abstract class ServerStreamingTestsSubcontract extends OldRpcServiceContract {
   // Константы для имен методов
   static const methodGenerateItems = 'generateItems';
   static const methodEchoStream = 'echoStream';

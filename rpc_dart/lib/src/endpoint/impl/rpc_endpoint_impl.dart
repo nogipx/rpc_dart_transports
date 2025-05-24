@@ -137,7 +137,7 @@ final class _RpcEndpointImpl
 
   /// Регистрирует контракт сервиса
   void registerServiceContract(
-    IRpcServiceContract<IRpcSerializableMessage> contract,
+    OldIRpcServiceContract<IRpcSerializableMessage> contract,
   ) {
     // Проверяем, не зарегистрирован ли уже контракт с таким именем
     if (_registry.getServiceContract(contract.serviceName) != null) {
@@ -151,12 +151,12 @@ final class _RpcEndpointImpl
 
   /// Регистрирует методы из декларативного контракта
   void _registerContract(
-    IRpcServiceContract<IRpcSerializableMessage> contract,
+    OldIRpcServiceContract<IRpcSerializableMessage> contract,
   ) {
     _registry.registerContract(contract);
 
     // Если это RpcServiceContract, используем объединение реестров
-    if (contract is RpcServiceContract) {
+    if (contract is OldRpcServiceContract) {
       // Объединяем реестр контракта с реестром эндпоинта
       contract.mergeInto(_registry);
     } else {
@@ -164,7 +164,7 @@ final class _RpcEndpointImpl
       contract.setup();
 
       // Регистрируем все подконтракты, если они есть
-      if (contract is RpcServiceContract) {
+      if (contract is OldRpcServiceContract) {
         for (final subContract in contract.getSubContracts()) {
           if (_registry.getServiceContract(subContract.serviceName) == null) {
             // Рекурсивно регистрируем подконтракт (только если он еще не зарегистрирован)
@@ -274,7 +274,7 @@ final class _RpcEndpointImpl
 
   /// Получает контракт сервиса по имени
   @override
-  IRpcServiceContract<IRpcSerializableMessage>? getServiceContract(
+  OldIRpcServiceContract<IRpcSerializableMessage>? getServiceContract(
     String serviceName,
   ) {
     return _registry.getServiceContract(serviceName);
@@ -328,7 +328,8 @@ final class _RpcEndpointImpl
   }
 
   @override
-  Map<String, IRpcServiceContract<IRpcSerializableMessage>> getAllContracts() {
+  Map<String, OldIRpcServiceContract<IRpcSerializableMessage>>
+      getAllContracts() {
     return _registry.getAllContracts();
   }
 
@@ -343,7 +344,8 @@ final class _RpcEndpointImpl
   }
 
   @override
-  void registerContract(IRpcServiceContract<IRpcSerializableMessage> contract) {
+  void registerContract(
+      OldIRpcServiceContract<IRpcSerializableMessage> contract) {
     _registry.registerContract(contract);
   }
 

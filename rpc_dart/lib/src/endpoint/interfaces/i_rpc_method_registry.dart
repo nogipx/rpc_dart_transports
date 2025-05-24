@@ -8,16 +8,17 @@ part of '../_index.dart';
 /// Предоставляет методы для управления регистрацией и поиском сервисных контрактов и их методов
 abstract interface class IRpcMethodRegistry {
   /// Возвращает зарегистрированный контракт сервиса по имени
-  IRpcServiceContract<IRpcSerializableMessage>? getServiceContract(
+  OldIRpcServiceContract<IRpcSerializableMessage>? getServiceContract(
     String serviceName,
   );
 
   /// Возвращает все зарегистрированные контракты
-  Map<String, IRpcServiceContract<IRpcSerializableMessage>> getAllContracts();
+  Map<String, OldIRpcServiceContract<IRpcSerializableMessage>>
+      getAllContracts();
 
   /// Регистрирует сервисный контракт и все его методы
   void registerContract(
-    IRpcServiceContract<IRpcSerializableMessage> contract,
+    OldIRpcServiceContract<IRpcSerializableMessage> contract,
   );
 
   /// Регистрирует отдельный метод

@@ -5,7 +5,7 @@
 part of '../test_contract.dart';
 
 /// Контракт для тестирования транспортов
-abstract class TransportTestsSubcontract extends RpcServiceContract {
+abstract class TransportTestsSubcontract extends OldRpcServiceContract {
   // Константы для имен методов
   static const methodMemoryTransport = 'memoryTransport';
   static const methodJsonRpcTransport = 'jsonRpcTransport';

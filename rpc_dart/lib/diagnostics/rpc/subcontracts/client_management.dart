@@ -5,7 +5,7 @@
 part of '../_contract.dart';
 
 /// Контракт для управления клиентами
-abstract class _RpcClientManagementContract extends RpcServiceContract {
+abstract class _RpcClientManagementContract extends OldRpcServiceContract {
   // Константы для имен методов
   static const methodRegisterClient = 'registerClient';
   static const methodPing = 'ping';

@@ -7,7 +7,7 @@ import 'bidirectional.dart';
 import 'bidirectional_models.dart';
 
 /// Абстрактный контракт чат-сервиса
-abstract base class ChatServiceContract extends RpcServiceContract {
+abstract base class ChatServiceContract extends OldRpcServiceContract {
   ChatServiceContract() : super('ChatService');
 
   @override

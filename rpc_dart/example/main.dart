@@ -161,7 +161,7 @@ void main() async {
 }
 
 /// Контракт для демонстрационного сервиса
-abstract class DemoServiceContract extends RpcServiceContract {
+abstract class DemoServiceContract extends OldRpcServiceContract {
   DemoServiceContract() : super('demo_service');
 
   @override

@@ -56,7 +56,7 @@ abstract interface class IRpcEndpoint {
   Future<void> close();
 
   /// Получает контракт сервиса по имени
-  IRpcServiceContract<IRpcSerializableMessage>? getServiceContract(
+  OldIRpcServiceContract<IRpcSerializableMessage>? getServiceContract(
     String serviceName,
   );
 

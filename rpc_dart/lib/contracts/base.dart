@@ -12,11 +12,8 @@ import 'dart:typed_data';
 
 import 'package:rpc_dart/logger.dart';
 import 'package:rpc_dart/rpc/_index.dart';
-import 'package:rpc_dart/src/contracts/_index.dart';
 
-/// ============================================
-/// ОСНОВНОЙ ИНТЕРФЕЙС ДЛЯ RPC
-/// ============================================
+import 'rpc_service_contract.dart';
 
 /// Основной интерфейс для всех RPC сообщений - ОБЯЗАТЕЛЬНЫЙ!
 /// Все типы запросов и ответов должны реализовывать этот интерфейс
@@ -24,10 +21,6 @@ abstract interface class IRpcSerializableMessage {
   /// Сериализует в JSON - ОБЯЗАТЕЛЬНЫЙ метод!
   Map<String, dynamic> toJson();
 }
-
-/// ============================================
-/// ВНУТРЕННИЕ ENVELOPES ДЛЯ БИБЛИОТЕКИ
-/// ============================================
 
 /// Внутренняя обертка для запросов (только для библиотеки)
 class RpcRequestEnvelope<T extends IRpcSerializableMessage> {
@@ -262,7 +255,7 @@ class RpcMethodRegistration {
 /// ============================================
 
 /// Основной RPC endpoint для работы с типобезопасными моделями
-class RpcEndpoint {
+final class RpcEndpoint {
   final IRpcTransport _transport;
   final Map<String, dynamic> _contracts = {};
   final Map<String, RpcMethodRegistration> _methods = {};
@@ -293,7 +286,7 @@ class RpcEndpoint {
     _contracts[serviceName] = contract;
     contract.setup();
 
-    final methods = contract.methods as Map<String, RpcMethodRegistration>;
+    final methods = contract.methods;
     for (final entry in methods.entries) {
       final methodName = entry.key;
       final method = entry.value;

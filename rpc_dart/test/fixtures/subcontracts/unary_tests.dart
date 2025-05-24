@@ -22,7 +22,7 @@ class UnaryResponse extends TestMessage {
 }
 
 /// Контракт для тестирования унарных методов
-abstract class UnaryTestsSubcontract extends RpcServiceContract {
+abstract class UnaryTestsSubcontract extends OldRpcServiceContract {
   // Константы для имен методов
   static const methodSimpleUnary = 'simpleUnary';
   static const methodEchoUnary = 'echoUnary';

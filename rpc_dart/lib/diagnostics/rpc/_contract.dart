@@ -16,7 +16,8 @@ part 'rpc_diagnostic_server_contract.dart';
 /// Базовый контракт диагностического сервиса
 ///
 /// Объединяет все подконтракты в один интерфейс
-abstract base class _RpcDiagnosticServiceContract extends RpcServiceContract {
+abstract base class _RpcDiagnosticServiceContract
+    extends OldRpcServiceContract {
   final _RpcMetricsContract metrics;
   final _RpcLoggingContract logging;
   final _RpcTracingContract tracing;

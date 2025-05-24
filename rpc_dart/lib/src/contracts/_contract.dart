@@ -31,9 +31,9 @@ abstract class IRpcSerializableMessage {
 }
 
 /// Базовый интерфейс для всех сервисных контрактов
-abstract interface class IRpcServiceContract<
+abstract interface class OldIRpcServiceContract<
     BaseMessage extends IRpcSerializableMessage> {
-  const IRpcServiceContract();
+  const OldIRpcServiceContract();
 
   /// Уникальное имя сервиса
   String get serviceName;

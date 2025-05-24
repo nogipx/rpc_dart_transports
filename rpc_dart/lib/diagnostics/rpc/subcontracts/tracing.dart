@@ -5,7 +5,7 @@
 part of '../_contract.dart';
 
 /// Контракт для трассировки
-abstract class _RpcTracingContract extends RpcServiceContract {
+abstract class _RpcTracingContract extends OldRpcServiceContract {
   // Константы для имен методов
   static const methodTraceEvent = 'traceEvent';
 

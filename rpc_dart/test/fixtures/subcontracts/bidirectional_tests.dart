@@ -22,7 +22,7 @@ class BidirectionalResponse extends TestMessage {
 }
 
 /// Контракт для тестирования двунаправленного стриминга
-abstract class BidirectionalTestsSubcontract extends RpcServiceContract {
+abstract class BidirectionalTestsSubcontract extends OldRpcServiceContract {
   // Константы для имен методов
   static const methodEchoStream = 'echoStream';
   static const methodTransformStream = 'transformStream';

@@ -40,7 +40,7 @@ class TestMessage extends IRpcSerializableMessage {
 
 /// Базовый контракт для тестов
 /// Объединяет все группы тестов в единый интерфейс
-abstract base class TestFixtureBaseContract extends RpcServiceContract {
+abstract base class TestFixtureBaseContract extends OldRpcServiceContract {
   final UnaryTestsSubcontract unaryTests;
   final ClientStreamingTestsSubcontract clientStreamingTests;
   final ServerStreamingTestsSubcontract serverStreamingTests;

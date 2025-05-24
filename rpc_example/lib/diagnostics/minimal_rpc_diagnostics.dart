@@ -58,7 +58,7 @@ void main() async {
 }
 
 /// Базовый контракт эхо-сервиса
-abstract class EchoServiceContract extends RpcServiceContract {
+abstract class EchoServiceContract extends OldRpcServiceContract {
   static const String echoMethodName = 'echo';
 
   EchoServiceContract() : super('EchoService');

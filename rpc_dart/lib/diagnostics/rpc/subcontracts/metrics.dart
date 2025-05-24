@@ -5,7 +5,7 @@
 part of '../_contract.dart';
 
 /// Контракт для отправки метрик различных типов
-abstract class _RpcMetricsContract extends RpcServiceContract {
+abstract class _RpcMetricsContract extends OldRpcServiceContract {
   // Константы для имен методов
   static const methodSendMetrics = 'sendMetrics';
   static const methodLatencyMetric = 'latencyMetric';

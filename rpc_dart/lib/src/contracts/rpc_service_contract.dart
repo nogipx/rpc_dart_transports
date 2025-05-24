@@ -9,19 +9,20 @@ import 'package:meta/meta.dart';
 
 /// Контракт, объединяющий несколько других контрактов
 /// для модульной организации сервисов
-abstract class RpcServiceContract
-    implements IRpcServiceContract<IRpcSerializableMessage> {
+abstract class OldRpcServiceContract
+    implements OldIRpcServiceContract<IRpcSerializableMessage> {
   @override
   final String serviceName;
 
-  final List<IRpcServiceContract<IRpcSerializableMessage>> _subContracts = [];
+  final List<OldIRpcServiceContract<IRpcSerializableMessage>> _subContracts =
+      [];
 
   /// Реестр методов
   final IRpcMethodRegistry _methodRegistry;
 
   /// Создает новый сервисный контракт с указанным именем
   /// Если [methodRegistry] не указан, создается новый экземпляр [RpcMethodRegistry]
-  RpcServiceContract(
+  OldRpcServiceContract(
     this.serviceName, {
     IRpcMethodRegistry? methodRegistry,
   }) : _methodRegistry = methodRegistry ?? RpcMethodRegistry();
@@ -55,7 +56,7 @@ abstract class RpcServiceContract
 
     // Обрабатываем все подконтракты
     for (final subContract in _subContracts) {
-      if (subContract is RpcServiceContract) {
+      if (subContract is OldRpcServiceContract) {
         subContract.mergeInto(targetRegistry);
       } else {
         // Для обратной совместимости с обычными IRpcServiceContract
@@ -67,17 +68,18 @@ abstract class RpcServiceContract
   }
 
   /// Добавляет подконтракт в композитный контракт
-  void addSubContract(IRpcServiceContract<IRpcSerializableMessage> contract) {
+  void addSubContract(
+      OldIRpcServiceContract<IRpcSerializableMessage> contract) {
     _subContracts.add(contract);
 
     // Если подконтракт - это RpcServiceContract, передаем ему наш реестр
-    if (contract is RpcServiceContract) {
+    if (contract is OldRpcServiceContract) {
       contract.mergeInto(_methodRegistry);
     }
   }
 
   /// Возвращает список всех подконтрактов (непосредственных дочерних)
-  List<IRpcServiceContract<IRpcSerializableMessage>> getSubContracts() {
+  List<OldIRpcServiceContract<IRpcSerializableMessage>> getSubContracts() {
     return List.unmodifiable(_subContracts);
   }
 

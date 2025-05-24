@@ -243,8 +243,8 @@ class RpcMethodInvocationException implements Exception {
 /// Класс для управления регистрацией и поиском сервисных контрактов и их методов
 final class RpcMethodRegistry implements IRpcMethodRegistry {
   /// Зарегистрированные контракты сервисов
-  final Map<String, IRpcServiceContract<IRpcSerializableMessage>> _contracts =
-      {};
+  final Map<String, OldIRpcServiceContract<IRpcSerializableMessage>>
+      _contracts = {};
 
   /// Структурированная информация о зарегистрированных методах
   final Map<
@@ -259,20 +259,22 @@ final class RpcMethodRegistry implements IRpcMethodRegistry {
 
   /// Возвращает зарегистрированный контракт сервиса по имени
   @override
-  IRpcServiceContract<IRpcSerializableMessage>? getServiceContract(
+  OldIRpcServiceContract<IRpcSerializableMessage>? getServiceContract(
       String serviceName) {
     return _contracts[serviceName];
   }
 
   /// Возвращает все зарегистрированные контракты
   @override
-  Map<String, IRpcServiceContract<IRpcSerializableMessage>> getAllContracts() {
+  Map<String, OldIRpcServiceContract<IRpcSerializableMessage>>
+      getAllContracts() {
     return Map.unmodifiable(_contracts);
   }
 
   /// Регистрирует сервисный контракт и все его методы
   @override
-  void registerContract(IRpcServiceContract<IRpcSerializableMessage> contract) {
+  void registerContract(
+      OldIRpcServiceContract<IRpcSerializableMessage> contract) {
     if (_contracts.containsKey(contract.serviceName)) {
       _logger.error(
           'Контракт сервиса ${contract.serviceName} уже зарегистрирован');
@@ -283,7 +285,7 @@ final class RpcMethodRegistry implements IRpcMethodRegistry {
     _contracts[contract.serviceName] = contract;
 
     // Если контракт имеет собственный реестр, объединяем его с текущим
-    if (contract is RpcServiceContract) {
+    if (contract is OldRpcServiceContract) {
       // Вызываем setup для инициализации всех методов
       contract.setup();
 
@@ -306,7 +308,7 @@ final class RpcMethodRegistry implements IRpcMethodRegistry {
 
   /// Собирает и регистрирует все методы контракта
   void _collectAndRegisterMethods(
-      IRpcServiceContract<IRpcSerializableMessage> contract) {
+      OldIRpcServiceContract<IRpcSerializableMessage> contract) {
     for (final method in contract.methods) {
       final methodName = method.methodName;
       final handler = contract.getMethodHandler(methodName);
@@ -955,7 +957,7 @@ void debugPrintRegisteredContracts(IRpcMethodRegistry registry, String label) {
     print('$contractName (${contract.runtimeType})');
     print('  • Методов: ${contract.methods.length}');
 
-    if (contract is RpcServiceContract) {
+    if (contract is OldRpcServiceContract) {
       final subContracts = contract.getSubContracts();
       print('  • Субконтрактов: ${subContracts.length}');
       for (final subContract in subContracts) {

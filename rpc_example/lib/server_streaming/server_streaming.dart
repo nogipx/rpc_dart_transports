@@ -45,7 +45,7 @@ Future<void> main({bool debug = true}) async {
   printHeader('Пример завершен');
 }
 
-abstract class TaskServiceContract extends RpcServiceContract {
+abstract class TaskServiceContract extends OldRpcServiceContract {
   TaskServiceContract() : super('TaskService');
 
   static const String methodName = 'startTask';
