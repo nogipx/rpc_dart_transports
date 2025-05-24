@@ -1,14 +1,35 @@
 import 'dart:async';
 import 'calculator_contract.dart';
+import 'calculator_interface.dart';
 import '../_index.dart';
 
 /// Серверная реализация калькулятора
-class CalculatorServer extends CalculatorContract {
+class CalculatorServer extends RpcServerContract
+    implements ICalculatorContract {
   /// Настраиваемая задержка (мс) для имитации вычислений
   final int simulatedDelayMs;
 
   /// Конструктор с опциональной настройкой задержки
-  CalculatorServer({this.simulatedDelayMs = 0});
+  CalculatorServer({this.simulatedDelayMs = 0}) : super('CalculatorService');
+
+  @override
+  void setup() {
+    // Унарный метод для простых вычислений
+    addUnaryMethod<CalculationRequest, CalculationResponse>(
+      methodName: ICalculatorContract.methodCalculate,
+      handler: calculate,
+      description: 'Выполняет одиночную операцию',
+    );
+
+    // Двунаправленный стрим для непрерывных вычислений
+    addBidirectionalMethod<CalculationRequest, CalculationResponse>(
+      methodName: ICalculatorContract.methodStreamCalculate,
+      handler: streamCalculate,
+      description: 'Обрабатывает поток вычислений',
+    );
+
+    super.setup();
+  }
 
   @override
   Future<CalculationResponse> calculate(CalculationRequest request) async {
@@ -87,16 +108,4 @@ class CalculatorServer extends CalculatorContract {
         throw Exception('Unsupported operation: $operation');
     }
   }
-}
-
-/// Пример использования сервера
-void exampleServerUsage() {
-  // Создаем сервер
-  final server = CalculatorServer(simulatedDelayMs: 100);
-
-  // Регистрируем сервер в эндпоинте
-  // final endpoint = RpcEndpoint(transport: someTransport);
-  // endpoint.registerServiceContract(server);
-
-  print('Сервер калькулятора запущен и готов принимать запросы');
 }

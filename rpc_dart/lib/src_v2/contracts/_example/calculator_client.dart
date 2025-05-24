@@ -1,28 +1,20 @@
 import 'dart:async';
 import 'calculator_contract.dart';
+import 'calculator_interface.dart';
 import '../_index.dart';
 
 /// Клиентская реализация калькулятора
-class CalculatorClient extends CalculatorContract {
-  final RpcEndpoint _endpoint;
-
+class CalculatorClient extends RpcClientContract
+    implements ICalculatorContract {
   /// Создает клиента с указанным эндпоинтом
-  CalculatorClient(this._endpoint);
-
-  /// Переопределяем setup() чтобы предотвратить регистрацию методов на клиенте
-  @override
-  void setup() {
-    // Не регистрируем методы для клиента - это должно происходить только на сервере
-    throw UnsupportedError('Метод setup() не должен вызываться для клиентов! '
-        'Клиент не обрабатывает запросы, а только отправляет их.');
-  }
+  CalculatorClient(RpcEndpoint endpoint) : super('CalculatorService', endpoint);
 
   @override
   Future<CalculationResponse> calculate(CalculationRequest request) {
-    return _endpoint
+    return endpoint
         .unaryRequest(
           serviceName: serviceName,
-          methodName: CalculatorContract.methodCalculate,
+          methodName: ICalculatorContract.methodCalculate,
         )
         .call(
           request: request,
@@ -33,10 +25,10 @@ class CalculatorClient extends CalculatorContract {
   @override
   Stream<CalculationResponse> streamCalculate(
       Stream<CalculationRequest> requests) {
-    return _endpoint
+    return endpoint
         .bidirectionalStream(
           serviceName: serviceName,
-          methodName: CalculatorContract.methodStreamCalculate,
+          methodName: ICalculatorContract.methodStreamCalculate,
         )
         .call(
           requests: requests,
@@ -96,10 +88,10 @@ class CalculatorClient extends CalculatorContract {
       operation: operation,
     );
 
-    return _endpoint
+    return endpoint
         .unaryRequest(
           serviceName: serviceName,
-          methodName: CalculatorContract.methodCalculate,
+          methodName: ICalculatorContract.methodCalculate,
           preferredFormat: RpcSerializationFormat.binary,
         )
         .call(

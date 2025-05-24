@@ -24,9 +24,9 @@ Future<void> runCalculatorDemo() async {
   // Создаем клиента
   final client = CalculatorClient(clientEndpoint);
 
-  // Проверка проблемы: регистрация клиентского контракта
-  // Если раскомментировать строку ниже, будет ошибка:
-  // clientEndpoint.registerServiceContract(client); // ❌ Не делайте этого!
+  // Проверка типобезопасности: попытка регистрации клиентского контракта не должна компилироваться
+  // Раскомментируйте строку ниже, чтобы увидеть ошибку компиляции:
+  // clientEndpoint.registerServiceContract(client); // ❌ Ошибка компиляции!
 
   // 1. Демонстрация унарного метода
   print('\n--- Унарный метод: calculate ---');
@@ -143,34 +143,7 @@ Future<void> _demoBidirectionalStream(CalculatorClient client) async {
   await responseSubscription.cancel();
 }
 
-/// Проверяет, что регистрация клиентского контракта вызывает ошибку
-Future<void> _testClientContractRegistration(
-    CalculatorClient client, RpcEndpoint endpoint) async {
-  print('\n--- Тест защиты от регистрации клиентского контракта ---');
-
-  try {
-    // Пытаемся зарегистрировать клиент - должна быть ошибка
-    endpoint.registerServiceContract(client);
-    print('❌ ОШИБКА: Регистрация клиента должна была вызвать исключение!');
-  } catch (e) {
-    print('✅ Правильно: Попытка регистрации клиента вызвала исключение:');
-    print('   $e');
-  }
-}
-
 /// Точка входа для демонстрации
 void main() async {
   await runCalculatorDemo();
-
-  // Раскомментируйте строку ниже для проверки защиты от регистрации клиента
-  // await _testClientRegistration();
-}
-
-/// Тестирует защиту от регистрации клиентского контракта
-Future<void> _testClientRegistration() async {
-  final transport = RpcInMemoryTransport.pair();
-  final endpoint = RpcEndpoint(transport: transport.$1);
-  final client = CalculatorClient(endpoint);
-
-  await _testClientContractRegistration(client, endpoint);
 }

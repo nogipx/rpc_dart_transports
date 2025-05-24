@@ -19,7 +19,7 @@ final class RpcEndpoint {
   }
 
   /// Регистрирует контракт сервиса
-  void registerServiceContract(RpcServiceContract contract) {
+  void registerServiceContract(RpcServerContract contract) {
     final serviceName = contract.serviceName;
 
     if (_contracts.containsKey(serviceName)) {

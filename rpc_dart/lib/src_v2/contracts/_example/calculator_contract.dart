@@ -1,42 +1,6 @@
 import '../_index.dart';
 import 'dart:convert';
 
-/// Контракт сервиса калькулятора
-/// Демонстрирует унарные и двунаправленные вызовы
-abstract class CalculatorContract extends RpcServiceContract {
-  // Имена методов
-  static const methodCalculate = 'calculate';
-  static const methodStreamCalculate = 'streamCalculate';
-
-  CalculatorContract() : super('CalculatorService');
-
-  @override
-  void setup() {
-    // Унарный метод для простых вычислений
-    addUnaryMethod<CalculationRequest, CalculationResponse>(
-      methodName: methodCalculate,
-      handler: calculate,
-      description: 'Выполняет одиночную операцию',
-    );
-
-    // Двунаправленный стрим для непрерывных вычислений
-    addBidirectionalMethod<CalculationRequest, CalculationResponse>(
-      methodName: methodStreamCalculate,
-      handler: streamCalculate,
-      description: 'Обрабатывает поток вычислений',
-    );
-
-    super.setup();
-  }
-
-  /// Выполняет одиночную операцию
-  Future<CalculationResponse> calculate(CalculationRequest request);
-
-  /// Обрабатывает поток вычислений
-  Stream<CalculationResponse> streamCalculate(
-      Stream<CalculationRequest> requests);
-}
-
 /// Запрос на вычисление
 class CalculationRequest implements IRpcJsonSerializable, IRpcSerializable {
   final double a;

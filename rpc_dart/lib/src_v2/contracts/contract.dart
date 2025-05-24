@@ -1,20 +1,27 @@
 part of '_index.dart';
 
-/// Базовый контракт сервиса (полностью дженериковый)
-/// Пользователи могут передавать любые свои типы без ограничений!
-abstract class RpcServiceContract {
+/// Базовый интерфейс для всех контрактов
+abstract interface class IRpcContract {
+  /// Имя сервиса
+  String get serviceName;
+}
+
+/// Серверный контракт сервиса
+/// Регистрирует и обрабатывает методы
+abstract class RpcServerContract implements IRpcContract {
+  @override
   final String serviceName;
   final Map<String, RpcMethodRegistration> _methods = {};
 
-  RpcServiceContract(this.serviceName);
+  RpcServerContract(this.serviceName);
 
-  /// Декларативная регистрация методов (как в setup())
+  /// Декларативная регистрация методов
   void setup() {
     // Переопределяется в наследниках
   }
 
   /// Регистрирует унарный метод
-  /// TRequest и TResponse должны реализовывать IRpcSerializableMessage!
+  /// TRequest и TResponse должны реализовывать IRpcSerializable!
   void addUnaryMethod<TRequest extends IRpcSerializable,
       TResponse extends IRpcSerializable>({
     required String methodName,
@@ -34,7 +41,7 @@ abstract class RpcServiceContract {
   }
 
   /// Регистрирует серверный стрим
-  /// TRequest и TResponse должны реализовывать IRpcSerializableMessage!
+  /// TRequest и TResponse должны реализовывать IRpcSerializable!
   void addServerStreamMethod<TRequest extends IRpcSerializable,
       TResponse extends IRpcSerializable>({
     required String methodName,
@@ -54,7 +61,7 @@ abstract class RpcServiceContract {
   }
 
   /// Регистрирует клиентский стрим
-  /// TRequest и TResponse должны реализовывать IRpcSerializableMessage!
+  /// TRequest и TResponse должны реализовывать IRpcSerializable!
   void addClientStreamMethod<TRequest extends IRpcSerializable,
       TResponse extends IRpcSerializable>({
     required String methodName,
@@ -74,7 +81,7 @@ abstract class RpcServiceContract {
   }
 
   /// Регистрирует двунаправленный стрим
-  /// TRequest и TResponse должны реализовывать IRpcSerializableMessage!
+  /// TRequest и TResponse должны реализовывать IRpcSerializable!
   void addBidirectionalMethod<TRequest extends IRpcSerializable,
       TResponse extends IRpcSerializable>({
     required String methodName,
@@ -95,4 +102,17 @@ abstract class RpcServiceContract {
 
   /// Получает зарегистрированные методы
   Map<String, RpcMethodRegistration> get methods => Map.unmodifiable(_methods);
+}
+
+/// Клиентский контракт сервиса
+/// Только вызывает методы, не регистрирует их
+abstract class RpcClientContract implements IRpcContract {
+  @override
+  final String serviceName;
+  final RpcEndpoint _endpoint;
+
+  RpcClientContract(this.serviceName, this._endpoint);
+
+  /// Получает endpoint, используемый для отправки запросов
+  RpcEndpoint get endpoint => _endpoint;
 }
