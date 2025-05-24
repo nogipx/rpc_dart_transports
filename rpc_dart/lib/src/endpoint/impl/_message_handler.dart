@@ -299,9 +299,7 @@ final class _RequestMessageHandler implements _IMessageHandler {
         }
 
         // Если это обычное сообщение для двунаправленного стрима, перенаправляем его в контроллер
-        if (methodHandler.methodType == RpcMethodType.bidirectional &&
-            updatedRequestContext is RpcMessage &&
-            updatedRequestContext.messageId != null) {
+        if (methodHandler.methodType == RpcMethodType.bidirectional) {
           _logger.debug(
               'ДИАГНОСТИКА: _callMethodHandler: Перенаправляем обычное сообщение в двунаправленный стрим: ${updatedRequestContext.messageId}');
 
