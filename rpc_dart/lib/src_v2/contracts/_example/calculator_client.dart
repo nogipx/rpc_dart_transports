@@ -17,7 +17,7 @@ class CalculatorClient extends RpcClientContract
           serviceName: serviceName,
           methodName: ICalculatorContract.methodCalculate,
         )
-        .call(
+        .callJson(
           request: request,
           responseParser: CalculationResponse.fromJson,
         );
@@ -31,7 +31,7 @@ class CalculatorClient extends RpcClientContract
           serviceName: serviceName,
           methodName: ICalculatorContract.methodStreamCalculate,
         )
-        .call(
+        .callJson(
           requests: requests,
           responseParser: CalculationResponse.fromJson,
         );
@@ -93,9 +93,8 @@ class CalculatorClient extends RpcClientContract
         .unaryRequest(
           serviceName: serviceName,
           methodName: ICalculatorContract.methodCalculate,
-          preferredFormat: RpcSerializationFormat.binary,
         )
-        .call(
+        .callJson(
           request: request,
           responseParser: CalculationResponse.fromJson,
         );

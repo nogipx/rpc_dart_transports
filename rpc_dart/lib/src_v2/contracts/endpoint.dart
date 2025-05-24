@@ -54,13 +54,11 @@ final class RpcClientEndpoint extends RpcEndpointBase {
   RpcUnaryRequestBuilder unaryRequest({
     required String serviceName,
     required String methodName,
-    RpcSerializationFormat? preferredFormat,
   }) {
     return RpcUnaryRequestBuilder(
       endpoint: this,
       serviceName: serviceName,
       methodName: methodName,
-      preferredFormat: preferredFormat,
     );
   }
 
@@ -68,13 +66,11 @@ final class RpcClientEndpoint extends RpcEndpointBase {
   RpcServerStreamBuilder serverStream({
     required String serviceName,
     required String methodName,
-    RpcSerializationFormat? preferredFormat,
   }) {
     return RpcServerStreamBuilder(
       endpoint: this,
       serviceName: serviceName,
       methodName: methodName,
-      preferredFormat: preferredFormat,
     );
   }
 
@@ -82,13 +78,11 @@ final class RpcClientEndpoint extends RpcEndpointBase {
   RpcClientStreamBuilder clientStream({
     required String serviceName,
     required String methodName,
-    RpcSerializationFormat? preferredFormat,
   }) {
     return RpcClientStreamBuilder(
       endpoint: this,
       serviceName: serviceName,
       methodName: methodName,
-      preferredFormat: preferredFormat,
     );
   }
 
@@ -96,13 +90,11 @@ final class RpcClientEndpoint extends RpcEndpointBase {
   RpcBidirectionalStreamBuilder bidirectionalStream({
     required String serviceName,
     required String methodName,
-    RpcSerializationFormat? preferredFormat,
   }) {
     return RpcBidirectionalStreamBuilder(
       endpoint: this,
       serviceName: serviceName,
       methodName: methodName,
-      preferredFormat: preferredFormat,
     );
   }
 }

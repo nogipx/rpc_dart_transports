@@ -5,85 +5,44 @@ class RpcUnaryRequestBuilder {
   final RpcEndpointBase endpoint;
   final String serviceName;
   final String methodName;
-  final RpcSerializationFormat? _preferredFormat;
 
   RpcUnaryRequestBuilder({
     required this.endpoint,
     required this.serviceName,
     required this.methodName,
-    RpcSerializationFormat? preferredFormat,
-  }) : _preferredFormat = preferredFormat {
+  }) {
     _logger
         .debug('Создан builder для унарного запроса $serviceName.$methodName');
   }
 
   RpcLogger get _logger => endpoint.logger.child('UnaryBuilder');
 
-  Future<TResponse> call<TRequest extends IRpcSerializable,
+  /// Выполняет унарный запрос с JSON сериализацией
+  ///
+  /// [request] - Объект запроса, который будет сериализован в JSON
+  /// [responseParser] - Функция для преобразования JSON в объект ответа
+  Future<TResponse> callJson<TRequest extends IRpcSerializable,
       TResponse extends IRpcSerializable>({
     required TRequest request,
     required TResponse Function(Map<String, dynamic>) responseParser,
-    RpcSerializationFormat? serializationFormat,
   }) async {
-    _logger.debug('Выполнение унарного запроса $serviceName.$methodName');
+    _logger.debug('Выполнение JSON унарного запроса $serviceName.$methodName');
 
-    // Определяем формат сериализации: указанный в вызове > предпочтительный > из объекта запроса
-    final format =
-        serializationFormat ?? _preferredFormat ?? request.getFormat();
+    // Создаем JSON сериализаторы
+    _logger.debug('Создание JSON сериализаторов для $serviceName.$methodName');
+    final requestSerializer = RpcSerializerFactory.binary<TRequest>(
+      (bytes) => throw UnsupportedError(
+        'Десериализация TRequest не требуется в клиентском билдере',
+      ),
+    );
 
-    _logger.debug('Используется формат сериализации: ${format.name}');
-
-    // Создаем сериализаторы в зависимости от формата
-    final IRpcSerializer<TRequest> requestSerializer;
-    final IRpcSerializer<TResponse> responseSerializer;
-
-    if (format == RpcSerializationFormat.binary) {
-      _logger.debug(
-          'Создание бинарных сериализаторов для $serviceName.$methodName');
-      // Бинарная сериализация
-      requestSerializer = RpcSerializerFactory.binary<TRequest>(
-        (bytes) => throw UnsupportedError(
-          'Десериализация TRequest не требуется в клиентском билдере',
-        ),
-      );
-
-      responseSerializer = RpcSerializerFactory.binary<TResponse>(
-        (bytes) {
-          // Если объект имеет собственный бинарный формат - пытаемся его использовать
-          // В противном случае предполагаем, что внутри JSON
-          try {
-            // Пробуем через JSON
-            _logger.debug('Десериализация бинарного ответа через JSON');
-            final jsonMap = jsonDecode(utf8.decode(bytes));
-            return responseParser(jsonMap as Map<String, dynamic>);
-          } catch (e) {
-            _logger.error('Ошибка при десериализации бинарного ответа',
-                error: e);
-            throw FormatException(
-              'Невозможно десериализовать ответ. Убедитесь, что у вашего типа '
-              'есть статический метод fromBytes или укажите правильный '
-              'responseParser.',
-            );
-          }
-        },
-      );
-    } else {
-      _logger
-          .debug('Создание JSON сериализаторов для $serviceName.$methodName');
-      // JSON сериализация (по умолчанию)
-      requestSerializer = RpcSerializerFactory.binary<TRequest>(
-        (bytes) => throw UnsupportedError(
-          'Десериализация TRequest не требуется в клиентском билдере',
-        ),
-      );
-
-      responseSerializer = RpcSerializerFactory.binary<TResponse>(
-        (bytes) => responseParser(jsonDecode(utf8.decode(bytes))),
-      );
-    }
+    final responseSerializer = RpcSerializerFactory.binary<TResponse>(
+      (bytes) => responseParser(jsonDecode(utf8.decode(bytes))),
+    );
 
     // Создаем клиент с выбранными сериализаторами
-    _logger.debug('Создание унарного клиента для $serviceName.$methodName');
+    _logger
+        .debug('Создание унарного клиента для $serviceName.$methodName (JSON)');
     final client = UnaryCaller<TRequest, TResponse>(
       transport: endpoint.transport,
       serviceName: serviceName,
@@ -94,13 +53,67 @@ class RpcUnaryRequestBuilder {
     );
 
     try {
-      _logger.debug('Отправка унарного запроса $serviceName.$methodName');
+      _logger.debug('Отправка JSON унарного запроса $serviceName.$methodName');
       final response = await client.call(request);
-      _logger.debug('Получен ответ на унарный запрос $serviceName.$methodName');
+      _logger.debug(
+          'Получен ответ на JSON унарный запрос $serviceName.$methodName');
       return response;
     } catch (e, stackTrace) {
       _logger.error(
-          'Ошибка при выполнении унарного запроса $serviceName.$methodName',
+          'Ошибка при выполнении JSON унарного запроса $serviceName.$methodName',
+          error: e,
+          stackTrace: stackTrace);
+      rethrow;
+    } finally {
+      _logger.debug('Закрытие унарного клиента $serviceName.$methodName');
+      await client.close();
+    }
+  }
+
+  /// Выполняет унарный запрос с бинарной сериализацией (например, Protobuf)
+  ///
+  /// [request] - Объект запроса, который будет сериализован в бинарный формат
+  /// [responseParser] - Функция для преобразования бинарных данных в объект ответа
+  Future<TResponse> callBinary<TRequest extends IRpcSerializable,
+      TResponse extends IRpcSerializable>({
+    required TRequest request,
+    required TResponse Function(Uint8List) responseParser,
+  }) async {
+    _logger.debug(
+        'Выполнение бинарного унарного запроса $serviceName.$methodName');
+
+    // Создаем сериализаторы для бинарного формата
+    final requestSerializer = RpcSerializerFactory.binary<TRequest>(
+      (bytes) => throw UnsupportedError(
+        'Десериализация TRequest не требуется в клиентском билдере',
+      ),
+    );
+
+    final responseSerializer =
+        RpcSerializerFactory.binary<TResponse>(responseParser);
+
+    // Создаем клиент с выбранными сериализаторами
+    _logger.debug(
+        'Создание унарного клиента для $serviceName.$methodName (binary)');
+    final client = UnaryCaller<TRequest, TResponse>(
+      transport: endpoint.transport,
+      serviceName: serviceName,
+      methodName: methodName,
+      requestSerializer: requestSerializer,
+      responseSerializer: responseSerializer,
+      logger: _logger,
+    );
+
+    try {
+      _logger.debug(
+          'Отправка бинарного унарного запроса $serviceName.$methodName');
+      final response = await client.call(request);
+      _logger.debug(
+          'Получен ответ на бинарный унарный запрос $serviceName.$methodName');
+      return response;
+    } catch (e, stackTrace) {
+      _logger.error(
+          'Ошибка при выполнении бинарного унарного запроса $serviceName.$methodName',
           error: e,
           stackTrace: stackTrace);
       rethrow;
@@ -116,86 +129,47 @@ class RpcServerStreamBuilder {
   final RpcEndpointBase endpoint;
   final String serviceName;
   final String methodName;
-  final RpcSerializationFormat? _preferredFormat;
 
   RpcServerStreamBuilder({
     required this.endpoint,
     required this.serviceName,
     required this.methodName,
-    RpcSerializationFormat? preferredFormat,
-  }) : _preferredFormat = preferredFormat {
+  }) {
     _logger
         .debug('Создан builder для серверного стрима $serviceName.$methodName');
   }
 
   RpcLogger get _logger => endpoint.logger.child('ServerBuilder');
 
-  Stream<TResponse> call<TRequest extends IRpcSerializable,
+  /// Выполняет запрос серверного стрима с JSON сериализацией
+  ///
+  /// [request] - Объект запроса, который будет сериализован в JSON
+  /// [responseParser] - Функция для преобразования JSON в объекты ответов
+  Stream<TResponse> callJson<TRequest extends IRpcSerializable,
       TResponse extends IRpcSerializable>({
     required TRequest request,
     required TResponse Function(Map<String, dynamic>) responseParser,
-    RpcSerializationFormat? serializationFormat,
-  }) async* {
-    _logger.debug('Инициализация серверного стрима $serviceName.$methodName');
+  }) {
+    final streamController = StreamController<TResponse>();
 
-    // Определяем формат сериализации: указанный в вызове > предпочтительный > из объекта запроса
-    final format =
-        serializationFormat ?? _preferredFormat ?? request.getFormat();
+    _logger
+        .debug('Инициализация JSON серверного стрима $serviceName.$methodName');
 
-    _logger.debug('Используется формат сериализации: ${format.name}');
+    // Создаем JSON сериализаторы
+    _logger.debug('Создание JSON сериализаторов для $serviceName.$methodName');
+    final requestSerializer = RpcSerializerFactory.binary<TRequest>(
+      (bytes) => throw UnsupportedError(
+        'Десериализация TRequest не требуется в клиентском билдере',
+      ),
+    );
 
-    // Создаем сериализаторы в зависимости от формата
-    final IRpcSerializer<TRequest> requestSerializer;
-    final IRpcSerializer<TResponse> responseSerializer;
-
-    if (format == RpcSerializationFormat.binary) {
-      _logger.debug(
-          'Создание бинарных сериализаторов для $serviceName.$methodName');
-      // Бинарная сериализация
-      requestSerializer = RpcSerializerFactory.binary<TRequest>(
-        (bytes) => throw UnsupportedError(
-          'Десериализация TRequest не требуется в клиентском билдере',
-        ),
-      );
-
-      responseSerializer = RpcSerializerFactory.binary<TResponse>(
-        (bytes) {
-          // Если объект имеет собственный бинарный формат - пытаемся его использовать
-          // В противном случае предполагаем, что внутри JSON
-          try {
-            // Пробуем через JSON
-            _logger.debug('Десериализация бинарного ответа через JSON');
-            final jsonMap = jsonDecode(utf8.decode(bytes));
-            return responseParser(jsonMap as Map<String, dynamic>);
-          } catch (e) {
-            _logger.error('Ошибка при десериализации бинарного ответа',
-                error: e);
-            throw FormatException(
-              'Невозможно десериализовать ответ. Убедитесь, что у вашего типа '
-              'есть статический метод fromBytes или укажите правильный '
-              'responseParser.',
-            );
-          }
-        },
-      );
-    } else {
-      _logger
-          .debug('Создание JSON сериализаторов для $serviceName.$methodName');
-      // JSON сериализация (по умолчанию)
-      requestSerializer = RpcSerializerFactory.binary<TRequest>(
-        (bytes) => throw UnsupportedError(
-          'Десериализация TRequest не требуется в клиентском билдере',
-        ),
-      );
-
-      responseSerializer = RpcSerializerFactory.binary<TResponse>(
-        (bytes) => responseParser(jsonDecode(utf8.decode(bytes))),
-      );
-    }
+    final responseSerializer = RpcSerializerFactory.binary<TResponse>(
+      (bytes) => responseParser(jsonDecode(utf8.decode(bytes))),
+    );
 
     // Создаем клиент с выбранными сериализаторами
     _logger.debug(
-        'Создание клиента серверного стрима для $serviceName.$methodName');
+        'Создание клиента JSON серверного стрима для $serviceName.$methodName');
     final client = ServerStreamCaller<TRequest, TResponse>(
       transport: endpoint.transport,
       serviceName: serviceName,
@@ -205,34 +179,114 @@ class RpcServerStreamBuilder {
       logger: _logger,
     );
 
-    try {
-      _logger
-          .debug('Отправка запроса в серверный стрим $serviceName.$methodName');
-      await client.send(request);
-      _logger.debug(
-          'Начало получения ответов из серверного стрима $serviceName.$methodName');
+    () async {
+      try {
+        _logger.debug(
+            'Отправка запроса в JSON серверный стрим $serviceName.$methodName');
+        await client.send(request);
+        _logger.debug(
+            'Начало получения ответов из JSON серверного стрима $serviceName.$methodName');
 
-      await for (final message in client.responses) {
-        if (message.payload != null) {
-          _logger.debug(
-              'Получен ответ из серверного стрима $serviceName.$methodName');
-          yield message.payload!;
-        } else if (message.isMetadataOnly) {
-          _logger.debug(
-              'Получены метаданные из серверного стрима $serviceName.$methodName');
+        await for (final message in client.responses) {
+          if (message.payload != null) {
+            _logger.debug(
+                'Получен ответ из JSON серверного стрима $serviceName.$methodName');
+            streamController.add(message.payload!);
+          } else if (message.isMetadataOnly) {
+            _logger.debug(
+                'Получены метаданные из JSON серверного стрима $serviceName.$methodName');
+          }
         }
-      }
 
-      _logger.debug('Стрим ответов завершен для $serviceName.$methodName');
-    } catch (e, stackTrace) {
-      _logger.error('Ошибка в серверном стриме $serviceName.$methodName',
-          error: e, stackTrace: stackTrace);
-      rethrow;
-    } finally {
-      _logger
-          .debug('Закрытие клиента серверного стрима $serviceName.$methodName');
-      await client.close();
-    }
+        _logger
+            .debug('Стрим JSON ответов завершен для $serviceName.$methodName');
+        await streamController.close();
+      } catch (e, stackTrace) {
+        _logger.error('Ошибка в JSON серверном стриме $serviceName.$methodName',
+            error: e, stackTrace: stackTrace);
+        streamController.addError(e, stackTrace);
+      } finally {
+        _logger.debug(
+            'Закрытие клиента JSON серверного стрима $serviceName.$methodName');
+        await client.close();
+      }
+    }();
+
+    return streamController.stream;
+  }
+
+  /// Выполняет запрос серверного стрима с бинарной сериализацией (например, Protobuf)
+  ///
+  /// [request] - Объект запроса, который будет сериализован в бинарный формат
+  /// [responseParser] - Функция для преобразования бинарных данных в объекты ответов
+  Stream<TResponse> callBinary<TRequest extends IRpcSerializable,
+      TResponse extends IRpcSerializable>({
+    required TRequest request,
+    required TResponse Function(Uint8List) responseParser,
+  }) {
+    final streamController = StreamController<TResponse>();
+
+    _logger.debug(
+        'Инициализация бинарного серверного стрима $serviceName.$methodName');
+
+    // Создаем сериализаторы для бинарного формата
+    final requestSerializer = RpcSerializerFactory.binary<TRequest>(
+      (bytes) => throw UnsupportedError(
+        'Десериализация TRequest не требуется в клиентском билдере',
+      ),
+    );
+
+    final responseSerializer =
+        RpcSerializerFactory.binary<TResponse>(responseParser);
+
+    // Создаем клиент с выбранными сериализаторами
+    _logger.debug(
+        'Создание клиента бинарного серверного стрима для $serviceName.$methodName');
+    final client = ServerStreamCaller<TRequest, TResponse>(
+      transport: endpoint.transport,
+      serviceName: serviceName,
+      methodName: methodName,
+      requestSerializer: requestSerializer,
+      responseSerializer: responseSerializer,
+      logger: _logger,
+    );
+
+    () async {
+      try {
+        _logger.debug(
+            'Отправка запроса в бинарный серверный стрим $serviceName.$methodName');
+        await client.send(request);
+        _logger.debug(
+            'Начало получения ответов из бинарного серверного стрима $serviceName.$methodName');
+
+        await for (final message in client.responses) {
+          if (message.payload != null) {
+            _logger.debug(
+                'Получен ответ из бинарного серверного стрима $serviceName.$methodName');
+            streamController.add(message.payload!);
+          } else if (message.isMetadataOnly) {
+            _logger.debug(
+                'Получены метаданные из бинарного серверного стрима $serviceName.$methodName');
+          }
+        }
+
+        _logger.debug(
+            'Стрим бинарных ответов завершен для $serviceName.$methodName');
+        await streamController.close();
+      } catch (e, stackTrace) {
+        _logger.error(
+            'Ошибка в бинарном серверном стриме $serviceName.$methodName',
+            error: e,
+            stackTrace: stackTrace);
+        streamController.addError(e, stackTrace);
+      } finally {
+        _logger.debug(
+            'Закрытие клиента бинарного серверного стрима $serviceName.$methodName');
+        await client.close();
+      }
+    }();
+
+    return streamController.stream;
   }
 }
 
@@ -241,84 +295,45 @@ class RpcClientStreamBuilder {
   final RpcEndpointBase endpoint;
   final String serviceName;
   final String methodName;
-  final RpcSerializationFormat? _preferredFormat;
 
   RpcClientStreamBuilder({
     required this.endpoint,
     required this.serviceName,
     required this.methodName,
-    RpcSerializationFormat? preferredFormat,
-  }) : _preferredFormat = preferredFormat {
+  }) {
     _logger.debug(
         'Создан builder для клиентского стрима $serviceName.$methodName');
   }
 
   RpcLogger get _logger => endpoint.logger.child('ClientBuilder');
 
-  Future<TResponse> call<TRequest extends IRpcSerializable,
+  /// Выполняет запрос клиентского стрима с JSON сериализацией
+  ///
+  /// [requests] - Поток объектов запросов, которые будут сериализованы в JSON
+  /// [responseParser] - Функция для преобразования JSON в объект ответа
+  Future<TResponse> callJson<TRequest extends IRpcSerializable,
       TResponse extends IRpcSerializable>({
     required Stream<TRequest> requests,
     required TResponse Function(Map<String, dynamic>) responseParser,
-    RpcSerializationFormat? serializationFormat,
   }) async {
-    _logger.debug('Инициализация клиентского стрима $serviceName.$methodName');
+    _logger.debug(
+        'Инициализация JSON клиентского стрима $serviceName.$methodName');
 
-    // Определяем формат сериализации (используем предпочтительный, если указан)
-    final format =
-        serializationFormat ?? _preferredFormat ?? RpcSerializationFormat.json;
+    // Создаем JSON сериализаторы
+    _logger.debug('Создание JSON сериализаторов для $serviceName.$methodName');
+    final requestSerializer = RpcSerializerFactory.binary<TRequest>(
+      (bytes) => throw UnsupportedError(
+        'Десериализация TRequest не требуется в клиентском билдере',
+      ),
+    );
 
-    _logger.debug('Используется формат сериализации: ${format.name}');
-
-    // Создаем сериализаторы в зависимости от формата
-    final IRpcSerializer<TRequest> requestSerializer;
-    final IRpcSerializer<TResponse> responseSerializer;
-
-    if (format == RpcSerializationFormat.binary) {
-      _logger.debug(
-          'Создание бинарных сериализаторов для $serviceName.$methodName');
-      // Создаем сериализаторы для бинарного формата
-      requestSerializer = RpcSerializerFactory.binary<TRequest>(
-        (bytes) => throw UnsupportedError(
-          'Десериализация TRequest не требуется в клиентском билдере',
-        ),
-      );
-
-      responseSerializer = RpcSerializerFactory.binary<TResponse>(
-        (bytes) {
-          try {
-            _logger.debug('Десериализация бинарного ответа через JSON');
-            // Пробуем через JSON
-            final jsonMap = jsonDecode(utf8.decode(bytes));
-            return responseParser(jsonMap as Map<String, dynamic>);
-          } catch (e) {
-            _logger.error('Ошибка при десериализации бинарного ответа',
-                error: e);
-            throw FormatException(
-              'Невозможно десериализовать ответ. Убедитесь, что у вашего типа '
-              'есть статический метод fromBytes или укажите правильный '
-              'responseParser.',
-            );
-          }
-        },
-      );
-    } else {
-      _logger
-          .debug('Создание JSON сериализаторов для $serviceName.$methodName');
-      // JSON сериализация (по умолчанию)
-      requestSerializer = RpcSerializerFactory.binary<TRequest>(
-        (bytes) => throw UnsupportedError(
-          'Десериализация TRequest не требуется в клиентском билдере',
-        ),
-      );
-
-      responseSerializer = RpcSerializerFactory.binary<TResponse>(
-        (bytes) => responseParser(jsonDecode(utf8.decode(bytes))),
-      );
-    }
+    final responseSerializer = RpcSerializerFactory.binary<TResponse>(
+      (bytes) => responseParser(jsonDecode(utf8.decode(bytes))),
+    );
 
     // Создаем клиент с выбранными сериализаторами
     _logger.debug(
-        'Создание клиента клиентского стрима для $serviceName.$methodName');
+        'Создание клиента JSON клиентского стрима для $serviceName.$methodName');
     final client = ClientStreamCaller<TRequest, TResponse>(
       transport: endpoint.transport,
       serviceName: serviceName,
@@ -330,12 +345,12 @@ class RpcClientStreamBuilder {
 
     try {
       _logger.debug(
-          'Начало отправки запросов в клиентский стрим $serviceName.$methodName');
+          'Начало отправки запросов в JSON клиентский стрим $serviceName.$methodName');
       int requestCount = 0;
 
       await for (final request in requests) {
         _logger.debug(
-            'Отправка запроса #${++requestCount} в клиентский стрим $serviceName.$methodName');
+            'Отправка запроса #${++requestCount} в JSON клиентский стрим $serviceName.$methodName');
         client.send(request);
       }
 
@@ -345,12 +360,80 @@ class RpcClientStreamBuilder {
       _logger.debug('Получен финальный ответ от $serviceName.$methodName');
       return response;
     } catch (e, stackTrace) {
-      _logger.error('Ошибка в клиентском стриме $serviceName.$methodName',
+      _logger.error('Ошибка в JSON клиентском стриме $serviceName.$methodName',
           error: e, stackTrace: stackTrace);
       rethrow;
     } finally {
       _logger.debug(
-          'Закрытие клиента клиентского стрима $serviceName.$methodName');
+          'Закрытие клиента JSON клиентского стрима $serviceName.$methodName');
+      await client.close();
+    }
+  }
+
+  /// Выполняет запрос клиентского стрима с бинарной сериализацией (например, Protobuf)
+  ///
+  /// [requests] - Поток объектов запросов, которые будут сериализованы в бинарный формат
+  /// [responseParser] - Функция для преобразования бинарных данных в объект ответа
+  Future<TResponse> callBinary<TRequest extends IRpcSerializable,
+      TResponse extends IRpcSerializable>({
+    required Stream<TRequest> requests,
+    required TResponse Function(Uint8List) responseParser,
+  }) async {
+    _logger.debug(
+        'Инициализация бинарного клиентского стрима $serviceName.$methodName');
+
+    // Определяем формат сериализации (бинарный)
+    final format = RpcSerializationFormat.binary;
+
+    _logger.debug('Используется формат сериализации: ${format.name}');
+
+    // Создаем сериализаторы для бинарного формата
+    final requestSerializer = RpcSerializerFactory.binary<TRequest>(
+      (bytes) => throw UnsupportedError(
+        'Десериализация TRequest не требуется в клиентском билдере',
+      ),
+    );
+
+    final responseSerializer =
+        RpcSerializerFactory.binary<TResponse>(responseParser);
+
+    // Создаем клиент с выбранными сериализаторами
+    _logger.debug(
+        'Создание клиента бинарного клиентского стрима для $serviceName.$methodName');
+    final client = ClientStreamCaller<TRequest, TResponse>(
+      transport: endpoint.transport,
+      serviceName: serviceName,
+      methodName: methodName,
+      requestSerializer: requestSerializer,
+      responseSerializer: responseSerializer,
+      logger: _logger,
+    );
+
+    try {
+      _logger.debug(
+          'Начало отправки запросов в бинарный клиентский стрим $serviceName.$methodName');
+      int requestCount = 0;
+
+      await for (final request in requests) {
+        _logger.debug(
+            'Отправка запроса #${++requestCount} в бинарный клиентский стрим $serviceName.$methodName');
+        client.send(request);
+      }
+
+      _logger.debug(
+          'Завершение отправки запросов и ожидание ответа $serviceName.$methodName');
+      final response = await client.finishSending();
+      _logger.debug('Получен финальный ответ от $serviceName.$methodName');
+      return response;
+    } catch (e, stackTrace) {
+      _logger.error(
+          'Ошибка в бинарном клиентском стриме $serviceName.$methodName',
+          error: e,
+          stackTrace: stackTrace);
+      rethrow;
+    } finally {
+      _logger.debug(
+          'Закрытие клиента бинарного клиентского стрима $serviceName.$methodName');
       await client.close();
     }
   }
@@ -361,85 +444,45 @@ class RpcBidirectionalStreamBuilder {
   final RpcEndpointBase endpoint;
   final String serviceName;
   final String methodName;
-  final RpcSerializationFormat? _preferredFormat;
 
   RpcBidirectionalStreamBuilder({
     required this.endpoint,
     required this.serviceName,
     required this.methodName,
-    RpcSerializationFormat? preferredFormat,
-  }) : _preferredFormat = preferredFormat {
+  }) {
     _logger.debug(
         'Создан builder для двунаправленного стрима $serviceName.$methodName');
   }
 
   RpcLogger get _logger => endpoint.logger.child('BidirectionalBuilder');
 
-  Stream<TResponse> call<TRequest extends IRpcSerializable,
+  /// Выполняет запрос двунаправленного стрима с JSON сериализацией
+  ///
+  /// [requests] - Поток объектов запросов, которые будут сериализованы в JSON
+  /// [responseParser] - Функция для преобразования JSON в объекты ответов
+  Stream<TResponse> callJson<TRequest extends IRpcSerializable,
       TResponse extends IRpcSerializable>({
     required Stream<TRequest> requests,
     required TResponse Function(Map<String, dynamic>) responseParser,
-    RpcSerializationFormat? serializationFormat,
   }) async* {
     _logger.debug(
-        'Инициализация двунаправленного стрима $serviceName.$methodName');
+        'Инициализация JSON двунаправленного стрима $serviceName.$methodName');
 
-    // Определяем формат сериализации (используем предпочтительный, если указан)
-    final format =
-        serializationFormat ?? _preferredFormat ?? RpcSerializationFormat.json;
+    // Создаем JSON сериализаторы
+    _logger.debug('Создание JSON сериализаторов для $serviceName.$methodName');
+    final requestSerializer = RpcSerializerFactory.binary<TRequest>(
+      (bytes) => throw UnsupportedError(
+        'Десериализация TRequest не требуется в клиентском билдере',
+      ),
+    );
 
-    _logger.debug('Используется формат сериализации: ${format.name}');
-
-    // Создаем сериализаторы в зависимости от формата
-    final IRpcSerializer<TRequest> requestSerializer;
-    final IRpcSerializer<TResponse> responseSerializer;
-
-    if (format == RpcSerializationFormat.binary) {
-      _logger.debug(
-          'Создание бинарных сериализаторов для $serviceName.$methodName');
-      // Создаем сериализаторы для бинарного формата
-      requestSerializer = RpcSerializerFactory.binary<TRequest>(
-        (bytes) => throw UnsupportedError(
-          'Десериализация TRequest не требуется в клиентском билдере',
-        ),
-      );
-
-      responseSerializer = RpcSerializerFactory.binary<TResponse>(
-        (bytes) {
-          try {
-            _logger.debug('Десериализация бинарного ответа через JSON');
-            // Пробуем через JSON
-            final jsonMap = jsonDecode(utf8.decode(bytes));
-            return responseParser(jsonMap as Map<String, dynamic>);
-          } catch (e) {
-            _logger.error('Ошибка при десериализации бинарного ответа',
-                error: e);
-            throw FormatException(
-              'Невозможно десериализовать ответ. Убедитесь, что у вашего типа '
-              'есть статический метод fromBytes или укажите правильный '
-              'responseParser.',
-            );
-          }
-        },
-      );
-    } else {
-      _logger
-          .debug('Создание JSON сериализаторов для $serviceName.$methodName');
-      // JSON сериализация (по умолчанию)
-      requestSerializer = RpcSerializerFactory.binary<TRequest>(
-        (bytes) => throw UnsupportedError(
-          'Десериализация TRequest не требуется в клиентском билдере',
-        ),
-      );
-
-      responseSerializer = RpcSerializerFactory.binary<TResponse>(
-        (bytes) => responseParser(jsonDecode(utf8.decode(bytes))),
-      );
-    }
+    final responseSerializer = RpcSerializerFactory.binary<TResponse>(
+      (bytes) => responseParser(jsonDecode(utf8.decode(bytes))),
+    );
 
     // Создаем клиент с выбранными сериализаторами
     _logger.debug(
-        'Создание клиента двунаправленного стрима для $serviceName.$methodName');
+        'Создание клиента JSON двунаправленного стрима для $serviceName.$methodName');
     final client = BidirectionalStreamCaller<TRequest, TResponse>(
       transport: endpoint.transport,
       serviceName: serviceName,
@@ -453,21 +496,21 @@ class RpcBidirectionalStreamBuilder {
       // Асинхронно отправляем запросы
       int requestCount = 0;
       _logger.debug(
-          'Запуск отправки запросов в двунаправленный стрим $serviceName.$methodName');
+          'Запуск отправки запросов в JSON двунаправленный стрим $serviceName.$methodName');
 
       unawaited(() async {
         try {
           await for (final request in requests) {
             _logger.debug(
-                'Отправка запроса #${++requestCount} в двунаправленный стрим $serviceName.$methodName');
+                'Отправка запроса #${++requestCount} в JSON двунаправленный стрим $serviceName.$methodName');
             client.send(request);
           }
           _logger.debug(
-              'Завершение отправки запросов в двунаправленный стрим $serviceName.$methodName');
+              'Завершение отправки запросов в JSON двунаправленный стрим $serviceName.$methodName');
           client.finishSending();
         } catch (e, stackTrace) {
           _logger.error(
-              'Ошибка при отправке запросов в двунаправленный стрим $serviceName.$methodName',
+              'Ошибка при отправке запросов в JSON двунаправленный стрим $serviceName.$methodName',
               error: e,
               stackTrace: stackTrace);
         }
@@ -475,53 +518,70 @@ class RpcBidirectionalStreamBuilder {
 
       // Обрабатываем ответы
       _logger.debug(
-          'Начало получения ответов из двунаправленного стрима $serviceName.$methodName');
+          'Начало получения ответов из JSON двунаправленного стрима $serviceName.$methodName');
       int responseCount = 0;
 
       await for (final message in client.responses) {
         if (message.payload != null) {
           _logger.debug(
-              'Получен ответ #${++responseCount} из двунаправленного стрима $serviceName.$methodName');
+              'Получен ответ #${++responseCount} из JSON двунаправленного стрима $serviceName.$methodName');
           yield message.payload!;
         } else if (message.isMetadataOnly) {
           _logger.debug(
-              'Получены метаданные из двунаправленного стрима $serviceName.$methodName');
+              'Получены метаданные из JSON двунаправленного стрима $serviceName.$methodName');
         }
       }
 
-      _logger.debug('Стрим ответов завершен для $serviceName.$methodName');
+      _logger.debug('Стрим JSON ответов завершен для $serviceName.$methodName');
     } catch (e, stackTrace) {
-      _logger.error('Ошибка в двунаправленном стриме $serviceName.$methodName',
-          error: e, stackTrace: stackTrace);
+      _logger.error(
+          'Ошибка в JSON двунаправленном стриме $serviceName.$methodName',
+          error: e,
+          stackTrace: stackTrace);
       rethrow;
     } finally {
       _logger.debug(
-          'Закрытие клиента двунаправленного стрима $serviceName.$methodName');
+          'Закрытие клиента JSON двунаправленного стрима $serviceName.$methodName');
       await client.close();
     }
   }
 
-  /// Вызов с бинарным парсером (для обратной совместимости)
-  Stream<TResponse> callWithBinaryParser<TRequest extends IRpcSerializable,
+  /// Выполняет запрос двунаправленного стрима с бинарной сериализацией (например, Protobuf)
+  ///
+  /// [requests] - Поток объектов запросов, которые будут сериализованы в бинарный формат
+  /// [responseParser] - Функция для преобразования бинарных данных в объекты ответов
+  Stream<TResponse> callBinary<TRequest extends IRpcSerializable,
       TResponse extends IRpcSerializable>({
     required Stream<TRequest> requests,
-    required TResponse Function(Uint8List bytes) responseParser,
+    required TResponse Function(Uint8List) responseParser,
   }) async* {
     _logger.debug(
-        'Инициализация двунаправленного стрима с бинарным парсером $serviceName.$methodName');
+        'Инициализация бинарного двунаправленного стрима $serviceName.$methodName');
 
+    // Определяем формат сериализации (бинарный)
+    final format = RpcSerializationFormat.binary;
+
+    _logger.debug('Используется формат сериализации: ${format.name}');
+
+    // Создаем сериализаторы для бинарного формата
+    final requestSerializer = RpcSerializerFactory.binary<TRequest>(
+      (bytes) => throw UnsupportedError(
+        'Десериализация TRequest не требуется в клиентском билдере',
+      ),
+    );
+
+    final responseSerializer =
+        RpcSerializerFactory.binary<TResponse>(responseParser);
+
+    // Создаем клиент с выбранными сериализаторами
+    _logger.debug(
+        'Создание клиента бинарного двунаправленного стрима для $serviceName.$methodName');
     final client = BidirectionalStreamCaller<TRequest, TResponse>(
       transport: endpoint.transport,
       serviceName: serviceName,
       methodName: methodName,
-      requestSerializer: RpcSerializerFactory.binary<TRequest>(
-        (bytes) => throw UnsupportedError(
-          'Десериализация TRequest не требуется в клиентском билдере',
-        ),
-      ),
-      responseSerializer: RpcSerializerFactory.binary<TResponse>(
-        responseParser,
-      ),
+      requestSerializer: requestSerializer,
+      responseSerializer: responseSerializer,
       logger: _logger,
     );
 
@@ -529,21 +589,21 @@ class RpcBidirectionalStreamBuilder {
       // Асинхронно отправляем запросы
       int requestCount = 0;
       _logger.debug(
-          'Запуск отправки запросов в двунаправленный стрим (бинарный) $serviceName.$methodName');
+          'Запуск отправки запросов в бинарный двунаправленный стрим $serviceName.$methodName');
 
       unawaited(() async {
         try {
           await for (final request in requests) {
             _logger.debug(
-                'Отправка запроса #${++requestCount} в двунаправленный стрим (бинарный) $serviceName.$methodName');
+                'Отправка запроса #${++requestCount} в бинарный двунаправленный стрим $serviceName.$methodName');
             client.send(request);
           }
           _logger.debug(
-              'Завершение отправки запросов в двунаправленный стрим (бинарный) $serviceName.$methodName');
+              'Завершение отправки запросов в бинарный двунаправленный стрим $serviceName.$methodName');
           client.finishSending();
         } catch (e, stackTrace) {
           _logger.error(
-              'Ошибка при отправке запросов в двунаправленный стрим (бинарный) $serviceName.$methodName',
+              'Ошибка при отправке запросов в бинарный двунаправленный стрим $serviceName.$methodName',
               error: e,
               stackTrace: stackTrace);
         }
@@ -551,31 +611,31 @@ class RpcBidirectionalStreamBuilder {
 
       // Обрабатываем ответы
       _logger.debug(
-          'Начало получения ответов из двунаправленного стрима (бинарный) $serviceName.$methodName');
+          'Начало получения ответов из бинарного двунаправленного стрима $serviceName.$methodName');
       int responseCount = 0;
 
       await for (final message in client.responses) {
         if (message.payload != null) {
           _logger.debug(
-              'Получен ответ #${++responseCount} из двунаправленного стрима (бинарный) $serviceName.$methodName');
+              'Получен ответ #${++responseCount} из бинарного двунаправленного стрима $serviceName.$methodName');
           yield message.payload!;
         } else if (message.isMetadataOnly) {
           _logger.debug(
-              'Получены метаданные из двунаправленного стрима (бинарный) $serviceName.$methodName');
+              'Получены метаданные из бинарного двунаправленного стрима $serviceName.$methodName');
         }
       }
 
       _logger.debug(
-          'Стрим ответов завершен для бинарного $serviceName.$methodName');
+          'Стрим бинарных ответов завершен для $serviceName.$methodName');
     } catch (e, stackTrace) {
       _logger.error(
-          'Ошибка в двунаправленном стриме (бинарный) $serviceName.$methodName',
+          'Ошибка в бинарном двунаправленном стриме $serviceName.$methodName',
           error: e,
           stackTrace: stackTrace);
       rethrow;
     } finally {
       _logger.debug(
-          'Закрытие клиента двунаправленного стрима (бинарный) $serviceName.$methodName');
+          'Закрытие клиента бинарного двунаправленного стрима $serviceName.$methodName');
       await client.close();
     }
   }
