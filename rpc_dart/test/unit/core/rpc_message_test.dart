@@ -1,5 +1,5 @@
 import 'package:test/test.dart';
-import 'package:rpc_dart/src_v2/rpc/_index.dart';
+import 'package:rpc_dart/src/rpc/_index.dart';
 
 void main() {
   group('RpcMessage', () {

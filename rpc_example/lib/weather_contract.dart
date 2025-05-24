@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:rpc_dart/src_v2/contracts/_index.dart';
+import 'package:rpc_dart/src/contracts/_index.dart';
 import 'package:protobuf/protobuf.dart';
 import 'generated/weather_service.pb.dart';
 

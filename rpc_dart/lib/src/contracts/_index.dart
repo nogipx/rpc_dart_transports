@@ -1,7 +1,14 @@
-// SPDX-FileCopyrightText: 2025 Karim "nogipx" Mamatkazin <nogipx@gmail.com>
-//
-// SPDX-License-Identifier: LGPL-3.0-or-later
+import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 
-export '_contract.dart';
-export 'typedefs.dart';
-export 'rpc_service_contract.dart';
+import 'package:rpc_dart/logger.dart';
+import 'package:rpc_dart/src/rpc/_index.dart';
+
+export 'dart:typed_data';
+
+part 'builders.dart';
+part 'contract.dart';
+part 'endpoint.dart';
+part 'models.dart';
+part 'serializer.dart';

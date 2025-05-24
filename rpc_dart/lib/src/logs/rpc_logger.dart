@@ -4,6 +4,24 @@
 
 part of '_logs.dart';
 
+/// Уровни логирования
+enum RpcLoggerLevel {
+  debug,
+  info,
+  warning,
+  error,
+  critical,
+  none;
+
+  /// Создание из строки JSON
+  static RpcLoggerLevel fromJson(String json) {
+    return values.firstWhere(
+      (e) => e.name == json,
+      orElse: () => none,
+    );
+  }
+}
+
 typedef RpcLoggerFactory = RpcLogger Function(
   String loggerName, {
   RpcLoggerColors? colors,
@@ -15,10 +33,21 @@ abstract interface class IRpcLoggerFilter {
   bool shouldLog(RpcLoggerLevel level, String source);
 }
 
+/// Результат форматирования лога с разделением на заголовок и содержимое
+class LogFormattingResult {
+  /// Заголовок сообщения
+  final String header;
+
+  /// Содержимое сообщения
+  final String content;
+
+  LogFormattingResult(this.header, this.content);
+}
+
 /// Интерфейс для форматирования логов
 abstract interface class IRpcLoggerFormatter {
-  /// Форматирует сообщение лога
-  String format(
+  /// Форматирует сообщение лога, возвращая заголовок и содержимое раздельно
+  LogFormattingResult format(
       DateTime timestamp, RpcLoggerLevel level, String source, String message,
       {String? context});
 }
@@ -34,9 +63,6 @@ abstract interface class RpcLogger {
   /// Имя логгера, обычно название компонента или модуля
   String get name;
 
-  /// Диагностический клиент
-  IRpcDiagnosticClient? get diagnostic;
-
   /// Создает новый логгер с указанным именем
   factory RpcLogger(
     String loggerName, {
@@ -44,6 +70,8 @@ abstract interface class RpcLogger {
   }) {
     return _RpcLoggerRegistry.instance.get(loggerName, colors: colors);
   }
+
+  RpcLogger child(String childName);
 
   /// Отправляет лог с указанным уровнем в сервис диагностики
   Future<void> log({

@@ -5,6 +5,6 @@
 /// Библиотека для логирования сообщений в RPC библиотеке
 ///
 /// Экспортирует все необходимые классы и функции для работы с логами
-library logger;
+library rpc_logger;
 
-export 'src_v2/logs/_logs.dart';
+export 'src/logs/_logs.dart';
