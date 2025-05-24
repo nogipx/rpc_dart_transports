@@ -1,4 +1,4 @@
-import 'base.dart';
+part of '_index.dart';
 
 /// Базовый контракт сервиса (полностью дженериковый)
 /// Пользователи могут передавать любые свои типы без ограничений!
@@ -20,14 +20,12 @@ abstract class RpcServiceContract {
     required String methodName,
     required Future<TResponse> Function(TRequest) handler,
     String description = '',
-    RpcMethodMetadata metadata = const RpcMethodMetadata(),
   }) {
     _methods[methodName] = RpcMethodRegistration(
       name: methodName,
       type: RpcMethodType.unary,
       handler: handler,
       description: description,
-      metadata: metadata,
       requestType: TRequest,
       responseType: TResponse,
     );
@@ -40,14 +38,12 @@ abstract class RpcServiceContract {
     required String methodName,
     required Stream<TResponse> Function(TRequest) handler,
     String description = '',
-    RpcMethodMetadata metadata = const RpcMethodMetadata(),
   }) {
     _methods[methodName] = RpcMethodRegistration(
       name: methodName,
       type: RpcMethodType.serverStream,
       handler: handler,
       description: description,
-      metadata: metadata,
       requestType: TRequest,
       responseType: TResponse,
     );
@@ -60,14 +56,12 @@ abstract class RpcServiceContract {
     required String methodName,
     required Future<TResponse> Function(Stream<TRequest>) handler,
     String description = '',
-    RpcMethodMetadata metadata = const RpcMethodMetadata(),
   }) {
     _methods[methodName] = RpcMethodRegistration(
       name: methodName,
       type: RpcMethodType.clientStream,
       handler: handler,
       description: description,
-      metadata: metadata,
       requestType: TRequest,
       responseType: TResponse,
     );
@@ -80,14 +74,12 @@ abstract class RpcServiceContract {
     required String methodName,
     required Stream<TResponse> Function(Stream<TRequest>) handler,
     String description = '',
-    RpcMethodMetadata metadata = const RpcMethodMetadata(),
   }) {
     _methods[methodName] = RpcMethodRegistration(
       name: methodName,
       type: RpcMethodType.bidirectional,
       handler: handler,
       description: description,
-      metadata: metadata,
       requestType: TRequest,
       responseType: TResponse,
     );

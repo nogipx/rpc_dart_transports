@@ -1,6 +1,5 @@
 import 'dart:async';
-import 'base.dart';
-import 'rpc_service_contract.dart';
+import '_index.dart';
 
 /// ============================================
 /// ПРИМЕР ИСПОЛЬЗОВАНИЯ - USER SERVICE
@@ -26,40 +25,24 @@ abstract class UserServiceContract extends RpcServiceContract {
       methodName: methodGetUser,
       handler: getUser,
       description: 'Получает пользователя по ID',
-      metadata: const RpcMethodMetadata(
-        timeout: Duration(seconds: 5),
-        cacheable: true,
-      ),
     );
 
     addUnaryMethod<CreateUserRequest, UserResponse>(
       methodName: methodCreateUser,
       handler: createUser,
       description: 'Создает нового пользователя',
-      metadata: const RpcMethodMetadata(
-        requiresAuth: true,
-        permissions: ['user.create'],
-      ),
     );
 
     addServerStreamMethod<ListUsersRequest, UserResponse>(
       methodName: methodListUsers,
       handler: listUsers,
       description: 'Получает список пользователей потоком',
-      metadata: const RpcMethodMetadata(
-        timeout: Duration(seconds: 30),
-      ),
     );
 
     addBidirectionalMethod<WatchUsersRequest, UserEventResponse>(
       methodName: methodWatchUsers,
       handler: watchUsers,
       description: 'Наблюдает за изменениями пользователей',
-      metadata: const RpcMethodMetadata(
-        requiresAuth: true,
-        permissions: ['user.watch'],
-        timeout: Duration(minutes: 30),
-      ),
     );
 
     super.setup();
