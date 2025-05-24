@@ -21,6 +21,8 @@ class InMemoryRpcExample {
     // Инициализируем серверную часть
     final server = BidirectionalStreamServer<String, String>(
       transport: serverTransport,
+      serviceName: 'ChatService',
+      methodName: 'Connect',
       requestSerializer: stringSerializer,
       responseSerializer: stringSerializer,
     );
@@ -54,6 +56,8 @@ class InMemoryRpcExample {
     // Инициализируем клиентскую часть
     final client = BidirectionalStreamClient<String, String>(
       transport: clientTransport,
+      serviceName: 'ChatService',
+      methodName: 'Connect',
       requestSerializer: stringSerializer,
       responseSerializer: stringSerializer,
     );

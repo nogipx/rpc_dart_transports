@@ -25,6 +25,8 @@ Future<void> runIsolateExample() async {
   // Создаем клиент для двустороннего потока
   final client = BidirectionalStreamClient<String, String>(
     transport: result.transport,
+    serviceName: 'EchoService',
+    methodName: 'Echo',
     requestSerializer: const SimpleStringSerializer(),
     responseSerializer: const SimpleStringSerializer(),
     logger: RpcLogger(
@@ -95,6 +97,8 @@ void customEchoServer(
   // Создаем двунаправленный стрим-сервер
   final server = BidirectionalStreamServer<String, String>(
     transport: transport,
+    serviceName: 'EchoService',
+    methodName: 'Echo',
     requestSerializer: serializer,
     responseSerializer: serializer,
     logger: logger,

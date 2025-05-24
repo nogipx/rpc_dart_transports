@@ -21,6 +21,15 @@ final class BidirectionalStreamClient<TRequest, TResponse> {
   /// Уникальный Stream ID для этого RPC вызова
   late final int _streamId;
 
+  /// Имя сервиса
+  final String _serviceName;
+
+  /// Имя метода
+  final String _methodName;
+
+  /// Путь метода в формате /<ServiceName>/<MethodName>
+  late final String _methodPath;
+
   /// Кодек для сериализации исходящих запросов
   final IRpcSerializer<TRequest> _requestSerializer;
 
@@ -55,19 +64,27 @@ final class BidirectionalStreamClient<TRequest, TResponse> {
   /// Создает новый клиентский двунаправленный стрим.
   ///
   /// [transport] Транспортный уровень
+  /// [serviceName] Имя сервиса (например, "ChatService")
+  /// [methodName] Имя метода (например, "Connect")
   /// [requestSerializer] Кодек для сериализации запросов
   /// [responseSerializer] Кодек для десериализации ответов
+  /// [logger] Опциональный логгер
   BidirectionalStreamClient({
     required IRpcTransport transport,
+    required String serviceName,
+    required String methodName,
     required IRpcSerializer<TRequest> requestSerializer,
     required IRpcSerializer<TResponse> responseSerializer,
     RpcLogger? logger,
   })  : _transport = transport,
+        _serviceName = serviceName,
+        _methodName = methodName,
         _requestSerializer = requestSerializer,
         _responseSerializer = responseSerializer,
         _parser = RpcMessageParser(logger: logger),
         _logger = logger {
     _streamId = _transport.createStream();
+    _methodPath = '/$serviceName/$methodName';
     unawaited(_setupStreams());
   }
 
@@ -77,6 +94,12 @@ final class BidirectionalStreamClient<TRequest, TResponse> {
   /// 1. От приложения к сети: сериализация и отправка запросов
   /// 2. От сети к приложению: получение, парсинг и десериализация ответов
   Future<void> _setupStreams() async {
+    // Отправляем начальные метаданные для инициализации RPC вызова
+    final initialMetadata =
+        RpcMetadata.forClientRequest(_serviceName, _methodName);
+    await _transport.sendMetadata(_streamId, initialMetadata);
+    _logger?.debug('Начальные метаданные отправлены для $_methodPath');
+
     // Настраиваем отправку запросов
     _requestController.stream.listen(
       (request) async {
@@ -243,8 +266,14 @@ final class BidirectionalStreamServer<TRequest, TResponse> {
   /// Базовый транспорт для обмена данными
   final IRpcTransport _transport;
 
-  /// Уникальный Stream ID для этого RPC вызова
-  late final int _streamId;
+  /// Имя сервиса
+  final String serviceName;
+
+  /// Имя метода
+  final String methodName;
+
+  /// Путь метода в формате /<ServiceName>/<MethodName>
+  late final String _methodPath;
 
   /// Кодек для десериализации входящих запросов
   final IRpcSerializer<TRequest> _requestSerializer;
@@ -263,9 +292,8 @@ final class BidirectionalStreamServer<TRequest, TResponse> {
   /// Парсер для обработки фрагментированных сообщений
   late final RpcMessageParser _parser;
 
-  /// Флаг, указывающий, были ли отправлены начальные заголовки
-  // ignore: unused_field
-  bool _headersSent = false;
+  /// Stream ID для активного соединения (устанавливается при первом входящем вызове)
+  int? _activeStreamId;
 
   /// Поток входящих запросов от клиента.
   ///
@@ -277,10 +305,15 @@ final class BidirectionalStreamServer<TRequest, TResponse> {
   /// Создает новый серверный двунаправленный стрим.
   ///
   /// [transport] Транспортный уровень
+  /// [serviceName] Имя сервиса (например, "ChatService")
+  /// [methodName] Имя метода (например, "Connect")
   /// [requestSerializer] Кодек для десериализации запросов
   /// [responseSerializer] Кодек для сериализации ответов
+  /// [logger] Опциональный логгер
   BidirectionalStreamServer({
     required IRpcTransport transport,
+    required this.serviceName,
+    required this.methodName,
     required IRpcSerializer<TRequest> requestSerializer,
     required IRpcSerializer<TResponse> responseSerializer,
     RpcLogger? logger,
@@ -289,68 +322,90 @@ final class BidirectionalStreamServer<TRequest, TResponse> {
         _responseSerializer = responseSerializer,
         _parser = RpcMessageParser(logger: logger),
         _logger = logger {
-    _streamId = _transport.createStream();
+    _methodPath = '/$serviceName/$methodName';
     unawaited(_setupStreams());
   }
 
   /// Настраивает потоки данных для обработки запросов и отправки ответов.
   ///
-  /// 1. Инициализирует отправку начальных заголовков клиенту
+  /// 1. Слушает все входящие сообщения и реагирует на новые Stream ID
   /// 2. Настраивает пайплайн для отправки ответов
   /// 3. Настраивает обработку входящих сообщений от клиента
   Future<void> _setupStreams() async {
-    // Отправляем начальные заголовки
-    final initialHeaders = RpcMetadata.forServerInitialResponse();
-    await _transport.sendMetadata(_streamId, initialHeaders);
-    _headersSent = true;
-    _logger?.debug('Начальные заголовки отправлены');
+    // Слушаем ВСЕ входящие сообщения для обнаружения новых вызовов
+    _transport.incomingMessages.listen(
+      (message) async {
+        // Если это новый Stream ID и метаданные, проверяем путь метода
+        if (message.isMetadataOnly &&
+            message.metadata != null &&
+            _activeStreamId == null) {
+          // Проверяем, что это вызов нашего метода
+          if (message.methodPath == _methodPath) {
+            _activeStreamId = message.streamId;
+            _logger
+                ?.debug('Новый вызов $_methodPath на stream $_activeStreamId');
 
-    // Настраиваем отправку ответов
-    _responseController.stream.listen(
-      (response) async {
-        final serialized = _responseSerializer.serialize(response);
-        final framedMessage = RpcMessageFrame.encode(serialized);
-        await _transport.sendMessage(_streamId, framedMessage);
-        _logger?.debug(
-          'Ответ фреймирован, размер: ${framedMessage.length} байт',
-        );
-      },
-      onDone: () async {
-        // Отправляем трейлер при завершении отправки ответов
-        final trailers = RpcMetadata.forTrailer(RpcStatus.OK);
-        await _transport.sendMetadata(_streamId, trailers, endStream: true);
-        _logger?.debug('Трейлер отправлен');
-      },
-    );
+            // Отправляем начальные заголовки в ответ
+            final initialHeaders = RpcMetadata.forServerInitialResponse();
+            await _transport.sendMetadata(_activeStreamId!, initialHeaders);
+            _logger?.debug('Начальные заголовки отправлены для $_methodPath');
 
-    // Настраиваем прием запросов для нашего stream
-    _transport.getMessagesForStream(_streamId).listen(
-      (message) {
-        if (!message.isMetadataOnly && message.payload != null) {
-          // Обрабатываем сообщения
-          final messageBytes = message.payload!;
-          _logger?.debug(
-            'Получено сообщение от транспорта размером: ${messageBytes.length} байт',
-          );
-          final messages = _parser(messageBytes);
-
-          for (var msgBytes in messages) {
-            final request = _requestSerializer.deserialize(msgBytes);
-            _requestController.add(request);
+            // Настраиваем отправку ответов для этого stream
+            _responseController.stream.listen(
+              (response) async {
+                final serialized = _responseSerializer.serialize(response);
+                final framedMessage = RpcMessageFrame.encode(serialized);
+                await _transport.sendMessage(_activeStreamId!, framedMessage);
+                _logger?.debug(
+                  'Ответ фреймирован, размер: ${framedMessage.length} байт',
+                );
+              },
+              onDone: () async {
+                // Отправляем трейлер при завершении отправки ответов
+                final trailers = RpcMetadata.forTrailer(RpcStatus.OK);
+                await _transport.sendMetadata(_activeStreamId!, trailers,
+                    endStream: true);
+                _logger?.debug('Трейлер отправлен для $_methodPath');
+              },
+            );
+          } else {
+            // Это не наш метод, игнорируем
+            _logger?.debug(
+                'Игнорируем вызов ${message.methodPath}, ожидаем $_methodPath');
+            return;
           }
         }
 
-        // Если это конец потока запросов, закрываем контроллер
-        if (message.isEndOfStream) {
-          _logger?.debug('Получен END_STREAM, закрываем контроллер запросов');
-          _requestController.close();
+        // Обрабатываем данные только для нашего активного stream
+        if (message.streamId == _activeStreamId) {
+          if (!message.isMetadataOnly && message.payload != null) {
+            // Обрабатываем сообщения
+            final messageBytes = message.payload!;
+            _logger?.debug(
+              'Получено сообщение от транспорта размером: ${messageBytes.length} байт',
+            );
+            final messages = _parser(messageBytes);
+
+            for (var msgBytes in messages) {
+              final request = _requestSerializer.deserialize(msgBytes);
+              _requestController.add(request);
+            }
+          }
+
+          // Если это конец потока запросов, закрываем контроллер
+          if (message.isEndOfStream) {
+            _logger?.debug('Получен END_STREAM, закрываем контроллер запросов');
+            _requestController.close();
+          }
         }
       },
       onError: (error) {
         _logger?.error('Ошибка от транспорта: $error', error: error);
         _requestController.addError(error);
         _requestController.close();
-        sendError(RpcStatus.INTERNAL, 'Внутренняя ошибка: $error');
+        if (_activeStreamId != null) {
+          sendError(RpcStatus.INTERNAL, 'Внутренняя ошибка: $error');
+        }
       },
       onDone: () {
         _logger?.debug('Транспорт завершил поток сообщений');
@@ -369,6 +424,11 @@ final class BidirectionalStreamServer<TRequest, TResponse> {
   ///
   /// [response] Объект ответа для отправки
   Future<void> send(TResponse response) async {
+    if (_activeStreamId == null) {
+      _logger?.warning('Попытка отправить ответ без активного соединения');
+      return;
+    }
+
     if (!_responseController.isClosed) {
       _responseController.add(response);
     }
@@ -383,12 +443,17 @@ final class BidirectionalStreamServer<TRequest, TResponse> {
   /// [statusCode] Код ошибки gRPC (см. GrpcStatus)
   /// [message] Текстовое сообщение с описанием ошибки
   Future<void> sendError(int statusCode, String message) async {
+    if (_activeStreamId == null) {
+      _logger?.warning('Попытка отправить ошибку без активного соединения');
+      return;
+    }
+
     if (!_responseController.isClosed) {
       _responseController.close();
     }
 
     final trailers = RpcMetadata.forTrailer(statusCode, message: message);
-    await _transport.sendMetadata(_streamId, trailers, endStream: true);
+    await _transport.sendMetadata(_activeStreamId!, trailers, endStream: true);
   }
 
   /// Завершает отправку ответов.

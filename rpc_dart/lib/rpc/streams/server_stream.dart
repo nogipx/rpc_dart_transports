@@ -29,16 +29,22 @@ final class ServerStreamClient<TRequest, TResponse> {
   /// Создает клиент серверного стриминга
   ///
   /// [transport] Транспортный уровень
+  /// [serviceName] Имя сервиса (например, "DataService")
+  /// [methodName] Имя метода (например, "GetData")
   /// [requestSerializer] Кодек для сериализации запроса
   /// [responseSerializer] Кодек для десериализации ответов
   /// [logger] Опциональный логгер
   ServerStreamClient({
     required IRpcTransport transport,
+    required String serviceName,
+    required String methodName,
     required IRpcSerializer<TRequest> requestSerializer,
     required IRpcSerializer<TResponse> responseSerializer,
     RpcLogger? logger,
   }) : _innerClient = BidirectionalStreamClient<TRequest, TResponse>(
           transport: transport,
+          serviceName: serviceName,
+          methodName: methodName,
           requestSerializer: requestSerializer,
           responseSerializer: responseSerializer,
           logger: logger,
@@ -130,12 +136,16 @@ final class ServerStreamServer<TRequest, TResponse> {
   /// Создает сервер серверного стриминга
   ///
   /// [transport] Транспортный уровень
+  /// [serviceName] Имя сервиса (например, "DataService")
+  /// [methodName] Имя метода (например, "GetData")
   /// [requestSerializer] Кодек для десериализации запроса
   /// [responseSerializer] Кодек для сериализации ответов
   /// [handler] Функция-обработчик, вызываемая при получении запроса
   /// [logger] Опциональный логгер
   ServerStreamServer({
     required IRpcTransport transport,
+    required String serviceName,
+    required String methodName,
     required IRpcSerializer<TRequest> requestSerializer,
     required IRpcSerializer<TResponse> responseSerializer,
     required void Function(
@@ -145,6 +155,8 @@ final class ServerStreamServer<TRequest, TResponse> {
     RpcLogger? logger,
   }) : _innerServer = BidirectionalStreamServer<TRequest, TResponse>(
           transport: transport,
+          serviceName: serviceName,
+          methodName: methodName,
           requestSerializer: requestSerializer,
           responseSerializer: responseSerializer,
           logger: logger,

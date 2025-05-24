@@ -27,8 +27,8 @@ class SimpleStringSerializer implements IRpcSerializer<String> {
 }
 
 void main() async {
-  // await runInMemoryExample();
-  // await runIsolateExample();
-  // await runStreamTypesExample();
+  await runInMemoryExample();
+  await runIsolateExample();
+  await runStreamTypesExample();
   await runUnaryExample();
 }

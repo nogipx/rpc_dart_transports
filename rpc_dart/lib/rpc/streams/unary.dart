@@ -43,6 +43,9 @@ final class UnaryClient<TRequest, TResponse> {
   /// Логгер
   final RpcLogger? _logger;
 
+  /// Парсер для обработки фрагментированных сообщений
+  late final RpcMessageParser _parser;
+
   /// Создает клиент унарного вызова
   ///
   /// [transport] Транспортный уровень
@@ -63,7 +66,8 @@ final class UnaryClient<TRequest, TResponse> {
         _methodName = methodName,
         _requestSerializer = requestSerializer,
         _responseSerializer = responseSerializer,
-        _logger = logger {
+        _logger = logger,
+        _parser = RpcMessageParser(logger: logger) {
     _methodPath = '/$_serviceName/$_methodName';
   }
 
@@ -90,10 +94,14 @@ final class UnaryClient<TRequest, TResponse> {
           if (!message.isMetadataOnly && message.payload != null) {
             // Получили данные ответа
             try {
-              final response =
-                  _responseSerializer.deserialize(message.payload!);
-              if (!completer.isCompleted) {
-                completer.complete(response);
+              // Используем парсер для извлечения сообщений из фрейма с префиксом
+              final messages = _parser(message.payload!);
+              for (final msgBytes in messages) {
+                final response = _responseSerializer.deserialize(msgBytes);
+                if (!completer.isCompleted) {
+                  completer.complete(response);
+                  break; // Для унарного вызова нужен только первый ответ
+                }
               }
             } catch (e) {
               if (!completer.isCompleted) {
@@ -205,6 +213,9 @@ final class UnaryServer<TRequest, TResponse> {
   /// Логгер
   final RpcLogger? _logger;
 
+  /// Парсер для обработки фрагментированных сообщений
+  late final RpcMessageParser _parser;
+
   /// Подписка на входящие сообщения
   StreamSubscription? _subscription;
 
@@ -230,7 +241,8 @@ final class UnaryServer<TRequest, TResponse> {
         _methodName = methodName,
         _requestSerializer = requestSerializer,
         _responseSerializer = responseSerializer,
-        _logger = logger {
+        _logger = logger,
+        _parser = RpcMessageParser(logger: logger) {
     _methodPath = '/$_serviceName/$_methodName';
     _setupRequestHandler(handler);
   }
@@ -281,7 +293,12 @@ final class UnaryServer<TRequest, TResponse> {
             }
 
             // Десериализуем запрос
-            final request = _requestSerializer.deserialize(message.payload!);
+            // Используем парсер для извлечения сообщений из фрейма с префиксом
+            final messages = _parser(message.payload!);
+            if (messages.isEmpty) {
+              throw Exception('Не удалось извлечь сообщение из payload');
+            }
+            final request = _requestSerializer.deserialize(messages.first);
 
             _logger?.debug(
                 'UnaryServer: обрабатываем запрос для метода $_methodPath на stream $streamId');

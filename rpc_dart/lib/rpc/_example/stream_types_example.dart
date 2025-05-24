@@ -25,6 +25,8 @@ class StreamTypesExample {
     // Инициализируем серверную часть с обработчиком
     final server = ServerStreamServer<String, String>(
       transport: serverTransport,
+      serviceName: 'DataService',
+      methodName: 'GetServerStream',
       requestSerializer: stringSerializer,
       responseSerializer: stringSerializer,
       handler: (request, responder) async {
@@ -49,6 +51,8 @@ class StreamTypesExample {
     // Инициализируем клиентскую часть
     final client = ServerStreamClient<String, String>(
       transport: clientTransport,
+      serviceName: 'DataService',
+      methodName: 'GetServerStream',
       requestSerializer: stringSerializer,
       responseSerializer: stringSerializer,
     );
@@ -102,6 +106,8 @@ class StreamTypesExample {
     // Инициализируем серверную часть с обработчиком
     final server = ClientStreamServer<String, String>(
       transport: serverTransport,
+      serviceName: 'DataAggregatorService',
+      methodName: 'ProcessClientStream',
       requestSerializer: stringSerializer,
       responseSerializer: stringSerializer,
       handler: (Stream<String> requests) async {
@@ -126,6 +132,8 @@ class StreamTypesExample {
     // Инициализируем клиентскую часть
     final client = ClientStreamClient<String, String>(
       transport: clientTransport,
+      serviceName: 'DataAggregatorService',
+      methodName: 'ProcessClientStream',
       requestSerializer: stringSerializer,
       responseSerializer: stringSerializer,
     );

@@ -79,7 +79,6 @@ class RpcIsolateTransport {
           final transport = _IsolateWorkerTransport(
             hostSendPort: mainHostSendPort,
             messageStream: messageController.stream,
-            isolateId: isolateId,
           );
 
           // Вызываем пользовательскую функцию, передавая транспорт
@@ -120,7 +119,6 @@ class RpcIsolateTransport {
     final hostTransport = _IsolateHostTransport(
       workerSendPort: workerSendPort,
       receivePort: hostReceivePort,
-      isolateId: isolateId,
     );
 
     // Функция для завершения изолята
@@ -137,7 +135,6 @@ class RpcIsolateTransport {
 class _IsolateHostTransport implements IRpcTransport {
   final SendPort _workerSendPort;
   final ReceivePort _receivePort;
-  final String _isolateId;
 
   final StreamController<RpcTransportMessage<Uint8List>> _messageController =
       StreamController<RpcTransportMessage<Uint8List>>.broadcast();
@@ -153,10 +150,8 @@ class _IsolateHostTransport implements IRpcTransport {
   _IsolateHostTransport({
     required SendPort workerSendPort,
     required ReceivePort receivePort,
-    required String isolateId,
   })  : _workerSendPort = workerSendPort,
-        _receivePort = receivePort,
-        _isolateId = isolateId {
+        _receivePort = receivePort {
     // Настраиваем обработку входящих сообщений
     _receivePort.listen(_handleMessage, onDone: () {
       if (!_messageController.isClosed) {
@@ -299,7 +294,6 @@ class _IsolateHostTransport implements IRpcTransport {
 class _IsolateWorkerTransport implements IRpcTransport {
   final SendPort _hostSendPort;
   final Stream<dynamic> _messageStream;
-  final String _isolateId;
 
   final StreamController<RpcTransportMessage<Uint8List>> _messageController =
       StreamController<RpcTransportMessage<Uint8List>>.broadcast();
@@ -316,10 +310,8 @@ class _IsolateWorkerTransport implements IRpcTransport {
   _IsolateWorkerTransport({
     required SendPort hostSendPort,
     required Stream<dynamic> messageStream,
-    required String isolateId,
   })  : _hostSendPort = hostSendPort,
-        _messageStream = messageStream,
-        _isolateId = isolateId {
+        _messageStream = messageStream {
     // Настраиваем обработку входящих сообщений
     _subscription = _messageStream.listen(_handleMessage, onDone: () {
       if (!_messageController.isClosed) {
