@@ -9,9 +9,9 @@ part 'core/message.dart';
 part 'core/parser.dart';
 part 'core/transport.dart';
 
-part 'transports/isolate_transport.dart';
 part 'transports/in_memory_transport.dart';
-part 'transports/multiplex_transport.dart';
+part 'transports/isolate_transport.dart';
+// multiplex_transport.dart убран - мультиплексирование теперь встроено в базовый интерфейс
 
 part 'streams/bidirectional_stream.dart';
 part 'streams/server_stream.dart';

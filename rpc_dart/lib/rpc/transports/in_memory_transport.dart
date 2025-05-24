@@ -1,9 +1,10 @@
 part of '../_index.dart';
 
-/// Высокопроизводительный транспорт для обмена сообщениями в памяти.
+/// Высокопроизводительный транспорт для обмена сообщениями в памяти со Stream ID.
 ///
 /// Полноценная реализация транспортного уровня для коммуникации
 /// между компонентами в одном процессе с минимальными накладными расходами.
+/// Поддерживает мультиплексирование по уникальным Stream ID согласно gRPC спецификации.
 /// Идеально подходит для:
 /// - Межкомпонентной коммуникации внутри приложения
 /// - Высоконагруженных систем, где важна скорость обмена данными
@@ -15,10 +16,13 @@ class RpcInMemoryTransport implements IRpcTransport {
 
   /// Контроллер для управления потоком входящих сообщений
   final StreamController<RpcTransportMessage<Uint8List>> _incomingController =
-      StreamController<RpcTransportMessage<Uint8List>>();
+      StreamController<RpcTransportMessage<Uint8List>>.broadcast();
 
-  /// Флаг, указывающий, что отправка завершена
-  bool _sendingFinished = false;
+  /// Счетчик для генерации уникальных Stream ID
+  int _nextStreamId;
+
+  /// Активные streams и их состояние отправки
+  final Map<int, bool> _streamSendingFinished = <int, bool>{};
 
   /// Флаг, указывающий, что транспорт закрыт
   bool _closed = false;
@@ -38,16 +42,20 @@ class RpcInMemoryTransport implements IRpcTransport {
   /// Создает новый высокопроизводительный транспорт для обмена сообщениями в памяти
   ///
   /// [_outgoingController] Контроллер для отправки сообщений партнеру
+  /// [isClient] Флаг клиентского транспорта (влияет на генерацию Stream ID)
   /// [flowControlWindow] Начальный размер окна управления потоком (предотвращает OOM)
   /// [logger] Опциональный логгер для отладки транспорта
   /// [errorHandler] Функция для обработки ошибок транспорта
   RpcInMemoryTransport(
     this._outgoingController, {
+    bool isClient = true, // Клиент использует нечетные ID, сервер - четные
     int initialFlowControlWindow = 10 * 1024 * 1024, // 10 МБ по умолчанию
     int maxFlowControlWindow = 100 * 1024 * 1024, // 100 МБ максимум
     RpcLogger? logger,
     void Function(Object error)? errorHandler,
-  })  : _flowControlWindow = initialFlowControlWindow,
+  })  : _nextStreamId =
+            isClient ? 1 : 2, // HTTP/2: клиент - нечетные, сервер - четные
+        _flowControlWindow = initialFlowControlWindow,
         _maxFlowControlWindow = maxFlowControlWindow,
         _logger = logger,
         _errorHandler = errorHandler {
@@ -57,16 +65,34 @@ class RpcInMemoryTransport implements IRpcTransport {
     }
 
     _logger?.debug(
-        'InMemoryTransport: инициализирован с буфером $_flowControlWindow байт');
+        'InMemoryTransport: инициализирован с буфером $_flowControlWindow байт, isClient: $isClient');
   }
 
   @override
   Stream<RpcTransportMessage<Uint8List>> get incomingMessages =>
       _incomingController.stream;
 
+  @override
+  Stream<RpcTransportMessage<Uint8List>> getMessagesForStream(int streamId) {
+    return incomingMessages.where((message) => message.streamId == streamId);
+  }
+
+  @override
+  int createStream() {
+    final streamId = _nextStreamId;
+    _nextStreamId +=
+        2; // HTTP/2: клиент использует нечетные ID, сервер - четные
+    _streamSendingFinished[streamId] = false;
+    _logger?.debug('InMemoryTransport: создан stream $streamId');
+    return streamId;
+  }
+
   /// Добавляет входящее сообщение в поток (вызывается партнерским транспортом)
   void addIncomingMessage(RpcTransportMessage<Uint8List> message) {
     if (_incomingController.isClosed) return;
+
+    _logger?.debug(
+        'InMemoryTransport: получено сообщение для stream ${message.streamId}, isMetadataOnly: ${message.isMetadataOnly}, endStream: ${message.isEndOfStream}, payload: ${message.payload?.length ?? 0} байт, path: ${message.methodPath}');
 
     // Проверка размера сообщения для управления памятью
     if (message.payload != null) {
@@ -91,11 +117,10 @@ class RpcInMemoryTransport implements IRpcTransport {
     // Добавляем сообщение в поток
     _incomingController.add(message);
 
-    // Если это сообщение завершающее, закрываем контроллер
+    // Если это сообщение завершающее, закрываем контроллер для конкретного stream
     if (message.isEndOfStream) {
       _logger?.debug(
-          'InMemoryTransport: получен END_STREAM, закрываем поток приема');
-      _incomingController.close();
+          'InMemoryTransport: получен END_STREAM для stream ${message.streamId}');
     }
   }
 
@@ -107,22 +132,33 @@ class RpcInMemoryTransport implements IRpcTransport {
   }
 
   @override
-  Future<void> sendMetadata(RpcMetadata metadata,
-      {bool endStream = false}) async {
-    if (_sendingFinished || _closed) {
+  Future<void> sendMetadata(
+    int streamId,
+    RpcMetadata metadata, {
+    bool endStream = false,
+  }) async {
+    if (_closed) {
       _logger?.warning(
-          'InMemoryTransport: попытка отправить метаданные после завершения отправки');
+          'InMemoryTransport: попытка отправить метаданные после закрытия транспорта');
       return;
     }
 
     try {
-      _outgoingController.add(RpcTransportMessage<Uint8List>(
+      final message = RpcTransportMessage<Uint8List>(
         metadata: metadata,
         isEndOfStream: endStream,
-      ));
+        methodPath: metadata.methodPath,
+        streamId: streamId,
+      );
+
+      _logger?.debug(
+          'InMemoryTransport: отправляем метаданные для stream $streamId, endStream: $endStream, path: ${metadata.methodPath}');
+      _outgoingController.add(message);
 
       if (endStream) {
-        _sendingFinished = true;
+        _streamSendingFinished[streamId] = true;
+        _logger?.debug(
+            'InMemoryTransport: stream $streamId помечен как завершенный для отправки');
       }
     } catch (e) {
       _logger?.error('InMemoryTransport: ошибка при отправке метаданных: $e');
@@ -132,21 +168,32 @@ class RpcInMemoryTransport implements IRpcTransport {
   }
 
   @override
-  Future<void> sendMessage(Uint8List data, {bool endStream = false}) async {
-    if (_sendingFinished || _closed) {
+  Future<void> sendMessage(
+    int streamId,
+    Uint8List data, {
+    bool endStream = false,
+  }) async {
+    if (_closed) {
       _logger?.warning(
-          'InMemoryTransport: попытка отправить данные после завершения отправки');
+          'InMemoryTransport: попытка отправить данные после закрытия транспорта');
       return;
     }
 
     try {
-      _outgoingController.add(RpcTransportMessage<Uint8List>(
+      final message = RpcTransportMessage<Uint8List>(
         payload: data,
         isEndOfStream: endStream,
-      ));
+        streamId: streamId,
+      );
+
+      _logger?.debug(
+          'InMemoryTransport: отправляем сообщение для stream $streamId, размер: ${data.length} байт, endStream: $endStream');
+      _outgoingController.add(message);
 
       if (endStream) {
-        _sendingFinished = true;
+        _streamSendingFinished[streamId] = true;
+        _logger?.debug(
+            'InMemoryTransport: stream $streamId помечен как завершенный для отправки');
       }
     } catch (e) {
       _logger?.error('InMemoryTransport: ошибка при отправке сообщения: $e');
@@ -156,16 +203,20 @@ class RpcInMemoryTransport implements IRpcTransport {
   }
 
   @override
-  Future<void> finishSending() async {
-    if (_sendingFinished || _closed) return;
+  Future<void> finishSending(int streamId) async {
+    if (_closed) return;
+
+    if (_streamSendingFinished[streamId] == true) {
+      return; // Уже завершен
+    }
 
     try {
-      _sendingFinished = true;
+      _streamSendingFinished[streamId] = true;
 
-      // Отправляем пустое сообщение с флагом END_STREAM
-      // согласно спецификации gRPC - пустой DATA фрейм с END_STREAM
+      // Отправляем пустое сообщение с флагом END_STREAM для конкретного stream
       _outgoingController.add(RpcTransportMessage<Uint8List>(
         isEndOfStream: true,
+        streamId: streamId,
       ));
     } catch (e) {
       _logger?.error('InMemoryTransport: ошибка при завершении отправки: $e');
@@ -180,7 +231,7 @@ class RpcInMemoryTransport implements IRpcTransport {
 
     try {
       _closed = true;
-      _sendingFinished = true;
+      _streamSendingFinished.clear();
 
       // Закрываем исходящий поток, если он еще открыт
       if (!_outgoingController.isClosed) {
@@ -218,13 +269,14 @@ class RpcInMemoryTransport implements IRpcTransport {
   }) {
     // Создаем контроллеры для обмена сообщениями в обоих направлениях
     final clientToServerController =
-        StreamController<RpcTransportMessage<Uint8List>>();
+        StreamController<RpcTransportMessage<Uint8List>>.broadcast();
     final serverToClientController =
-        StreamController<RpcTransportMessage<Uint8List>>();
+        StreamController<RpcTransportMessage<Uint8List>>.broadcast();
 
     // Создаем оптимизированные транспорты
     final clientTransport = RpcInMemoryTransport(
       clientToServerController,
+      isClient: true, // Клиент будет использовать нечетные Stream ID
       initialFlowControlWindow: initialFlowControlWindow,
       maxFlowControlWindow: maxFlowControlWindow,
       logger: clientLogger,
@@ -233,6 +285,7 @@ class RpcInMemoryTransport implements IRpcTransport {
 
     final serverTransport = RpcInMemoryTransport(
       serverToClientController,
+      isClient: false, // Сервер будет использовать четные Stream ID
       initialFlowControlWindow: initialFlowControlWindow,
       maxFlowControlWindow: maxFlowControlWindow,
       logger: serverLogger,

@@ -82,7 +82,10 @@ void customEchoServer(
 ) {
   print('customParams: $customParams');
   print('СЕРВЕР: Запущен эхо-сервер с новым API');
-  final log = customParams['log'] as void Function(String);
+  final logger = RpcLogger(
+    "Isolate",
+    colors: RpcLoggerColors.singleColor(AnsiColor.brightGreen),
+  );
 
   // Создаем сериализатор
   final serializer = SimpleStringSerializer();
@@ -94,10 +97,7 @@ void customEchoServer(
     transport: transport,
     requestSerializer: serializer,
     responseSerializer: serializer,
-    logger: RpcLogger(
-      "Isolate",
-      colors: RpcLoggerColors.singleColor(AnsiColor.brightGreen),
-    ),
+    logger: logger,
   );
 
   // Настраиваем префикс для ответов
@@ -106,28 +106,13 @@ void customEchoServer(
   // Слушаем входящие запросы
   server.requests.listen((request) {
     final requestStr = request.toString();
-    log('СЕРВЕР: Получен запрос: "$requestStr"');
+    logger.debug('СЕРВЕР: Получен запрос: "$requestStr"');
 
     // Обработка запроса и отправка эхо-ответа
     final response = '$messagePrefix$requestStr';
-    log('СЕРВЕР: Отправляем ответ: "$response"');
+    logger.debug('СЕРВЕР: Отправляем ответ: "$response"');
     server.send(response);
   });
 
-  log('СЕРВЕР: Эхо-сервер запущен и готов к обработке запросов');
-}
-
-/// Простой сериализатор строк
-class SimpleStringSerializer implements IRpcSerializer<String> {
-  const SimpleStringSerializer();
-
-  @override
-  String deserialize(Uint8List bytes) {
-    return utf8.decode(bytes);
-  }
-
-  @override
-  Uint8List serialize(String message) {
-    return Uint8List.fromList(utf8.encode(message));
-  }
+  logger.debug('СЕРВЕР: Эхо-сервер запущен и готов к обработке запросов');
 }

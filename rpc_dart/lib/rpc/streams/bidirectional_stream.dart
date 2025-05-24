@@ -1,10 +1,11 @@
 part of '../_index.dart';
 
-/// Клиентская реализация двунаправленного стрима gRPC.
+/// Клиентская реализация двунаправленного стрима gRPC со Stream ID.
 ///
 /// Обеспечивает полную реализацию клиентской стороны двунаправленного
 /// стриминга (Bidirectional Streaming RPC). Позволяет клиенту отправлять
 /// поток запросов серверу и одновременно получать поток ответов.
+/// Каждый стрим использует уникальный Stream ID согласно gRPC спецификации.
 ///
 /// Особенности:
 /// - Асинхронный обмен сообщениями в обоих направлениях
@@ -16,6 +17,9 @@ final class BidirectionalStreamClient<TRequest, TResponse> {
 
   /// Базовый транспорт для обмена данными
   final IRpcTransport _transport;
+
+  /// Уникальный Stream ID для этого RPC вызова
+  late final int _streamId;
 
   /// Кодек для сериализации исходящих запросов
   final IRpcSerializer<TRequest> _requestSerializer;
@@ -63,6 +67,7 @@ final class BidirectionalStreamClient<TRequest, TResponse> {
         _responseSerializer = responseSerializer,
         _parser = RpcMessageParser(logger: logger),
         _logger = logger {
+    _streamId = _transport.createStream();
     unawaited(_setupStreams());
   }
 
@@ -77,12 +82,12 @@ final class BidirectionalStreamClient<TRequest, TResponse> {
       (request) async {
         final serialized = _requestSerializer.serialize(request);
         final framedMessage = RpcMessageFrame.encode(serialized);
-        await _transport.sendMessage(framedMessage);
+        await _transport.sendMessage(_streamId, framedMessage);
         _logger?.debug('Отправлено сообщение через транспорт: $framedMessage');
       },
       onDone: () async {
         _logger?.debug('Поток запросов завершен, вызываем finishSending()');
-        await _transport.finishSending();
+        await _transport.finishSending(_streamId);
       },
     );
 
@@ -104,8 +109,8 @@ final class BidirectionalStreamClient<TRequest, TResponse> {
       }
     }
 
-    // Настраиваем прием ответов
-    _transport.incomingMessages.listen(
+    // Настраиваем прием ответов для нашего stream
+    _transport.getMessagesForStream(_streamId).listen(
       (message) async {
         if (message.isMetadataOnly) {
           // Обрабатываем метаданные
@@ -216,15 +221,16 @@ final class BidirectionalStreamClient<TRequest, TResponse> {
   /// - Отменяет все подписки на события
   Future<void> close() async {
     finishSending();
-    await _transport.close();
+    // Не закрываем транспорт, так как он может использоваться другими стримами
   }
 }
 
-/// Серверная реализация двунаправленного стрима gRPC.
+/// Серверная реализация двунаправленного стрима gRPC со Stream ID.
 ///
 /// Обеспечивает полную реализацию серверной стороны двунаправленного
 /// стриминга gRPC. Обрабатывает входящие запросы от клиента и позволяет
 /// отправлять ответы асинхронно, независимо от получения запросов.
+/// Использует уникальный Stream ID для идентификации вызова.
 ///
 /// Ключевые возможности:
 /// - Асинхронная обработка потока входящих запросов
@@ -236,6 +242,9 @@ final class BidirectionalStreamServer<TRequest, TResponse> {
 
   /// Базовый транспорт для обмена данными
   final IRpcTransport _transport;
+
+  /// Уникальный Stream ID для этого RPC вызова
+  late final int _streamId;
 
   /// Кодек для десериализации входящих запросов
   final IRpcSerializer<TRequest> _requestSerializer;
@@ -280,6 +289,7 @@ final class BidirectionalStreamServer<TRequest, TResponse> {
         _responseSerializer = responseSerializer,
         _parser = RpcMessageParser(logger: logger),
         _logger = logger {
+    _streamId = _transport.createStream();
     unawaited(_setupStreams());
   }
 
@@ -291,7 +301,7 @@ final class BidirectionalStreamServer<TRequest, TResponse> {
   Future<void> _setupStreams() async {
     // Отправляем начальные заголовки
     final initialHeaders = RpcMetadata.forServerInitialResponse();
-    await _transport.sendMetadata(initialHeaders);
+    await _transport.sendMetadata(_streamId, initialHeaders);
     _headersSent = true;
     _logger?.debug('Начальные заголовки отправлены');
 
@@ -300,7 +310,7 @@ final class BidirectionalStreamServer<TRequest, TResponse> {
       (response) async {
         final serialized = _responseSerializer.serialize(response);
         final framedMessage = RpcMessageFrame.encode(serialized);
-        await _transport.sendMessage(framedMessage);
+        await _transport.sendMessage(_streamId, framedMessage);
         _logger?.debug(
           'Ответ фреймирован, размер: ${framedMessage.length} байт',
         );
@@ -308,13 +318,13 @@ final class BidirectionalStreamServer<TRequest, TResponse> {
       onDone: () async {
         // Отправляем трейлер при завершении отправки ответов
         final trailers = RpcMetadata.forTrailer(RpcStatus.OK);
-        await _transport.sendMetadata(trailers, endStream: true);
+        await _transport.sendMetadata(_streamId, trailers, endStream: true);
         _logger?.debug('Трейлер отправлен');
       },
     );
 
-    // Настраиваем прием запросов
-    _transport.incomingMessages.listen(
+    // Настраиваем прием запросов для нашего stream
+    _transport.getMessagesForStream(_streamId).listen(
       (message) {
         if (!message.isMetadataOnly && message.payload != null) {
           // Обрабатываем сообщения
@@ -378,7 +388,7 @@ final class BidirectionalStreamServer<TRequest, TResponse> {
     }
 
     final trailers = RpcMetadata.forTrailer(statusCode, message: message);
-    await _transport.sendMetadata(trailers, endStream: true);
+    await _transport.sendMetadata(_streamId, trailers, endStream: true);
   }
 
   /// Завершает отправку ответов.
@@ -400,6 +410,6 @@ final class BidirectionalStreamServer<TRequest, TResponse> {
   /// - Отменяет все подписки
   Future<void> close() async {
     await finishReceiving();
-    await _transport.close();
+    // Не закрываем транспорт, так как он может использоваться другими стримами
   }
 }

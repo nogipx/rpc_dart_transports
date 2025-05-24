@@ -37,9 +37,30 @@ final class RpcMetadata {
   /// Возвращает метаданные, готовые для отправки при инициализации запроса.
   static RpcMetadata forClientRequest(String serviceName, String methodName,
       {String host = ''}) {
+    final methodPath = '/$serviceName/$methodName';
     return RpcMetadata([
       RpcHeader(':method', 'POST'),
-      RpcHeader(':path', '/$serviceName/$methodName'),
+      RpcHeader(':path', methodPath),
+      RpcHeader(':scheme', 'http'),
+      RpcHeader(':authority', host),
+      RpcHeader(
+        RpcConstants.CONTENT_TYPE_HEADER,
+        RpcConstants.GRPC_CONTENT_TYPE,
+      ),
+      RpcHeader('te', 'trailers'),
+    ]);
+  }
+
+  /// Создает метаданные для клиентского запроса с готовым путем.
+  ///
+  /// Упрощенная версия для случаев, когда путь уже сформирован.
+  /// [methodPath] Путь метода в формате /<ServiceName>/<MethodName>
+  /// [host] Хост-заголовок (опционально)
+  static RpcMetadata forClientRequestWithPath(String methodPath,
+      {String host = ''}) {
+    return RpcMetadata([
+      RpcHeader(':method', 'POST'),
+      RpcHeader(':path', methodPath),
       RpcHeader(':scheme', 'http'),
       RpcHeader(':authority', host),
       RpcHeader(
@@ -101,6 +122,36 @@ final class RpcMetadata {
       }
     }
     return null;
+  }
+
+  /// Извлекает путь метода из метаданных.
+  ///
+  /// Ищет заголовок :path и возвращает его значение.
+  /// Возвращает null, если заголовок не найден.
+  String? get methodPath => getHeaderValue(':path');
+
+  /// Извлекает имя сервиса из пути метода.
+  ///
+  /// Парсит путь вида /<ServiceName>/<MethodName> и возвращает ServiceName.
+  /// Возвращает null, если путь некорректен или не найден.
+  String? get serviceName {
+    final path = methodPath;
+    if (path == null || !path.startsWith('/')) return null;
+
+    final parts = path.substring(1).split('/');
+    return parts.isNotEmpty ? parts[0] : null;
+  }
+
+  /// Извлекает имя метода из пути метода.
+  ///
+  /// Парсит путь вида /<ServiceName>/<MethodName> и возвращает MethodName.
+  /// Возвращает null, если путь некорректен или не найден.
+  String? get methodName {
+    final path = methodPath;
+    if (path == null || !path.startsWith('/')) return null;
+
+    final parts = path.substring(1).split('/');
+    return parts.length >= 2 ? parts[1] : null;
   }
 }
 
