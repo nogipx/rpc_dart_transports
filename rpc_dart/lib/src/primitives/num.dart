@@ -31,11 +31,56 @@ class RpcNum extends RpcPrimitiveMessage<num> {
     }
   }
 
+  /// Создает RpcNum из бинарных данных
+  static RpcNum fromBytes(Uint8List bytes) {
+    if (bytes.isEmpty) return const RpcNum(0);
+
+    // Первый байт - тип: 0 = int, 1 = double
+    final type = bytes[0];
+
+    if (type == 0) {
+      // Int (4 байта)
+      if (bytes.length < 5) return const RpcNum(0);
+
+      final buffer = ByteData.sublistView(bytes, 1, 5);
+      final intValue = buffer.getInt32(0, Endian.little);
+      return RpcNum(intValue);
+    } else {
+      // Double (8 байтов)
+      if (bytes.length < 9) return const RpcNum(0);
+
+      final buffer = ByteData.sublistView(bytes, 1, 9);
+      final doubleValue = buffer.getFloat64(0, Endian.little);
+      return RpcNum(doubleValue);
+    }
+  }
+
+  /// Сериализует в бинарный формат
   @override
-  Map<String, dynamic> toJson() => {'v': value};
+  Uint8List serialize() {
+    if (value is int) {
+      // Для целого числа (тип 0 + 4 байта)
+      final result = Uint8List(5);
+      result[0] = 0; // тип int
+
+      final buffer = ByteData.view(result.buffer);
+      buffer.setInt32(1, value as int, Endian.little);
+
+      return result;
+    } else {
+      // Для дробного числа (тип 1 + 8 байтов)
+      final result = Uint8List(9);
+      result[0] = 1; // тип double
+
+      final buffer = ByteData.view(result.buffer);
+      buffer.setFloat64(1, value.toDouble(), Endian.little);
+
+      return result;
+    }
+  }
 
   @override
-  String toString() => toJson().toString();
+  String toString() => 'RpcNum(${value})';
 
   // Арифметические операторы
   RpcNum operator +(Object other) => RpcNum(value + _extractNum(other));
@@ -124,11 +169,29 @@ class RpcInt extends RpcPrimitiveMessage<int> {
     }
   }
 
+  /// Создает RpcInt из бинарных данных
+  static RpcInt fromBytes(Uint8List bytes) {
+    if (bytes.isEmpty) return const RpcInt(0);
+
+    // 4 байта для int
+    if (bytes.length < 4) return const RpcInt(0);
+
+    final buffer = ByteData.sublistView(bytes);
+    final intValue = buffer.getInt32(0, Endian.little);
+    return RpcInt(intValue);
+  }
+
+  /// Сериализует в бинарный формат (4 байта)
   @override
-  Map<String, dynamic> toJson() => {'v': value};
+  Uint8List serialize() {
+    final result = Uint8List(4);
+    final buffer = ByteData.view(result.buffer);
+    buffer.setInt32(0, value, Endian.little);
+    return result;
+  }
 
   @override
-  String toString() => toJson().toString();
+  String toString() => 'RpcInt(${value})';
 
   // Арифметические операторы
   RpcInt operator +(Object other) => RpcInt(value + _extractInt(other));
@@ -204,17 +267,42 @@ class RpcDouble extends RpcPrimitiveMessage<double> {
       if (v == null) return const RpcDouble(0.0);
       if (v is double) return RpcDouble(v);
       if (v is num) return RpcDouble(v.toDouble());
-      return RpcDouble(double.tryParse(v.toString()) ?? 0.0);
+
+      // Пробуем преобразовать в double
+      final asDouble = double.tryParse(v.toString());
+      if (asDouble != null) {
+        return RpcDouble(asDouble);
+      }
+
+      return const RpcDouble(0.0);
     } catch (e) {
       return const RpcDouble(0.0);
     }
   }
 
+  /// Создает RpcDouble из бинарных данных
+  static RpcDouble fromBytes(Uint8List bytes) {
+    if (bytes.isEmpty) return const RpcDouble(0.0);
+
+    // 8 байтов для double
+    if (bytes.length < 8) return const RpcDouble(0.0);
+
+    final buffer = ByteData.sublistView(bytes);
+    final doubleValue = buffer.getFloat64(0, Endian.little);
+    return RpcDouble(doubleValue);
+  }
+
+  /// Сериализует в бинарный формат (8 байт)
   @override
-  Map<String, dynamic> toJson() => {'v': value};
+  Uint8List serialize() {
+    final result = Uint8List(8);
+    final buffer = ByteData.view(result.buffer);
+    buffer.setFloat64(0, value, Endian.little);
+    return result;
+  }
 
   @override
-  String toString() => toJson().toString();
+  String toString() => 'RpcDouble(${value})';
 
   // Арифметические операторы
   RpcDouble operator +(Object other) =>

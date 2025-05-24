@@ -20,9 +20,26 @@ class RpcString extends RpcPrimitiveMessage<String> {
     }
   }
 
+  /// Создает RpcString из бинарных данных
+  static RpcString fromBytes(Uint8List bytes) {
+    if (bytes.isEmpty) return const RpcString('');
+
+    try {
+      // Декодируем UTF-8 байты в строку
+      final stringValue = utf8.decode(bytes);
+      return RpcString(stringValue);
+    } catch (e) {
+      return const RpcString('');
+    }
+  }
+
+  /// Сериализует в бинарный формат (UTF-8 байты)
   @override
-  Map<String, dynamic> toJson() => {'v': value};
+  Uint8List serialize() {
+    // Преобразуем строку в UTF-8 байты
+    return Uint8List.fromList(utf8.encode(value));
+  }
 
   @override
-  String toString() => toJson().toString();
+  String toString() => 'RpcString("${value}")';
 }

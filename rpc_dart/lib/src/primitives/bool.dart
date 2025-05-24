@@ -37,20 +37,19 @@ class RpcBool extends RpcPrimitiveMessage<bool> {
     }
   }
 
-  Map<String, dynamic> toJson() => {'v': value};
-
-  @override
-  String toString() => toJson().toString();
-
-  @override
-  RpcSerializationFormat getFormat() {
-    // TODO: implement getFormat
-    throw UnimplementedError();
+  /// Создает RpcBool из бинарных данных
+  static RpcBool fromBytes(Uint8List bytes) {
+    if (bytes.isEmpty) return const RpcBool(false);
+    // В бинарном представлении true = 1, false = 0
+    return RpcBool(bytes[0] != 0);
   }
 
+  /// Сериализует в бинарный формат (1 байт: 1 или 0)
   @override
   Uint8List serialize() {
-    // TODO: implement serialize
-    throw UnimplementedError();
+    return Uint8List.fromList([value ? 1 : 0]);
   }
+
+  @override
+  String toString() => 'RpcBool(${value})';
 }

@@ -13,9 +13,17 @@ class RpcNull extends RpcPrimitiveMessage<void> {
     return const RpcNull();
   }
 
+  /// Создает RpcNull из бинарных данных
+  static RpcNull fromBytes(Uint8List bytes) {
+    return const RpcNull();
+  }
+
+  /// Сериализует в бинарный формат (пустой массив)
   @override
-  Map<String, dynamic> toJson() => {'v': null};
+  Uint8List serialize() {
+    return Uint8List(0); // Пустой массив для null
+  }
 
   @override
-  String toString() => toJson().toString();
+  String toString() => 'RpcNull()';
 }
