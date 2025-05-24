@@ -1,5 +1,6 @@
 import 'dart:async';
-import '_index.dart';
+import '../_index.dart';
+import 'dart:convert';
 
 /// ============================================
 /// ПРИМЕР ИСПОЛЬЗОВАНИЯ - USER SERVICE
@@ -225,8 +226,8 @@ class UserServiceServer extends UserServiceContract {
 /// RPC-СОВМЕСТИМЫЕ ПОЛЬЗОВАТЕЛЬСКИЕ ТИПЫ
 /// ============================================
 
-/// Доменная модель запроса пользователя - реализует IRpcSerializableMessage
-class GetUserRequest implements IRpcSerializable {
+/// Доменная модель запроса пользователя - теперь с JsonRpcSerializable
+class GetUserRequest implements IRpcJsonSerializable, IRpcSerializable {
   final int userId;
 
   GetUserRequest({required this.userId});
@@ -234,17 +235,26 @@ class GetUserRequest implements IRpcSerializable {
   /// Опциональная валидация (не обязательно)
   bool isValid() => userId > 0;
 
-  /// Обязательная сериализация в JSON
+  /// Сериализация в JSON
   @override
-  Uint8List serialize() => {'userId': userId};
+  Map<String, dynamic> toJson() => {'userId': userId};
+
+  @override
+  Uint8List serialize() {
+    final jsonString = jsonEncode(toJson());
+    return Uint8List.fromList(utf8.encode(jsonString));
+  }
+
+  @override
+  RpcSerializationFormat getFormat() => RpcSerializationFormat.json;
 
   static GetUserRequest fromJson(Map<String, dynamic> json) {
     return GetUserRequest(userId: json['userId']);
   }
 }
 
-/// Доменная модель создания пользователя - реализует IRpcSerializableMessage
-class CreateUserRequest implements IRpcSerializable {
+/// Доменная модель создания пользователя - теперь с JsonRpcSerializable
+class CreateUserRequest implements IRpcJsonSerializable, IRpcSerializable {
   final String name;
   final String email;
 
@@ -254,14 +264,23 @@ class CreateUserRequest implements IRpcSerializable {
   bool isValid() => name.trim().isNotEmpty && email.contains('@');
 
   @override
-  Map<String, dynamic> serialize() => {'name': name, 'email': email};
+  Map<String, dynamic> toJson() => {'name': name, 'email': email};
+
+  @override
+  Uint8List serialize() {
+    final jsonString = jsonEncode(toJson());
+    return Uint8List.fromList(utf8.encode(jsonString));
+  }
+
+  @override
+  RpcSerializationFormat getFormat() => RpcSerializationFormat.json;
 
   static CreateUserRequest fromJson(Map<String, dynamic> json) {
     return CreateUserRequest(name: json['name'], email: json['email']);
   }
 }
 
-class ListUsersRequest implements IRpcSerializable {
+class ListUsersRequest implements IRpcJsonSerializable, IRpcSerializable {
   final int limit;
   final int offset;
 
@@ -270,7 +289,16 @@ class ListUsersRequest implements IRpcSerializable {
   bool isValid() => limit > 0 && offset >= 0;
 
   @override
-  Map<String, dynamic> serialize() => {'limit': limit, 'offset': offset};
+  Map<String, dynamic> toJson() => {'limit': limit, 'offset': offset};
+
+  @override
+  Uint8List serialize() {
+    final jsonString = jsonEncode(toJson());
+    return Uint8List.fromList(utf8.encode(jsonString));
+  }
+
+  @override
+  RpcSerializationFormat getFormat() => RpcSerializationFormat.json;
 
   static ListUsersRequest fromJson(Map<String, dynamic> json) {
     return ListUsersRequest(
@@ -280,7 +308,7 @@ class ListUsersRequest implements IRpcSerializable {
   }
 }
 
-class WatchUsersRequest implements IRpcSerializable {
+class WatchUsersRequest implements IRpcJsonSerializable, IRpcSerializable {
   final List<int> userIds;
 
   WatchUsersRequest({required this.userIds});
@@ -288,15 +316,24 @@ class WatchUsersRequest implements IRpcSerializable {
   bool isValid() => userIds.isNotEmpty;
 
   @override
-  Map<String, dynamic> serialize() => {'userIds': userIds};
+  Map<String, dynamic> toJson() => {'userIds': userIds};
+
+  @override
+  Uint8List serialize() {
+    final jsonString = jsonEncode(toJson());
+    return Uint8List.fromList(utf8.encode(jsonString));
+  }
+
+  @override
+  RpcSerializationFormat getFormat() => RpcSerializationFormat.json;
 
   static WatchUsersRequest fromJson(Map<String, dynamic> json) {
     return WatchUsersRequest(userIds: List<int>.from(json['userIds']));
   }
 }
 
-/// Доменная модель ответа - реализует IRpcSerializableMessage
-class UserResponse implements IRpcSerializable {
+/// Доменная модель ответа - теперь с JsonRpcSerializable
+class UserResponse implements IRpcJsonSerializable, IRpcSerializable {
   final User? user;
   final bool isSuccess;
   final String? errorMessage;
@@ -308,11 +345,20 @@ class UserResponse implements IRpcSerializable {
   });
 
   @override
-  Map<String, dynamic> serialize() => {
-        'user': user?.serialize(),
+  Map<String, dynamic> toJson() => {
+        'user': user?.toJson(),
         'isSuccess': isSuccess,
         'errorMessage': errorMessage,
       };
+
+  @override
+  Uint8List serialize() {
+    final jsonString = jsonEncode(toJson());
+    return Uint8List.fromList(utf8.encode(jsonString));
+  }
+
+  @override
+  RpcSerializationFormat getFormat() => RpcSerializationFormat.json;
 
   static UserResponse fromJson(Map<String, dynamic> json) {
     return UserResponse(
@@ -323,17 +369,26 @@ class UserResponse implements IRpcSerializable {
   }
 }
 
-class UserEventResponse implements IRpcSerializable {
+class UserEventResponse implements IRpcJsonSerializable, IRpcSerializable {
   final UserEvent event;
   final bool isSuccess;
 
   const UserEventResponse({required this.event, this.isSuccess = true});
 
   @override
-  Map<String, dynamic> serialize() => {
-        'event': event.serialize(),
+  Map<String, dynamic> toJson() => {
+        'event': event.toJson(),
         'isSuccess': isSuccess,
       };
+
+  @override
+  Uint8List serialize() {
+    final jsonString = jsonEncode(toJson());
+    return Uint8List.fromList(utf8.encode(jsonString));
+  }
+
+  @override
+  RpcSerializationFormat getFormat() => RpcSerializationFormat.json;
 
   static UserEventResponse fromJson(Map<String, dynamic> json) {
     return UserEventResponse(
@@ -343,8 +398,8 @@ class UserEventResponse implements IRpcSerializable {
   }
 }
 
-/// Доменная модель пользователя - реализует IRpcSerializableMessage
-class User implements IRpcSerializable {
+/// Доменная модель пользователя - теперь с JsonRpcSerializable
+class User implements IRpcJsonSerializable, IRpcSerializable {
   final int id;
   final String name;
   final String email;
@@ -356,11 +411,20 @@ class User implements IRpcSerializable {
   });
 
   @override
-  Map<String, dynamic> serialize() => {
+  Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,
         'email': email,
       };
+
+  @override
+  Uint8List serialize() {
+    final jsonString = jsonEncode(toJson());
+    return Uint8List.fromList(utf8.encode(jsonString));
+  }
+
+  @override
+  RpcSerializationFormat getFormat() => RpcSerializationFormat.json;
 
   static User fromJson(Map<String, dynamic> json) {
     return User(
@@ -371,8 +435,8 @@ class User implements IRpcSerializable {
   }
 }
 
-/// Доменная модель события - реализует IRpcSerializableMessage
-class UserEvent implements IRpcSerializable {
+/// Доменная модель события - теперь с JsonRpcSerializable
+class UserEvent implements IRpcJsonSerializable, IRpcSerializable {
   final int userId;
   final String eventType;
   final Map<String, dynamic> data;
@@ -386,12 +450,21 @@ class UserEvent implements IRpcSerializable {
   });
 
   @override
-  Map<String, dynamic> serialize() => {
+  Map<String, dynamic> toJson() => {
         'userId': userId,
         'eventType': eventType,
         'data': data,
         'timestamp': timestamp.toIso8601String(),
       };
+
+  @override
+  Uint8List serialize() {
+    final jsonString = jsonEncode(toJson());
+    return Uint8List.fromList(utf8.encode(jsonString));
+  }
+
+  @override
+  RpcSerializationFormat getFormat() => RpcSerializationFormat.json;
 
   static UserEvent fromJson(Map<String, dynamic> json) {
     return UserEvent(
@@ -413,16 +486,19 @@ void exampleUsage() async {
 
   // ✅ Компилируется - GetUserRequest реализует IRpcSerializableMessage
   final request = GetUserRequest(userId: 123);
-  final json = request.serialize(); // Гарантированно доступен!
+  final json = request.toJson(); // Используем toJson для получения JSON
+  // Сериализуем в байты для отправки
+  final serialized = request.serialize();
 
   final response = UserResponse(
     user: User(id: 123, name: 'Тест', email: 'test@example.com'),
   );
-  final responseJson = response.serialize(); // Тоже гарантированно доступен!
+  final responseJson = response.toJson(); // Используем toJson для JSON
 
   print('✅ Строгий API работает!');
   print('Request JSON: $json');
   print('Response JSON: $responseJson');
+  print('Serialized bytes length: ${serialized.length}');
 
   // ============================================
   // 🔥 НОВОЕ: Поддержка бинарной сериализации!
@@ -460,10 +536,12 @@ void exampleUsage() async {
 }
 
 /// Пример модели с бинарной сериализацией
-class BinaryUser extends User with BinarySerializable {
+class BinaryUser extends User {
   BinaryUser({required super.id, required super.name, required super.email});
 
-  // Serialize уже унаследован от User, но теперь формат будет binary
+  // Переопределяем формат на binary
+  @override
+  RpcSerializationFormat getFormat() => RpcSerializationFormat.binary;
 }
 
 /// Пример создания и использования клиента

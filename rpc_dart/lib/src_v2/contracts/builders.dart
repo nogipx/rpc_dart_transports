@@ -204,15 +204,15 @@ class RpcClientStreamBuilder {
 
     if (format == RpcSerializationFormat.binary) {
       // Для binary формата (потенциально protobuf)
-      // Сначала проверим формат первого элемента в потоке, если возможно
-      TRequest? firstRequest;
-      try {
-        firstRequest = await requests.first.timeout(Duration(milliseconds: 10));
-      } catch (_) {
-        // Если не можем получить первый элемент за таймаут, используем указанный формат
-      }
-
-      final requestFormat = firstRequest?.getFormat() ?? format;
+      // Можно использовать формат первого элемента в потоке, если нужно
+      // Пример:
+      // TRequest? firstRequest;
+      // try {
+      //   firstRequest = await requests.first.timeout(Duration(milliseconds: 10));
+      //   final requestFormat = firstRequest?.getFormat() ?? format;
+      // } catch (_) {
+      //   // Если не можем получить первый элемент за таймаут, используем указанный формат
+      // }
 
       // Создаем сериализаторы для бинарного формата
       requestSerializer = RpcSerializerFactory.binary<TRequest>(
@@ -301,15 +301,15 @@ class RpcBidirectionalStreamBuilder {
 
     if (format == RpcSerializationFormat.binary) {
       // Для binary формата (потенциально protobuf)
-      // Сначала проверим формат первого элемента в потоке, если возможно
-      TRequest? firstRequest;
-      try {
-        firstRequest = await requests.first.timeout(Duration(milliseconds: 10));
-      } catch (_) {
-        // Если не можем получить первый элемент за таймаут, используем указанный формат
-      }
-
-      final requestFormat = firstRequest?.getFormat() ?? format;
+      // Можно использовать формат первого элемента в потоке, если нужно
+      // Пример:
+      // TRequest? firstRequest;
+      // try {
+      //   firstRequest = await requests.first.timeout(Duration(milliseconds: 10));
+      //   final requestFormat = firstRequest?.getFormat() ?? format;
+      // } catch (_) {
+      //   // Если не можем получить первый элемент за таймаут, используем указанный формат
+      // }
 
       // Создаем сериализаторы для бинарного формата
       requestSerializer = RpcSerializerFactory.binary<TRequest>(
