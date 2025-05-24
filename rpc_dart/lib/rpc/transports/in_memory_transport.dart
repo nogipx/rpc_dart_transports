@@ -213,8 +213,9 @@ class RpcInMemoryTransport implements IRpcTransport {
     try {
       _streamSendingFinished[streamId] = true;
 
-      // Отправляем пустое сообщение с флагом END_STREAM для конкретного stream
+      // Отправляем пустые метаданные с флагом END_STREAM для конкретного stream
       _outgoingController.add(RpcTransportMessage<Uint8List>(
+        metadata: RpcMetadata([]),
         isEndOfStream: true,
         streamId: streamId,
       ));

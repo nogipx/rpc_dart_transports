@@ -169,11 +169,17 @@ final class ServerStreamServer<TRequest, TResponse> {
   ) async {
     bool requestHandled = false;
 
-    _subscription = _innerServer.requests.listen((request) {
+    _subscription = _innerServer.requests.listen((request) async {
       if (!requestHandled) {
         requestHandled = true;
         final responder = ServerStreamResponder<TResponse>(_innerServer);
-        handler(request, responder);
+        try {
+          // Оборачиваем handler в Future для правильной обработки sync/async исключений
+          await Future.sync(() => handler(request, responder));
+        } catch (e) {
+          // Если обработчик бросает исключение (синхронно или асинхронно), отправляем ошибку
+          await responder.completeWithError(RpcStatus.INTERNAL, e.toString());
+        }
       }
       // Игнорируем все дополнительные запросы
     });

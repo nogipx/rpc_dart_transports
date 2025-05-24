@@ -474,6 +474,18 @@ final class BidirectionalStreamServer<TRequest, TResponse> {
   /// - Закрывает транспортное соединение
   /// - Отменяет все подписки
   Future<void> close() async {
+    // Если нет активного соединения, просто закрываем контроллеры
+    if (_activeStreamId == null) {
+      if (!_requestController.isClosed) {
+        _requestController.close();
+      }
+      if (!_responseController.isClosed) {
+        _responseController.close();
+      }
+      return;
+    }
+
+    // Если есть активное соединение, корректно завершаем его
     await finishReceiving();
     // Не закрываем транспорт, так как он может использоваться другими стримами
   }

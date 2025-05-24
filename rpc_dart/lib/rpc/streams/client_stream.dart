@@ -65,6 +65,25 @@ final class ClientStreamClient<TRequest, TResponse> {
   Future<void> _setupResponseHandler() async {
     _subscription = _innerClient.responses.listen(
       (response) {
+        // Проверяем на ошибки в метаданных (трейлерах)
+        if (response.isMetadataOnly &&
+            response.metadata != null &&
+            response.isEndOfStream) {
+          final statusCode = response.metadata!
+              .getHeaderValue(RpcConstants.GRPC_STATUS_HEADER);
+          if (statusCode != null && statusCode != '0') {
+            final errorMessage = response.metadata!
+                    .getHeaderValue(RpcConstants.GRPC_MESSAGE_HEADER) ??
+                '';
+            if (!_responseCompleter.isCompleted) {
+              _responseCompleter.completeError(
+                  Exception('gRPC error $statusCode: $errorMessage'));
+            }
+            return;
+          }
+        }
+
+        // Обрабатываем нормальные ответы
         if (!response.isMetadataOnly && !_responseCompleter.isCompleted) {
           _responseCompleter.complete(response.payload);
         }
@@ -178,14 +197,22 @@ final class ClientStreamServer<TRequest, TResponse> {
           requestsController.close();
         });
 
-    // Запускаем обработчик асинхронно
-    handler(requestsController.stream).then((response) async {
-      // Когда ответ готов, отправляем его
-      await _innerServer.send(response);
-      await _innerServer.finishReceiving();
-    }).catchError((e) async {
+    // Запускаем обработчик НЕМЕДЛЕННО (чтобы сразу поймать синхронные исключения)
+    try {
+      final futureResponse = handler(requestsController.stream);
+
+      // Ждем результат асинхронно
+      futureResponse.then((response) async {
+        // Когда ответ готов, отправляем его
+        await _innerServer.send(response);
+        await _innerServer.finishReceiving();
+      }).catchError((e) async {
+        await _innerServer.sendError(RpcStatus.INTERNAL, e.toString());
+      });
+    } catch (e) {
+      // Синхронное исключение - отправляем ошибку немедленно
       await _innerServer.sendError(RpcStatus.INTERNAL, e.toString());
-    });
+    }
   }
 
   /// Закрывает стрим и освобождает ресурсы

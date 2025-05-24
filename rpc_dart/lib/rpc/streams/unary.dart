@@ -120,7 +120,7 @@ final class UnaryClient<TRequest, TResponse> {
                         .getHeaderValue(RpcConstants.GRPC_MESSAGE_HEADER) ??
                     '';
                 completer.completeError(
-                    Exception('gRPC ошибка $code: $errorMessage'));
+                    Exception('gRPC error $code: $errorMessage'));
               }
             }
           }
@@ -151,7 +151,8 @@ final class UnaryClient<TRequest, TResponse> {
       if (timeout != null) {
         return await completer.future.timeout(
           timeout,
-          onTimeout: () => throw Exception('Таймаут вызова: $timeout'),
+          onTimeout: () =>
+              throw TimeoutException('Call timeout: $timeout', timeout),
         );
       } else {
         return await completer.future;
@@ -326,6 +327,15 @@ final class UnaryServer<TRequest, TResponse> {
               error: e,
               stackTrace: stackTrace,
             );
+
+            // Отправляем начальные заголовки, если еще не отправляли
+            if (streamInitialHeadersSent[streamId] != true) {
+              await _transport.sendMetadata(
+                streamId,
+                RpcMetadata.forServerInitialResponse(),
+              );
+              streamInitialHeadersSent[streamId] = true;
+            }
 
             // При ошибке отправляем трейлер с кодом ошибки
             await _transport.sendMetadata(
