@@ -4,24 +4,6 @@
 
 part of '_logs.dart';
 
-/// Уровни логирования
-enum RpcLoggerLevel {
-  debug,
-  info,
-  warning,
-  error,
-  critical,
-  none;
-
-  /// Создание из строки JSON
-  static RpcLoggerLevel fromJson(String json) {
-    return values.firstWhere(
-      (e) => e.name == json,
-      orElse: () => none,
-    );
-  }
-}
-
 typedef RpcLoggerFactory = RpcLogger Function(
   String loggerName, {
   RpcLoggerColors? colors,

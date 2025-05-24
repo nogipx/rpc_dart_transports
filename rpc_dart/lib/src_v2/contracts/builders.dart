@@ -21,11 +21,11 @@ class RpcUnaryRequestBuilder {
       transport: endpoint.transport,
       serviceName: serviceName,
       methodName: methodName,
-      requestSerializer: RpcBytesSerializer<TRequest>(
-        fromJson: responseParser as TRequest Function(Map<String, dynamic>),
+      requestSerializer: RpcSerializerFactory.binary<TRequest>(
+        (bytes) => responseParser(jsonDecode(utf8.decode(bytes))) as TRequest,
       ),
-      responseSerializer: RpcBytesSerializer<TResponse>(
-        fromJson: responseParser,
+      responseSerializer: RpcSerializerFactory.binary<TResponse>(
+        (bytes) => responseParser(jsonDecode(utf8.decode(bytes))),
       ),
       logger: endpoint.logger,
     );
@@ -60,11 +60,11 @@ class RpcServerStreamBuilder {
       transport: endpoint.transport,
       serviceName: serviceName,
       methodName: methodName,
-      requestSerializer: RpcBytesSerializer<TRequest>(
-        fromJson: responseParser as TRequest Function(Map<String, dynamic>),
+      requestSerializer: RpcSerializerFactory.binary<TRequest>(
+        (bytes) => responseParser(jsonDecode(utf8.decode(bytes))) as TRequest,
       ),
-      responseSerializer: RpcBytesSerializer<TResponse>(
-        fromJson: responseParser,
+      responseSerializer: RpcSerializerFactory.binary<TResponse>(
+        (bytes) => responseParser(jsonDecode(utf8.decode(bytes))),
       ),
       logger: endpoint.logger,
     );
@@ -103,11 +103,11 @@ class RpcClientStreamBuilder {
       transport: endpoint.transport,
       serviceName: serviceName,
       methodName: methodName,
-      requestSerializer: RpcBytesSerializer<TRequest>(
-        fromJson: responseParser as TRequest Function(Map<String, dynamic>),
+      requestSerializer: RpcSerializerFactory.binary<TRequest>(
+        (bytes) => responseParser(jsonDecode(utf8.decode(bytes))) as TRequest,
       ),
-      responseSerializer: RpcBytesSerializer<TResponse>(
-        fromJson: responseParser,
+      responseSerializer: RpcSerializerFactory.binary<TResponse>(
+        (bytes) => responseParser(jsonDecode(utf8.decode(bytes))),
       ),
       logger: endpoint.logger,
     );
@@ -145,11 +145,11 @@ class RpcBidirectionalStreamBuilder {
       transport: endpoint.transport,
       serviceName: serviceName,
       methodName: methodName,
-      requestSerializer: RpcBinarySerializer<TRequest>(
-        fromBytes: responseParser as TRequest Function(Uint8List),
+      requestSerializer: RpcSerializerFactory.binary<TRequest>(
+        responseParser as TRequest Function(Uint8List),
       ),
-      responseSerializer: RpcBinarySerializer<TResponse>(
-        fromBytes: responseParser,
+      responseSerializer: RpcSerializerFactory.binary<TResponse>(
+        responseParser,
       ),
       logger: endpoint.logger,
     );
