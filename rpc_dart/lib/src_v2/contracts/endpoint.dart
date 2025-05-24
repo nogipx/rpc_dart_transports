@@ -70,12 +70,21 @@ final class RpcEndpoint {
   RpcUnaryRequestBuilder unaryRequest({
     required String serviceName,
     required String methodName,
+    RpcSerializationFormat? preferredFormat,
   }) {
+    final methodKey = '$serviceName.$methodName';
+    final method = _methods[methodKey];
+
     _validateMethodExists(serviceName, methodName, RpcMethodType.unary);
+
+    // Если формат не указан, используем формат из регистрации метода
+    final format = preferredFormat ?? method?.serializationFormat;
+
     return RpcUnaryRequestBuilder(
       endpoint: this,
       serviceName: serviceName,
       methodName: methodName,
+      preferredFormat: format,
     );
   }
 
@@ -83,12 +92,21 @@ final class RpcEndpoint {
   RpcServerStreamBuilder serverStream({
     required String serviceName,
     required String methodName,
+    RpcSerializationFormat? preferredFormat,
   }) {
+    final methodKey = '$serviceName.$methodName';
+    final method = _methods[methodKey];
+
     _validateMethodExists(serviceName, methodName, RpcMethodType.serverStream);
+
+    // Если формат не указан, используем формат из регистрации метода
+    final format = preferredFormat ?? method?.serializationFormat;
+
     return RpcServerStreamBuilder(
       endpoint: this,
       serviceName: serviceName,
       methodName: methodName,
+      preferredFormat: format,
     );
   }
 
@@ -96,12 +114,21 @@ final class RpcEndpoint {
   RpcClientStreamBuilder clientStream({
     required String serviceName,
     required String methodName,
+    RpcSerializationFormat? preferredFormat,
   }) {
+    final methodKey = '$serviceName.$methodName';
+    final method = _methods[methodKey];
+
     _validateMethodExists(serviceName, methodName, RpcMethodType.clientStream);
+
+    // Если формат не указан, используем формат из регистрации метода
+    final format = preferredFormat ?? method?.serializationFormat;
+
     return RpcClientStreamBuilder(
       endpoint: this,
       serviceName: serviceName,
       methodName: methodName,
+      preferredFormat: format,
     );
   }
 
@@ -109,12 +136,21 @@ final class RpcEndpoint {
   RpcBidirectionalStreamBuilder bidirectionalStream({
     required String serviceName,
     required String methodName,
+    RpcSerializationFormat? preferredFormat,
   }) {
+    final methodKey = '$serviceName.$methodName';
+    final method = _methods[methodKey];
+
     _validateMethodExists(serviceName, methodName, RpcMethodType.bidirectional);
+
+    // Если формат не указан, используем формат из регистрации метода
+    final format = preferredFormat ?? method?.serializationFormat;
+
     return RpcBidirectionalStreamBuilder(
       endpoint: this,
       serviceName: serviceName,
       methodName: methodName,
+      preferredFormat: format,
     );
   }
 

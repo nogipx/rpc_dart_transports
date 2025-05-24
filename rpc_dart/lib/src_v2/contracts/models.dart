@@ -1,11 +1,23 @@
 part of '_index.dart';
 
+/// Формат сериализации для RPC сообщений
+enum RpcSerializationFormat {
+  /// JSON формат (через utf8)
+  json,
+
+  /// Бинарный формат (включая protobuf, msgpack и т.д.)
+  binary
+}
+
 /// Основной интерфейс для всех RPC сообщений - работает с байтами
 /// Все типы запросов и ответов должны реализовывать этот интерфейс
 /// Это базовый интерфейс для binary сериализации (protobuf, msgpack, etc.)
 abstract interface class IRpcSerializable {
   /// Сериализует объект в байты
   Uint8List serialize();
+
+  /// Возвращает формат сериализации (по умолчанию JSON для обратной совместимости)
+  RpcSerializationFormat getFormat() => RpcSerializationFormat.json;
 
   /// Десериализует объект из байтов - должен быть статическим методом
   /// static T fromBytes(Uint8List bytes);
@@ -32,6 +44,10 @@ mixin JsonRpcSerializable on IRpcJsonSerializable implements IRpcSerializable {
     return Uint8List.fromList(utf8.encode(jsonString));
   }
 
+  /// Переопределяем метод для указания формата сериализации
+  @override
+  RpcSerializationFormat getFormat() => RpcSerializationFormat.json;
+
   /// Статический хелпер для десериализации из байтов через JSON
   static T fromBytes<T extends IRpcJsonSerializable>(
     Uint8List bytes,
@@ -43,6 +59,14 @@ mixin JsonRpcSerializable on IRpcJsonSerializable implements IRpcSerializable {
   }
 }
 
+/// Миксин для бинарной сериализации данных
+/// Используется для прямой бинарной сериализации
+mixin BinarySerializable implements IRpcSerializable {
+  /// Переопределяем метод для указания формата сериализации
+  @override
+  RpcSerializationFormat getFormat() => RpcSerializationFormat.binary;
+}
+
 /// Миксин для protobuf моделей (готовим почву для будущего)
 /// Позволит использовать protobuf сериализацию
 mixin ProtobufRpcSerializable implements IRpcSerializable {
@@ -51,6 +75,10 @@ mixin ProtobufRpcSerializable implements IRpcSerializable {
 
   @override
   Uint8List serialize() => toBuffer();
+
+  /// Переопределяем метод для указания формата сериализации
+  @override
+  RpcSerializationFormat getFormat() => RpcSerializationFormat.binary;
 
   /// Статический хелпер для десериализации protobuf
   static T fromBytes<T extends IRpcSerializable>(
@@ -77,6 +105,7 @@ class RpcMethodRegistration {
   final String description;
   final Type requestType;
   final Type responseType;
+  final RpcSerializationFormat serializationFormat;
 
   const RpcMethodRegistration({
     required this.name,
@@ -85,6 +114,7 @@ class RpcMethodRegistration {
     required this.description,
     required this.requestType,
     required this.responseType,
+    this.serializationFormat = RpcSerializationFormat.json,
   });
 }
 

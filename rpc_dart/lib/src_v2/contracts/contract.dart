@@ -20,6 +20,7 @@ abstract class RpcServiceContract {
     required String methodName,
     required Future<TResponse> Function(TRequest) handler,
     String description = '',
+    RpcSerializationFormat? serializationFormat,
   }) {
     _methods[methodName] = RpcMethodRegistration(
       name: methodName,
@@ -28,6 +29,7 @@ abstract class RpcServiceContract {
       description: description,
       requestType: TRequest,
       responseType: TResponse,
+      serializationFormat: serializationFormat ?? RpcSerializationFormat.json,
     );
   }
 
@@ -38,6 +40,7 @@ abstract class RpcServiceContract {
     required String methodName,
     required Stream<TResponse> Function(TRequest) handler,
     String description = '',
+    RpcSerializationFormat? serializationFormat,
   }) {
     _methods[methodName] = RpcMethodRegistration(
       name: methodName,
@@ -46,6 +49,7 @@ abstract class RpcServiceContract {
       description: description,
       requestType: TRequest,
       responseType: TResponse,
+      serializationFormat: serializationFormat ?? RpcSerializationFormat.json,
     );
   }
 
@@ -56,6 +60,7 @@ abstract class RpcServiceContract {
     required String methodName,
     required Future<TResponse> Function(Stream<TRequest>) handler,
     String description = '',
+    RpcSerializationFormat? serializationFormat,
   }) {
     _methods[methodName] = RpcMethodRegistration(
       name: methodName,
@@ -64,6 +69,7 @@ abstract class RpcServiceContract {
       description: description,
       requestType: TRequest,
       responseType: TResponse,
+      serializationFormat: serializationFormat ?? RpcSerializationFormat.json,
     );
   }
 
@@ -74,6 +80,7 @@ abstract class RpcServiceContract {
     required String methodName,
     required Stream<TResponse> Function(Stream<TRequest>) handler,
     String description = '',
+    RpcSerializationFormat? serializationFormat,
   }) {
     _methods[methodName] = RpcMethodRegistration(
       name: methodName,
@@ -82,6 +89,7 @@ abstract class RpcServiceContract {
       description: description,
       requestType: TRequest,
       responseType: TResponse,
+      serializationFormat: serializationFormat ?? RpcSerializationFormat.json,
     );
   }
 

@@ -423,6 +423,47 @@ void exampleUsage() async {
   print('✅ Строгий API работает!');
   print('Request JSON: $json');
   print('Response JSON: $responseJson');
+
+  // ============================================
+  // 🔥 НОВОЕ: Поддержка бинарной сериализации!
+  // ============================================
+
+  // Создание модели с бинарной сериализацией
+  final binaryUser =
+      BinaryUser(id: 456, name: 'Бинарный', email: 'binary@example.com');
+  print(
+      'Формат сериализации: ${binaryUser.getFormat().name}'); // Выведет "binary"
+
+  // Контракт может указать предпочтительный формат сериализации
+  /*
+  addUnaryMethod<BinaryUser, BinaryUserResponse>(
+    methodName: 'getBinaryUser',
+    handler: getBinaryUser,
+    serializationFormat: RpcSerializationFormat.binary, // Явное указание формата
+  );
+  */
+
+  // Клиент также может указать формат при вызове
+  /*
+  final endpoint = RpcEndpoint(...);
+  final response = await endpoint
+      .unaryRequest(
+        serviceName: 'UserService', 
+        methodName: 'getUser',
+        preferredFormat: RpcSerializationFormat.binary, // Приоритет у binary
+      )
+      .call(
+        request: request,
+        responseParser: UserResponse.fromJson,
+      );
+  */
+}
+
+/// Пример модели с бинарной сериализацией
+class BinaryUser extends User with BinarySerializable {
+  BinaryUser({required super.id, required super.name, required super.email});
+
+  // Serialize уже унаследован от User, но теперь формат будет binary
 }
 
 /// Пример создания и использования клиента
@@ -443,3 +484,151 @@ void clientUsageExample() async {
   // 🔥 IDE покажет все методы: getUser, createUser, listUsers, watchUsers
   print('✅ Простое создание клиента - никаких лишних методов!');
 }
+
+/// ============================================
+/// ПРИМЕР ИНТЕГРАЦИИ С PROTOBUF (ПОЛЬЗОВАТЕЛЬСКИЙ КОД)
+/// ============================================
+
+/* 
+// Этот код показывает, как пользователи могут интегрировать сгенерированные 
+// Protobuf классы с RPC Dart библиотекой без внесения изменений в саму библиотеку
+
+// Предположим, у нас есть такое proto-определение:
+// syntax = "proto3";
+// package user;
+//
+// message User {
+//   int32 id = 1;
+//   string name = 2;
+//   string email = 3;
+// }
+//
+// message GetUserRequest {
+//   int32 user_id = 1;
+// }
+//
+// message GetUserResponse {
+//   User user = 1;
+//   bool success = 2;
+//   string error_message = 3;
+// }
+
+// Импорты в пользовательском коде
+import 'package:protobuf/protobuf.dart';
+import 'package:rpc_dart/rpc_dart.dart';
+import 'generated/user.pb.dart'; // Сгенерированные protobuf файлы
+
+// Класс-обертка для протобаф-модели
+class ProtoUser implements IRpcSerializable with BinarySerializable {
+  final User _proto;
+  
+  ProtoUser(this._proto);
+  
+  factory ProtoUser.create({required int id, required String name, required String email}) {
+    return ProtoUser(User()
+      ..id = id
+      ..name = name
+      ..email = email);
+  }
+  
+  @override
+  Uint8List serialize() {
+    // Используем встроенную сериализацию protobuf
+    return Uint8List.fromList(_proto.writeToBuffer());
+  }
+  
+  static ProtoUser fromBytes(Uint8List bytes) {
+    return ProtoUser(User.fromBuffer(bytes));
+  }
+  
+  int get id => _proto.id;
+  String get name => _proto.name;
+  String get email => _proto.email;
+}
+
+// Аналогично для других моделей
+class ProtoGetUserRequest implements IRpcSerializable with BinarySerializable {
+  final GetUserRequest _proto;
+  
+  ProtoGetUserRequest(this._proto);
+  
+  factory ProtoGetUserRequest.create({required int userId}) {
+    return ProtoGetUserRequest(GetUserRequest()..userId = userId);
+  }
+  
+  @override
+  Uint8List serialize() {
+    return Uint8List.fromList(_proto.writeToBuffer());
+  }
+  
+  static ProtoGetUserRequest fromBytes(Uint8List bytes) {
+    return ProtoGetUserRequest(GetUserRequest.fromBuffer(bytes));
+  }
+  
+  int get userId => _proto.userId;
+}
+
+class ProtoGetUserResponse implements IRpcSerializable with BinarySerializable {
+  final GetUserResponse _proto;
+  
+  ProtoGetUserResponse(this._proto);
+  
+  factory ProtoGetUserResponse.create({
+    User? user,
+    bool success = true,
+    String errorMessage = '',
+  }) {
+    return ProtoGetUserResponse(GetUserResponse()
+      ..user = user ?? User()
+      ..success = success
+      ..errorMessage = errorMessage);
+  }
+  
+  @override
+  Uint8List serialize() {
+    return Uint8List.fromList(_proto.writeToBuffer());
+  }
+  
+  static ProtoGetUserResponse fromBytes(Uint8List bytes) {
+    return ProtoGetUserResponse(GetUserResponse.fromBuffer(bytes));
+  }
+  
+  User? get user => _proto.hasUser() ? _proto.user : null;
+  bool get success => _proto.success;
+  String get errorMessage => _proto.errorMessage;
+}
+
+// Пример использования
+void protoUsageExample() {
+  // Создание протобаф-моделей
+  final protoUser = ProtoUser.create(
+    id: 123,
+    name: 'Протобаф Пользователь',
+    email: 'proto@example.com',
+  );
+  
+  // Сериализация в бинарный формат
+  final bytes = protoUser.serialize();
+  
+  // Десериализация
+  final restoredUser = ProtoUser.fromBytes(bytes);
+  
+  print('ProtoUser: ${restoredUser.id}, ${restoredUser.name}, ${restoredUser.email}');
+  
+  // Использование в контракте
+  // abstract class ProtoUserServiceContract extends RpcServiceContract {
+  //   ProtoUserServiceContract() : super('ProtoUserService');
+  //
+  //   @override
+  //   void setup() {
+  //     addUnaryMethod<ProtoGetUserRequest, ProtoGetUserResponse>(
+  //       methodName: 'getUser',
+  //       handler: getUser,
+  //       serializationFormat: RpcSerializationFormat.binary,
+  //     );
+  //   }
+  //
+  //   Future<ProtoGetUserResponse> getUser(ProtoGetUserRequest request);
+  // }
+}
+*/
