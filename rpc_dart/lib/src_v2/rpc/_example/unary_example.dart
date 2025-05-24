@@ -17,11 +17,9 @@ class UnaryRpcExample {
   /// несколько унарных вызовов разных типов через один транспорт.
   /// Каждый вызов получает уникальный Stream ID.
   static Future<void> run() async {
+    RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.debug);
     print(
         '\n=== Запуск примера унарного RPC с мультиплексированием по Stream ID ===\n');
-
-    // Включаем отладочные логи для диагностики
-    RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.debug);
 
     // Создаем одну пару соединенных транспортов для всех методов
     final (clientTransport, serverTransport) = RpcInMemoryTransport.pair(

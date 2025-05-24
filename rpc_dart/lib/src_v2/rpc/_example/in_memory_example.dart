@@ -10,6 +10,7 @@ class InMemoryRpcExample {
   /// Создает клиент и сервер в одном потоке и организует
   /// двунаправленный обмен сообщениями между ними.
   static Future<void> run() async {
+    RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.debug);
     print('Запуск примера двунаправленного стрима через транспорт в памяти...');
 
     // Создаем пару соединенных транспортов для клиента и сервера
@@ -25,6 +26,10 @@ class InMemoryRpcExample {
       methodName: 'Connect',
       requestSerializer: stringSerializer,
       responseSerializer: stringSerializer,
+      logger: RpcLogger(
+        'InMemoryRpcExample',
+        colors: RpcLoggerColors.singleColor(AnsiColor.cyan),
+      ),
     );
 
     // Настраиваем обработку запросов на сервере
@@ -60,6 +65,10 @@ class InMemoryRpcExample {
       methodName: 'Connect',
       requestSerializer: stringSerializer,
       responseSerializer: stringSerializer,
+      logger: RpcLogger(
+        'InMemoryRpcExample',
+        colors: RpcLoggerColors.singleColor(AnsiColor.black),
+      ),
     );
 
     // Подписываемся на ответы сервера

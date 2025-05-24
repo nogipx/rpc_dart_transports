@@ -14,6 +14,8 @@ Future<void> runStreamTypesExample() async {
 class StreamTypesExample {
   /// Запускает демонстрацию серверного стриминга (один запрос, много ответов).
   static Future<void> runServerStreaming() async {
+    RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.debug);
+
     print('\n=== Пример серверного стриминга (1 запрос -> N ответов) ===\n');
 
     // Создаем пару соединенных транспортов
@@ -29,6 +31,10 @@ class StreamTypesExample {
       methodName: 'GetServerStream',
       requestSerializer: stringSerializer,
       responseSerializer: stringSerializer,
+      logger: RpcLogger(
+        'ServerStreamingExample',
+        colors: RpcLoggerColors.singleColor(AnsiColor.brightGreen),
+      ),
       handler: (request, responder) async {
         print('СЕРВЕР: Получен запрос: "$request"');
 
@@ -55,6 +61,10 @@ class StreamTypesExample {
       methodName: 'GetServerStream',
       requestSerializer: stringSerializer,
       responseSerializer: stringSerializer,
+      logger: RpcLogger(
+        'ServerStreamingExample',
+        colors: RpcLoggerColors.singleColor(AnsiColor.brightGreen),
+      ),
     );
 
     // Подписываемся на поток ответов
@@ -95,6 +105,8 @@ class StreamTypesExample {
 
   /// Запускает демонстрацию клиентского стриминга (много запросов, один ответ).
   static Future<void> runClientStreaming() async {
+    RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.debug);
+
     print('\n=== Пример клиентского стриминга (N запросов -> 1 ответ) ===\n');
 
     // Создаем пару соединенных транспортов
@@ -110,6 +122,10 @@ class StreamTypesExample {
       methodName: 'ProcessClientStream',
       requestSerializer: stringSerializer,
       responseSerializer: stringSerializer,
+      logger: RpcLogger(
+        'ClientStreamingExample',
+        colors: RpcLoggerColors.singleColor(AnsiColor.brightMagenta),
+      ),
       handler: (Stream<String> requests) async {
         print('СЕРВЕР: Ожидаем запросы...');
 
@@ -136,6 +152,10 @@ class StreamTypesExample {
       methodName: 'ProcessClientStream',
       requestSerializer: stringSerializer,
       responseSerializer: stringSerializer,
+      logger: RpcLogger(
+        'ClientStreamingExample',
+        colors: RpcLoggerColors.singleColor(AnsiColor.brightMagenta),
+      ),
     );
 
     // Отправляем несколько запросов

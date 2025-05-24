@@ -2,6 +2,7 @@ part of '_index.dart';
 
 /// Пример использования изолята с пользовательской entrypoint функцией
 Future<void> runIsolateExample() async {
+  RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.debug);
   print('\n=== Запуск примера с пользовательским entrypoint ===\n');
 
   // Запускаем изолят с пользовательской entrypoint функцией
@@ -19,8 +20,6 @@ Future<void> runIsolateExample() async {
   final killIsolate = result.kill;
 
   print('Изолят запущен, настраиваем клиент...');
-
-  RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.debug);
 
   // Создаем клиент для двустороннего потока
   final client = BidirectionalStreamCaller<String, String>(
