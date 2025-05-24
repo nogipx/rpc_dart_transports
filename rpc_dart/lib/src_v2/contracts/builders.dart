@@ -2,7 +2,7 @@ part of '_index.dart';
 
 /// Builder для унарных запросов
 class RpcUnaryRequestBuilder {
-  final RpcEndpoint endpoint;
+  final RpcEndpointBase endpoint;
   final String serviceName;
   final String methodName;
   final RpcSerializationFormat? _preferredFormat;
@@ -87,7 +87,7 @@ class RpcUnaryRequestBuilder {
 
 /// Builder для серверных стримов
 class RpcServerStreamBuilder {
-  final RpcEndpoint endpoint;
+  final RpcEndpointBase endpoint;
   final String serviceName;
   final String methodName;
   final RpcSerializationFormat? _preferredFormat;
@@ -176,7 +176,7 @@ class RpcServerStreamBuilder {
 
 /// Builder для клиентских стримов
 class RpcClientStreamBuilder {
-  final RpcEndpoint endpoint;
+  final RpcEndpointBase endpoint;
   final String serviceName;
   final String methodName;
   final RpcSerializationFormat? _preferredFormat;
@@ -273,7 +273,7 @@ class RpcClientStreamBuilder {
 
 /// Builder для двунаправленных стримов
 class RpcBidirectionalStreamBuilder {
-  final RpcEndpoint endpoint;
+  final RpcEndpointBase endpoint;
   final String serviceName;
   final String methodName;
   final RpcSerializationFormat? _preferredFormat;

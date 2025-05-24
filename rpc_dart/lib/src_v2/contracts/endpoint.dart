@@ -1,22 +1,120 @@
 part of '_index.dart';
 
-/// Основной RPC endpoint для работы с типобезопасными моделями
-final class RpcEndpoint {
+/// Базовый класс для всех RPC эндпоинтов
+abstract base class RpcEndpointBase {
   final IRpcTransport _transport;
-  final Map<String, dynamic> _contracts = {};
-  final Map<String, RpcMethodRegistration> _methods = {};
   final List<IRpcMiddleware> _middlewares = [];
   final String? debugLabel;
   late final RpcLogger logger;
   bool _isActive = true;
 
-  RpcEndpoint({
+  RpcEndpointBase({
     required IRpcTransport transport,
     this.debugLabel,
   }) : _transport = transport {
     logger = RpcLogger('RpcEndpoint[${debugLabel ?? 'default'}]');
     logger.info('RpcEndpoint создан');
   }
+
+  void addMiddleware(IRpcMiddleware middleware) {
+    _middlewares.add(middleware);
+    logger.info('Добавлен middleware: ${middleware.runtimeType}');
+  }
+
+  bool get isActive => _isActive;
+
+  IRpcTransport get transport => _transport;
+
+  Future<void> close() async {
+    if (!_isActive) return;
+
+    logger.info('Закрытие RpcEndpoint');
+    _isActive = false;
+    _middlewares.clear();
+
+    try {
+      await _transport.close();
+    } catch (e) {
+      logger.warning('Ошибка при закрытии транспорта: $e');
+    }
+
+    logger.info('RpcEndpoint закрыт');
+  }
+}
+
+/// Клиентский RPC эндпоинт для отправки запросов
+final class RpcClientEndpoint extends RpcEndpointBase {
+  RpcClientEndpoint({
+    required super.transport,
+    super.debugLabel,
+  });
+
+  /// Создает унарный request builder
+  RpcUnaryRequestBuilder unaryRequest({
+    required String serviceName,
+    required String methodName,
+    RpcSerializationFormat? preferredFormat,
+  }) {
+    return RpcUnaryRequestBuilder(
+      endpoint: this,
+      serviceName: serviceName,
+      methodName: methodName,
+      preferredFormat: preferredFormat,
+    );
+  }
+
+  /// Создает server stream builder
+  RpcServerStreamBuilder serverStream({
+    required String serviceName,
+    required String methodName,
+    RpcSerializationFormat? preferredFormat,
+  }) {
+    return RpcServerStreamBuilder(
+      endpoint: this,
+      serviceName: serviceName,
+      methodName: methodName,
+      preferredFormat: preferredFormat,
+    );
+  }
+
+  /// Создает client stream builder
+  RpcClientStreamBuilder clientStream({
+    required String serviceName,
+    required String methodName,
+    RpcSerializationFormat? preferredFormat,
+  }) {
+    return RpcClientStreamBuilder(
+      endpoint: this,
+      serviceName: serviceName,
+      methodName: methodName,
+      preferredFormat: preferredFormat,
+    );
+  }
+
+  /// Создает bidirectional stream builder
+  RpcBidirectionalStreamBuilder bidirectionalStream({
+    required String serviceName,
+    required String methodName,
+    RpcSerializationFormat? preferredFormat,
+  }) {
+    return RpcBidirectionalStreamBuilder(
+      endpoint: this,
+      serviceName: serviceName,
+      methodName: methodName,
+      preferredFormat: preferredFormat,
+    );
+  }
+}
+
+/// Серверный RPC эндпоинт для обработки запросов
+final class RpcServerEndpoint extends RpcEndpointBase {
+  final Map<String, dynamic> _contracts = {};
+  final Map<String, RpcMethodRegistration> _methods = {};
+
+  RpcServerEndpoint({
+    required super.transport,
+    super.debugLabel,
+  });
 
   /// Регистрирует контракт сервиса
   void registerServiceContract(RpcServerContract contract) {
@@ -61,100 +159,8 @@ final class RpcEndpoint {
     logger.info('Зарегистрирован метод: $methodKey (${method.type.name})');
   }
 
-  void addMiddleware(IRpcMiddleware middleware) {
-    _middlewares.add(middleware);
-    logger.info('Добавлен middleware: ${middleware.runtimeType}');
-  }
-
-  /// Создает унарный request builder
-  RpcUnaryRequestBuilder unaryRequest({
-    required String serviceName,
-    required String methodName,
-    RpcSerializationFormat? preferredFormat,
-  }) {
-    final methodKey = '$serviceName.$methodName';
-    final method = _methods[methodKey];
-
-    _validateMethodExists(serviceName, methodName, RpcMethodType.unary);
-
-    // Если формат не указан, используем формат из регистрации метода
-    final format = preferredFormat ?? method?.serializationFormat;
-
-    return RpcUnaryRequestBuilder(
-      endpoint: this,
-      serviceName: serviceName,
-      methodName: methodName,
-      preferredFormat: format,
-    );
-  }
-
-  /// Создает server stream builder
-  RpcServerStreamBuilder serverStream({
-    required String serviceName,
-    required String methodName,
-    RpcSerializationFormat? preferredFormat,
-  }) {
-    final methodKey = '$serviceName.$methodName';
-    final method = _methods[methodKey];
-
-    _validateMethodExists(serviceName, methodName, RpcMethodType.serverStream);
-
-    // Если формат не указан, используем формат из регистрации метода
-    final format = preferredFormat ?? method?.serializationFormat;
-
-    return RpcServerStreamBuilder(
-      endpoint: this,
-      serviceName: serviceName,
-      methodName: methodName,
-      preferredFormat: format,
-    );
-  }
-
-  /// Создает client stream builder
-  RpcClientStreamBuilder clientStream({
-    required String serviceName,
-    required String methodName,
-    RpcSerializationFormat? preferredFormat,
-  }) {
-    final methodKey = '$serviceName.$methodName';
-    final method = _methods[methodKey];
-
-    _validateMethodExists(serviceName, methodName, RpcMethodType.clientStream);
-
-    // Если формат не указан, используем формат из регистрации метода
-    final format = preferredFormat ?? method?.serializationFormat;
-
-    return RpcClientStreamBuilder(
-      endpoint: this,
-      serviceName: serviceName,
-      methodName: methodName,
-      preferredFormat: format,
-    );
-  }
-
-  /// Создает bidirectional stream builder
-  RpcBidirectionalStreamBuilder bidirectionalStream({
-    required String serviceName,
-    required String methodName,
-    RpcSerializationFormat? preferredFormat,
-  }) {
-    final methodKey = '$serviceName.$methodName';
-    final method = _methods[methodKey];
-
-    _validateMethodExists(serviceName, methodName, RpcMethodType.bidirectional);
-
-    // Если формат не указан, используем формат из регистрации метода
-    final format = preferredFormat ?? method?.serializationFormat;
-
-    return RpcBidirectionalStreamBuilder(
-      endpoint: this,
-      serviceName: serviceName,
-      methodName: methodName,
-      preferredFormat: format,
-    );
-  }
-
-  void _validateMethodExists(
+  /// Проверяет существование метода и его тип
+  void validateMethodExists(
     String serviceName,
     String methodName,
     RpcMethodType expectedType,
@@ -179,25 +185,11 @@ final class RpcEndpoint {
   Map<String, RpcMethodRegistration> get registeredMethods =>
       Map.unmodifiable(_methods);
 
-  bool get isActive => _isActive;
-
-  IRpcTransport get transport => _transport;
-
+  @override
   Future<void> close() async {
-    if (!_isActive) return;
-
-    logger.info('Закрытие RpcEndpoint');
-    _isActive = false;
+    if (!isActive) return;
     _contracts.clear();
     _methods.clear();
-    _middlewares.clear();
-
-    try {
-      await _transport.close();
-    } catch (e) {
-      logger.warning('Ошибка при закрытии транспорта: $e');
-    }
-
-    logger.info('RpcEndpoint закрыт');
+    await super.close();
   }
 }

@@ -14,8 +14,8 @@ Future<void> runCalculatorDemo() async {
   final transport = RpcInMemoryTransport.pair();
 
   // Создаем эндпоинты для клиента и сервера
-  final serverEndpoint = RpcEndpoint(transport: transport.$1);
-  final clientEndpoint = RpcEndpoint(transport: transport.$2);
+  final serverEndpoint = RpcServerEndpoint(transport: transport.$1);
+  final clientEndpoint = RpcClientEndpoint(transport: transport.$2);
 
   // Создаем сервер и регистрируем его
   final server = CalculatorServer(simulatedDelayMs: 50);
@@ -24,9 +24,9 @@ Future<void> runCalculatorDemo() async {
   // Создаем клиента
   final client = CalculatorClient(clientEndpoint);
 
-  // Проверка типобезопасности: попытка регистрации клиентского контракта не должна компилироваться
+  // Проверка типобезопасности: теперь клиентский контракт нельзя зарегистрировать
   // Раскомментируйте строку ниже, чтобы увидеть ошибку компиляции:
-  // clientEndpoint.registerServiceContract(client); // ❌ Ошибка компиляции!
+  // serverEndpoint.registerServiceContract(client); // ❌ Ошибка компиляции!
 
   // 1. Демонстрация унарного метода
   print('\n--- Унарный метод: calculate ---');
