@@ -23,7 +23,7 @@ Future<void> runIsolateExample() async {
   RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.debug);
 
   // Создаем клиент для двустороннего потока
-  final client = BidirectionalStreamClient<String, String>(
+  final client = BidirectionalStreamCaller<String, String>(
     transport: result.transport,
     serviceName: 'EchoService',
     methodName: 'Echo',
@@ -95,7 +95,7 @@ void customEchoServer(
   RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.debug);
 
   // Создаем двунаправленный стрим-сервер
-  final server = BidirectionalStreamServer<String, String>(
+  final server = BidirectionalStreamResponder<String, String>(
     transport: transport,
     serviceName: 'EchoService',
     methodName: 'Echo',

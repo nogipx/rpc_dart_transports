@@ -1,5 +1,6 @@
-**/.dart_tool/
-**/coverage/html/
-**/coverage/test/
-rpc_dart/lib/src/
-rpc_dart/lib/**/*.md
+# **/.dart_tool/
+# **/coverage/html/
+# **/coverage/test/
+
+rpc_dart/lib/src
+rpc_dart/lib/rpc_dart.dart

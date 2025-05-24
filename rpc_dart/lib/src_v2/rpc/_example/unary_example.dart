@@ -48,10 +48,10 @@ class UnaryRpcExample {
     ];
 
     // Создаем серверы для каждого метода - каждый обрабатывает свой путь
-    final servers = <UnaryServer>[];
+    final servers = <UnaryResponder>[];
 
     for (final (serviceName, methodName) in services) {
-      final server = UnaryServer<String, String>(
+      final server = UnaryResponder<String, String>(
         transport: serverTransport,
         serviceName: serviceName,
         methodName: methodName,
@@ -87,7 +87,7 @@ class UnaryRpcExample {
     try {
       // Пример 1: Простой вызов приветствия
       print('КЛИЕНТ: Выполняем запрос к GreetingService/SayHello');
-      final client1 = UnaryClient<String, String>(
+      final client1 = UnaryCaller<String, String>(
         transport: clientTransport,
         serviceName: 'GreetingService',
         methodName: 'SayHello',
@@ -104,7 +104,7 @@ class UnaryRpcExample {
 
       // Пример 2: Запрос времени
       print('\nКЛИЕНТ: Выполняем запрос к TimeService/GetCurrentTime');
-      final client2 = UnaryClient<String, String>(
+      final client2 = UnaryCaller<String, String>(
         transport: clientTransport,
         serviceName: 'TimeService',
         methodName: 'GetCurrentTime',
@@ -122,7 +122,7 @@ class UnaryRpcExample {
       // Пример 3: Запрос с таймаутом
       print(
           '\nКЛИЕНТ: Выполняем запрос к StatusService/CheckHealth с таймаутом 500мс');
-      final client3 = UnaryClient<String, String>(
+      final client3 = UnaryCaller<String, String>(
         transport: clientTransport,
         serviceName: 'StatusService',
         methodName: 'CheckHealth',
@@ -143,7 +143,7 @@ class UnaryRpcExample {
       // Пример 4: Вызов с ошибкой
       print(
           '\nКЛИЕНТ: Выполняем запрос к ErrorService/ThrowError (должен вернуть ошибку)');
-      final client4 = UnaryClient<String, String>(
+      final client4 = UnaryCaller<String, String>(
         transport: clientTransport,
         serviceName: 'ErrorService',
         methodName: 'ThrowError',
@@ -164,7 +164,7 @@ class UnaryRpcExample {
       // Пример 5: Эхо-запрос с очень коротким таймаутом
       print(
           '\nКЛИЕНТ: Выполняем запрос к EchoService/Echo с очень коротким таймаутом (10мс)');
-      final client5 = UnaryClient<String, String>(
+      final client5 = UnaryCaller<String, String>(
         transport: clientTransport,
         serviceName: 'EchoService',
         methodName: 'Echo',
@@ -199,7 +199,7 @@ class UnaryRpcExample {
 
       for (final (serviceName, methodName, request) in parallelRequests) {
         final future = () async {
-          final client = UnaryClient<String, String>(
+          final client = UnaryCaller<String, String>(
             transport: clientTransport,
             serviceName: serviceName,
             methodName: methodName,

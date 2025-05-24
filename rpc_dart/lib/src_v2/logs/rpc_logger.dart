@@ -63,6 +63,8 @@ abstract interface class RpcLogger {
     return _RpcLoggerRegistry.instance.get(loggerName, colors: colors);
   }
 
+  RpcLogger child(String childName);
+
   /// Отправляет лог с указанным уровнем в сервис диагностики
   Future<void> log({
     required RpcLoggerLevel level,

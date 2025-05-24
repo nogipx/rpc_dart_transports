@@ -23,7 +23,7 @@ class StreamTypesExample {
     final stringSerializer = const SimpleStringSerializer();
 
     // Инициализируем серверную часть с обработчиком
-    final server = ServerStreamServer<String, String>(
+    final server = ServerStreamResponder<String, String>(
       transport: serverTransport,
       serviceName: 'DataService',
       methodName: 'GetServerStream',
@@ -49,7 +49,7 @@ class StreamTypesExample {
     );
 
     // Инициализируем клиентскую часть
-    final client = ServerStreamClient<String, String>(
+    final client = ServerStreamCaller<String, String>(
       transport: clientTransport,
       serviceName: 'DataService',
       methodName: 'GetServerStream',
@@ -104,7 +104,7 @@ class StreamTypesExample {
     final stringSerializer = const SimpleStringSerializer();
 
     // Инициализируем серверную часть с обработчиком
-    final server = ClientStreamServer<String, String>(
+    final server = ClientStreamResponder<String, String>(
       transport: serverTransport,
       serviceName: 'DataAggregatorService',
       methodName: 'ProcessClientStream',
@@ -130,7 +130,7 @@ class StreamTypesExample {
     );
 
     // Инициализируем клиентскую часть
-    final client = ClientStreamClient<String, String>(
+    final client = ClientStreamCaller<String, String>(
       transport: clientTransport,
       serviceName: 'DataAggregatorService',
       methodName: 'ProcessClientStream',

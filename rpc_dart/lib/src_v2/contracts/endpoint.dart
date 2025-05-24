@@ -5,16 +5,13 @@ abstract base class RpcEndpointBase {
   final IRpcTransport _transport;
   final List<IRpcMiddleware> _middlewares = [];
   final String? debugLabel;
-  late final RpcLogger logger;
+  RpcLogger get logger;
   bool _isActive = true;
 
   RpcEndpointBase({
     required IRpcTransport transport,
     this.debugLabel,
-  }) : _transport = transport {
-    logger = RpcLogger('RpcEndpoint[${debugLabel ?? 'default'}]');
-    logger.info('RpcEndpoint создан');
-  }
+  }) : _transport = transport;
 
   void addMiddleware(IRpcMiddleware middleware) {
     _middlewares.add(middleware);
@@ -44,6 +41,10 @@ abstract base class RpcEndpointBase {
 
 /// Клиентский RPC эндпоинт для отправки запросов
 final class RpcClientEndpoint extends RpcEndpointBase {
+  @override
+  RpcLogger get logger =>
+      RpcLogger('RpcClientEndpoint[${debugLabel ?? 'default'}]');
+
   RpcClientEndpoint({
     required super.transport,
     super.debugLabel,
@@ -108,6 +109,10 @@ final class RpcClientEndpoint extends RpcEndpointBase {
 
 /// Серверный RPC эндпоинт для обработки запросов
 final class RpcServerEndpoint extends RpcEndpointBase {
+  @override
+  RpcLogger get logger =>
+      RpcLogger('RpcServerEndpoint[${debugLabel ?? 'default'}]');
+
   final Map<String, dynamic> _contracts = {};
   final Map<String, RpcMethodRegistration> _methods = {};
 

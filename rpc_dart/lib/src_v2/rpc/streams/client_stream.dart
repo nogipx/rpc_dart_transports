@@ -26,9 +26,11 @@ part of '../_index.dart';
 /// final response = await client.response;
 /// print("Получен итоговый ответ: $response");
 /// ```
-final class ClientStreamClient<TRequest, TResponse> {
+final class ClientStreamCaller<TRequest, TResponse> {
+  late final RpcLogger? _logger;
+
   /// Внутренний клиент двунаправленного стрима
-  final BidirectionalStreamClient<TRequest, TResponse> _innerClient;
+  late final BidirectionalStreamCaller<TRequest, TResponse> _innerClient;
 
   /// Обещание с результатом запроса
   late final Completer<TResponse> _responseCompleter = Completer<TResponse>();
@@ -44,21 +46,23 @@ final class ClientStreamClient<TRequest, TResponse> {
   /// [requestSerializer] Кодек для сериализации запросов
   /// [responseSerializer] Кодек для десериализации ответа
   /// [logger] Опциональный логгер
-  ClientStreamClient({
+  ClientStreamCaller({
     required IRpcTransport transport,
     required String serviceName,
     required String methodName,
     required IRpcSerializer<TRequest> requestSerializer,
     required IRpcSerializer<TResponse> responseSerializer,
     RpcLogger? logger,
-  }) : _innerClient = BidirectionalStreamClient<TRequest, TResponse>(
-          transport: transport,
-          serviceName: serviceName,
-          methodName: methodName,
-          requestSerializer: requestSerializer,
-          responseSerializer: responseSerializer,
-          logger: logger,
-        ) {
+  }) {
+    _logger = logger?.child('ClientCaller');
+    _innerClient = BidirectionalStreamCaller<TRequest, TResponse>(
+      transport: transport,
+      serviceName: serviceName,
+      methodName: methodName,
+      requestSerializer: requestSerializer,
+      responseSerializer: responseSerializer,
+      logger: _logger,
+    );
     unawaited(_setupResponseHandler());
   }
 
@@ -151,9 +155,11 @@ final class ClientStreamClient<TRequest, TResponse> {
 ///   }
 /// );
 /// ```
-final class ClientStreamServer<TRequest, TResponse> {
+final class ClientStreamResponder<TRequest, TResponse> {
+  late final RpcLogger? _logger;
+
   /// Внутренний сервер двунаправленного стрима
-  final BidirectionalStreamServer<TRequest, TResponse> _innerServer;
+  late final BidirectionalStreamResponder<TRequest, TResponse> _innerServer;
 
   /// Создает сервер клиентского стриминга
   ///
@@ -164,7 +170,7 @@ final class ClientStreamServer<TRequest, TResponse> {
   /// [responseSerializer] Кодек для сериализации ответа
   /// [handler] Функция-обработчик, вызываемая для обработки потока запросов
   /// [logger] Опциональный логгер
-  ClientStreamServer({
+  ClientStreamResponder({
     required IRpcTransport transport,
     required String serviceName,
     required String methodName,
@@ -172,14 +178,16 @@ final class ClientStreamServer<TRequest, TResponse> {
     required IRpcSerializer<TResponse> responseSerializer,
     required Future<TResponse> Function(Stream<TRequest> requests) handler,
     RpcLogger? logger,
-  }) : _innerServer = BidirectionalStreamServer<TRequest, TResponse>(
-          transport: transport,
-          serviceName: serviceName,
-          methodName: methodName,
-          requestSerializer: requestSerializer,
-          responseSerializer: responseSerializer,
-          logger: logger,
-        ) {
+  }) {
+    _logger = logger?.child('ClientResponder');
+    _innerServer = BidirectionalStreamResponder<TRequest, TResponse>(
+      transport: transport,
+      serviceName: serviceName,
+      methodName: methodName,
+      requestSerializer: requestSerializer,
+      responseSerializer: responseSerializer,
+      logger: _logger,
+    );
     unawaited(_setupRequestHandler(handler));
   }
 

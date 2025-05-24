@@ -11,7 +11,7 @@ void main() {
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
         final serializer = _TestStringSerializer();
 
-        final server = BidirectionalStreamServer<String, String>(
+        final server = BidirectionalStreamResponder<String, String>(
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -19,7 +19,7 @@ void main() {
           responseSerializer: serializer,
         );
 
-        final client = BidirectionalStreamClient<String, String>(
+        final client = BidirectionalStreamCaller<String, String>(
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -68,7 +68,7 @@ void main() {
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
         final serializer = _TestStringSerializer();
 
-        final server = BidirectionalStreamServer<String, String>(
+        final server = BidirectionalStreamResponder<String, String>(
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -76,7 +76,7 @@ void main() {
           responseSerializer: serializer,
         );
 
-        final client = BidirectionalStreamClient<String, String>(
+        final client = BidirectionalStreamCaller<String, String>(
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -113,7 +113,7 @@ void main() {
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
         final serializer = _TestStringSerializer();
 
-        final server = BidirectionalStreamServer<String, String>(
+        final server = BidirectionalStreamResponder<String, String>(
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -121,7 +121,7 @@ void main() {
           responseSerializer: serializer,
         );
 
-        final client = BidirectionalStreamClient<String, String>(
+        final client = BidirectionalStreamCaller<String, String>(
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -141,7 +141,7 @@ void main() {
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
         final serializer = _TestStringSerializer();
 
-        final server = BidirectionalStreamServer<String, String>(
+        final server = BidirectionalStreamResponder<String, String>(
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -149,7 +149,7 @@ void main() {
           responseSerializer: serializer,
         );
 
-        final client = BidirectionalStreamClient<String, String>(
+        final client = BidirectionalStreamCaller<String, String>(
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -202,7 +202,7 @@ void main() {
         final serializer = _TestStringSerializer();
         var handlerCallCount = 0;
 
-        final server = BidirectionalStreamServer<String, String>(
+        final server = BidirectionalStreamResponder<String, String>(
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'SpecificMethod',
@@ -214,7 +214,7 @@ void main() {
           handlerCallCount++;
         });
 
-        final correctClient = BidirectionalStreamClient<String, String>(
+        final correctClient = BidirectionalStreamCaller<String, String>(
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'SpecificMethod',
@@ -222,7 +222,7 @@ void main() {
           responseSerializer: serializer,
         );
 
-        final incorrectClient = BidirectionalStreamClient<String, String>(
+        final incorrectClient = BidirectionalStreamCaller<String, String>(
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'DifferentMethod',
@@ -251,7 +251,7 @@ void main() {
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
         final serializer = _TestStringSerializer();
 
-        final sut = BidirectionalStreamServer<String, String>(
+        final sut = BidirectionalStreamResponder<String, String>(
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -271,7 +271,7 @@ void main() {
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
         final serializer = _TestStringSerializer();
 
-        final server = BidirectionalStreamServer<String, String>(
+        final server = BidirectionalStreamResponder<String, String>(
           transport: serverTransport,
           serviceName: 'ChatService',
           methodName: 'Chat',
@@ -279,7 +279,7 @@ void main() {
           responseSerializer: serializer,
         );
 
-        final client = BidirectionalStreamClient<String, String>(
+        final client = BidirectionalStreamCaller<String, String>(
           transport: clientTransport,
           serviceName: 'ChatService',
           methodName: 'Chat',
@@ -336,7 +336,7 @@ void main() {
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
         final serializer = _TestStringSerializer();
 
-        final server = BidirectionalStreamServer<String, String>(
+        final server = BidirectionalStreamResponder<String, String>(
           transport: serverTransport,
           serviceName: 'HighVolumeService',
           methodName: 'Process',
@@ -344,7 +344,7 @@ void main() {
           responseSerializer: serializer,
         );
 
-        final client = BidirectionalStreamClient<String, String>(
+        final client = BidirectionalStreamCaller<String, String>(
           transport: clientTransport,
           serviceName: 'HighVolumeService',
           methodName: 'Process',

@@ -86,7 +86,7 @@ void main() {
 
         // Act
         for (int i = 0; i < 3; i++) {
-          final client = UnaryClient<String, String>(
+          final client = UnaryCaller<String, String>(
             transport: clientTransport,
             serviceName: 'TestService',
             methodName: 'TestMethod',
@@ -114,7 +114,7 @@ void main() {
         final serializer = _TestStringSerializer();
         final receivedRequests = <String>[];
 
-        final server = UnaryServer<String, String>(
+        final server = UnaryResponder<String, String>(
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -126,7 +126,7 @@ void main() {
           },
         );
 
-        final client = UnaryClient<String, String>(
+        final client = UnaryCaller<String, String>(
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -152,7 +152,7 @@ void main() {
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
         final serializer = _TestStringSerializer();
 
-        final server = UnaryServer<String, String>(
+        final server = UnaryResponder<String, String>(
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -163,7 +163,7 @@ void main() {
           },
         );
 
-        final client = UnaryClient<String, String>(
+        final client = UnaryCaller<String, String>(
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -192,7 +192,7 @@ void main() {
         final serializer = _TestStringSerializer();
         var handlerCallCount = 0;
 
-        final server = UnaryServer<String, String>(
+        final server = UnaryResponder<String, String>(
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'SpecificMethod',
@@ -205,7 +205,7 @@ void main() {
         );
 
         // Создаем клиентов для разных методов
-        final correctClient = UnaryClient<String, String>(
+        final correctClient = UnaryCaller<String, String>(
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'SpecificMethod',
@@ -213,7 +213,7 @@ void main() {
           responseSerializer: serializer,
         );
 
-        final incorrectClient = UnaryClient<String, String>(
+        final incorrectClient = UnaryCaller<String, String>(
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'DifferentMethod',
@@ -243,7 +243,7 @@ void main() {
         final (_, serverTransport) = RpcInMemoryTransport.pair();
         final serializer = _TestStringSerializer();
 
-        final sut = UnaryServer<String, String>(
+        final sut = UnaryResponder<String, String>(
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -267,7 +267,7 @@ void main() {
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
         final serializer = _TestStringSerializer();
 
-        final server = UnaryServer<String, String>(
+        final server = UnaryResponder<String, String>(
           transport: serverTransport,
           serviceName: 'EchoService',
           methodName: 'Echo',
@@ -276,7 +276,7 @@ void main() {
           handler: (request) => 'Echo: $request',
         );
 
-        final client = UnaryClient<String, String>(
+        final client = UnaryCaller<String, String>(
           transport: clientTransport,
           serviceName: 'EchoService',
           methodName: 'Echo',
@@ -303,7 +303,7 @@ void main() {
         final serializer = _TestStringSerializer();
         var requestCount = 0;
 
-        final server = UnaryServer<String, String>(
+        final server = UnaryResponder<String, String>(
           transport: serverTransport,
           serviceName: 'CounterService',
           methodName: 'Increment',
@@ -318,7 +318,7 @@ void main() {
         // Act - создаем несколько клиентов
         final responses = <String>[];
         for (int i = 0; i < 3; i++) {
-          final client = UnaryClient<String, String>(
+          final client = UnaryCaller<String, String>(
             transport: clientTransport,
             serviceName: 'CounterService',
             methodName: 'Increment',
@@ -411,11 +411,11 @@ class _UnaryClientTestSetup {
 }
 
 /// Фабричный метод для создания UnaryClient с тестовой настройкой
-(UnaryClient<String, String>, _UnaryClientTestSetup) _createUnaryClientSetup() {
+(UnaryCaller<String, String>, _UnaryClientTestSetup) _createUnaryClientSetup() {
   final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
   final serializer = _TestStringSerializer();
 
-  final client = UnaryClient<String, String>(
+  final client = UnaryCaller<String, String>(
     transport: clientTransport,
     serviceName: 'TestService',
     methodName: 'TestMethod',

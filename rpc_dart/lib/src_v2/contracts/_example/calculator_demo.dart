@@ -1,5 +1,8 @@
 import 'dart:async';
 import 'dart:math';
+
+import 'package:rpc_dart/src_v2/logs/_logs.dart';
+
 import '../_index.dart';
 import '../../rpc/_index.dart';
 import 'calculator_client.dart';
@@ -12,6 +15,7 @@ Future<void> runCalculatorDemo() async {
 
   // Создаем транспорт в памяти для демонстрации
   final transport = RpcInMemoryTransport.pair();
+  RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.debug);
 
   // Создаем эндпоинты для клиента и сервера
   final serverEndpoint = RpcServerEndpoint(transport: transport.$1);
@@ -50,30 +54,40 @@ Future<void> runCalculatorDemo() async {
 /// Демонстрация унарных вычислений
 Future<void> _demoUnaryCalculation(CalculatorClient client) async {
   try {
+    print('DEBUG: Начало _demoUnaryCalculation');
+
     // Сложение
+    print('DEBUG: Вызов client.add(5, 3)');
     final sum = await client.add(5, 3);
     print('5 + 3 = $sum');
 
     // Вычитание
+    print('DEBUG: Вызов client.subtract(10, 4)');
     final diff = await client.subtract(10, 4);
     print('10 - 4 = $diff');
 
     // Умножение
+    print('DEBUG: Вызов client.multiply(6, 7)');
     final product = await client.multiply(6, 7);
     print('6 * 7 = $product');
 
     // Деление
+    print('DEBUG: Вызов client.divide(20, 4)');
     final quotient = await client.divide(20, 4);
     print('20 / 4 = $quotient');
 
     // Обработка ошибки
     try {
+      print('DEBUG: Вызов client.divide(5, 0)');
       await client.divide(5, 0);
     } catch (e) {
       print('Ошибка деления на ноль: $e');
     }
+
+    print('DEBUG: Завершение _demoUnaryCalculation');
   } catch (e) {
     print('Ошибка при выполнении унарных вычислений: $e');
+    print('DEBUG: Stack trace: ${StackTrace.current}');
   }
 }
 
@@ -145,5 +159,9 @@ Future<void> _demoBidirectionalStream(CalculatorClient client) async {
 
 /// Точка входа для демонстрации
 void main() async {
-  await runCalculatorDemo();
+  try {
+    await runCalculatorDemo();
+  } catch (e) {
+    print('Ошибка при запуске демонстрации: $e');
+  }
 }

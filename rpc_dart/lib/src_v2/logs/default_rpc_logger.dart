@@ -281,4 +281,18 @@ class DefaultRpcLogger implements RpcLogger {
     final coloredMessage = _colorize(message, color);
     print(coloredMessage);
   }
+
+  @override
+  RpcLogger child(String childName) {
+    return DefaultRpcLogger(
+      '$name.$childName',
+      colors: _colors,
+      minLogLevel: _filter is DefaultRpcLoggerFilter
+          ? (_filter as DefaultRpcLoggerFilter).minLogLevel
+          : RpcLoggerSettings.defaultMinLogLevel,
+      consoleLoggingEnabled: _consoleLoggingEnabled,
+      coloredLoggingEnabled: _coloredLoggingEnabled,
+      filter: _filter,
+    );
+  }
 }

@@ -12,7 +12,7 @@ void main() {
         final serializer = _TestStringSerializer();
         final receivedRequests = <String>[];
 
-        final server = ClientStreamServer<String, String>(
+        final server = ClientStreamResponder<String, String>(
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -26,7 +26,7 @@ void main() {
           },
         );
 
-        final client = ClientStreamClient<String, String>(
+        final client = ClientStreamCaller<String, String>(
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -57,7 +57,7 @@ void main() {
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
         final serializer = _TestStringSerializer();
 
-        final server = ClientStreamServer<String, String>(
+        final server = ClientStreamResponder<String, String>(
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -72,7 +72,7 @@ void main() {
           },
         );
 
-        final client = ClientStreamClient<String, String>(
+        final client = ClientStreamCaller<String, String>(
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -96,7 +96,7 @@ void main() {
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
         final serializer = _TestStringSerializer();
 
-        final server = ClientStreamServer<String, String>(
+        final server = ClientStreamResponder<String, String>(
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -108,7 +108,7 @@ void main() {
           },
         );
 
-        final client = ClientStreamClient<String, String>(
+        final client = ClientStreamCaller<String, String>(
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -136,7 +136,7 @@ void main() {
         final serializer = _TestStringSerializer();
         final receivedRequests = <String>[];
 
-        final server = ClientStreamServer<String, String>(
+        final server = ClientStreamResponder<String, String>(
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -150,7 +150,7 @@ void main() {
           },
         );
 
-        final client = ClientStreamClient<String, String>(
+        final client = ClientStreamCaller<String, String>(
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -180,7 +180,7 @@ void main() {
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
         final serializer = _TestStringSerializer();
 
-        final server = ClientStreamServer<String, String>(
+        final server = ClientStreamResponder<String, String>(
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -189,7 +189,7 @@ void main() {
           handler: (Stream<String> requests) async => 'test',
         );
 
-        final client = ClientStreamClient<String, String>(
+        final client = ClientStreamCaller<String, String>(
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -210,7 +210,7 @@ void main() {
         final serializer = _TestStringSerializer();
         final receivedRequests = <String>[];
 
-        final server = ClientStreamServer<String, String>(
+        final server = ClientStreamResponder<String, String>(
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -224,7 +224,7 @@ void main() {
           },
         );
 
-        final client = ClientStreamClient<String, String>(
+        final client = ClientStreamCaller<String, String>(
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -251,7 +251,7 @@ void main() {
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
         final serializer = _TestStringSerializer();
 
-        final server = ClientStreamServer<String, String>(
+        final server = ClientStreamResponder<String, String>(
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -262,7 +262,7 @@ void main() {
           },
         );
 
-        final client = ClientStreamClient<String, String>(
+        final client = ClientStreamCaller<String, String>(
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -288,7 +288,7 @@ void main() {
         final serializer = _TestStringSerializer();
         var handlerCallCount = 0;
 
-        final server = ClientStreamServer<String, String>(
+        final server = ClientStreamResponder<String, String>(
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'SpecificMethod',
@@ -301,7 +301,7 @@ void main() {
           },
         );
 
-        final correctClient = ClientStreamClient<String, String>(
+        final correctClient = ClientStreamCaller<String, String>(
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'SpecificMethod',
@@ -309,7 +309,7 @@ void main() {
           responseSerializer: serializer,
         );
 
-        final incorrectClient = ClientStreamClient<String, String>(
+        final incorrectClient = ClientStreamCaller<String, String>(
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'DifferentMethod',
@@ -343,7 +343,7 @@ void main() {
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
         final serializer = _TestStringSerializer();
 
-        final sut = ClientStreamServer<String, String>(
+        final sut = ClientStreamResponder<String, String>(
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -364,7 +364,7 @@ void main() {
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
         final serializer = _TestStringSerializer();
 
-        final server = ClientStreamServer<String, String>(
+        final server = ClientStreamResponder<String, String>(
           transport: serverTransport,
           serviceName: 'AggregatorService',
           methodName: 'Aggregate',
@@ -379,7 +379,7 @@ void main() {
           },
         );
 
-        final client = ClientStreamClient<String, String>(
+        final client = ClientStreamCaller<String, String>(
           transport: clientTransport,
           serviceName: 'AggregatorService',
           methodName: 'Aggregate',
@@ -407,7 +407,7 @@ void main() {
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
         final serializer = _TestStringSerializer();
 
-        final server = ClientStreamServer<String, String>(
+        final server = ClientStreamResponder<String, String>(
           transport: serverTransport,
           serviceName: 'CounterService',
           methodName: 'Count',
@@ -422,7 +422,7 @@ void main() {
           },
         );
 
-        final client = ClientStreamClient<String, String>(
+        final client = ClientStreamCaller<String, String>(
           transport: clientTransport,
           serviceName: 'CounterService',
           methodName: 'Count',
