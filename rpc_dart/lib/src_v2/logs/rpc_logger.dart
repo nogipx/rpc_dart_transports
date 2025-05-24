@@ -33,10 +33,21 @@ abstract interface class IRpcLoggerFilter {
   bool shouldLog(RpcLoggerLevel level, String source);
 }
 
+/// Результат форматирования лога с разделением на заголовок и содержимое
+class LogFormattingResult {
+  /// Заголовок сообщения
+  final String header;
+
+  /// Содержимое сообщения
+  final String content;
+
+  LogFormattingResult(this.header, this.content);
+}
+
 /// Интерфейс для форматирования логов
 abstract interface class IRpcLoggerFormatter {
-  /// Форматирует сообщение лога
-  String format(
+  /// Форматирует сообщение лога, возвращая заголовок и содержимое раздельно
+  LogFormattingResult format(
       DateTime timestamp, RpcLoggerLevel level, String source, String message,
       {String? context});
 }

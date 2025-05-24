@@ -21,30 +21,61 @@ class DefaultRpcLoggerFormatter implements IRpcLoggerFormatter {
   const DefaultRpcLoggerFormatter();
 
   @override
-  String format(
+  LogFormattingResult format(
       DateTime timestamp, RpcLoggerLevel level, String source, String message,
       {String? context}) {
     final formattedTime =
         '${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}:${timestamp.second.toString().padLeft(2, '0')}';
 
     String prefix;
+    String emoji;
+    String connector;
     switch (level) {
       case RpcLoggerLevel.debug:
         prefix = 'DEBUG';
+        emoji = '🔍';
+        connector = '⤷ ';
       case RpcLoggerLevel.info:
         prefix = 'INFO';
+        emoji = '📌';
+        connector = '⤷ ';
       case RpcLoggerLevel.warning:
         prefix = 'WARN';
+        emoji = '⚠️ ';
+        connector = '⤷ ';
       case RpcLoggerLevel.error:
         prefix = 'ERROR';
+        emoji = '❌';
+        connector = '⤷ ';
       case RpcLoggerLevel.critical:
         prefix = 'CRIT';
+        emoji = '🔥';
+        connector = '⤷ ';
       default:
         prefix = '';
+        emoji = '';
+        connector = '⤷ ';
     }
 
-    final contextStr = context != null ? ' ($context)' : '';
-    return '[$formattedTime] ${prefix.padRight(5)} [$source$contextStr] $message';
+    final contextStr = context != null ? ' [$context]' : '';
+    final header =
+        '[$formattedTime] ${prefix.padRight(5)} $emoji [$source$contextStr]';
+
+    // Разбиваем длинное сообщение на строки с отступами
+    final messageLines = message.split('\n');
+
+    // Для ошибок добавляем специальное форматирование с рамкой
+    String content;
+    if (level == RpcLoggerLevel.error || level == RpcLoggerLevel.critical) {
+      final formattedMessage =
+          messageLines.map((line) => '  │ $line').join('\n');
+      content =
+          '  ┌──────────── ! ERROR ! ────────────┐\n$formattedMessage\n  └────────────────────────────────────┘';
+    } else {
+      content = messageLines.map((line) => '  $connector $line').join('\n');
+    }
+
+    return LogFormattingResult(header, content);
   }
 }
 
@@ -142,30 +173,58 @@ class DefaultRpcLogger implements RpcLogger {
     AnsiColor? color,
   }) {
     final timestamp = DateTime.now();
-    final logMessage =
-        _formatter.format(timestamp, level, name, message, context: context);
 
-    // Если включен цветной вывод, используем цвет
+    // Создаем сообщение с включенными деталями ошибки для ERROR и CRITICAL
+    String fullMessage = message;
+    if (level == RpcLoggerLevel.error || level == RpcLoggerLevel.critical) {
+      if (error != null) {
+        fullMessage += '\n\nError details: $error';
+      }
+      if (stackTrace != null) {
+        fullMessage += '\n\nStack trace: \n$stackTrace';
+      }
+    }
+
+    final formattedLog = _formatter.format(timestamp, level, name, fullMessage,
+        context: context);
+
+    // Если включен цветной вывод, используем цвет только для заголовка
     if (_coloredLoggingEnabled) {
       final actualColor = color ?? _colors.colorForLevel(level);
-      _logColored(logMessage, actualColor);
 
-      if (error != null) {
-        _logColored('  Error details: $error', actualColor);
+      // Выводим заголовок с цветом
+      print('${actualColor.code}${formattedLog.header}${AnsiColor.reset.code}');
+
+      // Выводим содержимое без цвета
+      if (formattedLog.content.isNotEmpty) {
+        print(formattedLog.content);
       }
 
-      if (stackTrace != null) {
-        _logColored('  Stack trace: \n$stackTrace', actualColor);
-      }
-    } else {
-      // Обычный вывод без цвета
-      print(logMessage);
-
-      if (error != null) {
+      // Вывод деталей ошибки только для обычных (не ERROR/CRITICAL) уровней
+      if ((level != RpcLoggerLevel.error && level != RpcLoggerLevel.critical) &&
+          error != null) {
         print('  Error details: $error');
       }
 
-      if (stackTrace != null) {
+      if ((level != RpcLoggerLevel.error && level != RpcLoggerLevel.critical) &&
+          stackTrace != null) {
+        print('  Stack trace: \n$stackTrace');
+      }
+    } else {
+      // Обычный вывод без цвета
+      print(formattedLog.header);
+      if (formattedLog.content.isNotEmpty) {
+        print(formattedLog.content);
+      }
+
+      // Вывод деталей ошибки только для обычных (не ERROR/CRITICAL) уровней
+      if ((level != RpcLoggerLevel.error && level != RpcLoggerLevel.critical) &&
+          error != null) {
+        print('  Error details: $error');
+      }
+
+      if ((level != RpcLoggerLevel.error && level != RpcLoggerLevel.critical) &&
+          stackTrace != null) {
         print('  Stack trace: \n$stackTrace');
       }
     }
@@ -267,19 +326,6 @@ class DefaultRpcLogger implements RpcLogger {
       data: data,
       color: color,
     );
-  }
-
-  /// Возвращает строку с применённым цветом
-  ///
-  /// Если цветное логирование выключено, возвращает исходную строку
-  String _colorize(String message, AnsiColor color) {
-    return '${color.code}$message${AnsiColor.reset.code}';
-  }
-
-  /// Выводит сообщение в консоль с указанным цветом
-  void _logColored(String message, AnsiColor color) {
-    final coloredMessage = _colorize(message, color);
-    print(coloredMessage);
   }
 
   @override
