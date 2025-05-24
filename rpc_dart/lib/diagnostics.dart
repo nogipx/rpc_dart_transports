@@ -4,4 +4,4 @@
 
 library diagnostics;
 
-export 'diagnostics/_index.dart';
+export 'src_v2/diagnostics/_index.dart';

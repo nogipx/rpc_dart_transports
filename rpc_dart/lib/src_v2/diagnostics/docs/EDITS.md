@@ -137,13 +137,13 @@ DiagnosticService? get diagnostics => _diagnosticService;
 - Экспортировать публичные интерфейсы и классы диагностики
 ```dart
 // Диагностика
-export '../src/diagnostics/src/diagnostics/contracts/diagnostic_contract.dart';
-export '../src/diagnostics/src/diagnostics/contracts/diagnostic_service.dart';
-export '../src/diagnostics/src/diagnostics/models/client_identity.dart';
-export '../src/diagnostics/src/diagnostics/client/diagnostic_client.dart';
-export '../src/diagnostics/src/diagnostics/middleware/diagnostic_middleware.dart';
-export '../src/diagnostics/src/diagnostics/transport/encrypted_transport.dart';
-export '../src/diagnostics/src/diagnostics/util/encryption_key.dart';
+export '../../../diagnostics/src/diagnostics/src/diagnostics/contracts/diagnostic_contract.dart';
+export '../../../diagnostics/src/diagnostics/src/diagnostics/contracts/diagnostic_service.dart';
+export '../../../diagnostics/src/diagnostics/src/diagnostics/models/client_identity.dart';
+export '../../../diagnostics/src/diagnostics/src/diagnostics/client/diagnostic_client.dart';
+export '../../../diagnostics/src/diagnostics/src/diagnostics/middleware/diagnostic_middleware.dart';
+export '../../../diagnostics/src/diagnostics/src/diagnostics/transport/encrypted_transport.dart';
+export '../../../diagnostics/src/diagnostics/src/diagnostics/util/encryption_key.dart';
 ```
 
 ## 3. Последовательность реализации

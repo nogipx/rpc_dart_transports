@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 import 'package:test/test.dart';
-import 'package:rpc_dart/rpc/_index.dart';
+import 'package:rpc_dart/src_v2/rpc/_index.dart';
 
 void main() {
   group('RpcMessageFrame', () {

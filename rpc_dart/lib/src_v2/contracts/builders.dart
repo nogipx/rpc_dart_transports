@@ -139,17 +139,17 @@ class RpcBidirectionalStreamBuilder {
   Stream<TResponse> call<TRequest extends IRpcSerializable,
       TResponse extends IRpcSerializable>({
     required Stream<TRequest> requests,
-    required TResponse Function(Map<String, dynamic>) responseParser,
+    required TResponse Function(Uint8List) responseParser,
   }) async* {
     final client = BidirectionalStreamClient<TRequest, TResponse>(
       transport: endpoint.transport,
       serviceName: serviceName,
       methodName: methodName,
-      requestSerializer: RpcBytesSerializer<TRequest>(
-        fromJson: responseParser as TRequest Function(Map<String, dynamic>),
+      requestSerializer: RpcBinarySerializer<TRequest>(
+        fromBytes: responseParser as TRequest Function(Uint8List),
       ),
-      responseSerializer: RpcBytesSerializer<TResponse>(
-        fromJson: responseParser,
+      responseSerializer: RpcBinarySerializer<TResponse>(
+        fromBytes: responseParser,
       ),
       logger: endpoint.logger,
     );
