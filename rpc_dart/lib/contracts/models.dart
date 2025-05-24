@@ -2,9 +2,8 @@ part of '_index.dart';
 
 /// Основной интерфейс для всех RPC сообщений - ОБЯЗАТЕЛЬНЫЙ!
 /// Все типы запросов и ответов должны реализовывать этот интерфейс
-abstract interface class IRpcSerializableMessage {
-  /// Сериализует в JSON - ОБЯЗАТЕЛЬНЫЙ метод!
-  Map<String, dynamic> toJson();
+abstract interface class IRpcSerializable {
+  Uint8List serialize();
 }
 
 /// Типы RPC методов

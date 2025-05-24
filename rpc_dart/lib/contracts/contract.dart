@@ -15,8 +15,8 @@ abstract class RpcServiceContract {
 
   /// Регистрирует унарный метод
   /// TRequest и TResponse должны реализовывать IRpcSerializableMessage!
-  void addUnaryMethod<TRequest extends IRpcSerializableMessage,
-      TResponse extends IRpcSerializableMessage>({
+  void addUnaryMethod<TRequest extends IRpcSerializable,
+      TResponse extends IRpcSerializable>({
     required String methodName,
     required Future<TResponse> Function(TRequest) handler,
     String description = '',
@@ -33,8 +33,8 @@ abstract class RpcServiceContract {
 
   /// Регистрирует серверный стрим
   /// TRequest и TResponse должны реализовывать IRpcSerializableMessage!
-  void addServerStreamMethod<TRequest extends IRpcSerializableMessage,
-      TResponse extends IRpcSerializableMessage>({
+  void addServerStreamMethod<TRequest extends IRpcSerializable,
+      TResponse extends IRpcSerializable>({
     required String methodName,
     required Stream<TResponse> Function(TRequest) handler,
     String description = '',
@@ -51,8 +51,8 @@ abstract class RpcServiceContract {
 
   /// Регистрирует клиентский стрим
   /// TRequest и TResponse должны реализовывать IRpcSerializableMessage!
-  void addClientStreamMethod<TRequest extends IRpcSerializableMessage,
-      TResponse extends IRpcSerializableMessage>({
+  void addClientStreamMethod<TRequest extends IRpcSerializable,
+      TResponse extends IRpcSerializable>({
     required String methodName,
     required Future<TResponse> Function(Stream<TRequest>) handler,
     String description = '',
@@ -69,8 +69,8 @@ abstract class RpcServiceContract {
 
   /// Регистрирует двунаправленный стрим
   /// TRequest и TResponse должны реализовывать IRpcSerializableMessage!
-  void addBidirectionalMethod<TRequest extends IRpcSerializableMessage,
-      TResponse extends IRpcSerializableMessage>({
+  void addBidirectionalMethod<TRequest extends IRpcSerializable,
+      TResponse extends IRpcSerializable>({
     required String methodName,
     required Stream<TResponse> Function(Stream<TRequest>) handler,
     String description = '',

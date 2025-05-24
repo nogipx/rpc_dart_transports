@@ -226,7 +226,7 @@ class UserServiceServer extends UserServiceContract {
 /// ============================================
 
 /// Доменная модель запроса пользователя - реализует IRpcSerializableMessage
-class GetUserRequest implements IRpcSerializableMessage {
+class GetUserRequest implements IRpcSerializable {
   final int userId;
 
   GetUserRequest({required this.userId});
@@ -236,7 +236,7 @@ class GetUserRequest implements IRpcSerializableMessage {
 
   /// Обязательная сериализация в JSON
   @override
-  Map<String, dynamic> toJson() => {'userId': userId};
+  Uint8List serialize() => {'userId': userId};
 
   static GetUserRequest fromJson(Map<String, dynamic> json) {
     return GetUserRequest(userId: json['userId']);
@@ -244,7 +244,7 @@ class GetUserRequest implements IRpcSerializableMessage {
 }
 
 /// Доменная модель создания пользователя - реализует IRpcSerializableMessage
-class CreateUserRequest implements IRpcSerializableMessage {
+class CreateUserRequest implements IRpcSerializable {
   final String name;
   final String email;
 
@@ -254,14 +254,14 @@ class CreateUserRequest implements IRpcSerializableMessage {
   bool isValid() => name.trim().isNotEmpty && email.contains('@');
 
   @override
-  Map<String, dynamic> toJson() => {'name': name, 'email': email};
+  Map<String, dynamic> serialize() => {'name': name, 'email': email};
 
   static CreateUserRequest fromJson(Map<String, dynamic> json) {
     return CreateUserRequest(name: json['name'], email: json['email']);
   }
 }
 
-class ListUsersRequest implements IRpcSerializableMessage {
+class ListUsersRequest implements IRpcSerializable {
   final int limit;
   final int offset;
 
@@ -270,7 +270,7 @@ class ListUsersRequest implements IRpcSerializableMessage {
   bool isValid() => limit > 0 && offset >= 0;
 
   @override
-  Map<String, dynamic> toJson() => {'limit': limit, 'offset': offset};
+  Map<String, dynamic> serialize() => {'limit': limit, 'offset': offset};
 
   static ListUsersRequest fromJson(Map<String, dynamic> json) {
     return ListUsersRequest(
@@ -280,7 +280,7 @@ class ListUsersRequest implements IRpcSerializableMessage {
   }
 }
 
-class WatchUsersRequest implements IRpcSerializableMessage {
+class WatchUsersRequest implements IRpcSerializable {
   final List<int> userIds;
 
   WatchUsersRequest({required this.userIds});
@@ -288,7 +288,7 @@ class WatchUsersRequest implements IRpcSerializableMessage {
   bool isValid() => userIds.isNotEmpty;
 
   @override
-  Map<String, dynamic> toJson() => {'userIds': userIds};
+  Map<String, dynamic> serialize() => {'userIds': userIds};
 
   static WatchUsersRequest fromJson(Map<String, dynamic> json) {
     return WatchUsersRequest(userIds: List<int>.from(json['userIds']));
@@ -296,7 +296,7 @@ class WatchUsersRequest implements IRpcSerializableMessage {
 }
 
 /// Доменная модель ответа - реализует IRpcSerializableMessage
-class UserResponse implements IRpcSerializableMessage {
+class UserResponse implements IRpcSerializable {
   final User? user;
   final bool isSuccess;
   final String? errorMessage;
@@ -308,8 +308,8 @@ class UserResponse implements IRpcSerializableMessage {
   });
 
   @override
-  Map<String, dynamic> toJson() => {
-        'user': user?.toJson(),
+  Map<String, dynamic> serialize() => {
+        'user': user?.serialize(),
         'isSuccess': isSuccess,
         'errorMessage': errorMessage,
       };
@@ -323,15 +323,15 @@ class UserResponse implements IRpcSerializableMessage {
   }
 }
 
-class UserEventResponse implements IRpcSerializableMessage {
+class UserEventResponse implements IRpcSerializable {
   final UserEvent event;
   final bool isSuccess;
 
   const UserEventResponse({required this.event, this.isSuccess = true});
 
   @override
-  Map<String, dynamic> toJson() => {
-        'event': event.toJson(),
+  Map<String, dynamic> serialize() => {
+        'event': event.serialize(),
         'isSuccess': isSuccess,
       };
 
@@ -344,7 +344,7 @@ class UserEventResponse implements IRpcSerializableMessage {
 }
 
 /// Доменная модель пользователя - реализует IRpcSerializableMessage
-class User implements IRpcSerializableMessage {
+class User implements IRpcSerializable {
   final int id;
   final String name;
   final String email;
@@ -356,7 +356,7 @@ class User implements IRpcSerializableMessage {
   });
 
   @override
-  Map<String, dynamic> toJson() => {
+  Map<String, dynamic> serialize() => {
         'id': id,
         'name': name,
         'email': email,
@@ -372,7 +372,7 @@ class User implements IRpcSerializableMessage {
 }
 
 /// Доменная модель события - реализует IRpcSerializableMessage
-class UserEvent implements IRpcSerializableMessage {
+class UserEvent implements IRpcSerializable {
   final int userId;
   final String eventType;
   final Map<String, dynamic> data;
@@ -386,7 +386,7 @@ class UserEvent implements IRpcSerializableMessage {
   });
 
   @override
-  Map<String, dynamic> toJson() => {
+  Map<String, dynamic> serialize() => {
         'userId': userId,
         'eventType': eventType,
         'data': data,
@@ -413,12 +413,12 @@ void exampleUsage() async {
 
   // ✅ Компилируется - GetUserRequest реализует IRpcSerializableMessage
   final request = GetUserRequest(userId: 123);
-  final json = request.toJson(); // Гарантированно доступен!
+  final json = request.serialize(); // Гарантированно доступен!
 
   final response = UserResponse(
     user: User(id: 123, name: 'Тест', email: 'test@example.com'),
   );
-  final responseJson = response.toJson(); // Тоже гарантированно доступен!
+  final responseJson = response.serialize(); // Тоже гарантированно доступен!
 
   print('✅ Строгий API работает!');
   print('Request JSON: $json');

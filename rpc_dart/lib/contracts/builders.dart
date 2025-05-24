@@ -12,8 +12,8 @@ class RpcUnaryRequestBuilder {
     required this.methodName,
   });
 
-  Future<TResponse> call<TRequest extends IRpcSerializableMessage,
-      TResponse extends IRpcSerializableMessage>({
+  Future<TResponse> call<TRequest extends IRpcSerializable,
+      TResponse extends IRpcSerializable>({
     required TRequest request,
     required TResponse Function(Map<String, dynamic>) responseParser,
   }) async {
@@ -21,10 +21,10 @@ class RpcUnaryRequestBuilder {
       transport: endpoint.transport,
       serviceName: serviceName,
       methodName: methodName,
-      requestSerializer: RpcSerializer<TRequest>(
+      requestSerializer: RpcBytesSerializer<TRequest>(
         fromJson: responseParser as TRequest Function(Map<String, dynamic>),
       ),
-      responseSerializer: RpcSerializer<TResponse>(
+      responseSerializer: RpcBytesSerializer<TResponse>(
         fromJson: responseParser,
       ),
       logger: endpoint.logger,
@@ -51,8 +51,8 @@ class RpcServerStreamBuilder {
     required this.methodName,
   });
 
-  Stream<TResponse> call<TRequest extends IRpcSerializableMessage,
-      TResponse extends IRpcSerializableMessage>({
+  Stream<TResponse> call<TRequest extends IRpcSerializable,
+      TResponse extends IRpcSerializable>({
     required TRequest request,
     required TResponse Function(Map<String, dynamic>) responseParser,
   }) async* {
@@ -60,10 +60,10 @@ class RpcServerStreamBuilder {
       transport: endpoint.transport,
       serviceName: serviceName,
       methodName: methodName,
-      requestSerializer: RpcSerializer<TRequest>(
+      requestSerializer: RpcBytesSerializer<TRequest>(
         fromJson: responseParser as TRequest Function(Map<String, dynamic>),
       ),
-      responseSerializer: RpcSerializer<TResponse>(
+      responseSerializer: RpcBytesSerializer<TResponse>(
         fromJson: responseParser,
       ),
       logger: endpoint.logger,
@@ -94,8 +94,8 @@ class RpcClientStreamBuilder {
     required this.methodName,
   });
 
-  Future<TResponse> call<TRequest extends IRpcSerializableMessage,
-      TResponse extends IRpcSerializableMessage>({
+  Future<TResponse> call<TRequest extends IRpcSerializable,
+      TResponse extends IRpcSerializable>({
     required Stream<TRequest> requests,
     required TResponse Function(Map<String, dynamic>) responseParser,
   }) async {
@@ -103,10 +103,10 @@ class RpcClientStreamBuilder {
       transport: endpoint.transport,
       serviceName: serviceName,
       methodName: methodName,
-      requestSerializer: RpcSerializer<TRequest>(
+      requestSerializer: RpcBytesSerializer<TRequest>(
         fromJson: responseParser as TRequest Function(Map<String, dynamic>),
       ),
-      responseSerializer: RpcSerializer<TResponse>(
+      responseSerializer: RpcBytesSerializer<TResponse>(
         fromJson: responseParser,
       ),
       logger: endpoint.logger,
@@ -136,8 +136,8 @@ class RpcBidirectionalStreamBuilder {
     required this.methodName,
   });
 
-  Stream<TResponse> call<TRequest extends IRpcSerializableMessage,
-      TResponse extends IRpcSerializableMessage>({
+  Stream<TResponse> call<TRequest extends IRpcSerializable,
+      TResponse extends IRpcSerializable>({
     required Stream<TRequest> requests,
     required TResponse Function(Map<String, dynamic>) responseParser,
   }) async* {
@@ -145,10 +145,10 @@ class RpcBidirectionalStreamBuilder {
       transport: endpoint.transport,
       serviceName: serviceName,
       methodName: methodName,
-      requestSerializer: RpcSerializer<TRequest>(
+      requestSerializer: RpcBytesSerializer<TRequest>(
         fromJson: responseParser as TRequest Function(Map<String, dynamic>),
       ),
-      responseSerializer: RpcSerializer<TResponse>(
+      responseSerializer: RpcBytesSerializer<TResponse>(
         fromJson: responseParser,
       ),
       logger: endpoint.logger,

@@ -1,3 +1,4 @@
 **/.dart_tool/
 **/coverage/html/
 **/coverage/test/
+rpc_dart/lib/src/
