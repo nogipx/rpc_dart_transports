@@ -7,7 +7,7 @@ import '../_index.dart';
 class CalculatorClient extends RpcClientContract
     implements ICalculatorContract {
   /// Создает клиента с указанным эндпоинтом
-  CalculatorClient(RpcClientEndpoint endpoint)
+  CalculatorClient(RpcCallerEndpoint endpoint)
       : super('CalculatorService', endpoint);
 
   @override

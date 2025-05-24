@@ -40,12 +40,11 @@ abstract base class RpcEndpointBase {
 }
 
 /// Клиентский RPC эндпоинт для отправки запросов
-final class RpcClientEndpoint extends RpcEndpointBase {
+final class RpcCallerEndpoint extends RpcEndpointBase {
   @override
-  RpcLogger get logger =>
-      RpcLogger('RpcClientEndpoint[${debugLabel ?? 'default'}]');
+  RpcLogger get logger => RpcLogger('RpcCallerEndpoint[${debugLabel ?? ''}]');
 
-  RpcClientEndpoint({
+  RpcCallerEndpoint({
     required super.transport,
     super.debugLabel,
   });
@@ -100,15 +99,15 @@ final class RpcClientEndpoint extends RpcEndpointBase {
 }
 
 /// Серверный RPC эндпоинт для обработки запросов
-final class RpcServerEndpoint extends RpcEndpointBase {
+final class RpcResponderEndpoint extends RpcEndpointBase {
   @override
   RpcLogger get logger =>
-      RpcLogger('RpcServerEndpoint[${debugLabel ?? 'default'}]');
+      RpcLogger('RpcResponderEndpoint[${debugLabel ?? ''}]');
 
   final Map<String, dynamic> _contracts = {};
   final Map<String, RpcMethodRegistration> _methods = {};
 
-  RpcServerEndpoint({
+  RpcResponderEndpoint({
     required super.transport,
     super.debugLabel,
   });

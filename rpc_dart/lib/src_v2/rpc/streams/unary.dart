@@ -77,7 +77,8 @@ final class UnaryCaller<TRequest, TResponse> {
   /// [request] Объект запроса
   /// [timeout] Таймаут вызова (опционально)
   /// Возвращает ответ сервера
-  Future<TResponse> call(TRequest request, {Duration? timeout}) async {
+  Future<TResponse> call(TRequest request,
+      {Duration timeout = const Duration(seconds: 30)}) async {
     // Создаем новый stream для этого вызова
     final streamId = _transport.createStream();
 
@@ -180,17 +181,18 @@ final class UnaryCaller<TRequest, TResponse> {
       );
 
       // Ждем ответ с таймаутом, если указан
-      if (timeout != null) {
-        _logger?.debug(
-            'Установлен таймаут ожидания ответа: $timeout [streamId: $streamId]');
-        return await completer.future.timeout(timeout, onTimeout: () {
+      _logger?.debug(
+        'Установлен таймаут ожидания ответа: $timeout [streamId: $streamId]',
+      );
+      return await completer.future.timeout(
+        timeout,
+        onTimeout: () {
           _logger?.error(
-              'Тайм-аут ожидания ответа: $timeout [streamId: $streamId]');
+            'Тайм-аут ожидания ответа: $timeout [streamId: $streamId]',
+          );
           throw TimeoutException('Call timeout: $timeout', timeout);
-        });
-      } else {
-        return await completer.future;
-      }
+        },
+      );
     } catch (e, stackTrace) {
       _logger?.error(
           'Ошибка при выполнении унарного вызова $_methodPath [streamId: $streamId]',

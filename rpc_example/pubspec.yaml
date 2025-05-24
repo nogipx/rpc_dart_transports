@@ -15,7 +15,7 @@ dependencies:
   args: ^2.7.0
   freezed_annotation: ^3.0.0
   json_annotation: ^4.9.0
-  protobuf: ^4.1.0
+  protobuf: ^4.0.0
   fixnum: ^1.1.1
 
   rpc_dart:
@@ -43,4 +43,5 @@ dev_dependencies:
   build_runner: ^2.4.15
   freezed: ^3.0.6
   json_serializable: ^6.9.0
+  protoc_plugin: ^22.2.0
   

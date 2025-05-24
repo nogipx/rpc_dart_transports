@@ -18,8 +18,8 @@ Future<void> runCalculatorDemo() async {
   RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.debug);
 
   // Создаем эндпоинты для клиента и сервера
-  final serverEndpoint = RpcServerEndpoint(transport: transport.$1);
-  final clientEndpoint = RpcClientEndpoint(transport: transport.$2);
+  final serverEndpoint = RpcResponderEndpoint(transport: transport.$1);
+  final clientEndpoint = RpcCallerEndpoint(transport: transport.$2);
 
   // Создаем сервер и регистрируем его
   final server = CalculatorServer(simulatedDelayMs: 50);

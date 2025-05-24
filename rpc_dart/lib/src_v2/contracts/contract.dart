@@ -109,10 +109,10 @@ abstract class RpcServerContract implements IRpcContract {
 abstract class RpcClientContract implements IRpcContract {
   @override
   final String serviceName;
-  final RpcClientEndpoint _endpoint;
+  final RpcCallerEndpoint _endpoint;
 
   RpcClientContract(this.serviceName, this._endpoint);
 
   /// Получает endpoint, используемый для отправки запросов
-  RpcClientEndpoint get endpoint => _endpoint;
+  RpcCallerEndpoint get endpoint => _endpoint;
 }
