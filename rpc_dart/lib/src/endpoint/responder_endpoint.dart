@@ -3,8 +3,11 @@ part of '_index.dart';
 /// Серверный RPC эндпоинт для обработки запросов
 final class RpcResponderEndpoint extends RpcEndpointBase {
   @override
-  RpcLogger get logger =>
-      RpcLogger('RpcResponderEndpoint[${debugLabel ?? ''}]');
+  RpcLogger get logger => RpcLogger(
+        'RpcResponderEndpoint',
+        colors: loggerColors,
+        label: debugLabel,
+      );
 
   final Map<String, dynamic> _contracts = {};
   final Map<String, RpcMethodRegistration> _methods = {};
@@ -32,7 +35,9 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
     super.start();
 
     if (_isListening) {
-      logger.warning('RpcResponderEndpoint уже слушает входящие запросы');
+      logger.warning(
+        'RpcResponderEndpoint уже слушает входящие запросы',
+      );
       return;
     }
 
@@ -42,11 +47,17 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
 
   /// Этап 1: Начинает прослушивание транспорта для входящих сообщений
   void _startListeningTransport() {
-    logger.info('Начинаем прослушивание транспорта');
+    logger.info(
+      'Начинаем прослушивание транспорта',
+    );
 
-    transport.incomingMessages.listen(_handleIncomingMessage);
+    transport.incomingMessages.listen(
+      _handleIncomingMessage,
+    );
 
-    logger.info('RpcResponderEndpoint запущен и слушает входящие запросы');
+    logger.info(
+      'RpcResponderEndpoint запущен и слушает входящие запросы',
+    );
   }
 
   /// Этап 2: Обрабатывает входящее сообщение от транспорта
@@ -79,7 +90,9 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
     final methodInfo = _parseMethodPath(methodPath);
 
     if (methodInfo == null) {
-      logger.warning('Некорректный путь метода: $methodPath');
+      logger.warning(
+        'Некорректный путь метода: $methodPath',
+      );
       return;
     }
 
@@ -88,21 +101,26 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
     final methodKey = '$serviceName.$methodName';
 
     logger.info(
-        'Получено сообщение метаданных: $methodKey [streamId: $streamId]');
+      'Получено сообщение метаданных: $methodKey [streamId: $streamId]',
+    );
 
     // Сохраняем метод для этого потока
     _streamMethods[streamId] = methodKey;
 
     // Проверяем наличие метода
     if (!_methods.containsKey(methodKey)) {
-      logger.error('Метод $methodKey не зарегистрирован');
+      logger.error(
+        'Метод $methodKey не зарегистрирован',
+      );
       return;
     }
   }
 
   /// Этап 2.2: Обрабатывает сообщение с данными
   void _handleDataMessage(
-      int streamId, RpcTransportMessage<Uint8List> message) {
+    int streamId,
+    RpcTransportMessage<Uint8List> message,
+  ) {
     // Если для этого потока еще не определен метод, и это первое сообщение,
     // проверяем наличие methodPath в сообщении
     if (!_streamMethods.containsKey(streamId) && message.methodPath != null) {
@@ -110,7 +128,9 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
       final methodInfo = _parseMethodPath(methodPath);
 
       if (methodInfo == null) {
-        logger.warning('Некорректный путь метода: $methodPath');
+        logger.warning(
+          'Некорректный путь метода: $methodPath',
+        );
         return;
       }
 
@@ -119,14 +139,17 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
       final methodKey = '$serviceName.$methodName';
 
       logger.info(
-          'Получено сообщение с данными и методом: $methodKey [streamId: $streamId]');
+        'Получено сообщение с данными и методом: $methodKey [streamId: $streamId]',
+      );
 
       // Сохраняем метод для этого потока
       _streamMethods[streamId] = methodKey;
 
       // Проверяем наличие метода
       if (!_methods.containsKey(methodKey)) {
-        logger.error('Метод $methodKey не зарегистрирован');
+        logger.error(
+          'Метод $methodKey не зарегистрирован',
+        );
         return;
       }
     }
@@ -134,12 +157,15 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
     // Обрабатываем данные, если для этого потока определен метод
     if (_streamMethods.containsKey(streamId)) {
       final methodKey = _streamMethods[streamId]!;
-      final parts = methodKey.split('.');
+      final parts = methodKey.split(
+        '.',
+      );
       final serviceName = parts[0];
       final methodName = parts[1];
 
       logger.info(
-          'Обработка данных для метода: $methodKey [streamId: $streamId]');
+        'Обработка данных для метода: $methodKey [streamId: $streamId]',
+      );
 
       _routeMethodCall(
         _methods[methodKey]!,
@@ -150,20 +176,25 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
       );
     } else {
       logger.warning(
-          'Получены данные для неизвестного метода [streamId: $streamId]');
+        'Получены данные для неизвестного метода [streamId: $streamId]',
+      );
     }
   }
 
   /// Этап 2.3: Очищает информацию о потоке при его завершении
   void _cleanupStream(int streamId) {
-    logger.debug('Поток завершен [streamId: $streamId]');
+    logger.debug(
+      'Поток завершен [streamId: $streamId]',
+    );
     _streamMethods.remove(streamId);
     _streamMessages.remove(streamId);
   }
 
   /// Этап 3: Парсинг пути метода из строки формата /service/method
   (String, String)? _parseMethodPath(String methodPath) {
-    final parts = methodPath.split('/');
+    final parts = methodPath.split(
+      '/',
+    );
 
     if (parts.length != 3 || parts[0].isNotEmpty) {
       return null;
@@ -181,40 +212,65 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
     RpcTransportMessage<Uint8List>? message,
   ) {
     logger.info(
-        'Обработка вызова метода $serviceName.$methodName [streamId: $streamId]');
+      'Обработка вызова метода $serviceName.$methodName [streamId: $streamId]',
+    );
 
     try {
       switch (method.type) {
         case RpcMethodType.unary:
-          logger.debug('Создание UnaryResponder для $serviceName.$methodName');
+          logger.debug(
+            'Создание UnaryResponder для $serviceName.$methodName',
+          );
           _handleUnaryMethod(
-              streamId, serviceName, methodName, method.handler, message);
+            streamId,
+            serviceName,
+            methodName,
+            method.handler,
+            message,
+          );
           break;
 
         case RpcMethodType.clientStream:
           logger.debug(
-              'Создание ClientStreamResponder для $serviceName.$methodName');
+            'Создание ClientStreamResponder для $serviceName.$methodName',
+          );
           _handleClientStreamMethod(
-              streamId, serviceName, methodName, method.handler);
+            streamId,
+            serviceName,
+            methodName,
+            method.handler,
+          );
           break;
 
         case RpcMethodType.serverStream:
           logger.debug(
-              'Создание ServerStreamResponder для $serviceName.$methodName');
+            'Создание ServerStreamResponder для $serviceName.$methodName',
+          );
           _handleServerStreamMethod(
-              streamId, serviceName, methodName, method.handler, message);
+            streamId,
+            serviceName,
+            methodName,
+            method.handler,
+            message,
+          );
           break;
 
         case RpcMethodType.bidirectional:
           logger.debug(
-              'Создание BidirectionalStreamResponder для $serviceName.$methodName');
+            'Создание BidirectionalStreamResponder для $serviceName.$methodName',
+          );
           _handleBidirectionalMethod(
-              streamId, serviceName, methodName, method.handler);
+            streamId,
+            serviceName,
+            methodName,
+            method.handler,
+          );
           break;
       }
 
       logger.info(
-          'Успешно создан обработчик для метода $serviceName.$methodName [streamId: $streamId]');
+        'Успешно создан обработчик для метода $serviceName.$methodName [streamId: $streamId]',
+      );
     } catch (e, stackTrace) {
       logger.error(
         'Ошибка при создании обработчика для метода $serviceName.$methodName: $e',
@@ -233,8 +289,9 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
     RpcTransportMessage<Uint8List>? message,
   ) async {
     final methodPath = '/$serviceName/$methodName';
-    logger
-        .debug('Обработка унарного запроса $methodPath [streamId: $streamId]');
+    logger.debug(
+      'Обработка унарного запроса $methodPath [streamId: $streamId]',
+    );
 
     // Сначала отправляем начальные заголовки
     await _sendInitialHeaders(streamId);
@@ -246,7 +303,11 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
 
       // Вызываем обработчик метода
       final response = await _invokeMethodHandler(
-          handler, requestData, methodPath, streamId);
+        handler,
+        requestData,
+        methodPath,
+        streamId,
+      );
 
       // Отправляем ответ
       await _sendResponse(streamId, response, methodPath);
@@ -309,7 +370,9 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
                 responder.send(response);
               },
               onError: (error) {
-                logger.error('Ошибка в потоке ответов: $error');
+                logger.error(
+                  'Ошибка в потоке ответов: $error',
+                );
                 responder.complete();
               },
               onDone: () {
@@ -317,7 +380,9 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
               },
             );
           } catch (e, stack) {
-            logger.error('Ошибка при вызове обработчика: $e\n$stack');
+            logger.error(
+              'Ошибка при вызове обработчика: $e\n$stack',
+            );
             responder.complete();
           }
         },
@@ -357,14 +422,18 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
           responder.send(response);
         },
         onError: (error) {
-          logger.error('Ошибка в потоке ответов: $error');
+          logger.error(
+            'Ошибка в потоке ответов: $error',
+          );
         },
         onDone: () {
           // Просто завершаем обработку
         },
       );
     } catch (e, stack) {
-      logger.error('Ошибка при настройке двунаправленного потока: $e\n$stack');
+      logger.error(
+        'Ошибка при настройке двунаправленного потока: $e\n$stack',
+      );
     }
   }
 
@@ -383,24 +452,34 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
   ) async {
     // Проверяем наличие сообщения с данными
     if (message == null || message.payload == null) {
-      logger
-          .error('Нет сообщения с данными для обработки [streamId: $streamId]');
+      logger.error(
+        'Нет сообщения с данными для обработки [streamId: $streamId]',
+      );
       await _sendErrorTrailer(
-          streamId, 'Нет сообщения с данными для обработки');
+        streamId,
+        'Нет сообщения с данными для обработки',
+      );
       return null;
     }
+    final payload = message.payload ?? Uint8List(0);
+
+    final parser = RpcMessageParser(logger: logger.child('Parser'));
 
     logger.debug(
-        'Получено сообщение с запросом размером ${message.payload!.length} байт [streamId: $streamId]');
+      'Получено сообщение с запросом размером ${message.payload!.length} байт [streamId: $streamId]',
+    );
 
     // Используем парсер для извлечения данных из фрейма с префиксом
-    final payloads = parseRpcMessageFrame(message.payload!, logger: logger);
+    final payloads = parser(payload);
 
     if (payloads.isEmpty) {
       logger.error(
-          'Не удалось извлечь данные из сообщения [streamId: $streamId]');
+        'Не удалось извлечь данные из сообщения [streamId: $streamId]',
+      );
       await _sendErrorTrailer(
-          streamId, 'Не удалось извлечь данные из сообщения');
+        streamId,
+        'Не удалось извлечь данные из сообщения',
+      );
       return null;
     }
 
@@ -415,9 +494,13 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
     String methodPath,
     int streamId,
   ) async {
-    logger.debug('Вызов обработчика для $methodPath [streamId: $streamId]');
+    logger.debug(
+      'Вызов обработчика для $methodPath [streamId: $streamId]',
+    );
     final response = await Function.apply(handler, [requestData]);
-    logger.debug('Обработчик вернул ответ [streamId: $streamId]');
+    logger.debug(
+      'Обработчик вернул ответ [streamId: $streamId]',
+    );
     return response;
   }
 
@@ -440,7 +523,8 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
     // Кодируем ответ в фрейм и отправляем
     final framedResponse = RpcMessageFrame.encode(serializedResponse);
     logger.debug(
-        'Отправка ответа размером ${framedResponse.length} байт [streamId: $streamId]');
+      'Отправка ответа размером ${framedResponse.length} байт [streamId: $streamId]',
+    );
     await transport.sendMessage(streamId, framedResponse);
 
     // Отправляем трейлер с успешным статусом
@@ -450,8 +534,9 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
       endStream: true,
     );
 
-    logger
-        .info('Ответ успешно отправлен для $methodPath [streamId: $streamId]');
+    logger.info(
+      'Ответ успешно отправлен для $methodPath [streamId: $streamId]',
+    );
   }
 
   /// Этап 10: Обработка ошибок метода
@@ -467,7 +552,10 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
       stackTrace: stackTrace,
     );
 
-    await _sendErrorTrailer(streamId, 'Ошибка при обработке запроса: $error');
+    await _sendErrorTrailer(
+      streamId,
+      'Ошибка при обработке запроса: $error',
+    );
   }
 
   /// Отправляет трейлер с ошибкой
@@ -492,7 +580,9 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
       );
     }
 
-    logger.info('Регистрируем контракт сервиса: $serviceName');
+    logger.info(
+      'Регистрируем контракт сервиса: $serviceName',
+    );
     _contracts[serviceName] = contract;
 
     // Вызываем setup для регистрации методов в контракте
@@ -507,15 +597,20 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
       final methodKey = '$serviceName.$methodName';
 
       if (_methods.containsKey(methodKey)) {
-        throw RpcException('Метод $methodKey уже зарегистрирован');
+        throw RpcException(
+          'Метод $methodKey уже зарегистрирован',
+        );
       }
 
-      logger.info('Регистрируем метод: $methodKey (${method.type.name})');
+      logger.info(
+        'Регистрируем метод: $methodKey (${method.type.name})',
+      );
       _methods[methodKey] = method;
     }
 
     logger.info(
-        'Контракт $serviceName зарегистрирован с ${methods.length} методами');
+      'Контракт $serviceName зарегистрирован с ${methods.length} методами',
+    );
 
     // Автоматически запускаем прослушивание после регистрации первого контракта
     if (!_isListening) {
@@ -533,7 +628,9 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
     final method = _methods[methodKey];
 
     if (method == null) {
-      throw RpcException('Метод $methodKey не зарегистрирован');
+      throw RpcException(
+        'Метод $methodKey не зарегистрирован',
+      );
     }
 
     if (method.type != expectedType) {

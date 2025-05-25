@@ -18,7 +18,9 @@ class DefaultRpcLoggerFilter implements IRpcLoggerFilter {
 
 /// Реализация форматтера по умолчанию
 class DefaultRpcLoggerFormatter implements IRpcLoggerFormatter {
-  const DefaultRpcLoggerFormatter();
+  final String? label;
+
+  const DefaultRpcLoggerFormatter([this.label]);
 
   @override
   LogFormattingResult format(
@@ -58,8 +60,9 @@ class DefaultRpcLoggerFormatter implements IRpcLoggerFormatter {
     }
 
     final contextStr = context != null ? ' [$context]' : '';
+    final labelStr = label != null ? '($label) ' : '';
     final header =
-        '[$formattedTime] ${prefix.padRight(5)} $emoji [$source$contextStr]';
+        '[$formattedTime] ${prefix.padRight(5)} $emoji • $labelStr$source$contextStr';
 
     // Разбиваем длинное сообщение на строки с отступами
     final messageLines = message.split('\n');
@@ -103,6 +106,7 @@ class DefaultRpcLogger implements RpcLogger {
   DefaultRpcLogger(
     this.name, {
     RpcLoggerColors colors = const RpcLoggerColors(),
+    String? label,
     RpcLoggerLevel? minLogLevel,
     bool consoleLoggingEnabled = true,
     bool coloredLoggingEnabled = true,

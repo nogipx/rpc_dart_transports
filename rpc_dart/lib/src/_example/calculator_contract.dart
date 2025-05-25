@@ -1,4 +1,4 @@
-import '../_index.dart';
+import '../contracts/_index.dart';
 import 'dart:convert';
 
 /// Запрос на вычисление

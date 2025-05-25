@@ -25,6 +25,7 @@ enum RpcLoggerLevel {
 typedef RpcLoggerFactory = RpcLogger Function(
   String loggerName, {
   RpcLoggerColors? colors,
+  String? label,
 });
 
 /// Интерфейс для фильтрации логов
@@ -67,8 +68,13 @@ abstract interface class RpcLogger {
   factory RpcLogger(
     String loggerName, {
     RpcLoggerColors? colors,
+    String? label,
   }) {
-    return _RpcLoggerRegistry.instance.get(loggerName, colors: colors);
+    return _RpcLoggerRegistry.instance.get(
+      loggerName,
+      colors: colors,
+      label: label,
+    );
   }
 
   RpcLogger child(String childName);

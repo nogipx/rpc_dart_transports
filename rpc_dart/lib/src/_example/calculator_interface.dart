@@ -1,5 +1,5 @@
 import 'dart:async';
-import '../_index.dart';
+import '../contracts/_index.dart';
 import 'calculator_contract.dart';
 
 /// Общий интерфейс для контракта калькулятора

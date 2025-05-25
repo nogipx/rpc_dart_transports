@@ -4,8 +4,9 @@ part of '_index.dart';
 final class RpcCallerEndpoint extends RpcEndpointBase {
   @override
   RpcLogger get logger => RpcLogger(
-        'RpcCallerEndpoint[${debugLabel ?? ''}]',
+        'RpcCallerEndpoint',
         colors: loggerColors,
+        label: debugLabel,
       );
 
   RpcCallerEndpoint({
