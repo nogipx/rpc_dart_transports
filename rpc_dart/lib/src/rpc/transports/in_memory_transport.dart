@@ -12,11 +12,11 @@ part of '../_index.dart';
 /// - Повышения производительности без сетевых накладных расходов
 class RpcInMemoryTransport implements IRpcTransport {
   /// Контроллер для отправки сообщений партнерскому транспорту
-  final StreamController<RpcTransportMessage<Uint8List>> _outgoingController;
+  final StreamController<RpcTransportMessage> _outgoingController;
 
   /// Контроллер для управления потоком входящих сообщений
-  final StreamController<RpcTransportMessage<Uint8List>> _incomingController =
-      StreamController<RpcTransportMessage<Uint8List>>.broadcast();
+  final StreamController<RpcTransportMessage> _incomingController =
+      StreamController<RpcTransportMessage>.broadcast();
 
   /// Счетчик для генерации уникальных Stream ID
   int _nextStreamId;
@@ -69,11 +69,11 @@ class RpcInMemoryTransport implements IRpcTransport {
   }
 
   @override
-  Stream<RpcTransportMessage<Uint8List>> get incomingMessages =>
+  Stream<RpcTransportMessage> get incomingMessages =>
       _incomingController.stream;
 
   @override
-  Stream<RpcTransportMessage<Uint8List>> getMessagesForStream(int streamId) {
+  Stream<RpcTransportMessage> getMessagesForStream(int streamId) {
     return incomingMessages.where((message) => message.streamId == streamId);
   }
 
@@ -88,7 +88,7 @@ class RpcInMemoryTransport implements IRpcTransport {
   }
 
   /// Добавляет входящее сообщение в поток (вызывается партнерским транспортом)
-  void addIncomingMessage(RpcTransportMessage<Uint8List> message) {
+  void addIncomingMessage(RpcTransportMessage message) {
     if (_incomingController.isClosed) return;
 
     _logger?.debug(
@@ -144,7 +144,7 @@ class RpcInMemoryTransport implements IRpcTransport {
     }
 
     try {
-      final message = RpcTransportMessage<Uint8List>(
+      final message = RpcTransportMessage(
         metadata: metadata,
         isEndOfStream: endStream,
         methodPath: metadata.methodPath,
@@ -180,7 +180,7 @@ class RpcInMemoryTransport implements IRpcTransport {
     }
 
     try {
-      final message = RpcTransportMessage<Uint8List>(
+      final message = RpcTransportMessage(
         payload: data,
         isEndOfStream: endStream,
         streamId: streamId,
@@ -214,7 +214,7 @@ class RpcInMemoryTransport implements IRpcTransport {
       _streamSendingFinished[streamId] = true;
 
       // Отправляем пустые метаданные с флагом END_STREAM для конкретного stream
-      _outgoingController.add(RpcTransportMessage<Uint8List>(
+      _outgoingController.add(RpcTransportMessage(
         metadata: RpcMetadata([]),
         isEndOfStream: true,
         streamId: streamId,
@@ -270,9 +270,9 @@ class RpcInMemoryTransport implements IRpcTransport {
   }) {
     // Создаем контроллеры для обмена сообщениями в обоих направлениях
     final clientToServerController =
-        StreamController<RpcTransportMessage<Uint8List>>.broadcast();
+        StreamController<RpcTransportMessage>.broadcast();
     final serverToClientController =
-        StreamController<RpcTransportMessage<Uint8List>>.broadcast();
+        StreamController<RpcTransportMessage>.broadcast();
 
     // Создаем оптимизированные транспорты
     final clientTransport = RpcInMemoryTransport(

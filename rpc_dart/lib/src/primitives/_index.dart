@@ -4,6 +4,7 @@
 
 import 'dart:convert';
 import 'package:rpc_dart/rpc_dart.dart';
+import 'package:rpc_dart/src/serializers/cbor/cbor.dart';
 
 part 'bool.dart';
 part 'null.dart';
@@ -14,8 +15,7 @@ part 'extensions.dart';
 typedef RpcMessageProducer = String Function(String);
 
 /// Базовый класс для всех примитивных типов сообщений
-abstract class RpcPrimitiveMessage<T>
-    implements IRpcSerializable, IRpcJsonSerializable {
+abstract class RpcPrimitiveMessage<T> implements IRpcSerializable {
   final T value;
 
   const RpcPrimitiveMessage(this.value);
@@ -31,7 +31,7 @@ abstract class RpcPrimitiveMessage<T>
 
   /// Возвращает бинарный формат сериализации
   @override
-  RpcSerializationFormat getFormat() => RpcSerializationFormat.binary;
+  RpcCodecType get codec => RpcCodecType.binary;
 
   /// Сериализует примитивное значение в чисто бинарном формате
   @override

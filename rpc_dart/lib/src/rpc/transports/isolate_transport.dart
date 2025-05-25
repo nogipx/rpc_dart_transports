@@ -136,8 +136,8 @@ class _IsolateHostTransport implements IRpcTransport {
   final SendPort _workerSendPort;
   final ReceivePort _receivePort;
 
-  final StreamController<RpcTransportMessage<Uint8List>> _messageController =
-      StreamController<RpcTransportMessage<Uint8List>>.broadcast();
+  final StreamController<RpcTransportMessage> _messageController =
+      StreamController<RpcTransportMessage>.broadcast();
 
   /// Счетчик для генерации уникальных Stream ID на стороне хоста
   int _nextStreamId = 1; // Хост использует нечетные ID
@@ -166,7 +166,7 @@ class _IsolateHostTransport implements IRpcTransport {
     switch (message.type) {
       case _IsolateMessageType.metadata:
         final metadata = message.data as RpcMetadata;
-        _messageController.add(RpcTransportMessage<Uint8List>(
+        _messageController.add(RpcTransportMessage(
           metadata: metadata,
           isEndOfStream: message.isEndOfStream,
           streamId: message.streamId,
@@ -176,7 +176,7 @@ class _IsolateHostTransport implements IRpcTransport {
 
       case _IsolateMessageType.data:
         final data = message.data as Uint8List;
-        _messageController.add(RpcTransportMessage<Uint8List>(
+        _messageController.add(RpcTransportMessage(
           payload: data,
           isEndOfStream: message.isEndOfStream,
           streamId: message.streamId,
@@ -185,7 +185,7 @@ class _IsolateHostTransport implements IRpcTransport {
         break;
 
       case _IsolateMessageType.finish:
-        _messageController.add(RpcTransportMessage<Uint8List>(
+        _messageController.add(RpcTransportMessage(
           isEndOfStream: true,
           streamId: message.streamId,
         ));
@@ -198,11 +198,10 @@ class _IsolateHostTransport implements IRpcTransport {
   }
 
   @override
-  Stream<RpcTransportMessage<Uint8List>> get incomingMessages =>
-      _messageController.stream;
+  Stream<RpcTransportMessage> get incomingMessages => _messageController.stream;
 
   @override
-  Stream<RpcTransportMessage<Uint8List>> getMessagesForStream(int streamId) {
+  Stream<RpcTransportMessage> getMessagesForStream(int streamId) {
     return incomingMessages.where((message) => message.streamId == streamId);
   }
 
@@ -295,8 +294,8 @@ class _IsolateWorkerTransport implements IRpcTransport {
   final SendPort _hostSendPort;
   final Stream<dynamic> _messageStream;
 
-  final StreamController<RpcTransportMessage<Uint8List>> _messageController =
-      StreamController<RpcTransportMessage<Uint8List>>.broadcast();
+  final StreamController<RpcTransportMessage> _messageController =
+      StreamController<RpcTransportMessage>.broadcast();
 
   /// Счетчик для генерации уникальных Stream ID на стороне воркера
   int _nextStreamId = 2; // Воркер использует четные ID
@@ -326,7 +325,7 @@ class _IsolateWorkerTransport implements IRpcTransport {
     switch (message.type) {
       case _IsolateMessageType.metadata:
         final metadata = message.data as RpcMetadata;
-        _messageController.add(RpcTransportMessage<Uint8List>(
+        _messageController.add(RpcTransportMessage(
           metadata: metadata,
           isEndOfStream: message.isEndOfStream,
           streamId: message.streamId,
@@ -336,7 +335,7 @@ class _IsolateWorkerTransport implements IRpcTransport {
 
       case _IsolateMessageType.data:
         final data = message.data as Uint8List;
-        _messageController.add(RpcTransportMessage<Uint8List>(
+        _messageController.add(RpcTransportMessage(
           payload: data,
           isEndOfStream: message.isEndOfStream,
           streamId: message.streamId,
@@ -345,7 +344,7 @@ class _IsolateWorkerTransport implements IRpcTransport {
         break;
 
       case _IsolateMessageType.finish:
-        _messageController.add(RpcTransportMessage<Uint8List>(
+        _messageController.add(RpcTransportMessage(
           isEndOfStream: true,
           streamId: message.streamId,
         ));
@@ -362,11 +361,10 @@ class _IsolateWorkerTransport implements IRpcTransport {
   }
 
   @override
-  Stream<RpcTransportMessage<Uint8List>> get incomingMessages =>
-      _messageController.stream;
+  Stream<RpcTransportMessage> get incomingMessages => _messageController.stream;
 
   @override
-  Stream<RpcTransportMessage<Uint8List>> getMessagesForStream(int streamId) {
+  Stream<RpcTransportMessage> getMessagesForStream(int streamId) {
     return incomingMessages.where((message) => message.streamId == streamId);
   }
 

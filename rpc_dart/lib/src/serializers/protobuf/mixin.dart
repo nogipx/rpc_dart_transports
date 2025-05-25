@@ -11,7 +11,7 @@ mixin ProtobufRpcSerializable implements IRpcSerializable {
 
   /// Переопределяем метод для указания формата сериализации
   @override
-  RpcCodecType codec() => RpcCodecType.binary;
+  RpcCodecType get codec => RpcCodecType.binary;
 
   /// Статический хелпер для десериализации protobuf
   static T fromBytes<T extends IRpcSerializable>(

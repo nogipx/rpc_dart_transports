@@ -8,75 +8,15 @@ part of '_index.dart';
 class RpcNum extends RpcPrimitiveMessage<num> {
   const RpcNum(super.value);
 
-  /// Создает RpcNum из JSON
-  factory RpcNum.fromJson(Map<String, dynamic> json) {
-    try {
-      final v = json['v'];
-      if (v == null) return const RpcNum(0);
-      if (v is num) return RpcNum(v);
-
-      // Пробуем преобразовать в число
-      final asDouble = double.tryParse(v.toString());
-      if (asDouble != null) {
-        // Если это целое число, преобразуем в int
-        if (asDouble == asDouble.toInt()) {
-          return RpcNum(asDouble.toInt());
-        }
-        return RpcNum(asDouble);
-      }
-
-      return const RpcNum(0);
-    } catch (e) {
-      return const RpcNum(0);
-    }
-  }
-
   /// Создает RpcNum из бинарных данных
   static RpcNum fromBytes(Uint8List bytes) {
-    if (bytes.isEmpty) return const RpcNum(0);
-
-    // Первый байт - тип: 0 = int, 1 = double
-    final type = bytes[0];
-
-    if (type == 0) {
-      // Int (4 байта)
-      if (bytes.length < 5) return const RpcNum(0);
-
-      final buffer = ByteData.sublistView(bytes, 1, 5);
-      final intValue = buffer.getInt32(0, Endian.little);
-      return RpcNum(intValue);
-    } else {
-      // Double (8 байтов)
-      if (bytes.length < 9) return const RpcNum(0);
-
-      final buffer = ByteData.sublistView(bytes, 1, 9);
-      final doubleValue = buffer.getFloat64(0, Endian.little);
-      return RpcNum(doubleValue);
-    }
+    return CborCodec.decode(bytes);
   }
 
   /// Сериализует в бинарный формат
   @override
   Uint8List serialize() {
-    if (value is int) {
-      // Для целого числа (тип 0 + 4 байта)
-      final result = Uint8List(5);
-      result[0] = 0; // тип int
-
-      final buffer = ByteData.view(result.buffer);
-      buffer.setInt32(1, value as int, Endian.little);
-
-      return result;
-    } else {
-      // Для дробного числа (тип 1 + 8 байтов)
-      final result = Uint8List(9);
-      result[0] = 1; // тип double
-
-      final buffer = ByteData.view(result.buffer);
-      buffer.setFloat64(1, value.toDouble(), Endian.little);
-
-      return result;
-    }
+    return CborCodec.encode(value);
   }
 
   @override
@@ -156,29 +96,9 @@ class RpcNum extends RpcPrimitiveMessage<num> {
 class RpcInt extends RpcPrimitiveMessage<int> {
   const RpcInt(super.value);
 
-  /// Создает RpcInt из JSON
-  factory RpcInt.fromJson(Map<String, dynamic> json) {
-    try {
-      final v = json['v'];
-      if (v == null) return const RpcInt(0);
-      if (v is int) return RpcInt(v);
-      if (v is num) return RpcInt(v.toInt());
-      return RpcInt(int.tryParse(v.toString()) ?? 0);
-    } catch (e) {
-      return const RpcInt(0);
-    }
-  }
-
   /// Создает RpcInt из бинарных данных
   static RpcInt fromBytes(Uint8List bytes) {
-    if (bytes.isEmpty) return const RpcInt(0);
-
-    // 4 байта для int
-    if (bytes.length < 4) return const RpcInt(0);
-
-    final buffer = ByteData.sublistView(bytes);
-    final intValue = buffer.getInt32(0, Endian.little);
-    return RpcInt(intValue);
+    return CborCodec.decode(bytes);
   }
 
   /// Сериализует в бинарный формат (4 байта)

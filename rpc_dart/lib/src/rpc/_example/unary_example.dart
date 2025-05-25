@@ -34,7 +34,7 @@ class UnaryRpcExample {
     );
 
     // Создаем сериализатор для строк
-    final stringSerializer = RpcBinarySerializer(RpcString.fromBytes);
+    final stringSerializer = RpcCborCodec(RpcString.fromJson);
 
     // Определяем различные сервисы и методы для демонстрации мультиплексирования
     final services = [

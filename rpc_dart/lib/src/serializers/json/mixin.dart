@@ -20,7 +20,7 @@ mixin RpcJsonSerializable on IRpcSerializable {
 
   /// Переопределяем метод для указания формата сериализации
   @override
-  RpcCodecType codec() => RpcCodecType.json;
+  RpcCodecType get codec => RpcCodecType.json;
 
   /// Статический хелпер для десериализации из байтов через JSON
   static T fromBytes<T>(

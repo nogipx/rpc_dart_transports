@@ -22,7 +22,7 @@ class StreamTypesExample {
     final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
 
     // Создаем сериализаторы для строк
-    final stringSerializer = RpcBinarySerializer(RpcString.fromBytes);
+    final stringSerializer = RpcCborCodec(RpcString.fromJson);
 
     // Инициализируем серверную часть с обработчиком
     final server = ServerStreamResponder<RpcString, RpcString>(
@@ -113,7 +113,7 @@ class StreamTypesExample {
     final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
 
     // Создаем сериализаторы для строк
-    final stringSerializer = RpcBinarySerializer(RpcString.fromBytes);
+    final stringSerializer = RpcCborCodec(RpcString.fromJson);
 
     // Инициализируем серверную часть с обработчиком
     final server = ClientStreamResponder<RpcString, RpcString>(

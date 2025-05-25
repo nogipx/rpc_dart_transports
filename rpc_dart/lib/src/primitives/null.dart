@@ -8,20 +8,15 @@ part of '_index.dart';
 class RpcNull extends RpcPrimitiveMessage<void> {
   const RpcNull() : super(null);
 
-  /// Создает RpcNull из JSON (в любом случае возвращает RpcNull)
-  factory RpcNull.fromJson(Map<String, dynamic> json) {
-    return const RpcNull();
-  }
-
   /// Создает RpcNull из бинарных данных
   static RpcNull fromBytes(Uint8List bytes) {
-    return const RpcNull();
+    return CborCodec.decode(bytes);
   }
 
   /// Сериализует в бинарный формат (пустой массив)
   @override
   Uint8List serialize() {
-    return Uint8List(0); // Пустой массив для null
+    return CborCodec.encode(null);
   }
 
   @override

@@ -14,7 +14,7 @@ mixin CborRpcSerializable implements IRpcSerializable {
 
   /// Переопределяем метод для указания формата сериализации
   @override
-  RpcCodecType codec() => RpcCodecType.cbor;
+  RpcCodecType get codec => RpcCodecType.cbor;
 
   /// Статический хелпер для десериализации CBOR
   static T fromBytes<T extends IRpcSerializable>(
