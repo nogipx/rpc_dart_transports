@@ -10,7 +10,7 @@ class RpcNull extends RpcPrimitiveMessage<void> {
 
   /// Создает RpcNull из бинарных данных
   static RpcNull fromBytes(Uint8List bytes) {
-    return CborCodec.decode(bytes);
+    return RpcNull();
   }
 
   /// Сериализует в бинарный формат (пустой массив)

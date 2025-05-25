@@ -10,7 +10,7 @@ class RpcNum extends RpcPrimitiveMessage<num> {
 
   /// Создает RpcNum из бинарных данных
   static RpcNum fromBytes(Uint8List bytes) {
-    return CborCodec.decode(bytes);
+    return RpcNum(CborCodec.decode(bytes));
   }
 
   /// Сериализует в бинарный формат
@@ -98,16 +98,13 @@ class RpcInt extends RpcPrimitiveMessage<int> {
 
   /// Создает RpcInt из бинарных данных
   static RpcInt fromBytes(Uint8List bytes) {
-    return CborCodec.decode(bytes);
+    return RpcInt(CborCodec.decode(bytes));
   }
 
   /// Сериализует в бинарный формат (4 байта)
   @override
   Uint8List serialize() {
-    final result = Uint8List(4);
-    final buffer = ByteData.view(result.buffer);
-    buffer.setInt32(0, value, Endian.little);
-    return result;
+    return CborCodec.encode(value);
   }
 
   @override
@@ -180,45 +177,15 @@ class RpcInt extends RpcPrimitiveMessage<int> {
 class RpcDouble extends RpcPrimitiveMessage<double> {
   const RpcDouble(super.value);
 
-  /// Создает RpcDouble из JSON
-  factory RpcDouble.fromJson(Map<String, dynamic> json) {
-    try {
-      final v = json['v'];
-      if (v == null) return const RpcDouble(0.0);
-      if (v is double) return RpcDouble(v);
-      if (v is num) return RpcDouble(v.toDouble());
-
-      // Пробуем преобразовать в double
-      final asDouble = double.tryParse(v.toString());
-      if (asDouble != null) {
-        return RpcDouble(asDouble);
-      }
-
-      return const RpcDouble(0.0);
-    } catch (e) {
-      return const RpcDouble(0.0);
-    }
-  }
-
   /// Создает RpcDouble из бинарных данных
   static RpcDouble fromBytes(Uint8List bytes) {
-    if (bytes.isEmpty) return const RpcDouble(0.0);
-
-    // 8 байтов для double
-    if (bytes.length < 8) return const RpcDouble(0.0);
-
-    final buffer = ByteData.sublistView(bytes);
-    final doubleValue = buffer.getFloat64(0, Endian.little);
-    return RpcDouble(doubleValue);
+    return RpcDouble(CborCodec.decode(bytes));
   }
 
   /// Сериализует в бинарный формат (8 байт)
   @override
   Uint8List serialize() {
-    final result = Uint8List(8);
-    final buffer = ByteData.view(result.buffer);
-    buffer.setFloat64(0, value, Endian.little);
-    return result;
+    return CborCodec.encode(value);
   }
 
   @override

@@ -17,7 +17,7 @@ class RpcBool extends RpcPrimitiveMessage<bool> {
 
   /// Создает RpcBool из бинарных данных
   static RpcBool fromBytes(Uint8List bytes) {
-    return CborCodec.decode(bytes);
+    return RpcBool(CborCodec.decode(bytes));
   }
 
   /// Сериализует в бинарный формат (1 байт: 1 или 0)
