@@ -339,44 +339,6 @@ class CborCodec {
     builder.addByte(_getMajorTypeByte(_majorTypeSimple, _simpleValueBreak));
   }
 
-  static void _encodeIndefiniteString(String value, BytesBuilder builder) {
-    // Маркер начала indefinite текстовой строки
-    builder.addByte(_getMajorTypeByte(
-        _majorTypeTextString, _additionalInfoIndefiniteLength));
-
-    // Кодируем части строки (для примера разбиваем на части по 16 символов)
-    const chunkSize = 16;
-    for (int i = 0; i < value.length; i += chunkSize) {
-      final end = (i + chunkSize < value.length) ? i + chunkSize : value.length;
-      final chunk = value.substring(i, end);
-      final utf8Bytes = utf8.encode(chunk);
-      _encodeLength(_majorTypeTextString, utf8Bytes.length, builder);
-      builder.add(utf8Bytes);
-    }
-
-    // Маркер завершения (break)
-    builder.addByte(_getMajorTypeByte(_majorTypeSimple, _simpleValueBreak));
-  }
-
-  static void _encodeIndefiniteByteString(
-      Uint8List bytes, BytesBuilder builder) {
-    // Маркер начала indefinite бинарной строки
-    builder.addByte(_getMajorTypeByte(
-        _majorTypeByteString, _additionalInfoIndefiniteLength));
-
-    // Кодируем части байтовой строки (разбиваем на части по 16 байт)
-    const chunkSize = 16;
-    for (int i = 0; i < bytes.length; i += chunkSize) {
-      final end = (i + chunkSize < bytes.length) ? i + chunkSize : bytes.length;
-      final chunk = bytes.sublist(i, end);
-      _encodeLength(_majorTypeByteString, chunk.length, builder);
-      builder.add(chunk);
-    }
-
-    // Маркер завершения (break)
-    builder.addByte(_getMajorTypeByte(_majorTypeSimple, _simpleValueBreak));
-  }
-
   /// Кодирует список с неопределенной длиной
   static Uint8List encodeIndefiniteArray(List<dynamic> list) {
     final builder = BytesBuilder();

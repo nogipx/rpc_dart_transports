@@ -1,8 +1,18 @@
-import 'dart:typed_data';
-export 'cbor/cbor.dart';
+import 'dart:convert';
+import 'package:rpc_dart/rpc_dart.dart';
+import 'cbor/cbor.dart';
+
+part 'cbor/mixin.dart';
+part 'cbor/codec.dart';
+
+part 'json/mixin.dart';
+part 'json/codec.dart';
+
+part 'protobuf/mixin.dart';
+part 'protobuf/codec.dart';
 
 /// Формат сериализации для RPC сообщений
-enum RpcSerializationFormat {
+enum RpcCodecType {
   /// JSON формат (через utf8)
   json,
 
@@ -17,22 +27,33 @@ enum RpcSerializationFormat {
 /// Все типы запросов и ответов должны реализовывать этот интерфейс
 /// Это базовый интерфейс для binary сериализации (protobuf, msgpack, etc.)
 abstract interface class IRpcSerializable {
+  /// Возвращает формат сериализации (по умолчанию JSON для обратной совместимости)
+  RpcCodecType get codec => RpcCodecType.json;
+
   /// Сериализует объект в байты
   Uint8List serialize();
-
-  /// Возвращает формат сериализации (по умолчанию JSON для обратной совместимости)
-  RpcSerializationFormat getFormat() => RpcSerializationFormat.json;
 
   /// Десериализует объект из байтов - должен быть статическим методом
   /// static T fromBytes(Uint8List bytes);
 }
 
-/// Интерфейс для моделей, которые могут конвертироваться в JSON
-/// Более удобный интерфейс для пользовательских моделей
-abstract interface class IRpcJsonSerializable {
-  /// Конвертирует модель в JSON Map
-  Map<String, dynamic> toJson();
+/// Интерфейс для кодирования и декодирования сообщений.
+///
+/// Позволяет абстрагироваться от конкретного формата сериализации (JSON, Protocol Buffers,
+/// MessagePack и др.). Реализации должны обеспечивать корректное преобразование объектов
+/// в байты и обратно.
+abstract class IRpcCodec<T> {
+  /// Сериализует объект типа T в последовательность байтов.
+  ///
+  /// [message] Объект для сериализации.
+  /// Возвращает байтовое представление объекта.
+  Uint8List serialize(T message);
 
-  /// Создает модель из JSON Map - должен быть статическим методом
-  /// static T fromJson(Map<String, dynamic> json);
+  /// Десериализует последовательность байтов в объект типа T.
+  ///
+  /// [bytes] Байты для десериализации.
+  /// Возвращает объект, воссозданный из байтов.
+  T deserialize(Uint8List bytes);
+
+  RpcCodecType get format;
 }
