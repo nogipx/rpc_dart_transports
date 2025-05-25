@@ -32,7 +32,7 @@ class RpcJsonSerializer<T extends IRpcJsonSerializable>
   final T Function(Map<String, dynamic>) _fromJson;
 
   @override
-  RpcSerializationFormat get format => RpcSerializationFormat.binary;
+  RpcSerializationFormat get format => RpcSerializationFormat.json;
 
   /// Создает JSON сериализатор
   /// [fromJson] - функция для создания объекта из JSON (например, MyModel.fromJson)

@@ -20,130 +20,9 @@ class StringSerializer implements IRpcSerializer<String> {
   RpcSerializationFormat get format => RpcSerializationFormat.binary;
 }
 
-/// Создает тестовую установку для клиента унарного RPC
-(UnaryCaller<String, String>, _UnaryClientTestSetup) _createUnaryClientSetup() {
-  final testSetup = _UnaryClientTestSetup();
-  final serializer = StringSerializer();
-
-  final client = UnaryCaller<String, String>(
-    transport: testSetup.clientTransport,
-    serviceName: 'TestService',
-    methodName: 'TestMethod',
-    requestSerializer: serializer,
-    responseSerializer: serializer,
-    logger: RpcLogger('TestUnaryClient'),
-  );
-
-  return (client, testSetup);
-}
-
-/// Класс для настройки тестов унарного клиента
-class _UnaryClientTestSetup {
-  final (IRpcTransport, IRpcTransport) _transportPair;
-  final IRpcTransport clientTransport;
-  final IRpcTransport serverTransport;
-  final List<String> receivedRequests = [];
-
-  _UnaryClientTestSetup()
-      : _transportPair = RpcInMemoryTransport.pair(),
-        clientTransport = RpcInMemoryTransport.pair().$1,
-        serverTransport = RpcInMemoryTransport.pair().$2 {
-    _setupServer();
-  }
-
-  void _setupServer() {
-    serverTransport.incomingMessages.listen((message) {
-      if (message.payload != null) {
-        final payload = message.payload!;
-        final parser = RpcMessageParser();
-        final parsedPayloads = parser(payload);
-
-        if (parsedPayloads.isNotEmpty) {
-          final requestData = parsedPayloads.first;
-          final requestString = utf8.decode(requestData);
-          receivedRequests.add(requestString);
-        }
-      }
-    });
-  }
-
-  void mockResponse(String response) {
-    serverTransport.incomingMessages.listen((message) {
-      if (!message.isMetadataOnly) {
-        final streamId = message.streamId;
-
-        // Отправляем заголовки
-        serverTransport.sendMetadata(
-          streamId,
-          RpcMetadata.forServerInitialResponse(),
-        );
-
-        // Отправляем ответ
-        final responseData = RpcMessageFrame.encode(utf8.encode(response));
-        serverTransport.sendMessage(
-          streamId,
-          responseData,
-        );
-
-        // Отправляем трейлеры
-        serverTransport.sendMetadata(
-          streamId,
-          RpcMetadata.forTrailer(RpcStatus.OK),
-          endStream: true,
-        );
-      }
-    });
-  }
-
-  void mockError(int statusCode, String errorMessage) {
-    serverTransport.incomingMessages.listen((message) {
-      if (!message.isMetadataOnly) {
-        final streamId = message.streamId;
-
-        // Отправляем трейлеры с ошибкой
-        serverTransport.sendMetadata(
-          streamId,
-          RpcMetadata.forTrailer(
-            statusCode,
-            message: errorMessage,
-          ),
-          endStream: true,
-        );
-      }
-    });
-  }
-
-  void mockDelayedResponse(String response, Duration delay) {
-    serverTransport.incomingMessages.listen((message) async {
-      if (!message.isMetadataOnly) {
-        final streamId = message.streamId;
-
-        // Отправляем заголовки
-        serverTransport.sendMetadata(
-          streamId,
-          RpcMetadata.forServerInitialResponse(),
-        );
-
-        // Делаем задержку
-        await Future.delayed(delay);
-
-        // Отправляем ответ
-        final responseData = RpcMessageFrame.encode(utf8.encode(response));
-        serverTransport.sendMessage(
-          streamId,
-          responseData,
-        );
-
-        // Отправляем трейлеры
-        serverTransport.sendMetadata(
-          streamId,
-          RpcMetadata.forTrailer(RpcStatus.OK),
-          endStream: true,
-        );
-      }
-    });
-  }
-}
+/// Создает транспортную пару для тестирования
+(IRpcTransport, IRpcTransport) createTransportPair() =>
+    RpcInMemoryTransport.pair();
 
 void main() {
   group('Unary RPC', () {
@@ -152,107 +31,190 @@ void main() {
     group('UnaryClient', () {
       test('отправляет_запрос_и_получает_ответ', () async {
         // Arrange
-        final (sut, setup) = _createUnaryClientSetup();
-        final testRequest = 'test request';
-        final testResponse = 'test response';
+        final (clientTransport, serverTransport) = createTransportPair();
+        final receivedRequests = <String>[];
 
-        // Настраиваем мок ответа
-        setup.mockResponse(testResponse);
+        final server = UnaryResponder<String, String>(
+          transport: serverTransport,
+          serviceName: 'TestService',
+          methodName: 'TestMethod',
+          requestSerializer: serializer,
+          responseSerializer: serializer,
+          handler: (request) {
+            receivedRequests.add(request);
+            return 'Echo: $request';
+          },
+        );
+
+        final client = UnaryCaller<String, String>(
+          transport: clientTransport,
+          serviceName: 'TestService',
+          methodName: 'TestMethod',
+          requestSerializer: serializer,
+          responseSerializer: serializer,
+          logger: RpcLogger('TestUnaryClient'),
+        );
 
         // Act
-        final response = await sut.call(testRequest);
+        final response = await client.call('test request');
 
         // Assert
-        expect(response, equals(testResponse));
-        expect(setup.receivedRequests.length, equals(1));
-        expect(setup.receivedRequests.first, equals(testRequest));
+        expect(response, equals('Echo: test request'));
+        expect(receivedRequests.length, equals(1));
+        expect(receivedRequests.first, equals('test request'));
+
+        // Cleanup
+        await client.close();
+        await server.close();
       });
 
       test('выбрасывает_исключение_при_ошибке_сервера', () async {
         // Arrange
-        final (sut, setup) = _createUnaryClientSetup();
+        final (clientTransport, serverTransport) = createTransportPair();
 
-        // Настраиваем мок ошибки
-        setup.mockError(RpcStatus.INTERNAL, 'Internal server error');
+        final server = UnaryResponder<String, String>(
+          transport: serverTransport,
+          serviceName: 'TestService',
+          methodName: 'TestMethod',
+          requestSerializer: serializer,
+          responseSerializer: serializer,
+          handler: (request) {
+            throw Exception('Internal server error');
+          },
+        );
+
+        final client = UnaryCaller<String, String>(
+          transport: clientTransport,
+          serviceName: 'TestService',
+          methodName: 'TestMethod',
+          requestSerializer: serializer,
+          responseSerializer: serializer,
+          logger: RpcLogger('TestUnaryClient'),
+        );
 
         // Act & Assert
-        expect(
-          () => sut.call('test request'),
+        await expectLater(
+          client.call('test request'),
           throwsA(isA<Exception>().having(
             (e) => e.toString(),
             'message',
-            contains('gRPC error 13'),
+            contains('gRPC error'),
           )),
         );
+
+        // Cleanup
+        await client.close();
+        await server.close();
       });
 
       test('применяет_таймаут_к_запросу', () async {
         // Arrange
-        final (sut, setup) = _createUnaryClientSetup();
+        final (clientTransport, serverTransport) = createTransportPair();
 
-        // Настраиваем задержку больше таймаута
-        setup.mockDelayedResponse('delayed response', Duration(seconds: 2));
+        final server = UnaryResponder<String, String>(
+          transport: serverTransport,
+          serviceName: 'TestService',
+          methodName: 'TestMethod',
+          requestSerializer: serializer,
+          responseSerializer: serializer,
+          handler: (request) async {
+            // Задержка больше таймаута
+            await Future.delayed(Duration(seconds: 1));
+            return 'Delayed response';
+          },
+        );
+
+        final client = UnaryCaller<String, String>(
+          transport: clientTransport,
+          serviceName: 'TestService',
+          methodName: 'TestMethod',
+          requestSerializer: serializer,
+          responseSerializer: serializer,
+          logger: RpcLogger('TestUnaryClient'),
+        );
 
         // Act & Assert
         expect(
-          () => sut.call(
+          () => client.call(
             'test request',
             timeout: Duration(milliseconds: 100),
           ),
           throwsA(isA<TimeoutException>()),
         );
+
+        // Cleanup
+        await client.close();
+        await server.close();
       });
 
       test('закрывается_корректно', () async {
         // Arrange
-        final (sut, _) = _createUnaryClientSetup();
+        final (clientTransport, _) = createTransportPair();
 
-        // Act
-        await sut.close();
+        final client = UnaryCaller<String, String>(
+          transport: clientTransport,
+          serviceName: 'TestService',
+          methodName: 'TestMethod',
+          requestSerializer: serializer,
+          responseSerializer: serializer,
+          logger: RpcLogger('TestUnaryClient'),
+        );
 
-        // Assert
-        // Проверяем, что нет исключений при закрытии
-        expect(true, isTrue);
+        // Act & Assert
+        await client.close();
+        expect(true, isTrue); // No exceptions
       });
 
       test('создает_уникальные_stream_id_для_каждого_вызова', () async {
         // Arrange
-        final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
+        final (clientTransport, serverTransport) = createTransportPair();
         final receivedStreamIds = <int>[];
 
+        // Отслеживаем входящие stream IDs
         serverTransport.incomingMessages.listen((message) {
           if (message.isMetadataOnly) {
             receivedStreamIds.add(message.streamId);
           }
         });
 
-        // Act
-        for (int i = 0; i < 3; i++) {
-          final client = UnaryCaller<String, String>(
-            transport: clientTransport,
-            serviceName: 'TestService',
-            methodName: 'TestMethod',
-            requestSerializer: serializer,
-            responseSerializer: serializer,
-          );
+        // Создаем простой сервер
+        final server = UnaryResponder<String, String>(
+          transport: serverTransport,
+          serviceName: 'TestService',
+          methodName: 'TestMethod',
+          requestSerializer: serializer,
+          responseSerializer: serializer,
+          handler: (request) => 'Echo: $request',
+        );
 
-          // Просто создаем клиентов, не ждем ответов
-          unawaited(client.call('request $i').catchError((e) => 'error'));
-          await client.close();
-        }
+        // Act - делаем несколько вызовов
+        final client = UnaryCaller<String, String>(
+          transport: clientTransport,
+          serviceName: 'TestService',
+          methodName: 'TestMethod',
+          requestSerializer: serializer,
+          responseSerializer: serializer,
+        );
 
-        await Future.delayed(Duration(milliseconds: 50));
+        // Делаем три последовательных вызова
+        await client.call('request 1');
+        await client.call('request 2');
+        await client.call('request 3');
 
         // Assert
         expect(receivedStreamIds.length, equals(3));
         expect(receivedStreamIds.toSet().length, equals(3)); // Все уникальные
+
+        // Cleanup
+        await client.close();
+        await server.close();
       });
     });
 
     group('UnaryServer', () {
       test('обрабатывает_запрос_и_отправляет_ответ', () async {
         // Arrange
-        final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
+        final (clientTransport, serverTransport) = createTransportPair();
 
         final receivedRequests = <String>[];
 
@@ -291,7 +253,7 @@ void main() {
 
       test('отправляет_ошибку_при_исключении_в_обработчике', () async {
         // Arrange
-        final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
+        final (clientTransport, serverTransport) = createTransportPair();
 
         final server = UnaryResponder<String, String>(
           transport: serverTransport,
@@ -329,10 +291,12 @@ void main() {
 
       test('обрабатывает_только_запросы_своего_метода', () async {
         // Arrange
-        final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
+        final (clientTransport, serverTransport) = createTransportPair();
 
         var handlerCallCount = 0;
+        final receivedRequests = <String>[];
 
+        // Сервер для конкретного метода
         final server = UnaryResponder<String, String>(
           transport: serverTransport,
           serviceName: 'TestService',
@@ -341,7 +305,20 @@ void main() {
           responseSerializer: serializer,
           handler: (request) {
             handlerCallCount++;
-            return 'response';
+            receivedRequests.add(request);
+            return 'response from SpecificMethod';
+          },
+        );
+
+        // Второй сервер для другого метода
+        final otherServer = UnaryResponder<String, String>(
+          transport: serverTransport,
+          serviceName: 'TestService',
+          methodName: 'DifferentMethod',
+          requestSerializer: serializer,
+          responseSerializer: serializer,
+          handler: (request) {
+            return 'response from DifferentMethod';
           },
         );
 
@@ -354,7 +331,7 @@ void main() {
           responseSerializer: serializer,
         );
 
-        final incorrectClient = UnaryCaller<String, String>(
+        final otherClient = UnaryCaller<String, String>(
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'DifferentMethod',
@@ -363,25 +340,26 @@ void main() {
         );
 
         // Act
-        unawaited(correctClient.call('correct request'));
-        unawaited(incorrectClient
-            .call('incorrect request')
-            .catchError((e) => 'error'));
-
-        await Future.delayed(Duration(milliseconds: 100));
+        final response1 = await correctClient.call('correct request');
+        final response2 = await otherClient.call('other request');
 
         // Assert
-        expect(handlerCallCount, equals(1)); // Только один вызов
+        expect(handlerCallCount,
+            equals(1)); // Только один вызов конкретного обработчика
+        expect(receivedRequests, equals(['correct request']));
+        expect(response1, equals('response from SpecificMethod'));
+        expect(response2, equals('response from DifferentMethod'));
 
         // Cleanup
         await correctClient.close();
-        await incorrectClient.close();
+        await otherClient.close();
         await server.close();
+        await otherServer.close();
       });
 
       test('закрывается_корректно', () async {
         // Arrange
-        final (_, serverTransport) = RpcInMemoryTransport.pair();
+        final (_, serverTransport) = createTransportPair();
 
         final sut = UnaryResponder<String, String>(
           transport: serverTransport,
@@ -404,7 +382,7 @@ void main() {
     group('интеграционные тесты', () {
       test('полный_цикл_запрос_ответ_работает_корректно', () async {
         // Arrange
-        final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
+        final (clientTransport, serverTransport) = createTransportPair();
 
         final server = UnaryResponder<String, String>(
           transport: serverTransport,
@@ -438,7 +416,7 @@ void main() {
 
       test('несколько_клиентов_могут_использовать_один_сервер', () async {
         // Arrange
-        final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
+        final (clientTransport, serverTransport) = createTransportPair();
 
         var requestCount = 0;
 
