@@ -4,7 +4,7 @@ import 'package:test/test.dart';
 
 void main() {
   group('Server Stream', () {
-    final serializer = binaryStringSerializer;
+    final serializer = RpcCodec(RpcString.fromJson);
 
     group('ServerStreamClient', () {
       test('отправляет_один_запрос_и_получает_множественные_ответы', () async {
@@ -16,8 +16,8 @@ void main() {
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestCodec: serializer,
+          responseCodec: serializer,
           handler: (request, responder) async {
             receivedRequests.add(request);
             // Отправляем несколько ответов
@@ -32,8 +32,8 @@ void main() {
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestCodec: serializer,
+          responseCodec: serializer,
         );
 
         final receivedResponses = <RpcString>[];
@@ -73,8 +73,8 @@ void main() {
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestCodec: serializer,
+          responseCodec: serializer,
           handler: (request, responder) async {
             // Не отправляем ответов, только завершаем поток
             await responder.complete();
@@ -85,8 +85,8 @@ void main() {
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestCodec: serializer,
+          responseCodec: serializer,
         );
 
         var streamCompleted = false;
@@ -122,8 +122,8 @@ void main() {
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestCodec: serializer,
+          responseCodec: serializer,
           handler: (request, responder) async {
             throw Exception('Server error');
           },
@@ -133,8 +133,8 @@ void main() {
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestCodec: serializer,
+          responseCodec: serializer,
         );
 
         var errorReceived = false;
@@ -175,8 +175,8 @@ void main() {
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestCodec: serializer,
+          responseCodec: serializer,
           handler: (request, responder) async {
             await responder.send('response1'.rpc);
             await responder.send('response2'.rpc);
@@ -188,8 +188,8 @@ void main() {
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestCodec: serializer,
+          responseCodec: serializer,
         );
 
         var streamCompleted = false;
@@ -225,8 +225,8 @@ void main() {
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestCodec: serializer,
+          responseCodec: serializer,
           handler: (request, responder) async {
             await responder.complete();
           },
@@ -236,8 +236,8 @@ void main() {
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestCodec: serializer,
+          responseCodec: serializer,
         );
 
         // Act & Assert - должно закрыться без ошибок
@@ -256,8 +256,8 @@ void main() {
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestCodec: serializer,
+          responseCodec: serializer,
           handler: (request, responder) async {
             receivedRequests.add(request);
 
@@ -275,8 +275,8 @@ void main() {
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestCodec: serializer,
+          responseCodec: serializer,
         );
 
         final receivedResponses = <RpcString>[];
@@ -314,8 +314,8 @@ void main() {
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestCodec: serializer,
+          responseCodec: serializer,
           handler: (request, responder) async {
             throw Exception('Handler error');
           },
@@ -325,8 +325,8 @@ void main() {
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestCodec: serializer,
+          responseCodec: serializer,
         );
 
         var errorReceived = false;
@@ -368,8 +368,8 @@ void main() {
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'SpecificMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestCodec: serializer,
+          responseCodec: serializer,
           handler: (request, responder) async {
             handlerCallCount++;
             await responder.complete();
@@ -380,16 +380,16 @@ void main() {
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'SpecificMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestCodec: serializer,
+          responseCodec: serializer,
         );
 
         final incorrectClient = ServerStreamCaller<RpcString, RpcString>(
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'DifferentMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestCodec: serializer,
+          responseCodec: serializer,
         );
 
         // Act
@@ -417,8 +417,8 @@ void main() {
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestCodec: serializer,
+          responseCodec: serializer,
           handler: (request, responder) async {
             await responder.send('First response'.rpc);
             await responder.completeWithError(
@@ -430,8 +430,8 @@ void main() {
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestCodec: serializer,
+          responseCodec: serializer,
         );
 
         var errorReceived = false;
@@ -472,8 +472,8 @@ void main() {
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestCodec: serializer,
+          responseCodec: serializer,
           handler: (request, responder) async {
             await responder.complete();
           },
@@ -494,8 +494,8 @@ void main() {
           transport: serverTransport,
           serviceName: 'NumberService',
           methodName: 'GenerateNumbers',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestCodec: serializer,
+          responseCodec: serializer,
           handler: (request, responder) async {
             final count = int.tryParse(request.value) ?? 3;
             for (int i = 1; i <= count; i++) {
@@ -509,8 +509,8 @@ void main() {
           transport: clientTransport,
           serviceName: 'NumberService',
           methodName: 'GenerateNumbers',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestCodec: serializer,
+          responseCodec: serializer,
         );
 
         final receivedNumbers = <RpcString>[];
@@ -555,8 +555,8 @@ void main() {
           transport: serverTransport,
           serviceName: 'StreamService',
           methodName: 'LargeStream',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestCodec: serializer,
+          responseCodec: serializer,
           handler: (request, responder) async {
             const responseCount = 50;
             for (int i = 0; i < responseCount; i++) {
@@ -570,8 +570,8 @@ void main() {
           transport: clientTransport,
           serviceName: 'StreamService',
           methodName: 'LargeStream',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestCodec: serializer,
+          responseCodec: serializer,
         );
 
         final receivedResponses = <RpcString>[];

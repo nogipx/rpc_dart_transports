@@ -15,15 +15,31 @@ class RpcBool extends RpcPrimitiveMessage<bool> {
   /// в различных форматах.
   const RpcBool(super.value);
 
+  /// Создает RpcBool из JSON
+  factory RpcBool.fromJson(Map<String, dynamic> json) {
+    try {
+      final v = json['v'];
+      if (v == null) return const RpcBool(false);
+      if (v is bool) return RpcBool(v);
+
+      // Преобразование числовых значений
+      if (v is num) return RpcBool(v != 0);
+
+      // Преобразование строковых значений
+      final vStr = v.toString().toLowerCase().trim();
+      if (vStr == 'true' || vStr == '1') return const RpcBool(true);
+      if (vStr == 'false' || vStr == '0') return const RpcBool(false);
+
+      // Для всех других случаев
+      return const RpcBool(false);
+    } catch (e) {
+      return const RpcBool(false);
+    }
+  }
+
   /// Создает RpcBool из бинарных данных
   static RpcBool fromBytes(Uint8List bytes) {
     return RpcBool(CborCodec.decode(bytes));
-  }
-
-  /// Сериализует в бинарный формат (1 байт: 1 или 0)
-  @override
-  Uint8List serialize() {
-    return CborCodec.encode(value);
   }
 
   @override

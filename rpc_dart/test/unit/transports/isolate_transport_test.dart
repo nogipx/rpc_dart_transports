@@ -41,7 +41,7 @@ void main() {
 
         // Проверяем что можем общаться с изолятом
         final streamId = transport.createStream();
-        final receivedMessages = <RpcTransportMessage<Uint8List>>[];
+        final receivedMessages = <RpcTransportMessage>[];
 
         transport.incomingMessages.listen(receivedMessages.add);
 
@@ -139,7 +139,7 @@ void main() {
 
         final transport = result.transport;
         final streamId = transport.createStream();
-        final receivedMessages = <RpcTransportMessage<Uint8List>>[];
+        final receivedMessages = <RpcTransportMessage>[];
 
         transport.incomingMessages.listen(receivedMessages.add);
 
@@ -174,7 +174,7 @@ void main() {
 
         final transport = result.transport;
         final streamId = transport.createStream();
-        final receivedMessages = <RpcTransportMessage<Uint8List>>[];
+        final receivedMessages = <RpcTransportMessage>[];
 
         transport.incomingMessages.listen(receivedMessages.add);
 
@@ -212,7 +212,7 @@ void main() {
 
         final transport = result.transport;
         final streamId = transport.createStream();
-        final receivedMessages = <RpcTransportMessage<Uint8List>>[];
+        final receivedMessages = <RpcTransportMessage>[];
 
         transport.incomingMessages.listen(receivedMessages.add);
 
@@ -251,7 +251,7 @@ void main() {
 
         final transport = result.transport;
         final streamId = transport.createStream();
-        final receivedMessages = <RpcTransportMessage<Uint8List>>[];
+        final receivedMessages = <RpcTransportMessage>[];
 
         transport.incomingMessages.listen(receivedMessages.add);
 
@@ -285,7 +285,7 @@ void main() {
 
         final transport = result.transport;
         final streamId = transport.createStream();
-        final receivedMessages = <RpcTransportMessage<Uint8List>>[];
+        final receivedMessages = <RpcTransportMessage>[];
 
         transport.incomingMessages.listen(receivedMessages.add);
 
@@ -321,8 +321,8 @@ void main() {
         final streamId1 = transport.createStream();
         final streamId2 = transport.createStream();
 
-        final stream1Messages = <RpcTransportMessage<Uint8List>>[];
-        final stream2Messages = <RpcTransportMessage<Uint8List>>[];
+        final stream1Messages = <RpcTransportMessage>[];
+        final stream2Messages = <RpcTransportMessage>[];
 
         transport.getMessagesForStream(streamId1).listen(stream1Messages.add);
         transport.getMessagesForStream(streamId2).listen(stream2Messages.add);
@@ -396,7 +396,7 @@ void main() {
 
         final transport = result.transport;
         final streamId = transport.createStream();
-        final receivedMessages = <RpcTransportMessage<Uint8List>>[];
+        final receivedMessages = <RpcTransportMessage>[];
 
         transport.getMessagesForStream(streamId).listen(receivedMessages.add);
 
@@ -447,7 +447,7 @@ void main() {
 
         final transport = result.transport;
         final streamId = transport.createStream();
-        final receivedMessages = <RpcTransportMessage<Uint8List>>[];
+        final receivedMessages = <RpcTransportMessage>[];
 
         transport.getMessagesForStream(streamId).listen(receivedMessages.add);
 

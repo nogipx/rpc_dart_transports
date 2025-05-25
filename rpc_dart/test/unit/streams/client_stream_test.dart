@@ -1,12 +1,10 @@
 import 'dart:async';
-import 'dart:typed_data';
 import 'package:rpc_dart/rpc_dart.dart';
-import 'package:rpc_dart/src/contracts/_index.dart';
 import 'package:test/test.dart';
-import 'package:rpc_dart/src/rpc/_index.dart';
 
 void main() {
   group('Client Stream', () {
+    final codec = RpcCodec(RpcString.fromJson);
     group('ClientStreamClient', () {
       test('отправляет_несколько_запросов_и_получает_один_ответ', () async {
         // Arrange
@@ -17,8 +15,8 @@ void main() {
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: binaryStringSerializer,
-          responseSerializer: binaryStringSerializer,
+          requestCodec: codec,
+          responseCodec: codec,
           handler: (Stream<RpcString> requests) async {
             await for (final request in requests) {
               receivedRequests.add(request);
@@ -32,8 +30,8 @@ void main() {
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: binaryStringSerializer,
-          responseSerializer: binaryStringSerializer,
+          requestCodec: codec,
+          responseCodec: codec,
         );
 
         final testRequests = ['request1'.rpc, 'request2'.rpc, 'request3'.rpc];
@@ -62,8 +60,8 @@ void main() {
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: binaryStringSerializer,
-          responseSerializer: binaryStringSerializer,
+          requestCodec: codec,
+          responseCodec: codec,
           handler: (Stream<RpcString> requests) async {
             var count = 0;
             await for (final _ in requests) {
@@ -77,8 +75,8 @@ void main() {
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: binaryStringSerializer,
-          responseSerializer: binaryStringSerializer,
+          requestCodec: codec,
+          responseCodec: codec,
         );
 
         // Act
@@ -100,8 +98,8 @@ void main() {
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: binaryStringSerializer,
-          responseSerializer: binaryStringSerializer,
+          requestCodec: codec,
+          responseCodec: codec,
           handler: (Stream<RpcString> requests) async {
             // Сразу выбрасываем исключение без обработки stream
             throw Exception('Server processing error');
@@ -112,8 +110,8 @@ void main() {
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: binaryStringSerializer,
-          responseSerializer: binaryStringSerializer,
+          requestCodec: codec,
+          responseCodec: codec,
         );
 
         // Act & Assert
@@ -139,8 +137,8 @@ void main() {
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: binaryStringSerializer,
-          responseSerializer: binaryStringSerializer,
+          requestCodec: codec,
+          responseCodec: codec,
           handler: (Stream<RpcString> requests) async {
             await for (final request in requests) {
               receivedRequests.add(request);
@@ -153,8 +151,8 @@ void main() {
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: binaryStringSerializer,
-          responseSerializer: binaryStringSerializer,
+          requestCodec: codec,
+          responseCodec: codec,
         );
 
         final orderedRequests = ['first'.rpc, 'second'.rpc, 'third'.rpc];
@@ -182,8 +180,8 @@ void main() {
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: binaryStringSerializer,
-          responseSerializer: binaryStringSerializer,
+          requestCodec: codec,
+          responseCodec: codec,
           handler: (Stream<RpcString> requests) async => 'test'.rpc,
         );
 
@@ -191,8 +189,8 @@ void main() {
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: binaryStringSerializer,
-          responseSerializer: binaryStringSerializer,
+          requestCodec: codec,
+          responseCodec: codec,
         );
 
         // Act & Assert - должно закрыться без ошибок
@@ -211,8 +209,8 @@ void main() {
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: binaryStringSerializer,
-          responseSerializer: binaryStringSerializer,
+          requestCodec: codec,
+          responseCodec: codec,
           handler: (Stream<RpcString> requests) async {
             await for (final request in requests) {
               receivedRequests.add(request);
@@ -225,8 +223,8 @@ void main() {
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: binaryStringSerializer,
-          responseSerializer: binaryStringSerializer,
+          requestCodec: codec,
+          responseCodec: codec,
         );
 
         // Act
@@ -251,8 +249,8 @@ void main() {
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: binaryStringSerializer,
-          responseSerializer: binaryStringSerializer,
+          requestCodec: codec,
+          responseCodec: codec,
           handler: (Stream<RpcString> requests) async {
             throw Exception('Handler error');
           },
@@ -262,8 +260,8 @@ void main() {
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: binaryStringSerializer,
-          responseSerializer: binaryStringSerializer,
+          requestCodec: codec,
+          responseCodec: codec,
         );
 
         // Act & Assert
@@ -287,8 +285,8 @@ void main() {
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'SpecificMethod',
-          requestSerializer: binaryStringSerializer,
-          responseSerializer: binaryStringSerializer,
+          requestCodec: codec,
+          responseCodec: codec,
           handler: (Stream<RpcString> requests) async {
             handlerCallCount++;
             await for (final _ in requests) {}
@@ -300,16 +298,16 @@ void main() {
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'SpecificMethod',
-          requestSerializer: binaryStringSerializer,
-          responseSerializer: binaryStringSerializer,
+          requestCodec: codec,
+          responseCodec: codec,
         );
 
         final incorrectClient = ClientStreamCaller<RpcString, RpcString>(
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'DifferentMethod',
-          requestSerializer: binaryStringSerializer,
-          responseSerializer: binaryStringSerializer,
+          requestCodec: codec,
+          responseCodec: codec,
         );
 
         // Act
@@ -341,8 +339,8 @@ void main() {
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: binaryStringSerializer,
-          responseSerializer: binaryStringSerializer,
+          requestCodec: codec,
+          responseCodec: codec,
           handler: (Stream<RpcString> requests) async => 'response'.rpc,
         );
 
@@ -361,8 +359,8 @@ void main() {
           transport: serverTransport,
           serviceName: 'AggregatorService',
           methodName: 'Aggregate',
-          requestSerializer: binaryStringSerializer,
-          responseSerializer: binaryStringSerializer,
+          requestCodec: codec,
+          responseCodec: codec,
           handler: (Stream<RpcString> requests) async {
             final allRequests = <RpcString>[];
             await for (final request in requests) {
@@ -376,8 +374,8 @@ void main() {
           transport: clientTransport,
           serviceName: 'AggregatorService',
           methodName: 'Aggregate',
-          requestSerializer: binaryStringSerializer,
-          responseSerializer: binaryStringSerializer,
+          requestCodec: codec,
+          responseCodec: codec,
         );
 
         // Act
@@ -403,8 +401,8 @@ void main() {
           transport: serverTransport,
           serviceName: 'CounterService',
           methodName: 'Count',
-          requestSerializer: binaryStringSerializer,
-          responseSerializer: binaryStringSerializer,
+          requestCodec: codec,
+          responseCodec: codec,
           handler: (Stream<RpcString> requests) async {
             var count = 0;
             await for (final _ in requests) {
@@ -418,8 +416,8 @@ void main() {
           transport: clientTransport,
           serviceName: 'CounterService',
           methodName: 'Count',
-          requestSerializer: binaryStringSerializer,
-          responseSerializer: binaryStringSerializer,
+          requestCodec: codec,
+          responseCodec: codec,
         );
 
         // Act

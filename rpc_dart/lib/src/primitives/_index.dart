@@ -2,9 +2,8 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-import 'dart:convert';
 import 'package:rpc_dart/rpc_dart.dart';
-import 'package:rpc_dart/src/serializers/cbor/cbor.dart';
+import 'package:rpc_dart/src/codec/cbor.dart';
 
 part 'bool.dart';
 part 'null.dart';
@@ -29,15 +28,7 @@ abstract class RpcPrimitiveMessage<T> implements IRpcSerializable {
   @override
   int get hashCode => value.hashCode;
 
-  /// Возвращает бинарный формат сериализации
-  @override
-  RpcCodecType get codec => RpcCodecType.binary;
-
   /// Сериализует примитивное значение в чисто бинарном формате
-  @override
-  Uint8List serialize();
-
-  /// Преобразует в Map для обратной совместимости
   @override
   Map<String, dynamic> toJson() => {'v': value};
 

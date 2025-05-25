@@ -325,7 +325,7 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
     final methodName = i.methodName;
 
     // Создаем обработчик двунаправленного потока
-    final responder = BidirectionalStreamResponder(
+    BidirectionalStreamResponder(
       transport: transport,
       serviceName: serviceName,
       methodName: methodName,
@@ -333,30 +333,6 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
       responseCodec: i.method.responseCodec,
       logger: logger,
     );
-
-    try {
-      // Вызываем оригинальный обработчик с потоком запросов
-      final responseStream = i.method.handler();
-
-      // Настраиваем обработку запросов и отправку ответов
-      responseStream.listen(
-        (dynamic response) {
-          responder.send(response);
-        },
-        onError: (error) {
-          logger.error(
-            'Ошибка в потоке ответов: $error',
-          );
-        },
-        onDone: () {
-          // Просто завершаем обработку
-        },
-      );
-    } catch (e, stack) {
-      logger.error(
-        'Ошибка при настройке двунаправленного потока: $e\n$stack',
-      );
-    }
   }
 
   /// Этап 6: Отправка начальных заголовков ответа
@@ -415,7 +391,7 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
     Uint8List requestData,
   ) async {
     final streamId = i.streamId;
-    final methodPath = i.message!.methodPath!;
+    final methodPath = '/${i.serviceName}/${i.methodName}';
 
     logger.debug(
       'Вызов обработчика для $methodPath [streamId: $streamId]',
@@ -437,7 +413,7 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
   /// Этап 9: Сериализация и отправка ответа
   Future<void> _sendResponse(_MethodCallInfo i, dynamic response) async {
     final streamId = i.streamId;
-    final methodPath = i.message!.methodPath!;
+    final methodPath = '/${i.serviceName}/${i.methodName}';
 
     final serializedResponse = i.method.responseCodec.serialize(response);
     // Кодируем ответ в фрейм и отправляем

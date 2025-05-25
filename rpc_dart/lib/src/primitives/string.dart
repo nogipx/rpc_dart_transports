@@ -8,15 +8,21 @@ part of '_index.dart';
 class RpcString extends RpcPrimitiveMessage<String> {
   const RpcString(super.value);
 
+  /// Создает RpcString из JSON
+  factory RpcString.fromJson(Map<String, dynamic> json) {
+    try {
+      final v = json['v'];
+      if (v == null) return const RpcString('');
+      if (v is String) return RpcString(v);
+      return RpcString(v.toString());
+    } catch (e) {
+      return const RpcString('');
+    }
+  }
+
   /// Создает RpcString из бинарных данных
   static RpcString fromBytes(Uint8List bytes) {
     return RpcString(CborCodec.decode(bytes));
-  }
-
-  /// Сериализует в бинарный формат (UTF-8 байты)
-  @override
-  Uint8List serialize() {
-    return CborCodec.encode(value);
   }
 
   @override

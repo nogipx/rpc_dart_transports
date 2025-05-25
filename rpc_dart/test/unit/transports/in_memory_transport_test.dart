@@ -19,7 +19,7 @@ void main() {
       test('транспорты_связаны_друг_с_другом', () async {
         // Arrange
         final (transport1, transport2) = RpcInMemoryTransport.pair();
-        final receivedMessages = <RpcTransportMessage<Uint8List>>[];
+        final receivedMessages = <RpcTransportMessage>[];
 
         transport2.incomingMessages.listen(receivedMessages.add);
 
@@ -89,7 +89,7 @@ void main() {
       test('отправляет_сообщения_между_транспортами', () async {
         // Arrange
         final (transport1, transport2) = RpcInMemoryTransport.pair();
-        final receivedMessages = <RpcTransportMessage<Uint8List>>[];
+        final receivedMessages = <RpcTransportMessage>[];
 
         transport2.incomingMessages.listen(receivedMessages.add);
 
@@ -111,7 +111,7 @@ void main() {
       test('отправляет_метаданные_между_транспортами', () async {
         // Arrange
         final (transport1, transport2) = RpcInMemoryTransport.pair();
-        final receivedMessages = <RpcTransportMessage<Uint8List>>[];
+        final receivedMessages = <RpcTransportMessage>[];
 
         transport2.incomingMessages.listen(receivedMessages.add);
 
@@ -134,7 +134,7 @@ void main() {
       test('обрабатывает_end_stream_флаг', () async {
         // Arrange
         final (transport1, transport2) = RpcInMemoryTransport.pair();
-        final receivedMessages = <RpcTransportMessage<Uint8List>>[];
+        final receivedMessages = <RpcTransportMessage>[];
 
         transport2.incomingMessages.listen(receivedMessages.add);
 
@@ -157,8 +157,8 @@ void main() {
       test('двунаправленная_передача_сообщений', () async {
         // Arrange
         final (transport1, transport2) = RpcInMemoryTransport.pair();
-        final messages1 = <RpcTransportMessage<Uint8List>>[];
-        final messages2 = <RpcTransportMessage<Uint8List>>[];
+        final messages1 = <RpcTransportMessage>[];
+        final messages2 = <RpcTransportMessage>[];
 
         transport1.incomingMessages.listen(messages1.add);
         transport2.incomingMessages.listen(messages2.add);
@@ -187,7 +187,7 @@ void main() {
       test('отправляет_end_stream_сообщение', () async {
         // Arrange
         final (transport1, transport2) = RpcInMemoryTransport.pair();
-        final receivedMessages = <RpcTransportMessage<Uint8List>>[];
+        final receivedMessages = <RpcTransportMessage>[];
 
         transport2.incomingMessages.listen(receivedMessages.add);
 
@@ -208,7 +208,7 @@ void main() {
       test('предотвращает_повторную_отправку', () async {
         // Arrange
         final (transport1, transport2) = RpcInMemoryTransport.pair();
-        final receivedMessages = <RpcTransportMessage<Uint8List>>[];
+        final receivedMessages = <RpcTransportMessage>[];
 
         transport2.incomingMessages.listen(receivedMessages.add);
 
@@ -232,8 +232,8 @@ void main() {
         final streamId1 = transport1.createStream();
         final streamId2 = transport1.createStream();
 
-        final stream1Messages = <RpcTransportMessage<Uint8List>>[];
-        final stream2Messages = <RpcTransportMessage<Uint8List>>[];
+        final stream1Messages = <RpcTransportMessage>[];
+        final stream2Messages = <RpcTransportMessage>[];
 
         transport2.getMessagesForStream(streamId1).listen(stream1Messages.add);
         transport2.getMessagesForStream(streamId2).listen(stream2Messages.add);
@@ -266,7 +266,7 @@ void main() {
         final streamId1 = transport1.createStream();
         final streamId2 = transport1.createStream();
 
-        final stream1Messages = <RpcTransportMessage<Uint8List>>[];
+        final stream1Messages = <RpcTransportMessage>[];
         transport2.getMessagesForStream(streamId1).listen(stream1Messages.add);
 
         // Act
@@ -291,7 +291,7 @@ void main() {
       test('прекращает_прием_сообщений_после_закрытия', () async {
         // Arrange
         final (transport1, transport2) = RpcInMemoryTransport.pair();
-        final receivedMessages = <RpcTransportMessage<Uint8List>>[];
+        final receivedMessages = <RpcTransportMessage>[];
 
         transport2.incomingMessages.listen(receivedMessages.add);
 
@@ -311,8 +311,8 @@ void main() {
       test('полный_цикл_обмена_сообщениями', () async {
         // Arrange
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
-        final serverMessages = <RpcTransportMessage<Uint8List>>[];
-        final clientMessages = <RpcTransportMessage<Uint8List>>[];
+        final serverMessages = <RpcTransportMessage>[];
+        final clientMessages = <RpcTransportMessage>[];
 
         serverTransport.incomingMessages.listen(serverMessages.add);
         clientTransport.incomingMessages.listen(clientMessages.add);
@@ -369,7 +369,7 @@ void main() {
       test('множественные_потоки_на_одном_транспорте', () async {
         // Arrange
         final (transport1, transport2) = RpcInMemoryTransport.pair();
-        final receivedMessages = <RpcTransportMessage<Uint8List>>[];
+        final receivedMessages = <RpcTransportMessage>[];
 
         transport2.incomingMessages.listen(receivedMessages.add);
 

@@ -8,15 +8,32 @@ part of '_index.dart';
 class RpcNum extends RpcPrimitiveMessage<num> {
   const RpcNum(super.value);
 
+  /// Создает RpcNum из JSON
+  factory RpcNum.fromJson(Map<String, dynamic> json) {
+    try {
+      final v = json['v'];
+      if (v == null) return const RpcNum(0);
+      if (v is num) return RpcNum(v);
+
+      // Пробуем преобразовать в число
+      final asDouble = double.tryParse(v.toString());
+      if (asDouble != null) {
+        // Если это целое число, преобразуем в int
+        if (asDouble == asDouble.toInt()) {
+          return RpcNum(asDouble.toInt());
+        }
+        return RpcNum(asDouble);
+      }
+
+      return const RpcNum(0);
+    } catch (e) {
+      return const RpcNum(0);
+    }
+  }
+
   /// Создает RpcNum из бинарных данных
   static RpcNum fromBytes(Uint8List bytes) {
     return RpcNum(CborCodec.decode(bytes));
-  }
-
-  /// Сериализует в бинарный формат
-  @override
-  Uint8List serialize() {
-    return CborCodec.encode(value);
   }
 
   @override
@@ -96,15 +113,22 @@ class RpcNum extends RpcPrimitiveMessage<num> {
 class RpcInt extends RpcPrimitiveMessage<int> {
   const RpcInt(super.value);
 
+  /// Создает RpcInt из JSON
+  factory RpcInt.fromJson(Map<String, dynamic> json) {
+    try {
+      final v = json['v'];
+      if (v == null) return const RpcInt(0);
+      if (v is int) return RpcInt(v);
+      if (v is num) return RpcInt(v.toInt());
+      return RpcInt(int.tryParse(v.toString()) ?? 0);
+    } catch (e) {
+      return const RpcInt(0);
+    }
+  }
+
   /// Создает RpcInt из бинарных данных
   static RpcInt fromBytes(Uint8List bytes) {
     return RpcInt(CborCodec.decode(bytes));
-  }
-
-  /// Сериализует в бинарный формат (4 байта)
-  @override
-  Uint8List serialize() {
-    return CborCodec.encode(value);
   }
 
   @override
@@ -177,15 +201,29 @@ class RpcInt extends RpcPrimitiveMessage<int> {
 class RpcDouble extends RpcPrimitiveMessage<double> {
   const RpcDouble(super.value);
 
+  /// Создает RpcDouble из JSON
+  factory RpcDouble.fromJson(Map<String, dynamic> json) {
+    try {
+      final v = json['v'];
+      if (v == null) return const RpcDouble(0.0);
+      if (v is double) return RpcDouble(v);
+      if (v is num) return RpcDouble(v.toDouble());
+
+      // Пробуем преобразовать в double
+      final asDouble = double.tryParse(v.toString());
+      if (asDouble != null) {
+        return RpcDouble(asDouble);
+      }
+
+      return const RpcDouble(0.0);
+    } catch (e) {
+      return const RpcDouble(0.0);
+    }
+  }
+
   /// Создает RpcDouble из бинарных данных
   static RpcDouble fromBytes(Uint8List bytes) {
     return RpcDouble(CborCodec.decode(bytes));
-  }
-
-  /// Сериализует в бинарный формат (8 байт)
-  @override
-  Uint8List serialize() {
-    return CborCodec.encode(value);
   }
 
   @override

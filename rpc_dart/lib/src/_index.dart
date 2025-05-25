@@ -1,8 +1,6 @@
-import 'package:rpc_dart/rpc_dart.dart';
-
 export 'contracts/_index.dart';
 export 'endpoint/_index.dart';
 export 'logs/_logs.dart';
 export 'primitives/_index.dart';
 export 'rpc/_index.dart';
-export 'serializers/_index.dart';
+export 'codec/_index.dart';

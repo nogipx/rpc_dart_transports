@@ -17,7 +17,7 @@ class InMemoryRpcExample {
     final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
 
     // Создаем сериализаторы для строк
-    final stringSerializer = RpcCborCodec(RpcString.fromJson);
+    final stringSerializer = RpcCodec(RpcString.fromJson);
 
     // Инициализируем серверную часть
     final server = BidirectionalStreamResponder<RpcString, RpcString>(

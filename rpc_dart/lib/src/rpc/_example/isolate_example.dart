@@ -20,7 +20,7 @@ Future<void> runIsolateExample() async {
   final killIsolate = result.kill;
 
   print('Изолят запущен, настраиваем клиент...');
-  final serializer = RpcCborCodec(RpcString.fromJson);
+  final serializer = RpcCodec(RpcString.fromJson);
 
   // Создаем клиент для двустороннего потока
   final client = BidirectionalStreamCaller<RpcString, RpcString>(
@@ -90,7 +90,7 @@ void customEchoServer(
   );
 
   // Создаем сериализатор
-  final serializer = RpcCborCodec(RpcString.fromJson);
+  final serializer = RpcCodec(RpcString.fromJson);
 
   RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.debug);
 

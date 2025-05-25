@@ -4,7 +4,7 @@ import 'package:test/test.dart';
 
 void main() {
   group('Bidirectional Stream', () {
-    final serializer = RpcBinarySerializer(RpcString.fromBytes);
+    final serializer = RpcCodec(RpcString.fromJson);
     group('BidirectionalStreamClient', () {
       test('отправляет_и_получает_сообщения_двунаправленно', () async {
         // Arrange
@@ -14,16 +14,16 @@ void main() {
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestCodec: serializer,
+          responseCodec: serializer,
         );
 
         final client = BidirectionalStreamCaller<RpcString, RpcString>(
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestCodec: serializer,
+          responseCodec: serializer,
         );
 
         final receivedRequests = <RpcString>[];
@@ -73,16 +73,16 @@ void main() {
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestCodec: serializer,
+          responseCodec: serializer,
         );
 
         final client = BidirectionalStreamCaller<RpcString, RpcString>(
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestCodec: serializer,
+          responseCodec: serializer,
         );
 
         var metadataReceived = false;
@@ -117,16 +117,16 @@ void main() {
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestCodec: serializer,
+          responseCodec: serializer,
         );
 
         final client = BidirectionalStreamCaller<RpcString, RpcString>(
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestCodec: serializer,
+          responseCodec: serializer,
         );
 
         // Act & Assert - должно закрыться без ошибок
@@ -144,16 +144,16 @@ void main() {
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestCodec: serializer,
+          responseCodec: serializer,
         );
 
         final client = BidirectionalStreamCaller<RpcString, RpcString>(
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestCodec: serializer,
+          responseCodec: serializer,
         );
 
         final serverReceivedRequests = <RpcString>[];
@@ -205,8 +205,8 @@ void main() {
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'SpecificMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestCodec: serializer,
+          responseCodec: serializer,
         );
 
         server.requests.listen((request) {
@@ -217,16 +217,16 @@ void main() {
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'SpecificMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestCodec: serializer,
+          responseCodec: serializer,
         );
 
         final incorrectClient = BidirectionalStreamCaller<RpcString, RpcString>(
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'DifferentMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestCodec: serializer,
+          responseCodec: serializer,
         );
 
         // Act
@@ -253,8 +253,8 @@ void main() {
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestCodec: serializer,
+          responseCodec: serializer,
         );
 
         // Act & Assert - должно закрыться без ошибок
@@ -272,16 +272,16 @@ void main() {
           transport: serverTransport,
           serviceName: 'ChatService',
           methodName: 'Chat',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestCodec: serializer,
+          responseCodec: serializer,
         );
 
         final client = BidirectionalStreamCaller<RpcString, RpcString>(
           transport: clientTransport,
           serviceName: 'ChatService',
           methodName: 'Chat',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestCodec: serializer,
+          responseCodec: serializer,
         );
 
         final serverMessages = <RpcString>[];
@@ -337,16 +337,16 @@ void main() {
           transport: serverTransport,
           serviceName: 'HighVolumeService',
           methodName: 'Process',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestCodec: serializer,
+          responseCodec: serializer,
         );
 
         final client = BidirectionalStreamCaller<RpcString, RpcString>(
           transport: clientTransport,
           serviceName: 'HighVolumeService',
           methodName: 'Process',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestCodec: serializer,
+          responseCodec: serializer,
         );
 
         final receivedResponses = <RpcString>[];
@@ -385,19 +385,3 @@ void main() {
     });
   });
 }
-
-// /// Простой сериализатор строк для тестов
-// class _TestStringSerializer implements IRpcSerializer<String> {
-//   @override
-//   String deserialize(Uint8List bytes) {
-//     return String.fromCharCodes(bytes);
-//   }
-
-//   @override
-//   Uint8List serialize(String message) {
-//     return Uint8List.fromList(message.codeUnits);
-//   }
-
-//   @override
-//   RpcSerializationFormat get format => throw UnimplementedError();
-// }

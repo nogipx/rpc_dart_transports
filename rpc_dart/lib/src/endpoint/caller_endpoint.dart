@@ -16,11 +16,12 @@ final class RpcCallerEndpoint extends RpcEndpointBase {
   });
 
   /// Создает унарный request builder
-  UnaryCaller<C, R> unaryRequest<C, R>({
+  Future<R> unaryRequest<C, R>({
     required String serviceName,
     required String methodName,
     required IRpcCodec<C> requestCodec,
     required IRpcCodec<R> responseCodec,
+    required C request,
   }) {
     return UnaryCaller<C, R>(
       serviceName: serviceName,
@@ -28,7 +29,7 @@ final class RpcCallerEndpoint extends RpcEndpointBase {
       transport: transport,
       requestCodec: requestCodec,
       responseCodec: responseCodec,
-    );
+    ).call(request);
   }
 
   /// Создает server stream builder
@@ -64,7 +65,7 @@ final class RpcCallerEndpoint extends RpcEndpointBase {
   }
 
   /// Создает bidirectional stream builder
-  BidirectionalStreamCaller<C, R> bidirectionalStream<C, R>({
+  Stream<R> bidirectionalStream<C, R>({
     required String serviceName,
     required String methodName,
     required IRpcCodec<C> requestCodec,
@@ -76,6 +77,6 @@ final class RpcCallerEndpoint extends RpcEndpointBase {
       transport: transport,
       requestCodec: requestCodec,
       responseCodec: responseCodec,
-    );
+    ).responses.where((e) => e.payload != null).map((e) => e.payload!);
   }
 }

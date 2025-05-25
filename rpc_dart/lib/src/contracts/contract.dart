@@ -16,9 +16,9 @@ abstract class RpcResponderContract implements IRpcContract {
   RpcResponderContract(this.serviceName);
 
   /// Декларативная регистрация методов
-  void setup() {
-    // Переопределяется в наследниках
-  }
+  @mustBeOverridden
+  @mustCallSuper
+  void setup() {}
 
   /// Регистрирует унарный метод
   /// TRequest и TResponse должны реализовывать IRpcSerializable!
