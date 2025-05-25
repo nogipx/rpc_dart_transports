@@ -48,7 +48,7 @@ final class BidirectionalStreamCaller<TRequest, TResponse> {
   late final RpcMessageParser _parser;
 
   /// Поток для отправки запросов (для внутреннего использования)
-  Stream<TRequest> get requests => _requestController.stream;
+  StreamConsumer<TRequest> get requests => _requestController;
 
   /// Поток входящих ответов от сервера.
   ///

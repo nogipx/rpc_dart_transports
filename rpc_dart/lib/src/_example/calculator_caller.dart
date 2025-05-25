@@ -31,6 +31,7 @@ class CalculatorCaller extends RpcCallerContract
       methodName: ICalculatorContract.methodStreamCalculate,
       requestCodec: CalculationRequest.codec,
       responseCodec: CalculationResponse.codec,
+      requests: requests,
     );
   }
 

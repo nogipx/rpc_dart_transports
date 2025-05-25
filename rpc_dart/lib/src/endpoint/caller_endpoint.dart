@@ -33,35 +33,54 @@ final class RpcCallerEndpoint extends RpcEndpointBase {
   }
 
   /// Создает server stream builder
-  ServerStreamCaller<C, R> serverStream<C, R>({
+  Stream<R> serverStream<C, R>({
     required String serviceName,
     required String methodName,
     required IRpcCodec<C> requestCodec,
     required IRpcCodec<R> responseCodec,
-  }) {
-    return ServerStreamCaller<C, R>(
+    required C request,
+  }) async* {
+    final caller = ServerStreamCaller<C, R>(
       serviceName: serviceName,
       methodName: methodName,
       transport: transport,
       requestCodec: requestCodec,
       responseCodec: responseCodec,
     );
+
+    await caller.send(request);
+    yield* caller.responses
+        .where((e) => e.payload != null)
+        .map((e) => e.payload!);
   }
 
   /// Создает client stream builder
-  ClientStreamCaller<C, R> clientStream<C, R>({
+  Future<R> Function() clientStream<C, R>({
     required String serviceName,
     required String methodName,
     required IRpcCodec<C> requestCodec,
     required IRpcCodec<R> responseCodec,
+    required Stream<C> requests,
   }) {
-    return ClientStreamCaller<C, R>(
+    final caller = ClientStreamCaller<C, R>(
       serviceName: serviceName,
       methodName: methodName,
       transport: transport,
       requestCodec: requestCodec,
       responseCodec: responseCodec,
     );
+    StreamSubscription? sub;
+    sub = requests.listen(
+      caller.send,
+      onDone: () async {
+        await sub?.cancel();
+      },
+    );
+
+    return () async {
+      await sub?.cancel();
+      return caller.finishSending();
+    };
   }
 
   /// Создает bidirectional stream builder
@@ -70,13 +89,19 @@ final class RpcCallerEndpoint extends RpcEndpointBase {
     required String methodName,
     required IRpcCodec<C> requestCodec,
     required IRpcCodec<R> responseCodec,
-  }) {
-    return BidirectionalStreamCaller<C, R>(
+    required Stream<C> requests,
+  }) async* {
+    final caller = BidirectionalStreamCaller<C, R>(
       serviceName: serviceName,
       methodName: methodName,
       transport: transport,
       requestCodec: requestCodec,
       responseCodec: responseCodec,
-    ).responses.where((e) => e.payload != null).map((e) => e.payload!);
+    );
+
+    await requests.pipe(caller.requests);
+    yield* caller.responses
+        .where((e) => e.payload != null)
+        .map((e) => e.payload!);
   }
 }
