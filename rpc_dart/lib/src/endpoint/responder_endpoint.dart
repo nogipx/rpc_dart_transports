@@ -1,5 +1,13 @@
 part of '_index.dart';
 
+typedef _MethodCallInfo = ({
+  int streamId,
+  String serviceName,
+  String methodName,
+  RpcMethodRegistration method,
+  RpcTransportMessage? message,
+});
+
 /// Серверный RPC эндпоинт для обработки запросов
 final class RpcResponderEndpoint extends RpcEndpointBase {
   @override
@@ -17,7 +25,7 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
   final Map<int, String> _streamMethods = {};
 
   /// Сохраняем последнее сообщение с данными для каждого потока
-  final Map<int, RpcTransportMessage<Uint8List>> _streamMessages = {};
+  final Map<int, RpcTransportMessage> _streamMessages = {};
 
   Map<String, dynamic> get registeredContracts => Map.unmodifiable(_contracts);
 
@@ -42,26 +50,13 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
     }
 
     _isListening = true;
-    _startListeningTransport();
-  }
-
-  /// Этап 1: Начинает прослушивание транспорта для входящих сообщений
-  void _startListeningTransport() {
-    logger.info(
-      'Начинаем прослушивание транспорта',
-    );
-
     transport.incomingMessages.listen(
       _handleIncomingMessage,
-    );
-
-    logger.info(
-      'RpcResponderEndpoint запущен и слушает входящие запросы',
     );
   }
 
   /// Этап 2: Обрабатывает входящее сообщение от транспорта
-  void _handleIncomingMessage(RpcTransportMessage<Uint8List> message) {
+  void _handleIncomingMessage(RpcTransportMessage message) {
     final streamId = message.streamId;
 
     // Обработка метаданных (заголовков) сообщения
@@ -84,8 +79,7 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
   }
 
   /// Этап 2.1: Обрабатывает метаданные сообщения (заголовки)
-  void _handleMetadataMessage(
-      int streamId, RpcTransportMessage<Uint8List> message) {
+  void _handleMetadataMessage(int streamId, RpcTransportMessage message) {
     final methodPath = message.methodPath!;
     final methodInfo = _parseMethodPath(methodPath);
 
@@ -117,10 +111,7 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
   }
 
   /// Этап 2.2: Обрабатывает сообщение с данными
-  void _handleDataMessage(
-    int streamId,
-    RpcTransportMessage<Uint8List> message,
-  ) {
+  void _handleDataMessage(int streamId, RpcTransportMessage message) {
     // Если для этого потока еще не определен метод, и это первое сообщение,
     // проверяем наличие methodPath в сообщении
     if (!_streamMethods.containsKey(streamId) && message.methodPath != null) {
@@ -167,13 +158,13 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
         'Обработка данных для метода: $methodKey [streamId: $streamId]',
       );
 
-      _routeMethodCall(
-        _methods[methodKey]!,
-        streamId,
-        serviceName,
-        methodName,
-        message,
-      );
+      _routeMethodCall((
+        method: _methods[methodKey]!,
+        streamId: streamId,
+        serviceName: serviceName,
+        methodName: methodName,
+        message: message,
+      ));
     } else {
       logger.warning(
         'Получены данные для неизвестного метода [streamId: $streamId]',
@@ -204,73 +195,24 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
   }
 
   /// Этап 4: Маршрутизация вызова метода к нужному обработчику
-  void _routeMethodCall(
-    RpcMethodRegistration method,
-    int streamId,
-    String serviceName,
-    String methodName,
-    RpcTransportMessage<Uint8List>? message,
-  ) {
+  void _routeMethodCall(_MethodCallInfo i) {
+    final serviceName = i.serviceName;
+    final methodName = i.methodName;
+    final streamId = i.streamId;
+
     logger.info(
       'Обработка вызова метода $serviceName.$methodName [streamId: $streamId]',
     );
 
     try {
-      switch (method.type) {
-        case RpcMethodType.unary:
-          logger.debug(
-            'Создание UnaryResponder для $serviceName.$methodName',
-          );
-          _handleUnaryMethod(
-            streamId,
-            serviceName,
-            methodName,
-            method,
-            message,
-          );
-          break;
+      final handler = switch (i.method.type) {
+        RpcMethodType.unaryRequest => _handleUnaryMethod,
+        RpcMethodType.clientStream => _handleClientStreamMethod,
+        RpcMethodType.serverStream => _handleServerStreamMethod,
+        RpcMethodType.bidirectionalStream => _handleBidirectionalMethod,
+      };
 
-        case RpcMethodType.clientStream:
-          logger.debug(
-            'Создание ClientStreamResponder для $serviceName.$methodName',
-          );
-          _handleClientStreamMethod(
-            streamId,
-            serviceName,
-            methodName,
-            method,
-          );
-          break;
-
-        case RpcMethodType.serverStream:
-          logger.debug(
-            'Создание ServerStreamResponder для $serviceName.$methodName',
-          );
-          _handleServerStreamMethod(
-            streamId,
-            serviceName,
-            methodName,
-            method,
-            message,
-          );
-          break;
-
-        case RpcMethodType.bidirectional:
-          logger.debug(
-            'Создание BidirectionalStreamResponder для $serviceName.$methodName',
-          );
-          _handleBidirectionalMethod(
-            streamId,
-            serviceName,
-            methodName,
-            method,
-          );
-          break;
-      }
-
-      logger.info(
-        'Успешно создан обработчик для метода $serviceName.$methodName [streamId: $streamId]',
-      );
+      handler(i);
     } catch (e, stackTrace) {
       logger.error(
         'Ошибка при создании обработчика для метода $serviceName.$methodName: $e',
@@ -281,13 +223,11 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
   }
 
   /// Этап 5.1: Обработка унарного метода
-  Future<void> _handleUnaryMethod(
-    int streamId,
-    String serviceName,
-    String methodName,
-    RpcMethodRegistration method,
-    RpcTransportMessage<Uint8List>? message,
-  ) async {
+  Future<void> _handleUnaryMethod(_MethodCallInfo i) async {
+    final serviceName = i.serviceName;
+    final methodName = i.methodName;
+    final streamId = i.streamId;
+
     final methodPath = '/$serviceName/$methodName';
     logger.debug(
       'Обработка унарного запроса $methodPath [streamId: $streamId]',
@@ -298,56 +238,44 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
 
     try {
       // Получаем данные запроса
-      final requestData = await _extractRequestData(streamId, message);
+      final requestData = await _extractRequestData(i);
       if (requestData == null) return;
 
       // Вызываем обработчик метода
-      final response = await _invokeMethodHandler(
-        method,
-        requestData,
-        methodPath,
-        streamId,
-      );
+      final response = await _invokeMethodHandler(i, requestData);
 
       // Отправляем ответ
-      await _sendResponse(streamId, response, methodPath, method);
+      await _sendResponse(i, response);
     } catch (e, stackTrace) {
       _handleMethodError(streamId, methodPath, e, stackTrace);
     }
   }
 
   /// Этап 5.2: Обработка клиентского потокового метода
-  void _handleClientStreamMethod(
-    int streamId,
-    String serviceName,
-    String methodName,
-    RpcMethodRegistration method,
-  ) {
+  void _handleClientStreamMethod(_MethodCallInfo i) {
     // Создаем обработчик клиентского потока
-    ClientStreamResponder(
+    ClientStreamResponder<IRpcSerializable, IRpcSerializable>(
       transport: transport,
-      serviceName: serviceName,
-      methodName: methodName,
-      requestSerializer: const RpcPassthroughSerializer<dynamic>(),
-      responseSerializer: const RpcPassthroughSerializer<dynamic>(),
+      serviceName: i.serviceName,
+      methodName: i.methodName,
+      requestCodec: i.method.requestCodec,
+      responseCodec: i.method.responseCodec,
       handler: (Stream<dynamic> requests) async {
-        return await method.handler(requests);
+        return await i.method.handler(requests);
       },
       logger: logger,
     );
   }
 
   /// Этап 5.3: Обработка серверного потокового метода
-  void _handleServerStreamMethod(
-    int streamId,
-    String serviceName,
-    String methodName,
-    RpcMethodRegistration method,
-    RpcTransportMessage<Uint8List>? message,
-  ) async {
+  void _handleServerStreamMethod(_MethodCallInfo i) async {
+    final serviceName = i.serviceName;
+    final methodName = i.methodName;
+    final streamId = i.streamId;
+
     try {
       // Получаем данные запроса
-      final requestData = await _extractRequestData(streamId, message);
+      final requestData = await _extractRequestData(i);
       if (requestData == null) return;
 
       // Создаем обработчик серверного потока
@@ -355,12 +283,12 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
         transport: transport,
         serviceName: serviceName,
         methodName: methodName,
-        requestSerializer: const RpcPassthroughSerializer<dynamic>(),
-        responseSerializer: const RpcPassthroughSerializer<dynamic>(),
+        requestCodec: i.method.requestCodec,
+        responseCodec: i.method.responseCodec,
         handler: (dynamic request, responder) {
           try {
             // Вызываем оригинальный обработчик потока
-            final responseStream = method.handler();
+            final responseStream = i.method.handler();
 
             responseStream.listen(
               (dynamic response) {
@@ -392,25 +320,23 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
   }
 
   /// Этап 5.4: Обработка двунаправленного потокового метода
-  void _handleBidirectionalMethod(
-    int streamId,
-    String serviceName,
-    String methodName,
-    RpcMethodRegistration method,
-  ) {
+  void _handleBidirectionalMethod(_MethodCallInfo i) {
+    final serviceName = i.serviceName;
+    final methodName = i.methodName;
+
     // Создаем обработчик двунаправленного потока
     final responder = BidirectionalStreamResponder(
       transport: transport,
       serviceName: serviceName,
       methodName: methodName,
-      requestSerializer: const RpcPassthroughSerializer<dynamic>(),
-      responseSerializer: const RpcPassthroughSerializer<dynamic>(),
+      requestCodec: i.method.requestCodec,
+      responseCodec: i.method.responseCodec,
       logger: logger,
     );
 
     try {
       // Вызываем оригинальный обработчик с потоком запросов
-      final responseStream = method.handler();
+      final responseStream = i.method.handler();
 
       // Настраиваем обработку запросов и отправку ответов
       responseStream.listen(
@@ -442,10 +368,10 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
   }
 
   /// Этап 7: Извлечение данных запроса из сообщения
-  Future<Uint8List?> _extractRequestData(
-    int streamId,
-    RpcTransportMessage<Uint8List>? message,
-  ) async {
+  Future<Uint8List?> _extractRequestData(_MethodCallInfo i) async {
+    final streamId = i.streamId;
+    final message = i.message;
+
     // Проверяем наличие сообщения с данными
     if (message == null || message.payload == null) {
       logger.error(
@@ -485,24 +411,21 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
 
   /// Этап 8: Вызов обработчика метода
   Future<dynamic> _invokeMethodHandler(
-    RpcMethodRegistration method,
+    _MethodCallInfo i,
     Uint8List requestData,
-    String methodPath,
-    int streamId,
   ) async {
+    final streamId = i.streamId;
+    final methodPath = i.message!.methodPath!;
+
     logger.debug(
       'Вызов обработчика для $methodPath [streamId: $streamId]',
     );
 
-    // Получаем регистрацию метода из какого-то хранилища
-    final methodRegistration = _getMethodRegistration(methodPath);
-
     // Десериализуем данные запроса
-    final deserializedData =
-        methodRegistration.requestDeserializer(requestData);
+    final deserializedData = i.method.requestCodec.deserialize(requestData);
 
     // Вызываем обработчик с десериализованными данными
-    final response = method.handler(deserializedData);
+    final response = i.method.handler(deserializedData);
 
     logger.debug(
       'Обработчик вернул ответ [streamId: $streamId]',
@@ -512,22 +435,17 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
   }
 
   /// Этап 9: Сериализация и отправка ответа
-  Future<void> _sendResponse(
-    int streamId,
-    dynamic response,
-    String methodPath,
-    RpcMethodRegistration method,
-  ) async {
-    final serializer = method.responseSerializer;
-    if (serializer != null) {
-      final serializedResponse = (response);
-      // Кодируем ответ в фрейм и отправляем
-      final framedResponse = RpcMessageFrame.encode(serializedResponse);
-      logger.debug(
-        'Отправка ответа размером ${framedResponse.length} байт [streamId: $streamId]',
-      );
-      await transport.sendMessage(streamId, framedResponse);
-    }
+  Future<void> _sendResponse(_MethodCallInfo i, dynamic response) async {
+    final streamId = i.streamId;
+    final methodPath = i.message!.methodPath!;
+
+    final serializedResponse = i.method.responseCodec.serialize(response);
+    // Кодируем ответ в фрейм и отправляем
+    final framedResponse = RpcMessageFrame.encode(serializedResponse);
+    logger.debug(
+      'Отправка ответа размером ${framedResponse.length} байт [streamId: $streamId]',
+    );
+    await transport.sendMessage(streamId, framedResponse);
 
     // Отправляем трейлер с успешным статусом
     await transport.sendMetadata(

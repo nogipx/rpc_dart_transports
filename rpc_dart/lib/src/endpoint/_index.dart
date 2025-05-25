@@ -1,7 +1,6 @@
 import 'package:rpc_dart/rpc_dart.dart';
 import 'dart:convert';
 import 'dart:async';
-import 'caller_builders/_index.dart';
 
 part 'caller_endpoint.dart';
 part 'responder_endpoint.dart';
