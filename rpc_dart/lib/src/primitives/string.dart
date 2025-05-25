@@ -41,5 +41,5 @@ class RpcString extends RpcPrimitiveMessage<String> {
   }
 
   @override
-  String toString() => 'RpcString("$value")';
+  String toString() => value;
 }

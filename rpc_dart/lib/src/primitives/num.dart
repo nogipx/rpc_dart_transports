@@ -80,7 +80,7 @@ class RpcNum extends RpcPrimitiveMessage<num> {
   }
 
   @override
-  String toString() => 'RpcNum($value)';
+  String toString() => value.toString();
 
   // Арифметические операторы
   RpcNum operator +(Object other) => RpcNum(value + _extractNum(other));
@@ -191,7 +191,7 @@ class RpcInt extends RpcPrimitiveMessage<int> {
   }
 
   @override
-  String toString() => 'RpcInt($value)';
+  String toString() => value.toString();
 
   // Арифметические операторы
   RpcInt operator +(Object other) => RpcInt(value + _extractInt(other));
@@ -302,7 +302,7 @@ class RpcDouble extends RpcPrimitiveMessage<double> {
   }
 
   @override
-  String toString() => 'RpcDouble($value)';
+  String toString() => value.toString();
 
   // Арифметические операторы
   RpcDouble operator +(Object other) =>

@@ -1,10 +1,154 @@
 import 'dart:async';
 import 'dart:typed_data';
+import 'dart:convert';
+import 'package:rpc_dart/rpc_dart.dart';
 import 'package:test/test.dart';
 import 'package:rpc_dart/src/rpc/_index.dart';
 
+/// Сериализатор строк для тестирования
+class StringSerializer implements IRpcSerializer<String> {
+  const StringSerializer();
+
+  @override
+  Uint8List serialize(String message) =>
+      Uint8List.fromList(utf8.encode(message));
+
+  @override
+  String deserialize(Uint8List bytes) => utf8.decode(bytes);
+
+  @override
+  RpcSerializationFormat get format => RpcSerializationFormat.binary;
+}
+
+/// Создает тестовую установку для клиента унарного RPC
+(UnaryCaller<String, String>, _UnaryClientTestSetup) _createUnaryClientSetup() {
+  final testSetup = _UnaryClientTestSetup();
+  final serializer = StringSerializer();
+
+  final client = UnaryCaller<String, String>(
+    transport: testSetup.clientTransport,
+    serviceName: 'TestService',
+    methodName: 'TestMethod',
+    requestSerializer: serializer,
+    responseSerializer: serializer,
+    logger: RpcLogger('TestUnaryClient'),
+  );
+
+  return (client, testSetup);
+}
+
+/// Класс для настройки тестов унарного клиента
+class _UnaryClientTestSetup {
+  final (IRpcTransport, IRpcTransport) _transportPair;
+  final IRpcTransport clientTransport;
+  final IRpcTransport serverTransport;
+  final List<String> receivedRequests = [];
+
+  _UnaryClientTestSetup()
+      : _transportPair = RpcInMemoryTransport.pair(),
+        clientTransport = RpcInMemoryTransport.pair().$1,
+        serverTransport = RpcInMemoryTransport.pair().$2 {
+    _setupServer();
+  }
+
+  void _setupServer() {
+    serverTransport.incomingMessages.listen((message) {
+      if (message.payload != null) {
+        final payload = message.payload!;
+        final parser = RpcMessageParser();
+        final parsedPayloads = parser(payload);
+
+        if (parsedPayloads.isNotEmpty) {
+          final requestData = parsedPayloads.first;
+          final requestString = utf8.decode(requestData);
+          receivedRequests.add(requestString);
+        }
+      }
+    });
+  }
+
+  void mockResponse(String response) {
+    serverTransport.incomingMessages.listen((message) {
+      if (!message.isMetadataOnly) {
+        final streamId = message.streamId;
+
+        // Отправляем заголовки
+        serverTransport.sendMetadata(
+          streamId,
+          RpcMetadata.forServerInitialResponse(),
+        );
+
+        // Отправляем ответ
+        final responseData = RpcMessageFrame.encode(utf8.encode(response));
+        serverTransport.sendMessage(
+          streamId,
+          responseData,
+        );
+
+        // Отправляем трейлеры
+        serverTransport.sendMetadata(
+          streamId,
+          RpcMetadata.forTrailer(RpcStatus.OK),
+          endStream: true,
+        );
+      }
+    });
+  }
+
+  void mockError(int statusCode, String errorMessage) {
+    serverTransport.incomingMessages.listen((message) {
+      if (!message.isMetadataOnly) {
+        final streamId = message.streamId;
+
+        // Отправляем трейлеры с ошибкой
+        serverTransport.sendMetadata(
+          streamId,
+          RpcMetadata.forTrailer(
+            statusCode,
+            message: errorMessage,
+          ),
+          endStream: true,
+        );
+      }
+    });
+  }
+
+  void mockDelayedResponse(String response, Duration delay) {
+    serverTransport.incomingMessages.listen((message) async {
+      if (!message.isMetadataOnly) {
+        final streamId = message.streamId;
+
+        // Отправляем заголовки
+        serverTransport.sendMetadata(
+          streamId,
+          RpcMetadata.forServerInitialResponse(),
+        );
+
+        // Делаем задержку
+        await Future.delayed(delay);
+
+        // Отправляем ответ
+        final responseData = RpcMessageFrame.encode(utf8.encode(response));
+        serverTransport.sendMessage(
+          streamId,
+          responseData,
+        );
+
+        // Отправляем трейлеры
+        serverTransport.sendMetadata(
+          streamId,
+          RpcMetadata.forTrailer(RpcStatus.OK),
+          endStream: true,
+        );
+      }
+    });
+  }
+}
+
 void main() {
   group('Unary RPC', () {
+    final serializer = StringSerializer();
+
     group('UnaryClient', () {
       test('отправляет_запрос_и_получает_ответ', () async {
         // Arrange
@@ -82,8 +226,6 @@ void main() {
           }
         });
 
-        final serializer = _TestStringSerializer();
-
         // Act
         for (int i = 0; i < 3; i++) {
           final client = UnaryCaller<String, String>(
@@ -111,7 +253,7 @@ void main() {
       test('обрабатывает_запрос_и_отправляет_ответ', () async {
         // Arrange
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
-        final serializer = _TestStringSerializer();
+
         final receivedRequests = <String>[];
 
         final server = UnaryResponder<String, String>(
@@ -150,7 +292,6 @@ void main() {
       test('отправляет_ошибку_при_исключении_в_обработчике', () async {
         // Arrange
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
-        final serializer = _TestStringSerializer();
 
         final server = UnaryResponder<String, String>(
           transport: serverTransport,
@@ -189,7 +330,7 @@ void main() {
       test('обрабатывает_только_запросы_своего_метода', () async {
         // Arrange
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
-        final serializer = _TestStringSerializer();
+
         var handlerCallCount = 0;
 
         final server = UnaryResponder<String, String>(
@@ -241,7 +382,6 @@ void main() {
       test('закрывается_корректно', () async {
         // Arrange
         final (_, serverTransport) = RpcInMemoryTransport.pair();
-        final serializer = _TestStringSerializer();
 
         final sut = UnaryResponder<String, String>(
           transport: serverTransport,
@@ -265,7 +405,6 @@ void main() {
       test('полный_цикл_запрос_ответ_работает_корректно', () async {
         // Arrange
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
-        final serializer = _TestStringSerializer();
 
         final server = UnaryResponder<String, String>(
           transport: serverTransport,
@@ -300,7 +439,7 @@ void main() {
       test('несколько_клиентов_могут_использовать_один_сервер', () async {
         // Arrange
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
-        final serializer = _TestStringSerializer();
+
         var requestCount = 0;
 
         final server = UnaryResponder<String, String>(
@@ -341,102 +480,4 @@ void main() {
       });
     });
   });
-}
-
-/// Настройка для тестирования UnaryClient
-class _UnaryClientTestSetup {
-  final IRpcTransport clientTransport;
-  final IRpcTransport serverTransport;
-  final List<String> receivedRequests = [];
-  final StreamController<String?> responseController =
-      StreamController<String?>();
-  late final StreamSubscription _subscription;
-
-  _UnaryClientTestSetup(this.clientTransport, this.serverTransport) {
-    // Подписываемся на входящие запросы и обрабатываем их
-    _subscription = serverTransport.incomingMessages.listen((message) async {
-      if (!message.isMetadataOnly && message.payload != null) {
-        // Десериализуем запрос
-        final serializer = _TestStringSerializer();
-        final request = serializer.deserialize(
-          message.payload!.sublist(5), // Убираем 5-байтный префикс
-        );
-        receivedRequests.add(request);
-
-        // Ждем ответа от контроллера
-        final response = await responseController.stream.first;
-
-        if (response != null) {
-          // Отправляем ответ
-          final serializedResponse = serializer.serialize(response);
-          final framedResponse = RpcMessageFrame.encode(serializedResponse);
-          await serverTransport.sendMessage(message.streamId, framedResponse);
-
-          // Отправляем трейлер с успешным статусом
-          final trailer = RpcMetadata.forTrailer(RpcStatus.OK);
-          await serverTransport.sendMetadata(message.streamId, trailer,
-              endStream: true);
-        }
-      } else if (message.isMetadataOnly && !message.isEndOfStream) {
-        // Отправляем начальные заголовки
-        final initialHeaders = RpcMetadata.forServerInitialResponse();
-        await serverTransport.sendMetadata(message.streamId, initialHeaders);
-      }
-    });
-  }
-
-  void mockResponse(String response) {
-    responseController.add(response);
-  }
-
-  void mockError(int statusCode, String message) {
-    Timer(Duration(milliseconds: 10), () async {
-      if (receivedRequests.isNotEmpty) {
-        final streamId = 1; // Предполагаем первый stream
-        final trailer = RpcMetadata.forTrailer(statusCode, message: message);
-        await serverTransport.sendMetadata(streamId, trailer, endStream: true);
-      }
-    });
-    responseController.add(null);
-  }
-
-  void mockDelayedResponse(String response, Duration delay) {
-    Timer(delay, () => responseController.add(response));
-  }
-
-  void dispose() {
-    _subscription.cancel();
-    responseController.close();
-  }
-}
-
-/// Фабричный метод для создания UnaryClient с тестовой настройкой
-(UnaryCaller<String, String>, _UnaryClientTestSetup) _createUnaryClientSetup() {
-  final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
-  final serializer = _TestStringSerializer();
-
-  final client = UnaryCaller<String, String>(
-    transport: clientTransport,
-    serviceName: 'TestService',
-    methodName: 'TestMethod',
-    requestSerializer: serializer,
-    responseSerializer: serializer,
-  );
-
-  final setup = _UnaryClientTestSetup(clientTransport, serverTransport);
-
-  return (client, setup);
-}
-
-/// Простой сериализатор строк для тестов
-class _TestStringSerializer implements IRpcSerializer<String> {
-  @override
-  String deserialize(Uint8List bytes) {
-    return String.fromCharCodes(bytes);
-  }
-
-  @override
-  Uint8List serialize(String message) {
-    return Uint8List.fromList(message.codeUnits);
-  }
 }

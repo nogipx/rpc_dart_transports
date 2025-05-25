@@ -36,7 +36,7 @@ abstract interface class IRpcJsonSerializable {
 /// Миксин для автоматической сериализации JSON -> байты
 /// Позволяет разработчикам использовать привычные toJson/fromJson методы
 /// и автоматически получать binary сериализацию через JSON
-mixin JsonRpcSerializable on IRpcJsonSerializable implements IRpcSerializable {
+mixin _JsonRpcSerializable on IRpcJsonSerializable implements IRpcSerializable {
   @override
   Uint8List serialize() {
     final json = toJson();
@@ -103,18 +103,16 @@ class RpcMethodRegistration {
   final RpcMethodType type;
   final Function handler;
   final String description;
-  final Type requestType;
-  final Type responseType;
-  final RpcSerializationFormat serializationFormat;
+  final dynamic Function(Uint8List) requestDeserializer;
+  final Uint8List Function(dynamic)? responseSerializer;
 
   const RpcMethodRegistration({
     required this.name,
     required this.type,
     required this.handler,
     required this.description,
-    required this.requestType,
-    required this.responseType,
-    this.serializationFormat = RpcSerializationFormat.json,
+    required this.requestDeserializer,
+    this.responseSerializer,
   });
 }
 

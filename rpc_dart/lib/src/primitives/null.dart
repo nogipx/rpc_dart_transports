@@ -25,5 +25,5 @@ class RpcNull extends RpcPrimitiveMessage<void> {
   }
 
   @override
-  String toString() => 'RpcNull()';
+  String toString() => null.toString();
 }

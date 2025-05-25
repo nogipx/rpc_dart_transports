@@ -9,11 +9,13 @@ part 'bool.dart';
 part 'null.dart';
 part 'num.dart';
 part 'string.dart';
+part 'extensions.dart';
 
 typedef RpcMessageProducer = String Function(String);
 
 /// Базовый класс для всех примитивных типов сообщений
-abstract class RpcPrimitiveMessage<T> implements IRpcSerializable {
+abstract class RpcPrimitiveMessage<T>
+    implements IRpcSerializable, IRpcJsonSerializable {
   final T value;
 
   const RpcPrimitiveMessage(this.value);
@@ -36,6 +38,7 @@ abstract class RpcPrimitiveMessage<T> implements IRpcSerializable {
   Uint8List serialize();
 
   /// Преобразует в Map для обратной совместимости
+  @override
   Map<String, dynamic> toJson() => {'v': value};
 
   RpcException _comparisonException({

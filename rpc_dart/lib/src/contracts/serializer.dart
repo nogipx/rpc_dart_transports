@@ -6,11 +6,12 @@ class RpcBinarySerializer<T extends IRpcSerializable>
     implements IRpcSerializer<T> {
   final T Function(Uint8List) _fromBytes;
 
+  @override
+  RpcSerializationFormat get format => RpcSerializationFormat.binary;
+
   /// Создает binary сериализатор
   /// [fromBytes] - функция для десериализации из байтов (например, MyModel.fromBuffer)
-  RpcBinarySerializer({
-    required T Function(Uint8List) fromBytes,
-  }) : _fromBytes = fromBytes;
+  RpcBinarySerializer(this._fromBytes);
 
   @override
   Uint8List serialize(T message) {
@@ -30,6 +31,9 @@ class RpcJsonSerializer<T extends IRpcJsonSerializable>
     implements IRpcSerializer<T> {
   final T Function(Map<String, dynamic>) _fromJson;
 
+  @override
+  RpcSerializationFormat get format => RpcSerializationFormat.binary;
+
   /// Создает JSON сериализатор
   /// [fromJson] - функция для создания объекта из JSON (например, MyModel.fromJson)
   RpcJsonSerializer(this._fromJson);
@@ -43,31 +47,24 @@ class RpcJsonSerializer<T extends IRpcJsonSerializable>
   @override
   T deserialize(Uint8List bytes) {
     // Используем статический хелпер из миксина
-    return JsonRpcSerializable.fromBytes<T>(bytes, _fromJson);
+    return _JsonRpcSerializable.fromBytes<T>(bytes, _fromJson);
   }
 }
 
-/// Фабрика для создания сериализаторов
-/// Упрощает создание правильного типа сериализатора
-class RpcSerializerFactory {
-  /// Создает JSON сериализатор для модели с toJson/fromJson
-  static RpcJsonSerializer<T> json<T extends IRpcJsonSerializable>(
-    T Function(Map<String, dynamic>) fromJson,
-  ) {
-    return RpcJsonSerializer<T>(fromJson);
-  }
+/// Сериализатор, который просто передает данные как есть без преобразования
+class RpcPassthroughSerializer<T> implements IRpcSerializer<T> {
+  const RpcPassthroughSerializer();
 
-  /// Создает binary сериализатор для protobuf, msgpack и других binary форматов
-  static RpcBinarySerializer<T> binary<T extends IRpcSerializable>(
-    T Function(Uint8List) fromBytes,
-  ) {
-    return RpcBinarySerializer<T>(fromBytes: fromBytes);
-  }
+  T fromBytes(Uint8List bytes) => utf8.decode(bytes) as T;
 
-  /// Создает protobuf сериализатор (специализированный binary)
-  static RpcBinarySerializer<T> protobuf<T extends IRpcSerializable>(
-    T Function(Uint8List) fromBuffer,
-  ) {
-    return RpcBinarySerializer<T>(fromBytes: fromBuffer);
-  }
+  Uint8List toBytes(T data) => utf8.encode(data.toString());
+
+  @override
+  T deserialize(Uint8List data) => fromBytes(data);
+
+  @override
+  Uint8List serialize(T data) => toBytes(data);
+
+  @override
+  RpcSerializationFormat get format => RpcSerializationFormat.binary;
 }

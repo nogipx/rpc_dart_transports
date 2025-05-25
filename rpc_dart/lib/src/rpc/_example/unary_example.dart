@@ -34,7 +34,7 @@ class UnaryRpcExample {
     );
 
     // Создаем сериализатор для строк
-    final stringSerializer = SimpleStringSerializer();
+    final stringSerializer = RpcBinarySerializer(RpcString.fromBytes);
 
     // Определяем различные сервисы и методы для демонстрации мультиплексирования
     final services = [
@@ -49,7 +49,7 @@ class UnaryRpcExample {
     final servers = <UnaryResponder>[];
 
     for (final (serviceName, methodName) in services) {
-      final server = UnaryResponder<String, String>(
+      final server = UnaryResponder<RpcString, RpcString>(
         transport: serverTransport,
         serviceName: serviceName,
         methodName: methodName,
@@ -62,16 +62,16 @@ class UnaryRpcExample {
           // Обрабатываем разные запросы в зависимости от сервиса
           switch (serviceName) {
             case 'GreetingService':
-              return 'Здравствуйте! Это ответ от $serviceName';
+              return 'Здравствуйте! Это ответ от $serviceName'.rpc;
             case 'TimeService':
-              return 'Текущее время: ${DateTime.now()}';
+              return 'Текущее время: ${DateTime.now()}'.rpc;
             case 'StatusService':
-              return 'Все системы работают нормально в $serviceName';
+              return 'Все системы работают нормально в $serviceName'.rpc;
             case 'ErrorService':
               throw Exception('Тестовая ошибка от $serviceName');
             case 'EchoService':
             default:
-              return 'Эхо от $serviceName: $request';
+              return 'Эхо от $serviceName: $request'.rpc;
           }
         },
         logger: RpcLogger(
@@ -85,7 +85,7 @@ class UnaryRpcExample {
     try {
       // Пример 1: Простой вызов приветствия
       print('КЛИЕНТ: Выполняем запрос к GreetingService/SayHello');
-      final client1 = UnaryCaller<String, String>(
+      final client1 = UnaryCaller<RpcString, RpcString>(
         transport: clientTransport,
         serviceName: 'GreetingService',
         methodName: 'SayHello',
@@ -96,13 +96,13 @@ class UnaryRpcExample {
           colors: RpcLoggerColors.singleColor(AnsiColor.brightMagenta),
         ),
       );
-      final response1 = await client1.call('Привет');
+      final response1 = await client1.call('Привет'.rpc);
       print('КЛИЕНТ: Получен ответ: "$response1"');
       await client1.close(); // Теперь не закрывает транспорт
 
       // Пример 2: Запрос времени
       print('\nКЛИЕНТ: Выполняем запрос к TimeService/GetCurrentTime');
-      final client2 = UnaryCaller<String, String>(
+      final client2 = UnaryCaller<RpcString, RpcString>(
         transport: clientTransport,
         serviceName: 'TimeService',
         methodName: 'GetCurrentTime',
@@ -113,14 +113,14 @@ class UnaryRpcExample {
           colors: RpcLoggerColors.singleColor(AnsiColor.brightCyan),
         ),
       );
-      final response2 = await client2.call('Время');
+      final response2 = await client2.call('Время'.rpc);
       print('КЛИЕНТ: Получен ответ: "$response2"');
       await client2.close();
 
       // Пример 3: Запрос с таймаутом
       print(
           '\nКЛИЕНТ: Выполняем запрос к StatusService/CheckHealth с таймаутом 500мс');
-      final client3 = UnaryCaller<String, String>(
+      final client3 = UnaryCaller<RpcString, RpcString>(
         transport: clientTransport,
         serviceName: 'StatusService',
         methodName: 'CheckHealth',
@@ -132,7 +132,7 @@ class UnaryRpcExample {
         ),
       );
       final response3 = await client3.call(
-        'Статус',
+        'Статус'.rpc,
         timeout: Duration(milliseconds: 500),
       );
       print('КЛИЕНТ: Получен ответ: "$response3"');
@@ -141,7 +141,7 @@ class UnaryRpcExample {
       // Пример 4: Вызов с ошибкой
       print(
           '\nКЛИЕНТ: Выполняем запрос к ErrorService/ThrowError (должен вернуть ошибку)');
-      final client4 = UnaryCaller<String, String>(
+      final client4 = UnaryCaller<RpcString, RpcString>(
         transport: clientTransport,
         serviceName: 'ErrorService',
         methodName: 'ThrowError',
@@ -153,7 +153,7 @@ class UnaryRpcExample {
         ),
       );
       try {
-        await client4.call('Ошибка');
+        await client4.call('Ошибка'.rpc);
       } catch (e) {
         print('КЛИЕНТ: Получена ожидаемая ошибка: $e');
       }
@@ -162,7 +162,7 @@ class UnaryRpcExample {
       // Пример 5: Эхо-запрос с очень коротким таймаутом
       print(
           '\nКЛИЕНТ: Выполняем запрос к EchoService/Echo с очень коротким таймаутом (10мс)');
-      final client5 = UnaryCaller<String, String>(
+      final client5 = UnaryCaller<RpcString, RpcString>(
         transport: clientTransport,
         serviceName: 'EchoService',
         methodName: 'Echo',
@@ -175,7 +175,7 @@ class UnaryRpcExample {
       );
       try {
         await client5.call(
-          'Эхо тест с таймаутом',
+          'Эхо тест с таймаутом'.rpc,
           timeout: Duration(milliseconds: 10),
         );
       } catch (e) {
@@ -197,7 +197,7 @@ class UnaryRpcExample {
 
       for (final (serviceName, methodName, request) in parallelRequests) {
         final future = () async {
-          final client = UnaryCaller<String, String>(
+          final client = UnaryCaller<RpcString, RpcString>(
             transport: clientTransport,
             serviceName: serviceName,
             methodName: methodName,
@@ -213,7 +213,7 @@ class UnaryRpcExample {
             print(
                 'КЛИЕНТ: Параллельный запрос к $serviceName/$methodName: "$request"');
             final response =
-                await client.call(request, timeout: Duration(seconds: 2));
+                await client.call(request.rpc, timeout: Duration(seconds: 2));
             print(
                 'КЛИЕНТ: Параллельный ответ от $serviceName/$methodName: "$response"');
           } catch (e) {

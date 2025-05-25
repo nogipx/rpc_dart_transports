@@ -140,6 +140,7 @@ abstract class WeatherServerContract extends RpcResponderContract implements IWe
       methodName: IWeatherContract.methodGetCurrentWeather,
       handler: getCurrentWeather,
       description: 'Получить текущую погоду по городу',
+      requestDeserializer: RpcBinarySerializer(),
       serializationFormat: RpcSerializationFormat.binary,
     );
 

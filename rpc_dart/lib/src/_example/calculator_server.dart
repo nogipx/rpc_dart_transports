@@ -19,6 +19,8 @@ class CalculatorResponder extends RpcResponderContract
       methodName: ICalculatorContract.methodCalculate,
       handler: calculate,
       description: 'Выполняет одиночную операцию',
+      requestDeserializer: RpcJsonSerializer(CalculationRequest.fromJson),
+      responseSerializer: RpcJsonSerializer(CalculationResponse.fromJson),
     );
 
     // Двунаправленный стрим для непрерывных вычислений
@@ -26,6 +28,8 @@ class CalculatorResponder extends RpcResponderContract
       methodName: ICalculatorContract.methodStreamCalculate,
       handler: streamCalculate,
       description: 'Обрабатывает поток вычислений',
+      requestDeserializer: RpcJsonSerializer(CalculationRequest.fromJson),
+      responseSerializer: RpcJsonSerializer(CalculationResponse.fromJson),
     );
 
     super.setup();

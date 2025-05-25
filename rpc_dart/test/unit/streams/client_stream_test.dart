@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
+import 'package:rpc_dart/rpc_dart.dart';
+import 'package:rpc_dart/src/contracts/_index.dart';
 import 'package:test/test.dart';
 import 'package:rpc_dart/src/rpc/_index.dart';
 
@@ -9,32 +11,32 @@ void main() {
       test('отправляет_несколько_запросов_и_получает_один_ответ', () async {
         // Arrange
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
-        final serializer = _TestStringSerializer();
-        final receivedRequests = <String>[];
+        final receivedRequests = <RpcString>[];
 
-        final server = ClientStreamResponder<String, String>(
+        final server = ClientStreamResponder<RpcString, RpcString>(
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
-          handler: (Stream<String> requests) async {
+          requestSerializer: binaryStringSerializer,
+          responseSerializer: binaryStringSerializer,
+          handler: (Stream<RpcString> requests) async {
             await for (final request in requests) {
               receivedRequests.add(request);
             }
-            return 'Processed ${receivedRequests.length} requests: ${receivedRequests.join(", ")}';
+            return 'Processed ${receivedRequests.length} requests: ${receivedRequests.join(", ")}'
+                .rpc;
           },
         );
 
-        final client = ClientStreamCaller<String, String>(
+        final client = ClientStreamCaller<RpcString, RpcString>(
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestSerializer: binaryStringSerializer,
+          responseSerializer: binaryStringSerializer,
         );
 
-        final testRequests = ['request1', 'request2', 'request3'];
+        final testRequests = ['request1'.rpc, 'request2'.rpc, 'request3'.rpc];
 
         // Act
         for (final request in testRequests) {
@@ -44,7 +46,7 @@ void main() {
 
         // Assert
         expect(response,
-            equals('Processed 3 requests: request1, request2, request3'));
+            equals('Processed 3 requests: request1, request2, request3'.rpc));
         expect(receivedRequests, equals(testRequests));
 
         // Cleanup
@@ -55,36 +57,35 @@ void main() {
       test('обрабатывает_пустой_поток_запросов', () async {
         // Arrange
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
-        final serializer = _TestStringSerializer();
 
-        final server = ClientStreamResponder<String, String>(
+        final server = ClientStreamResponder<RpcString, RpcString>(
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
-          handler: (Stream<String> requests) async {
+          requestSerializer: binaryStringSerializer,
+          responseSerializer: binaryStringSerializer,
+          handler: (Stream<RpcString> requests) async {
             var count = 0;
             await for (final _ in requests) {
               count++;
             }
-            return 'Processed $count requests';
+            return 'Processed $count requests'.rpc;
           },
         );
 
-        final client = ClientStreamCaller<String, String>(
+        final client = ClientStreamCaller<RpcString, RpcString>(
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestSerializer: binaryStringSerializer,
+          responseSerializer: binaryStringSerializer,
         );
 
         // Act
         final response = await client.finishSending();
 
         // Assert
-        expect(response, equals('Processed 0 requests'));
+        expect(response, equals('Processed 0 requests'.rpc));
 
         // Cleanup
         await client.close();
@@ -94,30 +95,29 @@ void main() {
       test('выбрасывает_исключение_при_ошибке_сервера', () async {
         // Arrange
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
-        final serializer = _TestStringSerializer();
 
-        final server = ClientStreamResponder<String, String>(
+        final server = ClientStreamResponder<RpcString, RpcString>(
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
-          handler: (Stream<String> requests) async {
+          requestSerializer: binaryStringSerializer,
+          responseSerializer: binaryStringSerializer,
+          handler: (Stream<RpcString> requests) async {
             // Сразу выбрасываем исключение без обработки stream
             throw Exception('Server processing error');
           },
         );
 
-        final client = ClientStreamCaller<String, String>(
+        final client = ClientStreamCaller<RpcString, RpcString>(
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestSerializer: binaryStringSerializer,
+          responseSerializer: binaryStringSerializer,
         );
 
         // Act & Assert
-        await client.send('test request');
+        await client.send('test request'.rpc);
 
         // Используем expectLater с коротким таймаутом
         await expectLater(
@@ -133,32 +133,31 @@ void main() {
       test('отправляет_запросы_в_правильном_порядке', () async {
         // Arrange
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
-        final serializer = _TestStringSerializer();
-        final receivedRequests = <String>[];
+        final receivedRequests = <RpcString>[];
 
-        final server = ClientStreamResponder<String, String>(
+        final server = ClientStreamResponder<RpcString, RpcString>(
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
-          handler: (Stream<String> requests) async {
+          requestSerializer: binaryStringSerializer,
+          responseSerializer: binaryStringSerializer,
+          handler: (Stream<RpcString> requests) async {
             await for (final request in requests) {
               receivedRequests.add(request);
             }
-            return 'Ordered: ${receivedRequests.join(", ")}';
+            return 'Ordered: ${receivedRequests.join(", ")}'.rpc;
           },
         );
 
-        final client = ClientStreamCaller<String, String>(
+        final client = ClientStreamCaller<RpcString, RpcString>(
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestSerializer: binaryStringSerializer,
+          responseSerializer: binaryStringSerializer,
         );
 
-        final orderedRequests = ['first', 'second', 'third'];
+        final orderedRequests = ['first'.rpc, 'second'.rpc, 'third'.rpc];
 
         // Act
         for (final request in orderedRequests) {
@@ -167,7 +166,7 @@ void main() {
         final response = await client.finishSending();
 
         // Assert
-        expect(response, equals('Ordered: first, second, third'));
+        expect(response, equals('Ordered: first, second, third'.rpc));
         expect(receivedRequests, equals(orderedRequests));
 
         // Cleanup
@@ -178,23 +177,22 @@ void main() {
       test('закрывается_корректно', () async {
         // Arrange
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
-        final serializer = _TestStringSerializer();
 
-        final server = ClientStreamResponder<String, String>(
+        final server = ClientStreamResponder<RpcString, RpcString>(
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
-          handler: (Stream<String> requests) async => 'test',
+          requestSerializer: binaryStringSerializer,
+          responseSerializer: binaryStringSerializer,
+          handler: (Stream<RpcString> requests) async => 'test'.rpc,
         );
 
-        final client = ClientStreamCaller<String, String>(
+        final client = ClientStreamCaller<RpcString, RpcString>(
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestSerializer: binaryStringSerializer,
+          responseSerializer: binaryStringSerializer,
         );
 
         // Act & Assert - должно закрыться без ошибок
@@ -207,39 +205,38 @@ void main() {
       test('получает_поток_запросов_и_отправляет_один_ответ', () async {
         // Arrange
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
-        final serializer = _TestStringSerializer();
-        final receivedRequests = <String>[];
+        final receivedRequests = <RpcString>[];
 
-        final server = ClientStreamResponder<String, String>(
+        final server = ClientStreamResponder<RpcString, RpcString>(
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
-          handler: (Stream<String> requests) async {
+          requestSerializer: binaryStringSerializer,
+          responseSerializer: binaryStringSerializer,
+          handler: (Stream<RpcString> requests) async {
             await for (final request in requests) {
               receivedRequests.add(request);
             }
-            return 'Processed ${receivedRequests.length} requests';
+            return 'Processed ${receivedRequests.length} requests'.rpc;
           },
         );
 
-        final client = ClientStreamCaller<String, String>(
+        final client = ClientStreamCaller<RpcString, RpcString>(
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestSerializer: binaryStringSerializer,
+          responseSerializer: binaryStringSerializer,
         );
 
         // Act
-        await client.send('Hello');
-        await client.send('World');
+        await client.send('Hello'.rpc);
+        await client.send('World'.rpc);
         final response = await client.finishSending();
 
         // Assert
-        expect(response, equals('Processed 2 requests'));
-        expect(receivedRequests, equals(['Hello', 'World']));
+        expect(response, equals('Processed 2 requests'.rpc));
+        expect(receivedRequests, equals(['Hello'.rpc, 'World'.rpc]));
 
         // Cleanup
         await client.close();
@@ -249,29 +246,28 @@ void main() {
       test('обрабатывает_исключение_в_обработчике', () async {
         // Arrange
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
-        final serializer = _TestStringSerializer();
 
-        final server = ClientStreamResponder<String, String>(
+        final server = ClientStreamResponder<RpcString, RpcString>(
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
-          handler: (Stream<String> requests) async {
+          requestSerializer: binaryStringSerializer,
+          responseSerializer: binaryStringSerializer,
+          handler: (Stream<RpcString> requests) async {
             throw Exception('Handler error');
           },
         );
 
-        final client = ClientStreamCaller<String, String>(
+        final client = ClientStreamCaller<RpcString, RpcString>(
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestSerializer: binaryStringSerializer,
+          responseSerializer: binaryStringSerializer,
         );
 
         // Act & Assert
-        await client.send('test');
+        await client.send('test'.rpc);
         await expectLater(
           client.finishSending().timeout(Duration(seconds: 2)),
           throwsA(isA<Exception>()),
@@ -285,43 +281,42 @@ void main() {
       test('обрабатывает_только_запросы_своего_метода', () async {
         // Arrange
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
-        final serializer = _TestStringSerializer();
         var handlerCallCount = 0;
 
-        final server = ClientStreamResponder<String, String>(
+        final server = ClientStreamResponder<RpcString, RpcString>(
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'SpecificMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
-          handler: (Stream<String> requests) async {
+          requestSerializer: binaryStringSerializer,
+          responseSerializer: binaryStringSerializer,
+          handler: (Stream<RpcString> requests) async {
             handlerCallCount++;
             await for (final _ in requests) {}
-            return 'response';
+            return 'response'.rpc;
           },
         );
 
-        final correctClient = ClientStreamCaller<String, String>(
+        final correctClient = ClientStreamCaller<RpcString, RpcString>(
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'SpecificMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestSerializer: binaryStringSerializer,
+          responseSerializer: binaryStringSerializer,
         );
 
-        final incorrectClient = ClientStreamCaller<String, String>(
+        final incorrectClient = ClientStreamCaller<RpcString, RpcString>(
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'DifferentMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestSerializer: binaryStringSerializer,
+          responseSerializer: binaryStringSerializer,
         );
 
         // Act
-        await correctClient.send('correct');
+        await correctClient.send('correct'.rpc);
         final correctResponse = await correctClient.finishSending();
 
-        await incorrectClient.send('incorrect');
+        await incorrectClient.send('incorrect'.rpc);
         try {
           await incorrectClient.finishSending().timeout(Duration(seconds: 2));
         } catch (e) {
@@ -330,7 +325,7 @@ void main() {
 
         // Assert
         expect(handlerCallCount, equals(1));
-        expect(correctResponse, equals('response'));
+        expect(correctResponse, equals('response'.rpc));
 
         // Cleanup
         await correctClient.close();
@@ -341,15 +336,14 @@ void main() {
       test('закрывается_корректно', () async {
         // Arrange
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
-        final serializer = _TestStringSerializer();
 
-        final sut = ClientStreamResponder<String, String>(
+        final sut = ClientStreamResponder<RpcString, RpcString>(
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
-          handler: (Stream<String> requests) async => 'response',
+          requestSerializer: binaryStringSerializer,
+          responseSerializer: binaryStringSerializer,
+          handler: (Stream<RpcString> requests) async => 'response'.rpc,
         );
 
         // Act & Assert - должно закрыться без ошибок
@@ -362,40 +356,39 @@ void main() {
       test('полный_цикл_клиентского_стриминга', () async {
         // Arrange
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
-        final serializer = _TestStringSerializer();
 
-        final server = ClientStreamResponder<String, String>(
+        final server = ClientStreamResponder<RpcString, RpcString>(
           transport: serverTransport,
           serviceName: 'AggregatorService',
           methodName: 'Aggregate',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
-          handler: (Stream<String> requests) async {
-            final allRequests = <String>[];
+          requestSerializer: binaryStringSerializer,
+          responseSerializer: binaryStringSerializer,
+          handler: (Stream<RpcString> requests) async {
+            final allRequests = <RpcString>[];
             await for (final request in requests) {
               allRequests.add(request);
             }
-            return 'Aggregated: ${allRequests.join(', ')}';
+            return 'Aggregated: ${allRequests.join(', ')}'.rpc;
           },
         );
 
-        final client = ClientStreamCaller<String, String>(
+        final client = ClientStreamCaller<RpcString, RpcString>(
           transport: clientTransport,
           serviceName: 'AggregatorService',
           methodName: 'Aggregate',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestSerializer: binaryStringSerializer,
+          responseSerializer: binaryStringSerializer,
         );
 
         // Act
-        final requests = ['Part1', 'Part2', 'Part3'];
+        final requests = ['Part1'.rpc, 'Part2'.rpc, 'Part3'.rpc];
         for (final request in requests) {
           await client.send(request);
         }
         final response = await client.finishSending();
 
         // Assert
-        expect(response, equals('Aggregated: Part1, Part2, Part3'));
+        expect(response, equals('Aggregated: Part1, Part2, Part3'.rpc));
 
         // Cleanup
         await client.close();
@@ -405,40 +398,39 @@ void main() {
       test('большое_количество_запросов', () async {
         // Arrange
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
-        final serializer = _TestStringSerializer();
 
-        final server = ClientStreamResponder<String, String>(
+        final server = ClientStreamResponder<RpcString, RpcString>(
           transport: serverTransport,
           serviceName: 'CounterService',
           methodName: 'Count',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
-          handler: (Stream<String> requests) async {
+          requestSerializer: binaryStringSerializer,
+          responseSerializer: binaryStringSerializer,
+          handler: (Stream<RpcString> requests) async {
             var count = 0;
             await for (final _ in requests) {
               count++;
             }
-            return 'Total count: $count';
+            return 'Total count: $count'.rpc;
           },
         );
 
-        final client = ClientStreamCaller<String, String>(
+        final client = ClientStreamCaller<RpcString, RpcString>(
           transport: clientTransport,
           serviceName: 'CounterService',
           methodName: 'Count',
-          requestSerializer: serializer,
-          responseSerializer: serializer,
+          requestSerializer: binaryStringSerializer,
+          responseSerializer: binaryStringSerializer,
         );
 
         // Act
         const requestCount = 100;
         for (int i = 0; i < requestCount; i++) {
-          await client.send('request_$i');
+          await client.send('request_$i'.rpc);
         }
         final response = await client.finishSending();
 
         // Assert
-        expect(response, equals('Total count: $requestCount'));
+        expect(response, equals('Total count: $requestCount'.rpc));
 
         // Cleanup
         await client.close();
@@ -446,17 +438,4 @@ void main() {
       });
     });
   });
-}
-
-/// Простой сериализатор строк для тестов
-class _TestStringSerializer implements IRpcSerializer<String> {
-  @override
-  String deserialize(Uint8List bytes) {
-    return String.fromCharCodes(bytes);
-  }
-
-  @override
-  Uint8List serialize(String message) {
-    return Uint8List.fromList(message.codeUnits);
-  }
 }

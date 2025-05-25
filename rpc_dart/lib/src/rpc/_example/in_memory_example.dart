@@ -17,10 +17,10 @@ class InMemoryRpcExample {
     final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
 
     // Создаем сериализаторы для строк
-    final stringSerializer = SimpleStringSerializer();
+    final stringSerializer = RpcBinarySerializer(RpcString.fromBytes);
 
     // Инициализируем серверную часть
-    final server = BidirectionalStreamResponder<String, String>(
+    final server = BidirectionalStreamResponder<RpcString, RpcString>(
       transport: serverTransport,
       serviceName: 'ChatService',
       methodName: 'Connect',
@@ -37,29 +37,29 @@ class InMemoryRpcExample {
       print('Сервер получил: $request');
 
       // Эхо-обработчик с некоторой логикой
-      switch (request) {
+      switch (request.value) {
         case 'ping':
-          server.send('pong');
+          server.send('pong'.rpc);
           break;
         case 'время':
-          server.send('Текущее время: ${DateTime.now()}');
+          server.send('Текущее время: ${DateTime.now()}'.rpc);
           break;
         case 'случайное число':
           final random = (DateTime.now().millisecondsSinceEpoch % 100) + 1;
-          server.send('Случайное число от 1 до 100: $random');
+          server.send('Случайное число от 1 до 100: $random'.rpc);
           break;
         case 'завершить':
-          server.send('Сервер завершает работу...');
+          server.send('Сервер завершает работу...'.rpc);
           // Завершаем отправку с успешным статусом
           server.finishReceiving();
           break;
         default:
-          server.send('Эхо: $request');
+          server.send('Эхо: $request'.rpc);
       }
     });
 
     // Инициализируем клиентскую часть
-    final client = BidirectionalStreamCaller<String, String>(
+    final client = BidirectionalStreamCaller<RpcString, RpcString>(
       transport: clientTransport,
       serviceName: 'ChatService',
       methodName: 'Connect',
@@ -96,7 +96,7 @@ class InMemoryRpcExample {
 
     for (final request in requests) {
       print('Клиент отправляет: $request');
-      client.send(request);
+      client.send(request.rpc);
       await Future.delayed(Duration(milliseconds: 100));
     }
 

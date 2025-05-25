@@ -34,8 +34,8 @@ class RpcClientStreamBuilder {
     );
 
     // Создаем сериализаторы - на стороне клиента мы отправляем объекты напрямую
-    final requestSerializer = PassthroughSerializer<TRequest>();
-    final responseSerializer = PassthroughSerializer<TResponse>();
+    final requestSerializer = RpcPassthroughSerializer<TRequest>();
+    final responseSerializer = RpcPassthroughSerializer<TResponse>();
 
     // Создаем клиент с выбранными сериализаторами
     _logger.debug(
@@ -110,8 +110,8 @@ class RpcClientStreamBuilder {
     );
 
     // Создаем сериализаторы - на стороне клиента мы отправляем объекты напрямую
-    final requestSerializer = PassthroughSerializer<TRequest>();
-    final responseSerializer = PassthroughSerializer<TResponse>();
+    final requestSerializer = RpcPassthroughSerializer<TRequest>();
+    final responseSerializer = RpcPassthroughSerializer<TResponse>();
 
     // Создаем клиент с выбранными сериализаторами
     _logger.debug(

@@ -20,14 +20,15 @@ Future<void> runIsolateExample() async {
   final killIsolate = result.kill;
 
   print('Изолят запущен, настраиваем клиент...');
+  final serializer = RpcBinarySerializer(RpcString.fromBytes);
 
   // Создаем клиент для двустороннего потока
-  final client = BidirectionalStreamCaller<String, String>(
+  final client = BidirectionalStreamCaller<RpcString, RpcString>(
     transport: result.transport,
     serviceName: 'EchoService',
     methodName: 'Echo',
-    requestSerializer: const SimpleStringSerializer(),
-    responseSerializer: const SimpleStringSerializer(),
+    requestSerializer: serializer,
+    responseSerializer: serializer,
     logger: RpcLogger(
       "Host",
       colors: RpcLoggerColors.singleColor(AnsiColor.brightMagenta),
@@ -43,17 +44,17 @@ Future<void> runIsolateExample() async {
 
   // Отправляем запросы
   print('\nОтправляем запрос: "Привет, сервер!"');
-  client.send('Привет, сервер!');
+  client.send('Привет, сервер!'.rpc);
 
   await Future.delayed(Duration(milliseconds: 500));
 
   print('\nОтправляем запрос: "Как дела?"');
-  client.send('Как дела?');
+  client.send('Как дела?'.rpc);
 
   await Future.delayed(Duration(milliseconds: 500));
 
   print('\nОтправляем запрос: "Проверка эхо"');
-  client.send('Проверка эхо');
+  client.send('Проверка эхо'.rpc);
 
   // Ждем обработки сообщений
   await Future.delayed(Duration(seconds: 1));
@@ -89,12 +90,12 @@ void customEchoServer(
   );
 
   // Создаем сериализатор
-  final serializer = SimpleStringSerializer();
+  final serializer = RpcBinarySerializer(RpcString.fromBytes);
 
   RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.debug);
 
   // Создаем двунаправленный стрим-сервер
-  final server = BidirectionalStreamResponder<String, String>(
+  final server = BidirectionalStreamResponder<RpcString, RpcString>(
     transport: transport,
     serviceName: 'EchoService',
     methodName: 'Echo',
@@ -114,7 +115,7 @@ void customEchoServer(
     // Обработка запроса и отправка эхо-ответа
     final response = '$messagePrefix$requestStr';
     logger.debug('СЕРВЕР: Отправляем ответ: "$response"');
-    server.send(response);
+    server.send(response.rpc);
   });
 
   logger.debug('СЕРВЕР: Эхо-сервер запущен и готов к обработке запросов');

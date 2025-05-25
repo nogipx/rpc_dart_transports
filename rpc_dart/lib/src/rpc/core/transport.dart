@@ -17,6 +17,8 @@ abstract class IRpcSerializer<T> {
   /// [bytes] Байты для десериализации.
   /// Возвращает объект, воссозданный из байтов.
   T deserialize(Uint8List bytes);
+
+  RpcSerializationFormat get format;
 }
 
 /// Сообщение транспортного уровня с поддержкой Stream ID.

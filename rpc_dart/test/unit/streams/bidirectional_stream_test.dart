@@ -1,17 +1,16 @@
 import 'dart:async';
-import 'dart:typed_data';
+import 'package:rpc_dart/rpc_dart.dart';
 import 'package:test/test.dart';
-import 'package:rpc_dart/src/rpc/_index.dart';
 
 void main() {
   group('Bidirectional Stream', () {
+    final serializer = RpcBinarySerializer(RpcString.fromBytes);
     group('BidirectionalStreamClient', () {
       test('отправляет_и_получает_сообщения_двунаправленно', () async {
         // Arrange
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
-        final serializer = _TestStringSerializer();
 
-        final server = BidirectionalStreamResponder<String, String>(
+        final server = BidirectionalStreamResponder<RpcString, RpcString>(
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -19,7 +18,7 @@ void main() {
           responseSerializer: serializer,
         );
 
-        final client = BidirectionalStreamCaller<String, String>(
+        final client = BidirectionalStreamCaller<RpcString, RpcString>(
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -27,13 +26,13 @@ void main() {
           responseSerializer: serializer,
         );
 
-        final receivedRequests = <String>[];
-        final receivedResponses = <String>[];
+        final receivedRequests = <RpcString>[];
+        final receivedResponses = <RpcString>[];
 
         // Настраиваем серверную обработку
         server.requests.listen((request) async {
           receivedRequests.add(request);
-          await server.send('Echo: $request');
+          await server.send('Echo: $request'.rpc);
         });
 
         // Настраиваем клиентскую обработку
@@ -44,8 +43,8 @@ void main() {
         });
 
         // Act
-        await client.send('Hello');
-        await client.send('World');
+        await client.send('Hello'.rpc);
+        await client.send('World'.rpc);
 
         // Ждем обработки сообщений
         while (receivedResponses.length < 2) {
@@ -54,9 +53,12 @@ void main() {
 
         // Assert
         expect(receivedRequests.length, equals(2));
-        expect(receivedRequests, equals(['Hello', 'World']));
+        expect(receivedRequests, equals(['Hello'.rpc, 'World'.rpc]));
         expect(receivedResponses.length, equals(2));
-        expect(receivedResponses, equals(['Echo: Hello', 'Echo: World']));
+        expect(
+          receivedResponses,
+          equals(['Echo: Hello'.rpc, 'Echo: World'.rpc]),
+        );
 
         // Cleanup
         await client.close();
@@ -66,9 +68,8 @@ void main() {
       test('обрабатывает_метаданные_корректно', () async {
         // Arrange
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
-        final serializer = _TestStringSerializer();
 
-        final server = BidirectionalStreamResponder<String, String>(
+        final server = BidirectionalStreamResponder<RpcString, RpcString>(
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -76,7 +77,7 @@ void main() {
           responseSerializer: serializer,
         );
 
-        final client = BidirectionalStreamCaller<String, String>(
+        final client = BidirectionalStreamCaller<RpcString, RpcString>(
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -93,7 +94,7 @@ void main() {
         });
 
         // Act
-        await client.send('test message');
+        await client.send('test message'.rpc);
 
         // Ждем обработки метаданных
         while (!metadataReceived) {
@@ -111,9 +112,8 @@ void main() {
       test('закрывается_корректно', () async {
         // Arrange
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
-        final serializer = _TestStringSerializer();
 
-        final server = BidirectionalStreamResponder<String, String>(
+        final server = BidirectionalStreamResponder<RpcString, RpcString>(
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -121,7 +121,7 @@ void main() {
           responseSerializer: serializer,
         );
 
-        final client = BidirectionalStreamCaller<String, String>(
+        final client = BidirectionalStreamCaller<RpcString, RpcString>(
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -139,9 +139,8 @@ void main() {
       test('получает_и_отправляет_сообщения_двунаправленно', () async {
         // Arrange
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
-        final serializer = _TestStringSerializer();
 
-        final server = BidirectionalStreamResponder<String, String>(
+        final server = BidirectionalStreamResponder<RpcString, RpcString>(
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -149,7 +148,7 @@ void main() {
           responseSerializer: serializer,
         );
 
-        final client = BidirectionalStreamCaller<String, String>(
+        final client = BidirectionalStreamCaller<RpcString, RpcString>(
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -157,13 +156,13 @@ void main() {
           responseSerializer: serializer,
         );
 
-        final serverReceivedRequests = <String>[];
-        final clientReceivedResponses = <String>[];
+        final serverReceivedRequests = <RpcString>[];
+        final clientReceivedResponses = <RpcString>[];
 
         // Настраиваем серверную логику
         server.requests.listen((request) async {
           serverReceivedRequests.add(request);
-          await server.send('Server processed: $request');
+          await server.send('Server processed: $request'.rpc);
         });
 
         // Настраиваем клиентскую логику
@@ -174,8 +173,8 @@ void main() {
         });
 
         // Act
-        await client.send('Request 1');
-        await client.send('Request 2');
+        await client.send('Request 1'.rpc);
+        await client.send('Request 2'.rpc);
 
         // Ждем обработки
         while (clientReceivedResponses.length < 2) {
@@ -184,12 +183,13 @@ void main() {
 
         // Assert
         expect(serverReceivedRequests.length, equals(2));
-        expect(serverReceivedRequests, equals(['Request 1', 'Request 2']));
+        expect(
+            serverReceivedRequests, equals(['Request 1'.rpc, 'Request 2'.rpc]));
         expect(clientReceivedResponses.length, equals(2));
-        expect(
-            clientReceivedResponses, contains('Server processed: Request 1'));
-        expect(
-            clientReceivedResponses, contains('Server processed: Request 2'));
+        expect(clientReceivedResponses,
+            contains('Server processed: Request 1'.rpc));
+        expect(clientReceivedResponses,
+            contains('Server processed: Request 2'.rpc));
 
         // Cleanup
         await client.close();
@@ -199,10 +199,9 @@ void main() {
       test('обрабатывает_только_запросы_своего_метода', () async {
         // Arrange
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
-        final serializer = _TestStringSerializer();
         var handlerCallCount = 0;
 
-        final server = BidirectionalStreamResponder<String, String>(
+        final server = BidirectionalStreamResponder<RpcString, RpcString>(
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'SpecificMethod',
@@ -214,7 +213,7 @@ void main() {
           handlerCallCount++;
         });
 
-        final correctClient = BidirectionalStreamCaller<String, String>(
+        final correctClient = BidirectionalStreamCaller<RpcString, RpcString>(
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'SpecificMethod',
@@ -222,7 +221,7 @@ void main() {
           responseSerializer: serializer,
         );
 
-        final incorrectClient = BidirectionalStreamCaller<String, String>(
+        final incorrectClient = BidirectionalStreamCaller<RpcString, RpcString>(
           transport: clientTransport,
           serviceName: 'TestService',
           methodName: 'DifferentMethod',
@@ -231,8 +230,8 @@ void main() {
         );
 
         // Act
-        await correctClient.send('correct request');
-        await incorrectClient.send('incorrect request');
+        await correctClient.send('correct request'.rpc);
+        await incorrectClient.send('incorrect request'.rpc);
 
         // Ждем обработки
         await Future.delayed(Duration(milliseconds: 10));
@@ -249,9 +248,8 @@ void main() {
       test('закрывается_корректно', () async {
         // Arrange
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
-        final serializer = _TestStringSerializer();
 
-        final sut = BidirectionalStreamResponder<String, String>(
+        final sut = BidirectionalStreamResponder<RpcString, RpcString>(
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -269,9 +267,8 @@ void main() {
       test('полный_цикл_двунаправленного_стриминга', () async {
         // Arrange
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
-        final serializer = _TestStringSerializer();
 
-        final server = BidirectionalStreamResponder<String, String>(
+        final server = BidirectionalStreamResponder<RpcString, RpcString>(
           transport: serverTransport,
           serviceName: 'ChatService',
           methodName: 'Chat',
@@ -279,7 +276,7 @@ void main() {
           responseSerializer: serializer,
         );
 
-        final client = BidirectionalStreamCaller<String, String>(
+        final client = BidirectionalStreamCaller<RpcString, RpcString>(
           transport: clientTransport,
           serviceName: 'ChatService',
           methodName: 'Chat',
@@ -287,17 +284,17 @@ void main() {
           responseSerializer: serializer,
         );
 
-        final serverMessages = <String>[];
-        final clientMessages = <String>[];
+        final serverMessages = <RpcString>[];
+        final clientMessages = <RpcString>[];
 
         // Настраиваем сервер
         server.requests.listen((request) async {
           serverMessages.add(request);
 
-          if (request.startsWith('ping')) {
-            await server.send('pong');
+          if (request.value.startsWith('ping')) {
+            await server.send('pong'.rpc);
           } else {
-            await server.send('echo: $request');
+            await server.send('echo: $request'.rpc);
           }
         });
 
@@ -309,9 +306,9 @@ void main() {
         });
 
         // Act
-        await client.send('ping 1');
-        await client.send('hello world');
-        await client.send('ping 2');
+        await client.send('ping 1'.rpc);
+        await client.send('hello world'.rpc);
+        await client.send('ping 2'.rpc);
 
         // Ждем обработки всех сообщений
         while (clientMessages.length < 3) {
@@ -320,11 +317,12 @@ void main() {
 
         // Assert
         expect(serverMessages.length, equals(3));
-        expect(serverMessages, equals(['ping 1', 'hello world', 'ping 2']));
+        expect(serverMessages,
+            equals(['ping 1'.rpc, 'hello world'.rpc, 'ping 2'.rpc]));
 
         expect(clientMessages.length, equals(3));
-        expect(clientMessages, contains('pong'));
-        expect(clientMessages, contains('echo: hello world'));
+        expect(clientMessages, contains('pong'.rpc));
+        expect(clientMessages, contains('echo: hello world'.rpc));
 
         // Cleanup
         await client.close();
@@ -334,9 +332,8 @@ void main() {
       test('обработка_большого_количества_сообщений', () async {
         // Arrange
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
-        final serializer = _TestStringSerializer();
 
-        final server = BidirectionalStreamResponder<String, String>(
+        final server = BidirectionalStreamResponder<RpcString, RpcString>(
           transport: serverTransport,
           serviceName: 'HighVolumeService',
           methodName: 'Process',
@@ -344,7 +341,7 @@ void main() {
           responseSerializer: serializer,
         );
 
-        final client = BidirectionalStreamCaller<String, String>(
+        final client = BidirectionalStreamCaller<RpcString, RpcString>(
           transport: clientTransport,
           serviceName: 'HighVolumeService',
           methodName: 'Process',
@@ -352,10 +349,10 @@ void main() {
           responseSerializer: serializer,
         );
 
-        final receivedResponses = <String>[];
+        final receivedResponses = <RpcString>[];
 
         server.requests.listen((request) async {
-          await server.send('processed: $request');
+          await server.send('processed: $request'.rpc);
         });
 
         client.responses.listen((message) {
@@ -367,7 +364,7 @@ void main() {
         // Act
         const messageCount = 50;
         for (int i = 0; i < messageCount; i++) {
-          await client.send('message_$i');
+          await client.send('message_$i'.rpc);
         }
 
         // Ждем обработки всех сообщений
@@ -377,9 +374,9 @@ void main() {
 
         // Assert
         expect(receivedResponses.length, equals(messageCount));
-        expect(receivedResponses.first, equals('processed: message_0'));
+        expect(receivedResponses.first, equals('processed: message_0'.rpc));
         expect(receivedResponses.last,
-            equals('processed: message_${messageCount - 1}'));
+            equals('processed: message_${messageCount - 1}'.rpc));
 
         // Cleanup
         await client.close();
@@ -389,15 +386,18 @@ void main() {
   });
 }
 
-/// Простой сериализатор строк для тестов
-class _TestStringSerializer implements IRpcSerializer<String> {
-  @override
-  String deserialize(Uint8List bytes) {
-    return String.fromCharCodes(bytes);
-  }
+// /// Простой сериализатор строк для тестов
+// class _TestStringSerializer implements IRpcSerializer<String> {
+//   @override
+//   String deserialize(Uint8List bytes) {
+//     return String.fromCharCodes(bytes);
+//   }
 
-  @override
-  Uint8List serialize(String message) {
-    return Uint8List.fromList(message.codeUnits);
-  }
-}
+//   @override
+//   Uint8List serialize(String message) {
+//     return Uint8List.fromList(message.codeUnits);
+//   }
+
+//   @override
+//   RpcSerializationFormat get format => throw UnimplementedError();
+// }

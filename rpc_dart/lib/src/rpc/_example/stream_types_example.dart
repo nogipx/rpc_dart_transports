@@ -22,10 +22,10 @@ class StreamTypesExample {
     final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
 
     // Создаем сериализаторы для строк
-    final stringSerializer = const SimpleStringSerializer();
+    final stringSerializer = RpcBinarySerializer(RpcString.fromBytes);
 
     // Инициализируем серверную часть с обработчиком
-    final server = ServerStreamResponder<String, String>(
+    final server = ServerStreamResponder<RpcString, RpcString>(
       transport: serverTransport,
       serviceName: 'DataService',
       methodName: 'GetServerStream',
@@ -42,7 +42,7 @@ class StreamTypesExample {
         for (int i = 1; i <= 5; i++) {
           final response = 'Ответ #$i на запрос "$request"';
           print('СЕРВЕР: Отправляем: "$response"');
-          responder.send(response);
+          responder.send(response.rpc);
 
           // Делаем реальную задержку между ответами
           await Future.delayed(Duration(milliseconds: 50));
@@ -55,7 +55,7 @@ class StreamTypesExample {
     );
 
     // Инициализируем клиентскую часть
-    final client = ServerStreamCaller<String, String>(
+    final client = ServerStreamCaller<RpcString, RpcString>(
       transport: clientTransport,
       serviceName: 'DataService',
       methodName: 'GetServerStream',
@@ -88,7 +88,7 @@ class StreamTypesExample {
 
     // Отправляем единственный запрос
     print('КЛИЕНТ: Отправляем запрос: "Дай мне данные"');
-    await client.send('Дай мне данные');
+    await client.send('Дай мне данные'.rpc);
 
     // Ждем завершения обработки всех ответов
     print('КЛИЕНТ: Ждем завершения обработки...');
@@ -113,10 +113,10 @@ class StreamTypesExample {
     final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
 
     // Создаем сериализаторы для строк
-    final stringSerializer = const SimpleStringSerializer();
+    final stringSerializer = RpcBinarySerializer(RpcString.fromBytes);
 
     // Инициализируем серверную часть с обработчиком
-    final server = ClientStreamResponder<String, String>(
+    final server = ClientStreamResponder<RpcString, RpcString>(
       transport: serverTransport,
       serviceName: 'DataAggregatorService',
       methodName: 'ProcessClientStream',
@@ -126,7 +126,7 @@ class StreamTypesExample {
         'ClientStreamingExample',
         colors: RpcLoggerColors.singleColor(AnsiColor.brightMagenta),
       ),
-      handler: (Stream<String> requests) async {
+      handler: (Stream<RpcString> requests) async {
         print('СЕРВЕР: Ожидаем запросы...');
 
         int count = 0;
@@ -141,12 +141,12 @@ class StreamTypesExample {
         // Формируем и возвращаем итоговый ответ
         final response = 'Обработано $count запросов';
         print('СЕРВЕР: Отправляем ответ: "$response"');
-        return response;
+        return response.rpc;
       },
     );
 
     // Инициализируем клиентскую часть
-    final client = ClientStreamCaller<String, String>(
+    final client = ClientStreamCaller<RpcString, RpcString>(
       transport: clientTransport,
       serviceName: 'DataAggregatorService',
       methodName: 'ProcessClientStream',
@@ -169,7 +169,7 @@ class StreamTypesExample {
 
     for (final request in requests) {
       print('КЛИЕНТ: Отправляем запрос: "$request"');
-      client.send(request);
+      client.send(request.rpc);
       await Future.delayed(Duration(milliseconds: 50));
     }
 
@@ -179,7 +179,7 @@ class StreamTypesExample {
       // Ждем до 5 секунд, чтобы дать серверу больше времени
       final response = await client.finishSending().timeout(
             Duration(seconds: 5),
-            onTimeout: () => 'Таймаут ожидания ответа',
+            onTimeout: () => 'Таймаут ожидания ответа'.rpc,
           );
       print('КЛИЕНТ: Получен итоговый ответ: "$response"');
     } catch (e) {
