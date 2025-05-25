@@ -561,25 +561,6 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
     }
   }
 
-  /// Получает регистрацию метода по пути
-  RpcMethodRegistration _getMethodRegistration(String methodPath) {
-    final methodInfo = _parseMethodPath(methodPath);
-    if (methodInfo == null) {
-      throw RpcException('Некорректный путь метода: $methodPath');
-    }
-
-    final serviceName = methodInfo.$1;
-    final methodName = methodInfo.$2;
-    final methodKey = '$serviceName.$methodName';
-
-    final method = _methods[methodKey];
-    if (method == null) {
-      throw RpcException('Метод $methodKey не зарегистрирован');
-    }
-
-    return method;
-  }
-
   @override
   Future<void> close() async {
     if (!isActive) return;

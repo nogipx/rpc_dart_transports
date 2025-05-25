@@ -26,17 +26,17 @@ abstract class RpcResponderContract implements IRpcContract {
       TResponse extends IRpcSerializable>({
     required String methodName,
     required Future<TResponse> Function(TRequest) handler,
-    required IRpcSerializer requestDeserializer,
-    required IRpcSerializer responseSerializer,
+    required IRpcCodec<TRequest> requestCodec,
+    required IRpcCodec<TResponse> responseCodec,
     String description = '',
   }) {
-    _methods[methodName] = RpcMethodRegistration(
+    _methods[methodName] = RpcMethodRegistration<TRequest, TResponse>(
       name: methodName,
-      type: RpcMethodType.unary,
+      type: RpcMethodType.unaryRequest,
       handler: handler,
       description: description,
-      requestDeserializer: requestDeserializer.deserialize,
-      responseSerializer: responseSerializer.serialize,
+      requestCodec: requestCodec,
+      responseCodec: responseCodec,
     );
   }
 
@@ -46,17 +46,17 @@ abstract class RpcResponderContract implements IRpcContract {
       TResponse extends IRpcSerializable>({
     required String methodName,
     required Stream<TResponse> Function(TRequest) handler,
-    required IRpcSerializer requestDeserializer,
-    required IRpcSerializer responseSerializer,
+    required IRpcCodec<TRequest> requestCodec,
+    required IRpcCodec<TResponse> responseCodec,
     String description = '',
   }) {
-    _methods[methodName] = RpcMethodRegistration(
+    _methods[methodName] = RpcMethodRegistration<TRequest, TResponse>(
       name: methodName,
       type: RpcMethodType.serverStream,
       handler: handler,
       description: description,
-      requestDeserializer: requestDeserializer.deserialize,
-      responseSerializer: responseSerializer.serialize,
+      requestCodec: requestCodec,
+      responseCodec: responseCodec,
     );
   }
 
@@ -66,17 +66,17 @@ abstract class RpcResponderContract implements IRpcContract {
       TResponse extends IRpcSerializable>({
     required String methodName,
     required Future<TResponse> Function(Stream<TRequest>) handler,
-    required IRpcSerializer requestDeserializer,
-    required IRpcSerializer responseSerializer,
+    required IRpcCodec<TRequest> requestCodec,
+    required IRpcCodec<TResponse> responseCodec,
     String description = '',
   }) {
-    _methods[methodName] = RpcMethodRegistration(
+    _methods[methodName] = RpcMethodRegistration<TRequest, TResponse>(
       name: methodName,
       type: RpcMethodType.clientStream,
       handler: handler,
       description: description,
-      requestDeserializer: requestDeserializer.deserialize,
-      responseSerializer: responseSerializer.serialize,
+      requestCodec: requestCodec,
+      responseCodec: responseCodec,
     );
   }
 
@@ -86,17 +86,17 @@ abstract class RpcResponderContract implements IRpcContract {
       TResponse extends IRpcSerializable>({
     required String methodName,
     required Stream<TResponse> Function(Stream<TRequest>) handler,
-    required IRpcSerializer requestDeserializer,
-    required IRpcSerializer responseSerializer,
+    required IRpcCodec<TRequest> requestCodec,
+    required IRpcCodec<TResponse> responseCodec,
     String description = '',
   }) {
-    _methods[methodName] = RpcMethodRegistration(
+    _methods[methodName] = RpcMethodRegistration<TRequest, TResponse>(
       name: methodName,
-      type: RpcMethodType.bidirectional,
+      type: RpcMethodType.bidirectionalStream,
       handler: handler,
       description: description,
-      requestDeserializer: requestDeserializer.deserialize,
-      responseSerializer: responseSerializer.serialize,
+      requestCodec: requestCodec,
+      responseCodec: responseCodec,
     );
   }
 
