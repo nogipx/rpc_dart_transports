@@ -29,8 +29,8 @@ class StreamTypesExample {
       transport: serverTransport,
       serviceName: 'DataService',
       methodName: 'GetServerStream',
-      requestSerializer: stringSerializer,
-      responseSerializer: stringSerializer,
+      requestCodec: stringSerializer,
+      responseCodec: stringSerializer,
       logger: RpcLogger(
         'ServerStreamingExample',
         colors: RpcLoggerColors.singleColor(AnsiColor.brightGreen),
@@ -59,8 +59,8 @@ class StreamTypesExample {
       transport: clientTransport,
       serviceName: 'DataService',
       methodName: 'GetServerStream',
-      requestSerializer: stringSerializer,
-      responseSerializer: stringSerializer,
+      requestCodec: stringSerializer,
+      responseCodec: stringSerializer,
       logger: RpcLogger(
         'ServerStreamingExample',
         colors: RpcLoggerColors.singleColor(AnsiColor.brightGreen),

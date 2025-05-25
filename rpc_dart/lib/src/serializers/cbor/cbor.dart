@@ -5,7 +5,7 @@ import 'dart:typed_data';
 
 /// Реализация CBOR (Concise Binary Object Representation) для RPC
 /// Формат описан в RFC 7049: https://tools.ietf.org/html/rfc7049
-class CborCodec {
+abstract interface class CborCodec {
   /// Константы для мажорных типов
   static const int _majorTypeUnsignedInt = 0;
   static const int _majorTypeNegativeInt = 1;

@@ -53,8 +53,8 @@ class UnaryRpcExample {
         transport: serverTransport,
         serviceName: serviceName,
         methodName: methodName,
-        requestSerializer: stringSerializer,
-        responseSerializer: stringSerializer,
+        requestCodec: stringSerializer,
+        responseCodec: stringSerializer,
         handler: (request) {
           print(
               'СЕРВЕР [$serviceName/$methodName]: Получен запрос: "$request"');
@@ -89,8 +89,8 @@ class UnaryRpcExample {
         transport: clientTransport,
         serviceName: 'GreetingService',
         methodName: 'SayHello',
-        requestSerializer: stringSerializer,
-        responseSerializer: stringSerializer,
+        requestCodec: stringSerializer,
+        responseCodec: stringSerializer,
         logger: RpcLogger(
           "GreetingClient",
           colors: RpcLoggerColors.singleColor(AnsiColor.brightMagenta),
@@ -106,8 +106,8 @@ class UnaryRpcExample {
         transport: clientTransport,
         serviceName: 'TimeService',
         methodName: 'GetCurrentTime',
-        requestSerializer: stringSerializer,
-        responseSerializer: stringSerializer,
+        requestCodec: stringSerializer,
+        responseCodec: stringSerializer,
         logger: RpcLogger(
           "TimeClient",
           colors: RpcLoggerColors.singleColor(AnsiColor.brightCyan),
@@ -124,8 +124,8 @@ class UnaryRpcExample {
         transport: clientTransport,
         serviceName: 'StatusService',
         methodName: 'CheckHealth',
-        requestSerializer: stringSerializer,
-        responseSerializer: stringSerializer,
+        requestCodec: stringSerializer,
+        responseCodec: stringSerializer,
         logger: RpcLogger(
           "StatusClient",
           colors: RpcLoggerColors.singleColor(AnsiColor.brightWhite),
@@ -145,8 +145,8 @@ class UnaryRpcExample {
         transport: clientTransport,
         serviceName: 'ErrorService',
         methodName: 'ThrowError',
-        requestSerializer: stringSerializer,
-        responseSerializer: stringSerializer,
+        requestCodec: stringSerializer,
+        responseCodec: stringSerializer,
         logger: RpcLogger(
           "ErrorClient",
           colors: RpcLoggerColors.singleColor(AnsiColor.brightRed),
@@ -166,8 +166,8 @@ class UnaryRpcExample {
         transport: clientTransport,
         serviceName: 'EchoService',
         methodName: 'Echo',
-        requestSerializer: stringSerializer,
-        responseSerializer: stringSerializer,
+        requestCodec: stringSerializer,
+        responseCodec: stringSerializer,
         logger: RpcLogger(
           "EchoClient",
           colors: RpcLoggerColors.singleColor(AnsiColor.brightBlack),
@@ -201,8 +201,8 @@ class UnaryRpcExample {
             transport: clientTransport,
             serviceName: serviceName,
             methodName: methodName,
-            requestSerializer: stringSerializer,
-            responseSerializer: stringSerializer,
+            requestCodec: stringSerializer,
+            responseCodec: stringSerializer,
             logger: RpcLogger(
               "$serviceName-ParallelClient",
               colors: RpcLoggerColors.singleColor(AnsiColor.brightGreen),

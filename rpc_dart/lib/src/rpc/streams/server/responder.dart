@@ -35,16 +35,16 @@ final class ServerStreamResponder<TRequest, TResponse> {
   /// [transport] Транспортный уровень
   /// [serviceName] Имя сервиса (например, "DataService")
   /// [methodName] Имя метода (например, "GetData")
-  /// [requestSerializer] Кодек для десериализации запроса
-  /// [responseSerializer] Кодек для сериализации ответов
+  /// [requestCodec] Кодек для десериализации запроса
+  /// [responseCodec] Кодек для сериализации ответов
   /// [handler] Функция-обработчик, вызываемая при получении запроса
   /// [logger] Опциональный логгер
   ServerStreamResponder({
     required IRpcTransport transport,
     required String serviceName,
     required String methodName,
-    required IRpcCodec<TRequest> requestSerializer,
-    required IRpcCodec<TResponse> responseSerializer,
+    required IRpcCodec<TRequest> requestCodec,
+    required IRpcCodec<TResponse> responseCodec,
     required void Function(
       TRequest request,
       // ignore: library_private_types_in_public_api
@@ -57,8 +57,8 @@ final class ServerStreamResponder<TRequest, TResponse> {
       transport: transport,
       serviceName: serviceName,
       methodName: methodName,
-      requestCodec: requestSerializer,
-      responseCodec: responseSerializer,
+      requestCodec: requestCodec,
+      responseCodec: responseCodec,
       logger: _logger,
     );
     unawaited(_setupRequestHandler(handler));

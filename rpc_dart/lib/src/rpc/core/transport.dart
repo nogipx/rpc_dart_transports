@@ -5,9 +5,9 @@ part of '../_index.dart';
 /// Представляет различные типы сообщений, которые могут передаваться
 /// через транспортный уровень, включая метаданные и полезную нагрузку.
 /// Каждое сообщение привязано к конкретному HTTP/2 stream (RPC вызову).
-final class RpcTransportMessage<T> {
+final class RpcTransportMessage {
   /// Полезная нагрузка сообщения (данные)
-  final T? payload;
+  final Uint8List? payload;
 
   /// Связанные метаданные
   final RpcMetadata? metadata;
@@ -72,13 +72,13 @@ abstract class IRpcTransport {
   ///
   /// Объединяет входящие метаданные и данные в единый поток RpcTransportMessage.
   /// Каждый элемент потока содержит информацию о Stream ID для маршрутизации.
-  Stream<RpcTransportMessage<Uint8List>> get incomingMessages;
+  Stream<RpcTransportMessage> get incomingMessages;
 
   /// Создает отфильтрованный поток сообщений для конкретного stream.
   ///
   /// [streamId] Уникальный идентификатор HTTP/2 stream
   /// Возвращает поток сообщений только для указанного stream
-  Stream<RpcTransportMessage<Uint8List>> getMessagesForStream(int streamId) {
+  Stream<RpcTransportMessage> getMessagesForStream(int streamId) {
     return incomingMessages.where((message) => message.streamId == streamId);
   }
 

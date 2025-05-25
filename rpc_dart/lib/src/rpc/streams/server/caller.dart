@@ -33,15 +33,15 @@ final class ServerStreamCaller<TRequest, TResponse> {
   /// [transport] Транспортный уровень
   /// [serviceName] Имя сервиса (например, "DataService")
   /// [methodName] Имя метода (например, "GetData")
-  /// [requestSerializer] Кодек для сериализации запроса
-  /// [responseSerializer] Кодек для десериализации ответов
+  /// [requestCodec] Кодек для сериализации запроса
+  /// [responseCodec] Кодек для десериализации ответов
   /// [logger] Опциональный логгер
   ServerStreamCaller({
     required IRpcTransport transport,
     required String serviceName,
     required String methodName,
-    required IRpcCodec<TRequest> requestSerializer,
-    required IRpcCodec<TResponse> responseSerializer,
+    required IRpcCodec<TRequest> requestCodec,
+    required IRpcCodec<TResponse> responseCodec,
     RpcLogger? logger,
   }) {
     _logger = logger?.child('ServerCaller');
@@ -49,8 +49,8 @@ final class ServerStreamCaller<TRequest, TResponse> {
       transport: transport,
       serviceName: serviceName,
       methodName: methodName,
-      requestCodec: requestSerializer,
-      responseCodec: responseSerializer,
+      requestCodec: requestCodec,
+      responseCodec: responseCodec,
       logger: _logger,
     );
   }

@@ -52,23 +52,23 @@ final class UnaryResponder<TRequest, TResponse> {
   /// [transport] Транспортный уровень
   /// [serviceName] Имя сервиса (например, "GreetingService")
   /// [methodName] Имя метода (например, "SayHello")
-  /// [requestSerializer] Кодек для десериализации запроса
-  /// [responseSerializer] Кодек для сериализации ответа
+  /// [requestCodec] Кодек для десериализации запроса
+  /// [responseCodec] Кодек для сериализации ответа
   /// [handler] Функция-обработчик, вызываемая при получении запроса
   /// [logger] Опциональный логгер
   UnaryResponder({
     required IRpcTransport transport,
     required String serviceName,
     required String methodName,
-    required IRpcCodec<TRequest> requestSerializer,
-    required IRpcCodec<TResponse> responseSerializer,
+    required IRpcCodec<TRequest> requestCodec,
+    required IRpcCodec<TResponse> responseCodec,
     required FutureOr<TResponse> Function(TRequest request) handler,
     RpcLogger? logger,
   })  : _transport = transport,
         _serviceName = serviceName,
         _methodName = methodName,
-        _requestSerializer = requestSerializer,
-        _responseSerializer = responseSerializer {
+        _requestSerializer = requestCodec,
+        _responseSerializer = responseCodec {
     _logger = logger?.child('UnaryResponder');
     _parser = RpcMessageParser(logger: _logger);
     _methodPath = '/$_serviceName/$_methodName';
