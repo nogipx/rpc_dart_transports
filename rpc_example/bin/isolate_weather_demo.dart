@@ -16,6 +16,9 @@ void serverIsolateEntrypoint(IRpcTransport transport, Map<String, dynamic> custo
   final server = WeatherServer();
   serverEndpoint.registerServiceContract(server);
 
+  // Явно запускаем прослушивание (хотя это должно происходить автоматически при регистрации)
+  serverEndpoint.start();
+
   print('ISOLATE: Сервер погоды запущен и зарегистрирован');
 }
 

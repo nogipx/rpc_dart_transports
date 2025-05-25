@@ -4,13 +4,13 @@ import 'calculator_interface.dart';
 import '../_index.dart';
 
 /// Серверная реализация калькулятора
-class CalculatorServer extends RpcServerContract
+class CalculatorResponder extends RpcResponderContract
     implements ICalculatorContract {
   /// Настраиваемая задержка (мс) для имитации вычислений
   final int simulatedDelayMs;
 
   /// Конструктор с опциональной настройкой задержки
-  CalculatorServer({this.simulatedDelayMs = 0}) : super('CalculatorService');
+  CalculatorResponder({this.simulatedDelayMs = 0}) : super('CalculatorService');
 
   @override
   void setup() {

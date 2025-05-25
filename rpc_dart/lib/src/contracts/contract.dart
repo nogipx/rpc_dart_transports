@@ -8,12 +8,12 @@ abstract interface class IRpcContract {
 
 /// Серверный контракт сервиса
 /// Регистрирует и обрабатывает методы
-abstract class RpcServerContract implements IRpcContract {
+abstract class RpcResponderContract implements IRpcContract {
   @override
   final String serviceName;
   final Map<String, RpcMethodRegistration> _methods = {};
 
-  RpcServerContract(this.serviceName);
+  RpcResponderContract(this.serviceName);
 
   /// Декларативная регистрация методов
   void setup() {
@@ -106,12 +106,12 @@ abstract class RpcServerContract implements IRpcContract {
 
 /// Клиентский контракт сервиса
 /// Только вызывает методы, не регистрирует их
-abstract class RpcClientContract implements IRpcContract {
+abstract class RpcCallerContract implements IRpcContract {
   @override
   final String serviceName;
   final RpcCallerEndpoint _endpoint;
 
-  RpcClientContract(this.serviceName, this._endpoint);
+  RpcCallerContract(this.serviceName, this._endpoint);
 
   /// Получает endpoint, используемый для отправки запросов
   RpcCallerEndpoint get endpoint => _endpoint;

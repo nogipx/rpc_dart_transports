@@ -5,10 +5,10 @@ import 'calculator_contract.dart';
 import 'calculator_interface.dart';
 
 /// Клиентская реализация калькулятора
-class CalculatorClient extends RpcClientContract
+class CalculatorCaller extends RpcCallerContract
     implements ICalculatorContract {
   /// Создает клиента с указанным эндпоинтом
-  CalculatorClient(RpcCallerEndpoint endpoint)
+  CalculatorCaller(RpcCallerEndpoint endpoint)
       : super('CalculatorService', endpoint);
 
   @override

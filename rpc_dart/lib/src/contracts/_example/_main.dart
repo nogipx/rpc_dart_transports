@@ -7,6 +7,10 @@ import 'calculator_client.dart';
 import 'calculator_server.dart';
 import 'calculator_contract.dart';
 
+void main(List<String> args) async {
+  await runCalculatorDemo();
+}
+
 /// Демонстрация использования калькулятора
 Future<void> runCalculatorDemo() async {
   print('===== Запуск демонстрации калькулятора =====');
@@ -16,15 +20,21 @@ Future<void> runCalculatorDemo() async {
   RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.debug);
 
   // Создаем эндпоинты для клиента и сервера
-  final serverEndpoint = RpcResponderEndpoint(transport: transport.$1);
-  final clientEndpoint = RpcCallerEndpoint(transport: transport.$2);
+  final serverEndpoint = RpcResponderEndpoint(
+    transport: transport.$1,
+    loggerColors: RpcLoggerColors.singleColor(AnsiColor.cyan),
+  );
+  final clientEndpoint = RpcCallerEndpoint(
+    transport: transport.$2,
+    loggerColors: RpcLoggerColors.singleColor(AnsiColor.magenta),
+  );
 
   // Создаем сервер и регистрируем его
-  final server = CalculatorServer(simulatedDelayMs: 50);
+  final server = CalculatorResponder(simulatedDelayMs: 50);
   serverEndpoint.registerServiceContract(server);
 
   // Создаем клиента
-  final client = CalculatorClient(clientEndpoint);
+  final client = CalculatorCaller(clientEndpoint);
 
   // Проверка типобезопасности: теперь клиентский контракт нельзя зарегистрировать
   // Раскомментируйте строку ниже, чтобы увидеть ошибку компиляции:
@@ -50,7 +60,7 @@ Future<void> runCalculatorDemo() async {
 }
 
 /// Демонстрация унарных вычислений
-Future<void> _demoUnaryCalculation(CalculatorClient client) async {
+Future<void> _demoUnaryCalculation(CalculatorCaller client) async {
   try {
     print('DEBUG: Начало _demoUnaryCalculation');
 
@@ -90,7 +100,7 @@ Future<void> _demoUnaryCalculation(CalculatorClient client) async {
 }
 
 /// Демонстрация бинарной сериализации
-Future<void> _demoBinarySerialization(CalculatorClient client) async {
+Future<void> _demoBinarySerialization(CalculatorCaller client) async {
   try {
     // Используем бинарную сериализацию
     final response = await client.calculateBinary(
@@ -107,7 +117,7 @@ Future<void> _demoBinarySerialization(CalculatorClient client) async {
 }
 
 /// Демонстрация двунаправленного стрима
-Future<void> _demoBidirectionalStream(CalculatorClient client) async {
+Future<void> _demoBidirectionalStream(CalculatorCaller client) async {
   final random = Random();
 
   // Создаем контроллер для отправки запросов
@@ -153,13 +163,4 @@ Future<void> _demoBidirectionalStream(CalculatorClient client) async {
   // Ждем завершения всех ответов
   await responseSubscription.asFuture();
   await responseSubscription.cancel();
-}
-
-/// Точка входа для демонстрации
-void main() async {
-  try {
-    await runCalculatorDemo();
-  } catch (e) {
-    print('Ошибка при запуске демонстрации: $e');
-  }
 }

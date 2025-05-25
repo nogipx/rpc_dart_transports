@@ -130,7 +130,7 @@ abstract interface class IWeatherContract implements IRpcContract {
 }
 
 // Контракт для сервера
-abstract class WeatherServerContract extends RpcServerContract implements IWeatherContract {
+abstract class WeatherServerContract extends RpcResponderContract implements IWeatherContract {
   WeatherServerContract() : super(IWeatherContract.serviceNameValue);
 
   @override
@@ -169,7 +169,7 @@ abstract class WeatherServerContract extends RpcServerContract implements IWeath
 }
 
 // Контракт для клиента
-abstract class WeatherClientContract extends RpcClientContract implements IWeatherContract {
+abstract class WeatherClientContract extends RpcCallerContract implements IWeatherContract {
   WeatherClientContract(RpcCallerEndpoint endpoint)
       : super(IWeatherContract.serviceNameValue, endpoint);
 

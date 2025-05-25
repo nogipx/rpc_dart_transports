@@ -3,11 +3,15 @@ part of '_index.dart';
 /// Клиентский RPC эндпоинт для отправки запросов
 final class RpcCallerEndpoint extends RpcEndpointBase {
   @override
-  RpcLogger get logger => RpcLogger('RpcCallerEndpoint[${debugLabel ?? ''}]');
+  RpcLogger get logger => RpcLogger(
+        'RpcCallerEndpoint[${debugLabel ?? ''}]',
+        colors: loggerColors,
+      );
 
   RpcCallerEndpoint({
     required super.transport,
     super.debugLabel,
+    super.loggerColors,
   });
 
   /// Создает унарный request builder

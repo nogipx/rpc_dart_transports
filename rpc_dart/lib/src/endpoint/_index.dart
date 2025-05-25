@@ -1,4 +1,5 @@
 import 'package:rpc_dart/rpc_dart.dart';
+import 'dart:convert';
 
 part 'caller_endpoint.dart';
 part 'responder_endpoint.dart';
@@ -8,12 +9,15 @@ abstract base class RpcEndpointBase {
   final IRpcTransport _transport;
   final List<IRpcMiddleware> _middlewares = [];
   final String? debugLabel;
+  final RpcLoggerColors? loggerColors;
+
   RpcLogger get logger;
   bool _isActive = true;
 
   RpcEndpointBase({
     required IRpcTransport transport,
     this.debugLabel,
+    this.loggerColors,
   }) : _transport = transport;
 
   void addMiddleware(IRpcMiddleware middleware) {
