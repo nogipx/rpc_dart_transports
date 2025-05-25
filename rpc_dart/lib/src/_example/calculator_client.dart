@@ -95,9 +95,9 @@ class CalculatorCaller extends RpcCallerContract
           serviceName: serviceName,
           methodName: ICalculatorContract.methodCalculate,
         )
-        .callJson(
+        .callBinary(
           request: request,
-          responseParser: CalculationResponse.fromJson,
+          responseParser: calculationResponseFromBuffer,
         );
   }
 }

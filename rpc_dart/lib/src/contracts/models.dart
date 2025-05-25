@@ -1,38 +1,5 @@
 part of '_index.dart';
 
-/// Формат сериализации для RPC сообщений
-enum RpcSerializationFormat {
-  /// JSON формат (через utf8)
-  json,
-
-  /// Бинарный формат (включая protobuf, msgpack и т.д.)
-  binary
-}
-
-/// Основной интерфейс для всех RPC сообщений - работает с байтами
-/// Все типы запросов и ответов должны реализовывать этот интерфейс
-/// Это базовый интерфейс для binary сериализации (protobuf, msgpack, etc.)
-abstract interface class IRpcSerializable {
-  /// Сериализует объект в байты
-  Uint8List serialize();
-
-  /// Возвращает формат сериализации (по умолчанию JSON для обратной совместимости)
-  RpcSerializationFormat getFormat() => RpcSerializationFormat.json;
-
-  /// Десериализует объект из байтов - должен быть статическим методом
-  /// static T fromBytes(Uint8List bytes);
-}
-
-/// Интерфейс для моделей, которые могут конвертироваться в JSON
-/// Более удобный интерфейс для пользовательских моделей
-abstract interface class IRpcJsonSerializable {
-  /// Конвертирует модель в JSON Map
-  Map<String, dynamic> toJson();
-
-  /// Создает модель из JSON Map - должен быть статическим методом
-  /// static T fromJson(Map<String, dynamic> json);
-}
-
 /// Миксин для автоматической сериализации JSON -> байты
 /// Позволяет разработчикам использовать привычные toJson/fromJson методы
 /// и автоматически получать binary сериализацию через JSON
@@ -54,8 +21,18 @@ mixin _JsonRpcSerializable on IRpcJsonSerializable implements IRpcSerializable {
     T Function(Map<String, dynamic>) fromJson,
   ) {
     final jsonString = utf8.decode(bytes);
-    final json = jsonDecode(jsonString) as Map<String, dynamic>;
-    return fromJson(json);
+    try {
+      final json = jsonDecode(jsonString) as Map<String, dynamic>;
+      return fromJson(json);
+    } catch (e) {
+      if (jsonString.startsWith('Instance of ')) {
+        throw FormatException(
+          'Получена строка представления объекта вместо JSON: $jsonString. '
+          'Убедитесь, что объект правильно сериализуется в JSON перед отправкой.',
+        );
+      }
+      rethrow;
+    }
   }
 }
 

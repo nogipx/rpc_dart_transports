@@ -5,6 +5,7 @@ export 'endpoint/_index.dart';
 export 'logs/_logs.dart';
 export 'primitives/_index.dart';
 export 'rpc/_index.dart';
+export 'serializers/_index.dart';
 
 // BINARY
 
@@ -45,3 +46,23 @@ RpcJsonSerializer<RpcInt> get jsonIntSerializer =>
 
 RpcJsonSerializer<RpcString> get jsonStringSerializer =>
     RpcJsonSerializer<RpcString>(RpcString.fromJson);
+
+// CBOR
+
+RpcCborSerializer<RpcBool> get cborBoolSerializer =>
+    RpcCborSerializer<RpcBool>(RpcBool.fromJson);
+
+RpcCborSerializer<RpcNull> get cborNullSerializer =>
+    RpcCborSerializer<RpcNull>(RpcNull.fromJson);
+
+RpcCborSerializer<RpcNum> get cborNumSerializer =>
+    RpcCborSerializer<RpcNum>(RpcNum.fromJson);
+
+RpcCborSerializer<RpcDouble> get cborDoubleSerializer =>
+    RpcCborSerializer<RpcDouble>(RpcDouble.fromJson);
+
+RpcCborSerializer<RpcInt> get cborIntSerializer =>
+    RpcCborSerializer<RpcInt>(RpcInt.fromJson);
+
+RpcCborSerializer<RpcString> get cborStringSerializer =>
+    RpcCborSerializer<RpcString>(RpcString.fromJson);
