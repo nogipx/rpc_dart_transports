@@ -1,5 +1,7 @@
 import 'package:rpc_dart/rpc_dart.dart';
 import 'dart:convert';
+import 'dart:async';
+import 'caller_builders/_index.dart';
 
 part 'caller_endpoint.dart';
 part 'responder_endpoint.dart';
@@ -28,6 +30,16 @@ abstract base class RpcEndpointBase {
   bool get isActive => _isActive;
 
   IRpcTransport get transport => _transport;
+
+  /// Запускает эндпоинт
+  void start() {
+    logger.info('Запуск RPC эндпоинта');
+  }
+
+  /// Останавливает эндпоинт
+  void stop() {
+    logger.info('Остановка RPC эндпоинта');
+  }
 
   Future<void> close() async {
     if (!_isActive) return;
