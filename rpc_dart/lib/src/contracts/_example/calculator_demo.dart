@@ -1,10 +1,8 @@
 import 'dart:async';
 import 'dart:math';
 
-import 'package:rpc_dart/src/logs/_logs.dart';
+import 'package:rpc_dart/rpc_dart.dart';
 
-import '../_index.dart';
-import '../../rpc/_index.dart';
 import 'calculator_client.dart';
 import 'calculator_server.dart';
 import 'calculator_contract.dart';

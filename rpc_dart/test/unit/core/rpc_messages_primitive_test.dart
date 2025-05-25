@@ -98,11 +98,11 @@ void main() {
 
       // Проверка исключений при сравнении с примитивами
       // ignore: unrelated_type_equality_checks
-      expect(() => a == 11, throwsA(isA<RpcUnsupportedOperationException>()));
-      expect(() => a > 3, throwsA(isA<RpcUnsupportedOperationException>()));
-      expect(() => a < 20, throwsA(isA<RpcUnsupportedOperationException>()));
-      expect(() => a >= 10, throwsA(isA<RpcUnsupportedOperationException>()));
-      expect(() => a <= 10, throwsA(isA<RpcUnsupportedOperationException>()));
+      expect(() => a == 11, throwsA(isA<RpcException>()));
+      expect(() => a > 3, throwsA(isA<RpcException>()));
+      expect(() => a < 20, throwsA(isA<RpcException>()));
+      expect(() => a >= 10, throwsA(isA<RpcException>()));
+      expect(() => a <= 10, throwsA(isA<RpcException>()));
     });
   });
 
@@ -200,19 +200,19 @@ void main() {
 
       // Проверка исключений при сравнении с примитивами
       // ignore: unrelated_type_equality_checks
-      expect(() => a == 11, throwsA(isA<RpcUnsupportedOperationException>()));
-      expect(() => a > 3, throwsA(isA<RpcUnsupportedOperationException>()));
-      expect(() => a < 20, throwsA(isA<RpcUnsupportedOperationException>()));
-      expect(() => a >= 5.5, throwsA(isA<RpcUnsupportedOperationException>()));
-      expect(() => a <= 5.5, throwsA(isA<RpcUnsupportedOperationException>()));
+      expect(() => a == 11, throwsA(isA<RpcException>()));
+      expect(() => a > 3, throwsA(isA<RpcException>()));
+      expect(() => a < 20, throwsA(isA<RpcException>()));
+      expect(() => a >= 5.5, throwsA(isA<RpcException>()));
+      expect(() => a <= 5.5, throwsA(isA<RpcException>()));
 
       // Проверка исключений при сравнении с примитивами
       // ignore: unrelated_type_equality_checks
-      expect(() => a == 5.5, throwsA(isA<RpcUnsupportedOperationException>()));
-      expect(() => a > 2.0, throwsA(isA<RpcUnsupportedOperationException>()));
-      expect(() => a < 10.0, throwsA(isA<RpcUnsupportedOperationException>()));
-      expect(() => a >= 5.5, throwsA(isA<RpcUnsupportedOperationException>()));
-      expect(() => a <= 5.5, throwsA(isA<RpcUnsupportedOperationException>()));
+      expect(() => a == 5.5, throwsA(isA<RpcException>()));
+      expect(() => a > 2.0, throwsA(isA<RpcException>()));
+      expect(() => a < 10.0, throwsA(isA<RpcException>()));
+      expect(() => a >= 5.5, throwsA(isA<RpcException>()));
+      expect(() => a <= 5.5, throwsA(isA<RpcException>()));
     });
   });
 
@@ -276,7 +276,7 @@ void main() {
       expect(a - b, RpcNum(4.5));
       expect(a * b, RpcNum(17.5));
       expect(a / b, RpcNum(2.8));
-      expect(() => a ~/ b, throwsA(isA<RpcUnsupportedOperationException>()));
+      expect(() => a ~/ b, throwsA(isA<RpcException>()));
       expect(a % b, RpcNum(7 % 2.5));
       expect(-a, RpcNum(-7));
       // С обычными числами
@@ -307,18 +307,18 @@ void main() {
 
       // Проверка исключений при сравнении с примитивами
       // ignore: unrelated_type_equality_checks
-      expect(() => a == 7, throwsA(isA<RpcUnsupportedOperationException>()));
-      expect(() => a > 2, throwsA(isA<RpcUnsupportedOperationException>()));
-      expect(() => a < 10, throwsA(isA<RpcUnsupportedOperationException>()));
-      expect(() => a >= 7, throwsA(isA<RpcUnsupportedOperationException>()));
-      expect(() => a <= 7, throwsA(isA<RpcUnsupportedOperationException>()));
+      expect(() => a == 7, throwsA(isA<RpcException>()));
+      expect(() => a > 2, throwsA(isA<RpcException>()));
+      expect(() => a < 10, throwsA(isA<RpcException>()));
+      expect(() => a >= 7, throwsA(isA<RpcException>()));
+      expect(() => a <= 7, throwsA(isA<RpcException>()));
     });
   });
 
   group('RpcNull', () {
     test('создание', () {
       const nullValue = RpcNull();
-      expect(nullValue, isA<IRpcSerializableMessage>());
+      expect(nullValue, isA<IRpcSerializable>());
     });
 
     test('toJson', () {

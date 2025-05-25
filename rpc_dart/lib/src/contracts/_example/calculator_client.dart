@@ -1,7 +1,8 @@
 import 'dart:async';
+import 'package:rpc_dart/rpc_dart.dart';
+
 import 'calculator_contract.dart';
 import 'calculator_interface.dart';
-import '../_index.dart';
 
 /// Клиентская реализация калькулятора
 class CalculatorClient extends RpcClientContract

@@ -51,5 +51,5 @@ class RpcBool extends RpcPrimitiveMessage<bool> {
   }
 
   @override
-  String toString() => 'RpcBool(${value})';
+  String toString() => 'RpcBool($value)';
 }

@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-import 'dart:typed_data';
 import 'package:test/test.dart';
 import 'package:rpc_dart/rpc_dart.dart';
 import 'package:rpc_dart/src/primitives/_index.dart';

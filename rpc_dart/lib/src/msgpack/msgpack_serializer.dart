@@ -2,10 +2,7 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-import 'dart:typed_data';
-import 'package:rpc_dart/logger.dart';
 import 'package:rpc_dart/rpc_dart.dart';
-import 'package:rpc_dart/src/rpc/_index.dart';
 
 import 'msgpack.dart' as msgpack;
 
@@ -175,7 +172,4 @@ class MsgPackSerializer implements IRpcSerializer {
 
     return true;
   }
-
-  @override
-  String get name => 'msgpack';
 }

@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:rpc_dart/rpc_dart.dart';
 
 part 'bool.dart';
