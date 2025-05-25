@@ -120,8 +120,8 @@ class StreamTypesExample {
       transport: serverTransport,
       serviceName: 'DataAggregatorService',
       methodName: 'ProcessClientStream',
-      requestSerializer: stringSerializer,
-      responseSerializer: stringSerializer,
+      requestCodec: stringSerializer,
+      responseCodec: stringSerializer,
       logger: RpcLogger(
         'ClientStreamingExample',
         colors: RpcLoggerColors.singleColor(AnsiColor.brightMagenta),
@@ -150,8 +150,8 @@ class StreamTypesExample {
       transport: clientTransport,
       serviceName: 'DataAggregatorService',
       methodName: 'ProcessClientStream',
-      requestSerializer: stringSerializer,
-      responseSerializer: stringSerializer,
+      requestCodec: stringSerializer,
+      responseCodec: stringSerializer,
       logger: RpcLogger(
         'ClientStreamingExample',
         colors: RpcLoggerColors.singleColor(AnsiColor.brightMagenta),

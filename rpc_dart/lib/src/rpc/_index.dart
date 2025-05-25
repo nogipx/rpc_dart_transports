@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:isolate';
 
 import 'package:rpc_dart/rpc_dart.dart';
+export 'streams/_index.dart';
 
 part 'core/rpc.dart';
 part 'core/message.dart';
@@ -10,12 +11,6 @@ part 'core/transport.dart';
 
 part 'transports/in_memory_transport.dart';
 part 'transports/isolate_transport.dart';
-// multiplex_transport.dart убран - мультиплексирование теперь встроено в базовый интерфейс
-
-part 'streams/bidirectional_stream.dart';
-part 'streams/server_stream.dart';
-part 'streams/client_stream.dart';
-part 'streams/unary.dart';
 
 /// Фабрика для создания обработчиков двунаправленных стримов.
 ///
@@ -64,8 +59,8 @@ abstract class GrpcServer {
       String serviceName,
       String methodName,
       BidirectionalStreamHandlerFactory<TRequest, TResponse> handlerFactory,
-      IRpcSerializer<TRequest> requestCodec,
-      IRpcSerializer<TResponse> responseCodec);
+      IRpcCodec<TRequest> requestCodec,
+      IRpcCodec<TResponse> responseCodec);
 
   /// Останавливает сервер.
   ///

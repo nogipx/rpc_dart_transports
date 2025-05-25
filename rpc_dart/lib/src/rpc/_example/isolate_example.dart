@@ -27,8 +27,8 @@ Future<void> runIsolateExample() async {
     transport: result.transport,
     serviceName: 'EchoService',
     methodName: 'Echo',
-    requestSerializer: serializer,
-    responseSerializer: serializer,
+    requestCodec: serializer,
+    responseCodec: serializer,
     logger: RpcLogger(
       "Host",
       colors: RpcLoggerColors.singleColor(AnsiColor.brightMagenta),
@@ -99,8 +99,8 @@ void customEchoServer(
     transport: transport,
     serviceName: 'EchoService',
     methodName: 'Echo',
-    requestSerializer: serializer,
-    responseSerializer: serializer,
+    requestCodec: serializer,
+    responseCodec: serializer,
     logger: logger,
   );
 

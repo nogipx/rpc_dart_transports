@@ -24,8 +24,8 @@ class InMemoryRpcExample {
       transport: serverTransport,
       serviceName: 'ChatService',
       methodName: 'Connect',
-      requestSerializer: stringSerializer,
-      responseSerializer: stringSerializer,
+      requestCodec: stringSerializer,
+      responseCodec: stringSerializer,
       logger: RpcLogger(
         'InMemoryRpcExample',
         colors: RpcLoggerColors.singleColor(AnsiColor.cyan),
@@ -63,8 +63,8 @@ class InMemoryRpcExample {
       transport: clientTransport,
       serviceName: 'ChatService',
       methodName: 'Connect',
-      requestSerializer: stringSerializer,
-      responseSerializer: stringSerializer,
+      requestCodec: stringSerializer,
+      responseCodec: stringSerializer,
       logger: RpcLogger(
         'InMemoryRpcExample',
         colors: RpcLoggerColors.singleColor(AnsiColor.black),
