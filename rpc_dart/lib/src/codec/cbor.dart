@@ -5,7 +5,8 @@
 // part of '../../contracts/_index.dart';
 
 import 'dart:convert';
-import 'dart:typed_data';
+
+import 'package:rpc_dart/rpc_dart.dart';
 
 /// Реализация CBOR (Concise Binary Object Representation) для RPC
 /// Формат описан в RFC 7049: https://tools.ietf.org/html/rfc7049
@@ -59,9 +60,22 @@ abstract interface class CborCodec {
       _encodeList(value, builder);
     } else if (value is Map) {
       _encodeMap(value, builder);
+    } else if (value is IRpcSerializable) {
+      _encodeMap(value.toJson(), builder);
     } else {
-      // Для неизвестных типов преобразуем в строку
-      _encodeString(value.toString(), builder);
+      try {
+        final json = value.toJson();
+        if (json is Map) {
+          _encodeMap(json, builder);
+        } else if (json is List) {
+          _encodeList(json, builder);
+        } else {
+          _encodeString(json.toString(), builder);
+        }
+      } catch (e) {
+        // Для неизвестных типов преобразуем в строку
+        _encodeString(value.toString(), builder);
+      }
     }
   }
 
