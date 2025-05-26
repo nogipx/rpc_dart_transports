@@ -21,8 +21,12 @@ part of '../_index.dart';
 ///   }
 /// );
 /// ```
-final class ServerStreamResponder<TRequest, TResponse> {
+final class ServerStreamResponder<TRequest, TResponse>
+    implements IRpcResponder {
   late final RpcLogger? _logger;
+
+  @override
+  final int id;
 
   /// Внутренний сервер двунаправленного стрима
   late final BidirectionalStreamResponder<TRequest, TResponse> _innerServer;
@@ -37,23 +41,21 @@ final class ServerStreamResponder<TRequest, TResponse> {
   /// [methodName] Имя метода (например, "GetData")
   /// [requestCodec] Кодек для десериализации запроса
   /// [responseCodec] Кодек для сериализации ответов
-  /// [handler] Функция-обработчик, вызываемая при получении запроса
+  /// [handler] Функция-обработчик, вызываемая для обработки запроса
   /// [logger] Опциональный логгер
   ServerStreamResponder({
+    this.id = 0,
     required IRpcTransport transport,
     required String serviceName,
     required String methodName,
     required IRpcCodec<TRequest> requestCodec,
     required IRpcCodec<TResponse> responseCodec,
-    required void Function(
-      TRequest request,
-      // ignore: library_private_types_in_public_api
-      _ServerStreamResponderInternal<TResponse> responder,
-    ) handler,
+    required Stream<TResponse> Function(TRequest request) handler,
     RpcLogger? logger,
   }) {
     _logger = logger?.child('ServerResponder');
     _innerServer = BidirectionalStreamResponder<TRequest, TResponse>(
+      id: id,
       transport: transport,
       serviceName: serviceName,
       methodName: methodName,
@@ -65,21 +67,47 @@ final class ServerStreamResponder<TRequest, TResponse> {
   }
 
   Future<void> _setupRequestHandler(
-    void Function(TRequest, _ServerStreamResponderInternal<TResponse>) handler,
+    Stream<TResponse> Function(TRequest request) handler,
   ) async {
     bool requestHandled = false;
 
     _subscription = _innerServer.requests.listen((request) async {
       if (!requestHandled) {
         requestHandled = true;
-        final responder =
-            _ServerStreamResponderInternal<TResponse>(_innerServer);
+
         try {
-          // Оборачиваем handler в Future для правильной обработки sync/async исключений
-          await Future.sync(() => handler(request, responder));
-        } catch (e) {
-          // Если обработчик бросает исключение (синхронно или асинхронно), отправляем ошибку
-          await responder.completeWithError(RpcStatus.INTERNAL, e.toString());
+          // Оборачиваем вызов handler в try-catch для перехвата синхронных исключений
+          final Stream<TResponse> handlerStream;
+          try {
+            handlerStream = handler(request);
+          } catch (error, trace) {
+            _logger?.error(
+              'Синхронная ошибка при вызове обработчика',
+              error: error,
+              stackTrace: trace,
+            );
+            // Отправляем ошибку клиенту
+            await _innerServer.sendError(RpcStatus.INTERNAL, error.toString());
+            await close();
+            return;
+          }
+
+          // Обрабатываем стрим ответов
+          await for (final data in handlerStream) {
+            await _innerServer.send(data);
+          }
+
+          // После завершения стрима, корректно закрываем соединение
+          await _innerServer.finishReceiving();
+        } on Object catch (error, trace) {
+          _logger?.error(
+            'Ошибка при обработке данных',
+            error: error,
+            stackTrace: trace,
+          );
+          // В случае асинхронной ошибки также отправляем ошибку клиенту
+          await _innerServer.sendError(RpcStatus.INTERNAL, error.toString());
+          await close();
         }
       }
       // Игнорируем все дополнительные запросы
@@ -92,36 +120,5 @@ final class ServerStreamResponder<TRequest, TResponse> {
   Future<void> close() async {
     await _subscription?.cancel();
     await _innerServer.close();
-  }
-}
-
-/// Вспомогательный класс для отправки ответов в серверном стриминге
-///
-/// Предоставляет удобный API для отправки нескольких ответов
-/// в рамках обработчика серверного стриминга.
-final class _ServerStreamResponderInternal<TResponse> {
-  final BidirectionalStreamResponder<dynamic, TResponse> _server;
-
-  /// Создает объект ответчика, связанный с сервером
-  _ServerStreamResponderInternal(this._server);
-
-  /// Отправляет ответ в поток
-  ///
-  /// [response] Объект ответа для отправки
-  Future<void> send(TResponse response) async {
-    await _server.send(response);
-  }
-
-  /// Завершает поток ответов с успешным статусом
-  Future<void> complete() async {
-    await _server.finishReceiving();
-  }
-
-  /// Завершает поток с ошибкой
-  ///
-  /// [statusCode] Код ошибки gRPC (см. GrpcStatus)
-  /// [message] Текстовое сообщение с описанием ошибки
-  Future<void> completeWithError(int statusCode, String message) async {
-    await _server.sendError(statusCode, message);
   }
 }

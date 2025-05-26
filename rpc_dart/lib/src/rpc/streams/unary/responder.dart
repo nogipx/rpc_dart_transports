@@ -19,9 +19,12 @@ part of '../_index.dart';
 ///   }
 /// );
 /// ```
-final class UnaryResponder<TRequest, TResponse> {
+final class UnaryResponder<TRequest, TResponse> implements IRpcResponder {
   /// Транспорт для коммуникации
   final IRpcTransport _transport;
+
+  @override
+  final int id;
 
   /// Имя сервиса
   final String _serviceName;
@@ -57,6 +60,7 @@ final class UnaryResponder<TRequest, TResponse> {
   /// [handler] Функция-обработчик, вызываемая при получении запроса
   /// [logger] Опциональный логгер
   UnaryResponder({
+    this.id = 0,
     required IRpcTransport transport,
     required String serviceName,
     required String methodName,

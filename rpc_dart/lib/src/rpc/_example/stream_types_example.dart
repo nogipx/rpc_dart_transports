@@ -35,14 +35,14 @@ class StreamTypesExample {
         'ServerStreamingExample',
         colors: RpcLoggerColors.singleColor(AnsiColor.brightGreen),
       ),
-      handler: (request, responder) async {
+      handler: (request) async* {
         print('СЕРВЕР: Получен запрос: "$request"');
 
         // Отправляем несколько ответов с задержкой
         for (int i = 1; i <= 5; i++) {
           final response = 'Ответ #$i на запрос "$request"';
           print('СЕРВЕР: Отправляем: "$response"');
-          responder.send(response.rpc);
+          yield response.rpc;
 
           // Делаем реальную задержку между ответами
           await Future.delayed(Duration(milliseconds: 50));
@@ -50,7 +50,6 @@ class StreamTypesExample {
 
         // Завершаем поток ответов
         print('СЕРВЕР: Завершаем поток ответов');
-        responder.complete();
       },
     );
 

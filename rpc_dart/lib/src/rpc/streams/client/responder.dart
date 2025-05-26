@@ -19,8 +19,12 @@ part of '../_index.dart';
 ///   }
 /// );
 /// ```
-final class ClientStreamResponder<TRequest, TResponse> {
+final class ClientStreamResponder<TRequest, TResponse>
+    implements IRpcResponder {
   late final RpcLogger? _logger;
+
+  @override
+  final int id;
 
   /// Внутренний сервер двунаправленного стрима
   late final BidirectionalStreamResponder<TRequest, TResponse> _innerServer;
@@ -35,6 +39,7 @@ final class ClientStreamResponder<TRequest, TResponse> {
   /// [handler] Функция-обработчик, вызываемая для обработки потока запросов
   /// [logger] Опциональный логгер
   ClientStreamResponder({
+    this.id = 0,
     required IRpcTransport transport,
     required String serviceName,
     required String methodName,
@@ -45,6 +50,7 @@ final class ClientStreamResponder<TRequest, TResponse> {
   }) {
     _logger = logger?.child('ClientResponder');
     _innerServer = BidirectionalStreamResponder<TRequest, TResponse>(
+      id: id,
       transport: transport,
       serviceName: serviceName,
       methodName: methodName,

@@ -13,3 +13,7 @@ part 'server/responder.dart';
 
 part 'unary/caller.dart';
 part 'unary/responder.dart';
+
+abstract interface class IRpcResponder {
+  int get id;
+}

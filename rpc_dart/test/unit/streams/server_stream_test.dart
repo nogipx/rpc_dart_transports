@@ -18,13 +18,12 @@ void main() {
           methodName: 'TestMethod',
           requestCodec: serializer,
           responseCodec: serializer,
-          handler: (request, responder) async {
+          handler: (request) async* {
             receivedRequests.add(request);
             // Отправляем несколько ответов
-            await responder.send('Response 1 for: $request'.rpc);
-            await responder.send('Response 2 for: $request'.rpc);
-            await responder.send('Response 3 for: $request'.rpc);
-            await responder.complete();
+            yield 'Response 1 for: $request'.rpc;
+            yield 'Response 2 for: $request'.rpc;
+            yield 'Response 3 for: $request'.rpc;
           },
         );
 
@@ -75,9 +74,8 @@ void main() {
           methodName: 'TestMethod',
           requestCodec: serializer,
           responseCodec: serializer,
-          handler: (request, responder) async {
-            // Не отправляем ответов, только завершаем поток
-            await responder.complete();
+          handler: (request) {
+            return Stream.empty();
           },
         );
 
@@ -124,7 +122,8 @@ void main() {
           methodName: 'TestMethod',
           requestCodec: serializer,
           responseCodec: serializer,
-          handler: (request, responder) async {
+          handler: (request) {
+            // Выбрасываем синхронное исключение
             throw Exception('Server error');
           },
         );
@@ -177,10 +176,9 @@ void main() {
           methodName: 'TestMethod',
           requestCodec: serializer,
           responseCodec: serializer,
-          handler: (request, responder) async {
-            await responder.send('response1'.rpc);
-            await responder.send('response2'.rpc);
-            await responder.complete();
+          handler: (request) async* {
+            yield 'response1'.rpc;
+            yield 'response2'.rpc;
           },
         );
 
@@ -227,8 +225,8 @@ void main() {
           methodName: 'TestMethod',
           requestCodec: serializer,
           responseCodec: serializer,
-          handler: (request, responder) async {
-            await responder.complete();
+          handler: (request) async* {
+            // Пустой стрим
           },
         );
 
@@ -258,16 +256,13 @@ void main() {
           methodName: 'TestMethod',
           requestCodec: serializer,
           responseCodec: serializer,
-          handler: (request, responder) async {
+          handler: (request) async* {
             receivedRequests.add(request);
 
             // Отправляем несколько ответов
-            await responder.send('Response 1 for: $request'.rpc);
-            await responder.send('Response 2 for: $request'.rpc);
-            await responder.send('Response 3 for: $request'.rpc);
-
-            // Завершаем поток
-            await responder.complete();
+            yield 'Response 1 for: $request'.rpc;
+            yield 'Response 2 for: $request'.rpc;
+            yield 'Response 3 for: $request'.rpc;
           },
         );
 
@@ -316,7 +311,8 @@ void main() {
           methodName: 'TestMethod',
           requestCodec: serializer,
           responseCodec: serializer,
-          handler: (request, responder) async {
+          handler: (request) {
+            // Выбрасываем синхронное исключение
             throw Exception('Handler error');
           },
         );
@@ -370,9 +366,8 @@ void main() {
           methodName: 'SpecificMethod',
           requestCodec: serializer,
           responseCodec: serializer,
-          handler: (request, responder) async {
+          handler: (request) async* {
             handlerCallCount++;
-            await responder.complete();
           },
         );
 
@@ -413,16 +408,23 @@ void main() {
         // Arrange
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
 
+        // Создаем контроллер для управления стримом
+        final controller = StreamController<RpcString>();
+
         final server = ServerStreamResponder<RpcString, RpcString>(
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
           requestCodec: serializer,
           responseCodec: serializer,
-          handler: (request, responder) async {
-            await responder.send('First response'.rpc);
-            await responder.completeWithError(
-                RpcStatus.INTERNAL, 'Test error message');
+          handler: (request) {
+            // Асинхронно имитируем отправку одного ответа, а затем ошибку в стриме
+            Future.microtask(() {
+              controller.add('First response'.rpc);
+              controller.addError(Exception('Test error message'));
+              controller.close();
+            });
+            return controller.stream;
           },
         );
 
@@ -474,8 +476,8 @@ void main() {
           methodName: 'TestMethod',
           requestCodec: serializer,
           responseCodec: serializer,
-          handler: (request, responder) async {
-            await responder.complete();
+          handler: (request) async* {
+            // Пустой стрим
           },
         );
 
@@ -496,12 +498,11 @@ void main() {
           methodName: 'GenerateNumbers',
           requestCodec: serializer,
           responseCodec: serializer,
-          handler: (request, responder) async {
+          handler: (request) async* {
             final count = int.tryParse(request.value) ?? 3;
             for (int i = 1; i <= count; i++) {
-              await responder.send('Number $i'.rpc);
+              yield 'Number $i'.rpc;
             }
-            await responder.complete();
           },
         );
 
@@ -557,12 +558,11 @@ void main() {
           methodName: 'LargeStream',
           requestCodec: serializer,
           responseCodec: serializer,
-          handler: (request, responder) async {
+          handler: (request) async* {
             const responseCount = 50;
             for (int i = 0; i < responseCount; i++) {
-              await responder.send('Response $i'.rpc);
+              yield 'Response $i'.rpc;
             }
-            await responder.complete();
           },
         );
 

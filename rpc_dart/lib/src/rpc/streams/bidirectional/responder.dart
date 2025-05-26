@@ -12,8 +12,12 @@ part of '../_index.dart';
 /// - Асинхронная отправка потока ответов
 /// - Автоматическая сериализация/десериализация сообщений
 /// - Управление статусами и ошибками gRPC
-final class BidirectionalStreamResponder<TRequest, TResponse> {
+final class BidirectionalStreamResponder<TRequest, TResponse>
+    implements IRpcResponder {
   late final RpcLogger? _logger;
+
+  @override
+  final int id;
 
   /// Базовый транспорт для обмена данными
   final IRpcTransport _transport;
@@ -63,6 +67,7 @@ final class BidirectionalStreamResponder<TRequest, TResponse> {
   /// [responseCodec] Кодек для сериализации ответов
   /// [logger] Опциональный логгер
   BidirectionalStreamResponder({
+    this.id = 0,
     required IRpcTransport transport,
     required this.serviceName,
     required this.methodName,
