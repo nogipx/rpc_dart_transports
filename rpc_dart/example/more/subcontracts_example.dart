@@ -102,8 +102,6 @@ final class MainServiceContract extends RpcResponderContract
       responseCodec: RpcString.codec,
       description: 'Получает сообщение',
     );
-
-    super.setup();
   }
 
   @override
@@ -128,8 +126,6 @@ final class UserServiceContract extends RpcResponderContract
 
   @override
   void setup() {
-    super.setup();
-
     // Регистрируем методы подконтракта пользователей
     addUnaryMethod<RpcInt, UserResponse>(
       methodName: 'GetUser',
@@ -165,8 +161,6 @@ final class NotificationServiceContract extends RpcResponderContract
 
   @override
   void setup() {
-    super.setup();
-
     // Регистрируем методы подконтракта уведомлений
     addUnaryMethod<RpcString, RpcBool>(
       methodName: 'SendNotification',

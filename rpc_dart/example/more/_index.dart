@@ -12,8 +12,8 @@ part 'stream_types_example.dart';
 part 'unary_example.dart';
 
 void main() async {
-  await runInMemoryExample();
-  await runStreamTypesExample();
-  await runUnaryExample();
+  // await runInMemoryExample();
+  // await runStreamTypesExample();
+  // await runUnaryExample();
   runSubcontractsExample();
 }

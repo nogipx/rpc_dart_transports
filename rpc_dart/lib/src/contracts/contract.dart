@@ -23,8 +23,6 @@ abstract base class RpcResponderContract implements IRpcContract {
   RpcResponderContract(this.serviceName);
 
   /// Декларативная регистрация методов
-  @mustBeOverridden
-  @mustCallSuper
   void setup() {}
 
   /// Регистрирует подконтракт, который будет автоматически зарегистрирован

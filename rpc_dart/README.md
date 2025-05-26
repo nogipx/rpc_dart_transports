@@ -138,8 +138,6 @@ final class CalculatorResponder extends RpcResponderContract
       requestCodec: CalculationRequest.codec,
       responseCodec: CalculationResponse.codec,
     );
-
-    super.setup();
   }
 
   @override
