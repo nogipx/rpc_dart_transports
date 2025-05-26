@@ -9,7 +9,7 @@ import 'calculator_contract.dart';
 import 'calculator_interface.dart';
 
 /// Серверная реализация калькулятора
-class CalculatorResponder extends RpcResponderContract
+final class CalculatorResponder extends RpcResponderContract
     implements ICalculatorContract {
   /// Настраиваемая задержка (мс) для имитации вычислений
   final int simulatedDelayMs;

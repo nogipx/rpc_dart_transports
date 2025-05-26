@@ -13,7 +13,7 @@ enum RpcMethodType {
 }
 
 /// Регистрация метода в контракте
-class RpcMethodRegistration<TRequest extends IRpcSerializable,
+final class RpcMethodRegistration<TRequest extends IRpcSerializable,
     TResponse extends IRpcSerializable> {
   final String name;
   final RpcMethodType type;

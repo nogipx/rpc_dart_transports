@@ -50,7 +50,7 @@ class RpcInMemoryTransport implements IRpcTransport {
   /// [flowControlWindow] Начальный размер окна управления потоком (предотвращает OOM)
   /// [logger] Опциональный логгер для отладки транспорта
   /// [errorHandler] Функция для обработки ошибок транспорта
-  RpcInMemoryTransport(
+  RpcInMemoryTransport._(
     this._outgoingController, {
     bool isClient = true, // Клиент использует нечетные ID, сервер - четные
     int initialFlowControlWindow = 10 * 1024 * 1024, // 10 МБ по умолчанию
@@ -92,7 +92,7 @@ class RpcInMemoryTransport implements IRpcTransport {
   }
 
   /// Добавляет входящее сообщение в поток (вызывается партнерским транспортом)
-  void addIncomingMessage(RpcTransportMessage message) {
+  void _addIncomingMessage(RpcTransportMessage message) {
     if (_incomingController.isClosed) return;
 
     _logger?.debug(
@@ -279,7 +279,7 @@ class RpcInMemoryTransport implements IRpcTransport {
         StreamController<RpcTransportMessage>.broadcast();
 
     // Создаем оптимизированные транспорты
-    final clientTransport = RpcInMemoryTransport(
+    final clientTransport = RpcInMemoryTransport._(
       clientToServerController,
       isClient: true, // Клиент будет использовать нечетные Stream ID
       initialFlowControlWindow: initialFlowControlWindow,
@@ -288,7 +288,7 @@ class RpcInMemoryTransport implements IRpcTransport {
       errorHandler: clientErrorHandler,
     );
 
-    final serverTransport = RpcInMemoryTransport(
+    final serverTransport = RpcInMemoryTransport._(
       serverToClientController,
       isClient: false, // Сервер будет использовать четные Stream ID
       initialFlowControlWindow: initialFlowControlWindow,
@@ -299,7 +299,7 @@ class RpcInMemoryTransport implements IRpcTransport {
 
     // Подписываемся на сообщения для передачи между транспортами
     clientToServerController.stream.listen(
-      serverTransport.addIncomingMessage,
+      serverTransport._addIncomingMessage,
       onError: (error) {
         serverLogger?.error('Ошибка в потоке клиент->сервер: $error');
         serverErrorHandler?.call(error);
@@ -312,7 +312,7 @@ class RpcInMemoryTransport implements IRpcTransport {
     );
 
     serverToClientController.stream.listen(
-      clientTransport.addIncomingMessage,
+      clientTransport._addIncomingMessage,
       onError: (error) {
         clientLogger?.error('Ошибка в потоке сервер->клиент: $error');
         clientErrorHandler?.call(error);
