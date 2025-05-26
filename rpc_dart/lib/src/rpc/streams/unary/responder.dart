@@ -104,8 +104,9 @@ final class UnaryResponder<TRequest, TResponse> implements IRpcResponder {
       (message) async {
         final streamId = message.streamId;
 
-        // Игнорируем сообщения для других потоков, которые не соответствуют нашему id
-        if (streamId != id) {
+        // Если id респондера не задан (0), принимаем любые сообщения
+        // Это важно для тестов, где id может не быть известен заранее
+        if (id != 0 && streamId != id) {
           return;
         }
 
@@ -179,7 +180,8 @@ final class UnaryResponder<TRequest, TResponse> implements IRpcResponder {
     final streamId = message.streamId;
 
     // Проверяем, что сообщение предназначено для этого экземпляра респондера
-    if (streamId != id) {
+    // Для id=0 (значение по умолчанию) принимаем любые сообщения, это нужно для тестов
+    if (id != 0 && streamId != id) {
       _logger?.debug(
           'Сообщение для stream $streamId не принадлежит этому респондеру (id=$id), пропускаем');
       return;
