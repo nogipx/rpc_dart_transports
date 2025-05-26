@@ -2,5 +2,7 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
+export 'isolate/isolate_transport.dart';
+
 export 'websocket/client_websocket_transport.dart';
 export 'websocket/server_websocket_transport.dart';

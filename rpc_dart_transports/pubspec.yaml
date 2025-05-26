@@ -7,6 +7,10 @@ publish_to: none
 environment:
   sdk: '>=3.0.0 <4.0.0'
 
+dependency_overrides:
+  rpc_dart:
+    path: ../rpc_dart
+
 # Add regular dependencies here.
 dependencies:
   rpc_dart:
