@@ -42,6 +42,8 @@ class RpcBool extends RpcPrimitiveMessage<bool> {
     return RpcBool(CborCodec.decode(bytes));
   }
 
+  static RpcCodec<RpcBool> get codec => RpcCodec<RpcBool>(RpcBool.fromJson);
+
   @override
   String toString() => value.toString();
 }

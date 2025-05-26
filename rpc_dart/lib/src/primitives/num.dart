@@ -36,6 +36,8 @@ class RpcNum extends RpcPrimitiveMessage<num> {
     return RpcNum(CborCodec.decode(bytes));
   }
 
+  static RpcCodec<RpcNum> get codec => RpcCodec<RpcNum>(RpcNum.fromJson);
+
   @override
   String toString() => value.toString();
 
@@ -131,6 +133,8 @@ class RpcInt extends RpcPrimitiveMessage<int> {
     return RpcInt(CborCodec.decode(bytes));
   }
 
+  static RpcCodec<RpcInt> get codec => RpcCodec<RpcInt>(RpcInt.fromJson);
+
   @override
   String toString() => value.toString();
 
@@ -225,6 +229,9 @@ class RpcDouble extends RpcPrimitiveMessage<double> {
   static RpcDouble fromBytes(Uint8List bytes) {
     return RpcDouble(CborCodec.decode(bytes));
   }
+
+  static RpcCodec<RpcDouble> get codec =>
+      RpcCodec<RpcDouble>(RpcDouble.fromJson);
 
   @override
   String toString() => value.toString();

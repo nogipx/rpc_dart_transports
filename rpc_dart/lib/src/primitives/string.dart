@@ -25,6 +25,9 @@ class RpcString extends RpcPrimitiveMessage<String> {
     return RpcString(CborCodec.decode(bytes));
   }
 
+  static RpcCodec<RpcString> get codec =>
+      RpcCodec<RpcString>(RpcString.fromJson);
+
   @override
   String toString() => value;
 }

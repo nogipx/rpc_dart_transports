@@ -184,9 +184,18 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
     logger.debug(
       'Поток завершен [streamId: $streamId]',
     );
+
+    // Закрываем и удаляем респондер, если он существует
+    final responder = _streamResponders[streamId];
+    if (responder != null) {
+      if (responder is UnaryResponder) {
+        responder.close();
+      }
+      _streamResponders.remove(streamId);
+    }
+
     _streamMethods.remove(streamId);
     _streamMessages.remove(streamId);
-    _streamResponders.remove(streamId);
   }
 
   /// Этап 3: Парсинг пути метода из строки формата /service/method
@@ -247,9 +256,19 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
       handler: (request) async {
         return await i.method.handler(request);
       },
+      logger: logger,
     );
 
+    // Сохраняем респондер в реестре
     _streamResponders[responder.id] = responder;
+
+    // Проверяем, есть ли уже сообщение с данными для этого потока
+    final savedMessage = _streamMessages[streamId];
+    if (savedMessage != null &&
+        !savedMessage.isMetadataOnly &&
+        savedMessage.payload != null) {
+      await (responder as UnaryResponder).handleMessage(savedMessage);
+    }
   }
 
   /// Этап 5.2: Обработка клиентского потокового метода
@@ -369,6 +388,30 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
     logger.info(
       'Контракт $serviceName зарегистрирован с ${methods.length} методами',
     );
+
+    // Регистрируем подконтракты
+    final subcontracts = contract.subcontracts;
+    if (subcontracts.isNotEmpty) {
+      logger.info(
+        'Обнаружено ${subcontracts.length} подконтрактов для $serviceName, начинаем регистрацию',
+      );
+
+      for (final subcontract in subcontracts) {
+        try {
+          registerServiceContract(subcontract);
+        } catch (e, stackTrace) {
+          logger.error(
+            'Ошибка при регистрации подконтракта ${subcontract.serviceName}',
+            error: e,
+            stackTrace: stackTrace,
+          );
+        }
+      }
+
+      logger.info(
+        'Регистрация подконтрактов для $serviceName завершена',
+      );
+    }
 
     // Автоматически запускаем прослушивание после регистрации первого контракта
     if (!_isListening) {

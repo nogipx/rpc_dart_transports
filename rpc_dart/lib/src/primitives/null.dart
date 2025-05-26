@@ -16,6 +16,8 @@ class RpcNull extends RpcPrimitiveMessage<void> {
     return RpcNull();
   }
 
+  static RpcCodec<RpcNull> get codec => RpcCodec<RpcNull>(RpcNull.fromJson);
+
   @override
   String toString() => null.toString();
 }

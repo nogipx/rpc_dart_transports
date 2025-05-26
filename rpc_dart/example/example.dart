@@ -47,8 +47,8 @@ Future<void> runCalculatorDemo() async {
   // serverEndpoint.registerServiceContract(client); // ❌ Ошибка компиляции!
 
   // 1. Демонстрация унарного метода
-  // print('\n--- Унарный метод: calculate ---');
-  // await _demoUnaryCalculation(client);
+  print('\n--- Унарный метод: calculate ---');
+  await _demoUnaryCalculation(client);
 
   // 3. Демонстрация двунаправленного стрима
   print('\n--- Двунаправленный стрим: streamCalculate ---');

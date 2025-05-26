@@ -17,12 +17,33 @@ abstract base class RpcResponderContract implements IRpcContract {
   final String serviceName;
   final Map<String, RpcMethodRegistration> _methods = {};
 
+  /// Список подконтрактов, регистрируемых вместе с основным
+  final List<RpcResponderContract> _subcontracts = [];
+
   RpcResponderContract(this.serviceName);
 
   /// Декларативная регистрация методов
   @mustBeOverridden
   @mustCallSuper
   void setup() {}
+
+  /// Регистрирует подконтракт, который будет автоматически зарегистрирован
+  /// вместе с основным контрактом
+  ///
+  /// При регистрации основного контракта все его подконтракты будут
+  /// автоматически зарегистрированы в RpcResponderEndpoint.
+  ///
+  /// [subcontract] Подконтракт для регистрации
+  void addSubcontract(RpcResponderContract subcontract) {
+    _subcontracts.add(subcontract);
+  }
+
+  /// Возвращает список зарегистрированных подконтрактов
+  ///
+  /// Используется внутри [RpcResponderEndpoint] для автоматической
+  /// регистрации всех подконтрактов.
+  List<RpcResponderContract> get subcontracts =>
+      List.unmodifiable(_subcontracts);
 
   /// Регистрирует унарный метод
   /// TRequest и TResponse должны реализовывать IRpcSerializable!
