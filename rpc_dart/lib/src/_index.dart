@@ -8,3 +8,4 @@ export 'endpoint/_index.dart';
 export 'logs/_logs.dart';
 export 'primitives/_index.dart';
 export 'rpc/_index.dart';
+export 'utils/_index.dart';

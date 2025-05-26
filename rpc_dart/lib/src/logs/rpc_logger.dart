@@ -77,7 +77,7 @@ abstract interface class RpcLogger {
     );
   }
 
-  RpcLogger child(String childName);
+  RpcLogger child(String childName, {String? label});
 
   /// Отправляет лог с указанным уровнем в сервис диагностики
   Future<void> log({

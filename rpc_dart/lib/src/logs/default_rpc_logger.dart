@@ -316,10 +316,14 @@ class DefaultRpcLogger implements RpcLogger {
   }
 
   @override
-  RpcLogger child(String childName) {
+  RpcLogger child(String childName, {String? label}) {
     return DefaultRpcLogger(
       '$name.$childName',
       colors: _colors,
+      label: label ??
+          (_formatter is DefaultRpcLoggerFormatter
+              ? (_formatter as DefaultRpcLoggerFormatter).label
+              : null),
       minLogLevel: _filter is DefaultRpcLoggerFilter
           ? (_filter as DefaultRpcLoggerFilter).minLogLevel
           : RpcLoggerSettings.defaultMinLogLevel,
