@@ -9,7 +9,7 @@ import 'calculator_contract.dart';
 import 'calculator_interface.dart';
 
 /// Клиентская реализация калькулятора
-class CalculatorCaller extends RpcCallerContract
+final class CalculatorCaller extends RpcCallerContract
     implements ICalculatorContract {
   /// Создает клиента с указанным эндпоинтом
   CalculatorCaller(RpcCallerEndpoint endpoint)
