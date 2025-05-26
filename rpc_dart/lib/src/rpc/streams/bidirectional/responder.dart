@@ -32,7 +32,7 @@ final class BidirectionalStreamResponder<TRequest, TResponse>
   /// Имя метода
   final String methodName;
 
-  /// Путь метода в формате /<ServiceName>/<MethodName>
+  /// Путь метода в формате /ServiceName/MethodName
   late final String _methodPath;
 
   /// Кодек для десериализации входящих запросов

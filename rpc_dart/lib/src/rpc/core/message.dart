@@ -58,7 +58,7 @@ final class RpcMetadata {
   /// Создает метаданные для клиентского запроса с готовым путем.
   ///
   /// Упрощенная версия для случаев, когда путь уже сформирован.
-  /// [methodPath] Путь метода в формате /<ServiceName>/<MethodName>
+  /// [methodPath] Путь метода в формате /ServiceName/MethodName
   /// [host] Хост-заголовок (опционально)
   static RpcMetadata forClientRequestWithPath(String methodPath,
       {String host = ''}) {
@@ -136,7 +136,7 @@ final class RpcMetadata {
 
   /// Извлекает имя сервиса из пути метода.
   ///
-  /// Парсит путь вида /<ServiceName>/<MethodName> и возвращает ServiceName.
+  /// Парсит путь вида /ServiceName/MethodName и возвращает ServiceName.
   /// Возвращает null, если путь некорректен или не найден.
   String? get serviceName {
     final path = methodPath;
@@ -148,7 +148,7 @@ final class RpcMetadata {
 
   /// Извлекает имя метода из пути метода.
   ///
-  /// Парсит путь вида /<ServiceName>/<MethodName> и возвращает MethodName.
+  /// Парсит путь вида /ServiceName/MethodName и возвращает MethodName.
   /// Возвращает null, если путь некорректен или не найден.
   String? get methodName {
     final path = methodPath;

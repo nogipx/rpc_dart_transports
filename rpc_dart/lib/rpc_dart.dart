@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 /// Библиотека для gRPC-подобного взаимодействия на чистом Dart
-library rpc_dart;
+library;
 
 // Экспортируем основные компоненты
 export 'src/_index.dart';

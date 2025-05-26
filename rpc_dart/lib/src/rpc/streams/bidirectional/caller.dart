@@ -31,7 +31,7 @@ final class BidirectionalStreamCaller<TRequest, TResponse> {
   /// Имя метода
   final String _methodName;
 
-  /// Путь метода в формате /<ServiceName>/<MethodName>
+  /// Путь метода в формате /ServiceName/MethodName
   late final String _methodPath;
 
   /// Кодек для сериализации исходящих запросов

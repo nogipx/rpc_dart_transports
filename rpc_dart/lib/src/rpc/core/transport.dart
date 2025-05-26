@@ -19,7 +19,7 @@ final class RpcTransportMessage {
   /// Флаг, указывающий, что это последнее сообщение в потоке
   final bool isEndOfStream;
 
-  /// Путь метода в формате /<ServiceName>/<MethodName>
+  /// Путь метода в формате /ServiceName/MethodName
   final String? methodPath;
 
   /// Уникальный идентификатор HTTP/2 stream для этого RPC вызова

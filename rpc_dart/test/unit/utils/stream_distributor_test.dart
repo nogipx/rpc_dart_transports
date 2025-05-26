@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:rpc_dart/rpc_dart.dart';
-import 'package:rpc_dart/src/utils/_index.dart';
 import 'package:test/test.dart';
 
 // Тестовое сообщение, которое реализует IRpcSerializable
@@ -46,7 +45,7 @@ void main() {
 
     test('Создание и получение клиентских стримов', () {
       // Автоматическая генерация ID
-      final stream1 = distributor.createClientStream();
+      distributor.createClientStream();
       expect(distributor.activeClientCount, 1);
 
       // Явное указание ID

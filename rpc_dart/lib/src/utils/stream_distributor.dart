@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2025 Karim "nogipx" Mamatkazin <nogipx@gmail.com>
+//
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 // ignore_for_file: library_private_types_in_public_api
 
 import 'dart:async';
