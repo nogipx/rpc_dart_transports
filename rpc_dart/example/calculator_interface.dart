@@ -3,7 +3,8 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 import 'dart:async';
-import '../contracts/_index.dart';
+import 'package:rpc_dart/rpc_dart.dart';
+
 import 'calculator_contract.dart';
 
 /// Общий интерфейс для контракта калькулятора
