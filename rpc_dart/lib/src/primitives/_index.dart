@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 import 'package:rpc_dart/rpc_dart.dart';
-import 'package:rpc_dart/src/codec/cbor.dart';
 
 part 'bool.dart';
 part 'null.dart';

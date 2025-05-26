@@ -14,15 +14,18 @@ class RpcCodec<T extends IRpcSerializable> implements IRpcCodec<T> {
 
   @override
   Uint8List serialize(T message) {
-    return CborCodec.encode(message.toJson());
+    // Получаем JSON представление объекта
+    final json = message.toJson();
+
+    return CborCodec.encode(json);
   }
 
   @override
   T deserialize(Uint8List bytes) {
     final decoded = CborCodec.decode(bytes);
-    final json = (decoded as Map<dynamic, dynamic>).cast<String, dynamic>();
 
-    return _fromJson!(json);
+    // CborCodec.decode теперь всегда возвращает Map<String, dynamic>
+    return _fromJson!(decoded);
   }
 
   /// Статический хелпер для десериализации CBOR
@@ -31,18 +34,13 @@ class RpcCodec<T extends IRpcSerializable> implements IRpcCodec<T> {
     required T Function(Map<String, dynamic>) fromJson,
   }) {
     final decoded = CborCodec.decode(bytes);
-    if (decoded is! Map<dynamic, dynamic>) {
-      throw FormatException(
-        'Expected Map from CBOR, got ${decoded.runtimeType}',
-      );
-    }
 
-    // Преобразуем ключи в строки
-    final Map<String, dynamic> cborMap = {};
-    decoded.forEach((key, value) {
-      cborMap[key.toString()] = value;
-    });
-
-    return fromJson(cborMap);
+    // CborCodec.decode уже возвращает Map<String, dynamic>
+    return fromJson(decoded);
   }
+}
+
+// Преобразование LinkedMap<dynamic, dynamic> в Map<String, dynamic>
+Map<String, dynamic> convertMap(Map<dynamic, dynamic> map) {
+  return map.map((key, value) => MapEntry(key.toString(), value));
 }

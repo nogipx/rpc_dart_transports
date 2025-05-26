@@ -31,11 +31,6 @@ class RpcNum extends RpcPrimitiveMessage<num> {
     }
   }
 
-  /// Создает RpcNum из бинарных данных
-  static RpcNum fromBytes(Uint8List bytes) {
-    return RpcNum(CborCodec.decode(bytes));
-  }
-
   static RpcCodec<RpcNum> get codec => RpcCodec<RpcNum>(RpcNum.fromJson);
 
   @override
@@ -128,11 +123,6 @@ class RpcInt extends RpcPrimitiveMessage<int> {
     }
   }
 
-  /// Создает RpcInt из бинарных данных
-  static RpcInt fromBytes(Uint8List bytes) {
-    return RpcInt(CborCodec.decode(bytes));
-  }
-
   static RpcCodec<RpcInt> get codec => RpcCodec<RpcInt>(RpcInt.fromJson);
 
   @override
@@ -223,11 +213,6 @@ class RpcDouble extends RpcPrimitiveMessage<double> {
     } catch (e) {
       return const RpcDouble(0.0);
     }
-  }
-
-  /// Создает RpcDouble из бинарных данных
-  static RpcDouble fromBytes(Uint8List bytes) {
-    return RpcDouble(CborCodec.decode(bytes));
   }
 
   static RpcCodec<RpcDouble> get codec =>

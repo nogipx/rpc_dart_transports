@@ -5,6 +5,10 @@
 import 'package:rpc_dart/rpc_dart.dart';
 import 'package:rpc_dart_transports/rpc_dart_transports.dart';
 
+void main() {
+  runIsolateExample();
+}
+
 /// Пример использования изолята с пользовательской entrypoint функцией
 Future<void> runIsolateExample() async {
   RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.debug);
@@ -83,10 +87,7 @@ Future<void> runIsolateExample() async {
 
 /// Пользовательская функция сервера, получающая готовый транспорт
 @pragma('vm:entry-point')
-void customEchoServer(
-  IRpcTransport transport,
-  Map<String, dynamic> customParams,
-) {
+void customEchoServer(transport, customParams) {
   print('customParams: $customParams');
   print('СЕРВЕР: Запущен эхо-сервер с новым API');
   final logger = RpcLogger(

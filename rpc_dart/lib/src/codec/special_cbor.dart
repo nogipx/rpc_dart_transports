@@ -57,7 +57,7 @@ abstract interface class CborCodec {
 
   /// Кодирует любое значение в байты CBOR
   /// Если передан Map, он должен быть Map(String, dynamic) при strictMapTypes=true
-  static Uint8List _encode(dynamic value, {required bool strictMapTypes}) {
+  static Uint8List _encode(dynamic value, {bool strictMapTypes = true}) {
     // Проверяем, что если передана Map, то она имеет тип Map<String, dynamic>
     if (strictMapTypes && value is Map && value is! Map<String, dynamic>) {
       throw ArgumentError(
@@ -71,7 +71,7 @@ abstract interface class CborCodec {
   }
 
   /// Декодирует CBOR байты в Dart объекты
-  static dynamic _decode(Uint8List bytes, {required bool strictMapTypes}) {
+  static dynamic _decode(Uint8List bytes, {bool strictMapTypes = true}) {
     final reader = _CborReader(bytes);
     final value = reader.readValue();
 

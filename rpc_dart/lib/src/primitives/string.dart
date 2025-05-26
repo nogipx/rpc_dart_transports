@@ -20,11 +20,6 @@ class RpcString extends RpcPrimitiveMessage<String> {
     }
   }
 
-  /// Создает RpcString из бинарных данных
-  static RpcString fromBytes(Uint8List bytes) {
-    return RpcString(CborCodec.decode(bytes));
-  }
-
   static RpcCodec<RpcString> get codec =>
       RpcCodec<RpcString>(RpcString.fromJson);
 
