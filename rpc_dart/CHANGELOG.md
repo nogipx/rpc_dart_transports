@@ -1,5 +1,5 @@
 ## 1.0.3
-- CBOR сериализатор теперь работает только с Map<String, dynamic>
+- CBOR сериализатор теперь работает только с `Map<String, dynamic>`
 
 ## 1.0.2
 - Добавлен `StreamDistributor`
