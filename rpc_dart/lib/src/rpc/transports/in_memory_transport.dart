@@ -22,8 +22,8 @@ class RpcInMemoryTransport implements IRpcTransport {
   final StreamController<RpcTransportMessage> _incomingController =
       StreamController<RpcTransportMessage>.broadcast();
 
-  /// Счетчик для генерации уникальных Stream ID
-  int _nextStreamId;
+  /// Менеджер Stream ID, управляющий генерацией идентификаторов по HTTP/2 спецификации
+  final RpcStreamIdManager _idManager;
 
   /// Активные streams и их состояние отправки
   final Map<int, bool> _streamSendingFinished = <int, bool>{};
@@ -57,8 +57,7 @@ class RpcInMemoryTransport implements IRpcTransport {
     int maxFlowControlWindow = 100 * 1024 * 1024, // 100 МБ максимум
     RpcLogger? logger,
     void Function(Object error)? errorHandler,
-  })  : _nextStreamId =
-            isClient ? 1 : 2, // HTTP/2: клиент - нечетные, сервер - четные
+  })  : _idManager = RpcStreamIdManager(isClient: isClient),
         _flowControlWindow = initialFlowControlWindow,
         _maxFlowControlWindow = maxFlowControlWindow,
         _logger = logger,
@@ -82,13 +81,39 @@ class RpcInMemoryTransport implements IRpcTransport {
   }
 
   @override
+  bool releaseStreamId(int streamId) {
+    if (_closed) {
+      _logger?.warning(
+          'InMemoryTransport: попытка освободить ID после закрытия транспорта [streamId: $streamId]');
+      return false;
+    }
+
+    _streamSendingFinished.remove(streamId);
+
+    final released = _idManager.releaseId(streamId);
+    if (released) {
+      _logger?.debug(
+          'InMemoryTransport: ID освобожден [streamId: $streamId], активных потоков: ${_idManager.activeCount}');
+    } else {
+      _logger?.debug(
+          'InMemoryTransport: ID уже был освобожден или никогда не использовался [streamId: $streamId]');
+    }
+
+    return released;
+  }
+
+  @override
   int createStream() {
-    final streamId = _nextStreamId;
-    _nextStreamId +=
-        2; // HTTP/2: клиент использует нечетные ID, сервер - четные
-    _streamSendingFinished[streamId] = false;
-    _logger?.debug('InMemoryTransport: создан stream $streamId');
-    return streamId;
+    try {
+      final streamId = _idManager.generateId();
+      _streamSendingFinished[streamId] = false;
+      _logger?.debug('InMemoryTransport: создан stream $streamId');
+      return streamId;
+    } catch (e) {
+      _logger?.error('InMemoryTransport: ошибка при создании stream: $e');
+      _errorHandler?.call(e);
+      rethrow;
+    }
   }
 
   /// Добавляет входящее сообщение в поток (вызывается партнерским транспортом)
@@ -121,10 +146,17 @@ class RpcInMemoryTransport implements IRpcTransport {
     // Добавляем сообщение в поток
     _incomingController.add(message);
 
-    // Если это сообщение завершающее, закрываем контроллер для конкретного stream
+    // Если это сообщение завершающее, освобождаем ID стрима
     if (message.isEndOfStream) {
       _logger?.debug(
           'InMemoryTransport: получен END_STREAM для stream ${message.streamId}');
+
+      // Освобождаем ID, так как поток завершился
+      if (_idManager.isActive(message.streamId)) {
+        _idManager.releaseId(message.streamId);
+        _logger?.debug(
+            'InMemoryTransport: освобожден ID ${message.streamId}, активных потоков: ${_idManager.activeCount}');
+      }
     }
   }
 
@@ -161,8 +193,12 @@ class RpcInMemoryTransport implements IRpcTransport {
 
       if (endStream) {
         _streamSendingFinished[streamId] = true;
-        _logger?.debug(
-            'InMemoryTransport: stream $streamId помечен как завершенный для отправки');
+        // Освобождаем ID, если это конец потока с нашей стороны
+        if (_idManager.isActive(streamId)) {
+          _idManager.releaseId(streamId);
+          _logger?.debug(
+              'InMemoryTransport: освобожден ID $streamId после отправки метаданных с endStream=true');
+        }
       }
     } catch (e) {
       _logger?.error('InMemoryTransport: ошибка при отправке метаданных: $e');
@@ -196,8 +232,12 @@ class RpcInMemoryTransport implements IRpcTransport {
 
       if (endStream) {
         _streamSendingFinished[streamId] = true;
-        _logger?.debug(
-            'InMemoryTransport: stream $streamId помечен как завершенный для отправки');
+        // Освобождаем ID, если это конец потока с нашей стороны
+        if (_idManager.isActive(streamId)) {
+          _idManager.releaseId(streamId);
+          _logger?.debug(
+              'InMemoryTransport: освобожден ID $streamId после отправки сообщения с endStream=true');
+        }
       }
     } catch (e) {
       _logger?.error('InMemoryTransport: ошибка при отправке сообщения: $e');
@@ -223,6 +263,13 @@ class RpcInMemoryTransport implements IRpcTransport {
         isEndOfStream: true,
         streamId: streamId,
       ));
+
+      // Освобождаем ID, так как мы закончили с этим потоком
+      if (_idManager.isActive(streamId)) {
+        _idManager.releaseId(streamId);
+        _logger?.debug(
+            'InMemoryTransport: освобожден ID $streamId после finishSending');
+      }
     } catch (e) {
       _logger?.error('InMemoryTransport: ошибка при завершении отправки: $e');
       _errorHandler?.call(e);
@@ -237,6 +284,10 @@ class RpcInMemoryTransport implements IRpcTransport {
     try {
       _closed = true;
       _streamSendingFinished.clear();
+
+      // Сбрасываем менеджер ID
+      _idManager.reset();
+      _logger?.debug('InMemoryTransport: сброшен менеджер ID при закрытии');
 
       // Закрываем исходящий поток, если он еще открыт
       if (!_outgoingController.isClosed) {

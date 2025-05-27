@@ -196,6 +196,18 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
 
     _streamMethods.remove(streamId);
     _streamMessages.remove(streamId);
+
+    // Сообщаем транспорту, что этот ID больше не используется
+    try {
+      transport.releaseStreamId(streamId);
+      logger.debug(
+        'ID стрима освобожден [streamId: $streamId]',
+      );
+    } catch (e) {
+      logger.warning(
+        'Не удалось освободить ID стрима [streamId: $streamId]: $e',
+      );
+    }
   }
 
   /// Этап 3: Парсинг пути метода из строки формата /service/method
