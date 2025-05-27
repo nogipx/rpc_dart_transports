@@ -4,42 +4,29 @@
 
 part of '../_index.dart';
 
-/// Серверная часть серверного стриминга.
+/// Серверная часть серверного стриминга на основе StreamProcessor.
 ///
 /// Получает один запрос и отправляет поток ответов.
-/// Автоматически извлекает первый запрос из потока и вызывает
-/// пользовательский обработчик, игнорируя все последующие запросы.
-///
-/// Пример использования:
-/// ```dart
-/// final server = ServerStreamServer<String, String>(
-///   transport: serverTransport,
-///   requestSerializer: stringSerializer,
-///   responseSerializer: stringSerializer,
-///   handler: (request, responder) {
-///     // Обработка запроса
-///     for (int i = 0; i < 5; i++) {
-///       responder.sendResponse("Данные #$i");
-///     }
-///     responder.complete();
-///   }
-/// );
-/// ```
-final class ServerStreamResponder<TRequest, TResponse>
-    implements IRpcResponder {
+/// Использует новый StreamProcessor для обработки без race condition.
+final class ServerStreamResponder<TRequest extends IRpcSerializable,
+    TResponse extends IRpcSerializable> implements IRpcResponder {
   late final RpcLogger? _logger;
 
   @override
   final int id;
 
-  /// Внутренний сервер двунаправленного стрима
-  late final BidirectionalStreamResponder<TRequest, TResponse> _innerServer;
+  /// Внутренний процессор стрима
+  late final StreamProcessor<TRequest, TResponse> _processor;
 
   /// Подписка на входящие запросы
   StreamSubscription? _subscription;
 
+  /// Флаг обработки первого запроса
+  bool _requestHandled = false;
+
   /// Создает сервер серверного стриминга
   ///
+  /// [id] Идентификатор стрима
   /// [transport] Транспортный уровень
   /// [serviceName] Имя сервиса (например, "DataService")
   /// [methodName] Имя метода (например, "GetData")
@@ -48,7 +35,7 @@ final class ServerStreamResponder<TRequest, TResponse>
   /// [handler] Функция-обработчик, вызываемая для обработки запроса
   /// [logger] Опциональный логгер
   ServerStreamResponder({
-    this.id = 0,
+    required this.id,
     required IRpcTransport transport,
     required String serviceName,
     required String methodName,
@@ -58,71 +45,105 @@ final class ServerStreamResponder<TRequest, TResponse>
     RpcLogger? logger,
   }) {
     _logger = logger?.child('ServerResponder');
-    _innerServer = BidirectionalStreamResponder<TRequest, TResponse>(
-      id: id,
+    _logger?.debug(
+        'Создание ServerStreamResponder для $serviceName.$methodName [id: $id]');
+
+    _processor = StreamProcessor<TRequest, TResponse>(
       transport: transport,
+      streamId: id,
       serviceName: serviceName,
       methodName: methodName,
       requestCodec: requestCodec,
       responseCodec: responseCodec,
       logger: _logger,
     );
-    unawaited(_setupRequestHandler(handler));
+
+    _setupRequestHandler(handler);
   }
 
-  Future<void> _setupRequestHandler(
-    Stream<TResponse> Function(TRequest request) handler,
-  ) async {
-    bool requestHandled = false;
+  /// Привязывает респондер к потоку сообщений от endpoint'а
+  void bindToMessageStream(Stream<RpcTransportMessage> messageStream) {
+    _logger?.debug('Привязка к потоку сообщений [id: $id]');
+    _processor.bindToMessageStream(messageStream);
+  }
 
-    _subscription = _innerServer.requests.listen((request) async {
-      if (!requestHandled) {
-        requestHandled = true;
+  /// Настраивает обработчик запросов для серверного стрима
+  void _setupRequestHandler(
+    Stream<TResponse> Function(TRequest request) handler,
+  ) {
+    _logger?.debug(
+        'Настройка обработчика запросов для серверного стрима [id: $id]');
+
+    _subscription = _processor.requests.listen((request) async {
+      _logger
+          ?.debug('Получен запрос для серверного стрима: $request [id: $id]');
+
+      if (!_requestHandled) {
+        _logger?.debug(
+            'Обработка первого запроса для серверного стрима [id: $id]');
+        _requestHandled = true;
 
         try {
-          // Оборачиваем вызов handler в try-catch для перехвата синхронных исключений
-          final Stream<TResponse> handlerStream;
-          try {
-            handlerStream = handler(request);
-          } catch (error, trace) {
-            _logger?.error(
-              'Синхронная ошибка при вызове обработчика',
-              error: error,
-              stackTrace: trace,
-            );
-            // Отправляем ошибку клиенту
-            await _innerServer.sendError(RpcStatus.INTERNAL, error.toString());
-            await close();
-            return;
+          _logger?.debug('Вызов обработчика запроса [id: $id]');
+          final handlerStream = handler(request);
+          _logger?.debug(
+              'Обработчик успешно вызван, получен стрим ответов [id: $id]');
+
+          _logger?.debug(
+              'Начинаем обработку потока ответов от обработчика [id: $id]');
+
+          int responseCount = 0;
+          await for (var response in handlerStream) {
+            responseCount++;
+            _logger?.debug(
+                'Получен ответ #$responseCount от обработчика: $response [id: $id]');
+
+            try {
+              await _processor.send(response);
+              _logger?.debug(
+                  'Ответ #$responseCount успешно отправлен клиенту [id: $id]');
+
+              // Небольшая задержка для стабильности передачи данных
+              await Future.delayed(Duration(milliseconds: 10));
+            } catch (e, stackTrace) {
+              _logger?.error(
+                'Ошибка при отправке ответа #$responseCount клиенту [id: $id]',
+                error: e,
+                stackTrace: stackTrace,
+              );
+            }
           }
 
-          // Обрабатываем стрим ответов
-          await for (final data in handlerStream) {
-            await _innerServer.send(data);
-          }
+          _logger?.debug(
+              'Поток ответов от обработчика завершен, всего ответов: $responseCount [id: $id]');
 
-          // После завершения стрима, корректно закрываем соединение
-          await _innerServer.finishReceiving();
-        } on Object catch (error, trace) {
+          // Завершаем отправку ответов
+          await _processor.finishSending();
+          _logger?.debug('Отправка ответов завершена [id: $id]');
+        } catch (error, trace) {
           _logger?.error(
-            'Ошибка при обработке данных',
+            'Ошибка при обработке запроса [id: $id]',
             error: error,
             stackTrace: trace,
           );
-          // В случае асинхронной ошибки также отправляем ошибку клиенту
-          await _innerServer.sendError(RpcStatus.INTERNAL, error.toString());
-          await close();
+          await _processor.sendError(RpcStatus.INTERNAL, error.toString());
         }
+      } else {
+        _logger?.debug(
+            'Игнорирование дополнительного запроса (первый уже обработан) [id: $id]');
       }
-      // Игнорируем все дополнительные запросы
+    }, onError: (error, stackTrace) {
+      _logger?.error('Ошибка в потоке запросов [id: $id]',
+          error: error, stackTrace: stackTrace);
+    }, onDone: () {
+      _logger?.debug('Поток запросов завершен [id: $id]');
     });
   }
 
   /// Закрывает стрим и освобождает ресурсы
-  ///
-  /// Полностью завершает стрим, освобождая все ресурсы.
   Future<void> close() async {
+    _logger?.debug('Закрытие ServerStreamResponder [id: $id]');
     await _subscription?.cancel();
-    await _innerServer.close();
+    await _processor.close();
   }
 }

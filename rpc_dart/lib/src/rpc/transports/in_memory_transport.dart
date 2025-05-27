@@ -118,10 +118,18 @@ class RpcInMemoryTransport implements IRpcTransport {
 
   /// Добавляет входящее сообщение в поток (вызывается партнерским транспортом)
   void _addIncomingMessage(RpcTransportMessage message) {
-    if (_incomingController.isClosed) return;
+    if (_incomingController.isClosed) {
+      _logger?.warning(
+          'InMemoryTransport: контроллер закрыт, сообщение отброшено [streamId: ${message.streamId}]');
+      return;
+    }
 
     _logger?.debug(
-        'InMemoryTransport: получено сообщение для stream ${message.streamId}, isMetadataOnly: ${message.isMetadataOnly}, endStream: ${message.isEndOfStream}, payload: ${message.payload?.length ?? 0} байт, path: ${message.methodPath}');
+        'InMemoryTransport: получено сообщение для stream ${message.streamId}, '
+        'isMetadataOnly: ${message.isMetadataOnly}, '
+        'endStream: ${message.isEndOfStream}, '
+        'methodPath: ${message.methodPath ?? "null"}, '
+        'payloadSize: ${message.payload?.length ?? 0} байт');
 
     // Проверка размера сообщения для управления памятью
     if (message.payload != null) {
@@ -143,8 +151,19 @@ class RpcInMemoryTransport implements IRpcTransport {
       }
     }
 
-    // Добавляем сообщение в поток
-    _incomingController.add(message);
+    try {
+      // Добавляем сообщение в поток
+      _incomingController.add(message);
+      _logger?.debug(
+          'InMemoryTransport: сообщение успешно добавлено в поток [streamId: ${message.streamId}]');
+    } catch (e, stackTrace) {
+      _logger?.error(
+          'InMemoryTransport: ошибка при добавлении сообщения в поток [streamId: ${message.streamId}]',
+          error: e,
+          stackTrace: stackTrace);
+      _errorHandler?.call(e);
+      return;
+    }
 
     // Если это сообщение завершающее, освобождаем ID стрима
     if (message.isEndOfStream) {
@@ -176,10 +195,16 @@ class RpcInMemoryTransport implements IRpcTransport {
     if (_closed) {
       _logger?.warning(
           'InMemoryTransport: попытка отправить метаданные после закрытия транспорта');
-      return;
+      throw StateError('Транспорт закрыт');
     }
 
     try {
+      if (_outgoingController.isClosed) {
+        _logger?.warning(
+            'InMemoryTransport: контроллер исходящих сообщений закрыт');
+        throw StateError('Контроллер исходящих сообщений закрыт');
+      }
+
       final message = RpcTransportMessage(
         metadata: metadata,
         isEndOfStream: endStream,
@@ -188,8 +213,15 @@ class RpcInMemoryTransport implements IRpcTransport {
       );
 
       _logger?.debug(
-          'InMemoryTransport: отправляем метаданные для stream $streamId, endStream: $endStream, path: ${metadata.methodPath}');
+          'InMemoryTransport: отправляем метаданные для stream $streamId, '
+          'endStream: $endStream, path: ${metadata.methodPath}, '
+          'headers: ${metadata.headers.length}');
+
+      // Блокирующая отправка для гарантии доставки
       _outgoingController.add(message);
+
+      _logger?.debug(
+          'InMemoryTransport: метаданные успешно отправлены в контроллер [streamId: $streamId]');
 
       if (endStream) {
         _streamSendingFinished[streamId] = true;
@@ -200,8 +232,9 @@ class RpcInMemoryTransport implements IRpcTransport {
               'InMemoryTransport: освобожден ID $streamId после отправки метаданных с endStream=true');
         }
       }
-    } catch (e) {
-      _logger?.error('InMemoryTransport: ошибка при отправке метаданных: $e');
+    } catch (e, stackTrace) {
+      _logger?.error('InMemoryTransport: ошибка при отправке метаданных: $e',
+          error: e, stackTrace: stackTrace);
       _errorHandler?.call(e);
       rethrow;
     }
@@ -216,10 +249,16 @@ class RpcInMemoryTransport implements IRpcTransport {
     if (_closed) {
       _logger?.warning(
           'InMemoryTransport: попытка отправить данные после закрытия транспорта');
-      return;
+      throw StateError('Транспорт закрыт');
     }
 
     try {
+      if (_outgoingController.isClosed) {
+        _logger?.warning(
+            'InMemoryTransport: контроллер исходящих сообщений закрыт');
+        throw StateError('Контроллер исходящих сообщений закрыт');
+      }
+
       final message = RpcTransportMessage(
         payload: data,
         isEndOfStream: endStream,
@@ -227,8 +266,14 @@ class RpcInMemoryTransport implements IRpcTransport {
       );
 
       _logger?.debug(
-          'InMemoryTransport: отправляем сообщение для stream $streamId, размер: ${data.length} байт, endStream: $endStream');
+          'InMemoryTransport: отправляем сообщение для stream $streamId, '
+          'размер: ${data.length} байт, endStream: $endStream');
+
+      // Блокирующая отправка для гарантии доставки
       _outgoingController.add(message);
+
+      _logger?.debug(
+          'InMemoryTransport: сообщение успешно отправлено в контроллер [streamId: $streamId]');
 
       if (endStream) {
         _streamSendingFinished[streamId] = true;
@@ -239,8 +284,9 @@ class RpcInMemoryTransport implements IRpcTransport {
               'InMemoryTransport: освобожден ID $streamId после отправки сообщения с endStream=true');
         }
       }
-    } catch (e) {
-      _logger?.error('InMemoryTransport: ошибка при отправке сообщения: $e');
+    } catch (e, stackTrace) {
+      _logger?.error('InMemoryTransport: ошибка при отправке сообщения: $e',
+          error: e, stackTrace: stackTrace);
       _errorHandler?.call(e);
       rethrow;
     }
@@ -248,21 +294,51 @@ class RpcInMemoryTransport implements IRpcTransport {
 
   @override
   Future<void> finishSending(int streamId) async {
-    if (_closed) return;
+    _logger?.debug('InMemoryTransport: finishSending для stream $streamId');
 
-    if (_streamSendingFinished[streamId] == true) {
+    // Проверяем, закрыт ли транспорт
+    if (_closed) {
+      _logger?.warning(
+          'InMemoryTransport: попытка завершить отправку после закрытия транспорта');
+      throw StateError('Транспорт закрыт');
+    }
+
+    // Проверяем, завершена ли уже отправка для этого стрима
+    if (_streamSendingFinished.containsKey(streamId) &&
+        _streamSendingFinished[streamId] == true) {
+      _logger?.debug(
+          'InMemoryTransport: поток $streamId уже завершен, пропускаем');
       return; // Уже завершен
     }
 
     try {
-      _streamSendingFinished[streamId] = true;
+      // Проверяем, закрыт ли контроллер исходящих сообщений
+      if (_outgoingController.isClosed) {
+        _logger?.warning(
+            'InMemoryTransport: контроллер исходящих сообщений закрыт при finishSending');
+        throw StateError('Контроллер исходящих сообщений закрыт');
+      }
 
-      // Отправляем пустые метаданные с флагом END_STREAM для конкретного stream
-      _outgoingController.add(RpcTransportMessage(
+      // Отмечаем стрим как завершенный ПЕРЕД отправкой сообщения,
+      // чтобы предотвратить повторную отправку при асинхронных вызовах
+      _streamSendingFinished[streamId] = true;
+      _logger?.debug(
+          'InMemoryTransport: отмечаем поток $streamId как завершенный');
+
+      // Создаем сообщение с пустыми метаданными и флагом END_STREAM
+      final message = RpcTransportMessage(
         metadata: RpcMetadata([]),
         isEndOfStream: true,
         streamId: streamId,
-      ));
+      );
+
+      // Отправляем сообщение через контроллер
+      _outgoingController.add(message);
+      _logger?.debug(
+          'InMemoryTransport: отправлен сигнал END_STREAM для stream $streamId');
+
+      // Добавляем небольшую задержку для гарантии доставки сообщения
+      await Future.delayed(Duration(milliseconds: 20));
 
       // Освобождаем ID, так как мы закончили с этим потоком
       if (_idManager.isActive(streamId)) {
@@ -270,8 +346,9 @@ class RpcInMemoryTransport implements IRpcTransport {
         _logger?.debug(
             'InMemoryTransport: освобожден ID $streamId после finishSending');
       }
-    } catch (e) {
-      _logger?.error('InMemoryTransport: ошибка при завершении отправки: $e');
+    } catch (e, stackTrace) {
+      _logger?.error('InMemoryTransport: ошибка при завершении отправки: $e',
+          error: e, stackTrace: stackTrace);
       _errorHandler?.call(e);
       rethrow;
     }

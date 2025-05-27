@@ -4,66 +4,28 @@
 
 part of '../_index.dart';
 
-/// Серверная реализация двунаправленного стрима gRPC со Stream ID.
+/// Серверная реализация двунаправленного стрима на основе StreamProcessor.
 ///
 /// Обеспечивает полную реализацию серверной стороны двунаправленного
-/// стриминга gRPC. Обрабатывает входящие запросы от клиента и позволяет
+/// стриминга RPC. Обрабатывает входящие запросы от клиента и позволяет
 /// отправлять ответы асинхронно, независимо от получения запросов.
-/// Использует уникальный Stream ID для идентификации вызова.
-///
-/// Ключевые возможности:
-/// - Асинхронная обработка потока входящих запросов
-/// - Асинхронная отправка потока ответов
-/// - Автоматическая сериализация/десериализация сообщений
-/// - Управление статусами и ошибками gRPC
-final class BidirectionalStreamResponder<TRequest, TResponse>
-    implements IRpcResponder {
+/// Использует новый StreamProcessor для обработки без race condition.
+final class BidirectionalStreamResponder<TRequest extends IRpcSerializable,
+    TResponse extends IRpcSerializable> implements IRpcResponder {
   late final RpcLogger? _logger;
 
   @override
   final int id;
 
-  /// Базовый транспорт для обмена данными
-  final IRpcTransport _transport;
+  /// Внутренний процессор стрима
+  late final StreamProcessor<TRequest, TResponse> _processor;
 
-  /// Имя сервиса
-  final String serviceName;
-
-  /// Имя метода
-  final String methodName;
-
-  /// Путь метода в формате /ServiceName/MethodName
-  late final String _methodPath;
-
-  /// Кодек для десериализации входящих запросов
-  final IRpcCodec<TRequest> _requestSerializer;
-
-  /// Кодек для сериализации исходящих ответов
-  final IRpcCodec<TResponse> _responseSerializer;
-
-  /// Контроллер потока входящих запросов
-  final StreamController<TRequest> _requestController =
-      StreamController<TRequest>();
-
-  /// Контроллер потока исходящих ответов
-  final StreamController<TResponse> _responseController =
-      StreamController<TResponse>();
-
-  /// Парсер для обработки фрагментированных сообщений
-  late final RpcMessageParser _parser;
-
-  /// Stream ID для активного соединения (устанавливается при первом входящем вызове)
-  int? _activeStreamId;
-
-  /// Поток входящих запросов от клиента.
-  ///
-  /// Предоставляет доступ к потоку запросов, получаемых от клиента.
-  /// Бизнес-логика может подписаться на этот поток для обработки запросов.
-  /// Поток завершается, когда клиент завершает свою часть стрима.
-  Stream<TRequest> get requests => _requestController.stream;
+  /// Флаг активности респондера
+  bool _isActive = true;
 
   /// Создает новый серверный двунаправленный стрим.
   ///
+  /// [id] Идентификатор стрима
   /// [transport] Транспортный уровень
   /// [serviceName] Имя сервиса (например, "ChatService")
   /// [methodName] Имя метода (например, "Connect")
@@ -71,261 +33,82 @@ final class BidirectionalStreamResponder<TRequest, TResponse>
   /// [responseCodec] Кодек для сериализации ответов
   /// [logger] Опциональный логгер
   BidirectionalStreamResponder({
-    this.id = 0,
+    required this.id,
     required IRpcTransport transport,
-    required this.serviceName,
-    required this.methodName,
+    required String serviceName,
+    required String methodName,
     required IRpcCodec<TRequest> requestCodec,
     required IRpcCodec<TResponse> responseCodec,
     RpcLogger? logger,
-  })  : _transport = transport,
-        _requestSerializer = requestCodec,
-        _responseSerializer = responseCodec {
+  }) {
     _logger = logger?.child('BidirectionalResponder');
-    _parser = RpcMessageParser(logger: _logger);
-    _methodPath = '/$serviceName/$methodName';
-    _logger?.info('Создан серверный двунаправленный стрим для $_methodPath');
-    unawaited(_setupStreams());
-  }
+    _logger?.debug(
+        'Создание BidirectionalStreamResponder для $serviceName.$methodName [id: $id]');
 
-  /// Настраивает потоки данных для обработки запросов и отправки ответов.
-  ///
-  /// 1. Слушает все входящие сообщения и реагирует на новые Stream ID
-  /// 2. Настраивает пайплайн для отправки ответов
-  /// 3. Настраивает обработку входящих сообщений от клиента
-  Future<void> _setupStreams() async {
-    _logger?.debug('Настройка обработки сообщений для $_methodPath');
-
-    // Слушаем ВСЕ входящие сообщения для обнаружения новых вызовов
-    _transport.incomingMessages.listen(
-      (message) async {
-        // Если это новый Stream ID и метаданные, проверяем путь метода
-        if (message.isMetadataOnly &&
-            message.metadata != null &&
-            _activeStreamId == null) {
-          // Проверяем, что это вызов нашего метода
-          if (message.methodPath == _methodPath) {
-            _activeStreamId = message.streamId;
-            _logger?.debug(
-                'Новый вызов $_methodPath на stream ${message.streamId}');
-
-            // Отправляем начальные заголовки в ответ
-            final initialHeaders = RpcMetadata.forServerInitialResponse();
-            await _transport.sendMetadata(_activeStreamId!, initialHeaders);
-            _logger?.debug(
-                'Начальные заголовки отправлены для $_methodPath [streamId: ${message.streamId}]');
-
-            // Настраиваем отправку ответов для этого stream
-            _responseController.stream.listen(
-              (response) async {
-                _logger?.debug(
-                    'Отправка ответа для $_methodPath [streamId: ${message.streamId}]');
-                final serialized = _responseSerializer.serialize(response);
-                _logger?.debug(
-                    'Ответ сериализован, размер: ${serialized.length} байт [streamId: ${message.streamId}]');
-                final framedMessage = RpcMessageFrame.encode(serialized);
-                await _transport.sendMessage(_activeStreamId!, framedMessage);
-                _logger?.debug(
-                  'Ответ фреймирован и отправлен, размер: ${framedMessage.length} байт [streamId: ${message.streamId}]',
-                );
-              },
-              onDone: () async {
-                // Отправляем трейлер при завершении отправки ответов
-                _logger?.info(
-                    'Завершение отправки ответов для $_methodPath [streamId: ${message.streamId}]');
-                final trailers = RpcMetadata.forTrailer(RpcStatus.OK);
-                await _transport.sendMetadata(_activeStreamId!, trailers,
-                    endStream: true);
-                _logger?.debug(
-                    'Трейлер отправлен для $_methodPath [streamId: ${message.streamId}]');
-              },
-              onError: (Object e, StackTrace stackTrace) {
-                _logger?.error(
-                    'Ошибка при отправке ответа для $_methodPath [streamId: ${message.streamId}]',
-                    error: e,
-                    stackTrace: stackTrace);
-              },
-            );
-          } else {
-            // Это не наш метод, игнорируем
-            _logger?.debug(
-                'Игнорируем вызов ${message.methodPath}, ожидаем $_methodPath [streamId: ${message.streamId}]');
-            return;
-          }
-        }
-
-        // Обрабатываем данные только для нашего активного stream
-        // Для id=0 (значение по умолчанию в тестах) необходимо проверять метод
-        bool isOurMessage = false;
-
-        // Если у нас уже есть активный stream, проверяем его ID
-        if (_activeStreamId != null) {
-          isOurMessage = message.streamId == _activeStreamId;
-        }
-        // Если это тестовый режим (id=0) и нет активного stream, проверяем метод
-        else if (id == 0 &&
-            message.isMetadataOnly &&
-            message.methodPath == _methodPath) {
-          // В тестовом режиме активируем stream для правильного метода
-          _activeStreamId = message.streamId;
-          isOurMessage = true;
-        }
-
-        if (isOurMessage) {
-          if (!message.isMetadataOnly && message.payload != null) {
-            // Обрабатываем сообщения
-            final messageBytes = message.payload!;
-            _logger?.debug(
-              'Получено сообщение от клиента размером: ${messageBytes.length} байт [streamId: ${message.streamId}]',
-            );
-            final messages = _parser(messageBytes);
-            _logger?.debug(
-                'Парсер извлек ${messages.length} сообщений из фрейма [streamId: ${message.streamId}]');
-
-            for (var msgBytes in messages) {
-              try {
-                _logger?.debug(
-                    'Десериализация запроса размером ${msgBytes.length} байт [streamId: ${message.streamId}]');
-                final request = _requestSerializer.deserialize(msgBytes);
-                _requestController.add(request);
-                _logger?.debug(
-                    'Запрос десериализован и добавлен в поток запросов [streamId: ${message.streamId}]');
-              } catch (e, stackTrace) {
-                _logger?.error(
-                    'Ошибка при десериализации запроса [streamId: ${message.streamId}]',
-                    error: e,
-                    stackTrace: stackTrace);
-                if (!_requestController.isClosed) {
-                  _requestController.addError(e, stackTrace);
-                }
-              }
-            }
-          }
-
-          // Если это конец потока запросов, закрываем контроллер
-          if (message.isEndOfStream) {
-            _logger?.debug(
-                'Получен END_STREAM, закрываем контроллер запросов [streamId: ${message.streamId}]');
-            if (!_requestController.isClosed) {
-              _requestController.close();
-            }
-          }
-        }
-      },
-      onError: (error, stackTrace) {
-        _logger?.error('Ошибка от транспорта: $error',
-            error: error, stackTrace: stackTrace);
-
-        // Добавляем ошибку только если контроллер не закрыт
-        if (!_requestController.isClosed) {
-          _requestController.addError(error, stackTrace);
-          _requestController.close();
-        }
-
-        if (_activeStreamId != null) {
-          sendError(RpcStatus.INTERNAL, 'Внутренняя ошибка: $error');
-        }
-      },
-      onDone: () {
-        _logger?.debug('Транспорт завершил поток сообщений для $_methodPath');
-        if (!_requestController.isClosed) {
-          _requestController.close();
-        }
-      },
+    _processor = StreamProcessor<TRequest, TResponse>(
+      transport: transport,
+      streamId: id,
+      serviceName: serviceName,
+      methodName: methodName,
+      requestCodec: requestCodec,
+      responseCodec: responseCodec,
+      logger: _logger,
     );
   }
 
-  /// Отправляет ответ клиенту.
+  /// Поток входящих запросов от клиента.
   ///
-  /// Сериализует объект ответа и отправляет его клиенту.
-  /// Ответы можно отправлять в любом порядке и в любое время,
-  /// пока не вызван метод finishSending().
+  /// Предоставляет доступ к потоку запросов, получаемых от клиента.
+  /// Бизнес-логика может подписаться на этот поток для обработки запросов.
+  /// Поток завершается, когда клиент завершает свою часть стрима.
+  Stream<TRequest> get requests => _processor.requests;
+
+  /// Привязывает респондер к потоку сообщений от endpoint'а
+  void bindToMessageStream(Stream<RpcTransportMessage> messageStream) {
+    _logger?.debug('Привязка к потоку сообщений [id: $id]');
+    _processor.bindToMessageStream(messageStream);
+  }
+
+  /// Отправляет ответ клиенту
   ///
-  /// [response] Объект ответа для отправки
+  /// [response] Ответ для отправки клиенту
   Future<void> send(TResponse response) async {
-    if (_activeStreamId == null) {
-      _logger?.warning(
-          'Попытка отправить ответ без активного соединения для $_methodPath');
+    if (!_isActive) {
+      _logger
+          ?.warning('Попытка отправить ответ в неактивный респондер [id: $id]');
       return;
     }
 
-    if (!_responseController.isClosed) {
-      _logger?.debug(
-          'Отправка ответа в стрим $_methodPath [streamId: $_activeStreamId]');
-      _responseController.add(response);
-    } else {
-      _logger?.warning(
-          'Попытка отправить ответ в закрытый стрим $_methodPath [streamId: $_activeStreamId]');
-    }
+    await _processor.send(response);
   }
 
-  /// Отправляет сообщение об ошибке клиенту.
+  /// Отправляет ошибку клиенту
   ///
-  /// Завершает поток с указанным кодом ошибки gRPC и текстовым сообщением.
-  /// После вызова этого метода стрим завершается и новые ответы
-  /// отправлять невозможно.
-  ///
-  /// [statusCode] Код ошибки gRPC (см. GrpcStatus)
-  /// [message] Текстовое сообщение с описанием ошибки
+  /// [statusCode] Код статуса ошибки (например, RpcStatus.INTERNAL)
+  /// [message] Сообщение об ошибке
   Future<void> sendError(int statusCode, String message) async {
-    if (_activeStreamId == null) {
-      _logger?.warning(
-          'Попытка отправить ошибку без активного соединения для $_methodPath');
-      return;
-    }
+    if (!_isActive) return;
 
-    _logger?.error(
-        'Отправка ошибки клиенту: $statusCode - $message [streamId: $_activeStreamId]');
-
-    if (!_responseController.isClosed) {
-      _responseController.close();
-    }
-
-    final trailers = RpcMetadata.forTrailer(statusCode, message: message);
-    await _transport.sendMetadata(_activeStreamId!, trailers, endStream: true);
-    _logger?.debug(
-        'Трейлер с ошибкой отправлен клиенту [streamId: $_activeStreamId]');
+    await _processor.sendError(statusCode, message);
   }
 
-  /// Завершает отправку ответов.
+  /// Завершает отправку ответов
   ///
-  /// Сигнализирует клиенту, что сервер закончил отправку ответов.
-  /// Автоматически отправляет трейлер с успешным статусом.
-  /// После вызова этого метода новые ответы отправлять нельзя.
+  /// Вызывается когда сервер больше не будет отправлять ответы.
+  /// После этого вызова отправка ответов невозможна.
   Future<void> finishReceiving() async {
-    if (!_responseController.isClosed) {
-      _logger?.info(
-          'Завершение отправки ответов для $_methodPath [streamId: $_activeStreamId]');
-      await _responseController.close();
-    } else {
-      _logger?.debug(
-          'Попытка завершить уже закрытый поток ответов $_methodPath [streamId: $_activeStreamId]');
-    }
+    if (!_isActive) return;
+
+    _logger?.debug('Завершение отправки ответов [id: $id]');
+    await _processor.finishSending();
   }
 
-  /// Закрывает стрим и освобождает ресурсы.
-  ///
-  /// Полностью завершает двунаправленный стрим:
-  /// - Завершает отправку ответов
-  /// - Закрывает транспортное соединение
-  /// - Отменяет все подписки
+  /// Закрывает стрим и освобождает ресурсы
   Future<void> close() async {
-    _logger?.info(
-        'Закрытие двунаправленного стрима сервера $_methodPath [streamId: $_activeStreamId]');
+    if (!_isActive) return;
 
-    // Если нет активного соединения, просто закрываем контроллеры
-    if (_activeStreamId == null) {
-      if (!_requestController.isClosed) {
-        _requestController.close();
-      }
-      if (!_responseController.isClosed) {
-        _responseController.close();
-      }
-      return;
-    }
-
-    // Если есть активное соединение, корректно завершаем его
-    await finishReceiving();
-    // Не закрываем транспорт, так как он может использоваться другими стримами
+    _logger?.debug('Закрытие BidirectionalStreamResponder [id: $id]');
+    _isActive = false;
+    await _processor.close();
   }
 }

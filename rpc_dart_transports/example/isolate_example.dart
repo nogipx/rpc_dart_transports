@@ -102,12 +102,18 @@ void customEchoServer(transport, customParams) {
 
   // Создаем двунаправленный стрим-сервер
   final server = BidirectionalStreamResponder<RpcString, RpcString>(
+    id: 1,
     transport: transport,
     serviceName: 'EchoService',
     methodName: 'Echo',
     requestCodec: serializer,
     responseCodec: serializer,
     logger: logger,
+  );
+
+  // ВАЖНО: Привязываем сервер к потоку сообщений для streamId = 1
+  server.bindToMessageStream(
+    transport.incomingMessages.where((msg) => msg.streamId == 1),
   );
 
   // Настраиваем префикс для ответов

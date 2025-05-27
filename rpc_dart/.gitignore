@@ -6,6 +6,7 @@ pubspec.lock
 **/examples
 
 coverage/
+.chats/
 
 *.bin
 *.pem

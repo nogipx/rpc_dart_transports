@@ -5,6 +5,7 @@
 import 'package:rpc_dart/rpc_dart.dart';
 
 part 'bool.dart';
+part 'list.dart';
 part 'null.dart';
 part 'num.dart';
 part 'string.dart';

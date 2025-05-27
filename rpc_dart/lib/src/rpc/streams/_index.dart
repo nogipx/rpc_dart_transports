@@ -6,6 +6,8 @@ import 'dart:async';
 
 import 'package:rpc_dart/rpc_dart.dart';
 
+part 'base_processor.dart';
+
 part 'bidirectional/caller.dart';
 part 'bidirectional/responder.dart';
 

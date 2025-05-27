@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:rpc_dart/src/codec/special_cbor.dart';
 import 'package:test/test.dart';
-import 'package:rpc_dart/src/codec/cbor.dart';
 
 void main() {
   group('CBOR Codec - RFC 7049 Compliance Tests', () {

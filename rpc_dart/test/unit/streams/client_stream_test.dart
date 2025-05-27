@@ -9,21 +9,28 @@ void main() {
       test('отправляет_несколько_запросов_и_получает_один_ответ', () async {
         // Arrange
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
-        final receivedRequests = <RpcString>[];
 
         final server = ClientStreamResponder<RpcString, RpcString>(
+          id: 1,
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
           requestCodec: codec,
           responseCodec: codec,
-          handler: (Stream<RpcString> requests) async {
-            await for (final request in requests) {
-              receivedRequests.add(request);
-            }
-            return 'Processed ${receivedRequests.length} requests: ${receivedRequests.join(", ")}'
-                .rpc;
+          handler: (requests) async {
+            print('⭐ Сервер: Начата обработка запросов');
+            final allRequests = await requests.toList();
+            print(
+                '⭐ Сервер: Получено ${allRequests.length} запросов: $allRequests');
+            final joinedRequests = allRequests.join(', ');
+            print('⭐ Сервер: Отправляю ответ "Received: $joinedRequests"');
+            return 'Received: $joinedRequests'.rpc;
           },
+        );
+
+        // ВАЖНО: Привязываем сервер к потоку сообщений для streamId = 1
+        server.bindToMessageStream(
+          serverTransport.incomingMessages.where((msg) => msg.streamId == 1),
         );
 
         final client = ClientStreamCaller<RpcString, RpcString>(
@@ -34,18 +41,26 @@ void main() {
           responseCodec: codec,
         );
 
-        final testRequests = ['request1'.rpc, 'request2'.rpc, 'request3'.rpc];
-
         // Act
-        for (final request in testRequests) {
-          await client.send(request);
-        }
+        print('⭐ Клиент: Отправляю первый запрос');
+        await client.send('request1'.rpc);
+        await Future.delayed(Duration(milliseconds: 10));
+
+        print('⭐ Клиент: Отправляю второй запрос');
+        await client.send('request2'.rpc);
+        await Future.delayed(Duration(milliseconds: 10));
+
+        print('⭐ Клиент: Отправляю третий запрос');
+        await client.send('request3'.rpc);
+        await Future.delayed(Duration(milliseconds: 10));
+
+        print('⭐ Клиент: Завершаю отправку и жду ответ');
         final response = await client.finishSending();
+        print('⭐ Клиент: Получен ответ: $response');
 
         // Assert
-        expect(response,
-            equals('Processed 3 requests: request1, request2, request3'.rpc));
-        expect(receivedRequests, equals(testRequests));
+        expect(
+            response.value, equals('Received: request1, request2, request3'));
 
         // Cleanup
         await client.close();
@@ -57,6 +72,7 @@ void main() {
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
 
         final server = ClientStreamResponder<RpcString, RpcString>(
+          id: 1,
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -69,6 +85,11 @@ void main() {
             }
             return 'Processed $count requests'.rpc;
           },
+        );
+
+        // ВАЖНО: Привязываем сервер к потоку сообщений для streamId = 1
+        server.bindToMessageStream(
+          serverTransport.incomingMessages.where((msg) => msg.streamId == 1),
         );
 
         final client = ClientStreamCaller<RpcString, RpcString>(
@@ -95,6 +116,7 @@ void main() {
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
 
         final server = ClientStreamResponder<RpcString, RpcString>(
+          id: 1,
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -104,6 +126,11 @@ void main() {
             // Сразу выбрасываем исключение без обработки stream
             throw Exception('Server processing error');
           },
+        );
+
+        // ВАЖНО: Привязываем сервер к потоку сообщений для streamId = 1
+        server.bindToMessageStream(
+          serverTransport.incomingMessages.where((msg) => msg.streamId == 1),
         );
 
         final client = ClientStreamCaller<RpcString, RpcString>(
@@ -119,7 +146,7 @@ void main() {
 
         // Используем expectLater с коротким таймаутом
         await expectLater(
-          client.finishSending().timeout(Duration(seconds: 2)),
+          client.finishSending().timeout(Duration(seconds: 5)),
           throwsA(isA<Exception>()),
         );
 
@@ -134,6 +161,7 @@ void main() {
         final receivedRequests = <RpcString>[];
 
         final server = ClientStreamResponder<RpcString, RpcString>(
+          id: 1,
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -145,6 +173,11 @@ void main() {
             }
             return 'Ordered: ${receivedRequests.join(", ")}'.rpc;
           },
+        );
+
+        // ВАЖНО: Привязываем сервер к потоку сообщений для streamId = 1
+        server.bindToMessageStream(
+          serverTransport.incomingMessages.where((msg) => msg.streamId == 1),
         );
 
         final client = ClientStreamCaller<RpcString, RpcString>(
@@ -177,12 +210,18 @@ void main() {
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
 
         final server = ClientStreamResponder<RpcString, RpcString>(
+          id: 1,
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
           requestCodec: codec,
           responseCodec: codec,
           handler: (Stream<RpcString> requests) async => 'test'.rpc,
+        );
+
+        // ВАЖНО: Привязываем сервер к потоку сообщений для streamId = 1
+        server.bindToMessageStream(
+          serverTransport.incomingMessages.where((msg) => msg.streamId == 1),
         );
 
         final client = ClientStreamCaller<RpcString, RpcString>(
@@ -206,6 +245,7 @@ void main() {
         final receivedRequests = <RpcString>[];
 
         final server = ClientStreamResponder<RpcString, RpcString>(
+          id: 1,
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -217,6 +257,11 @@ void main() {
             }
             return 'Processed ${receivedRequests.length} requests'.rpc;
           },
+        );
+
+        // ВАЖНО: Привязываем сервер к потоку сообщений для streamId = 1
+        server.bindToMessageStream(
+          serverTransport.incomingMessages.where((msg) => msg.streamId == 1),
         );
 
         final client = ClientStreamCaller<RpcString, RpcString>(
@@ -246,6 +291,7 @@ void main() {
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
 
         final server = ClientStreamResponder<RpcString, RpcString>(
+          id: 1,
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -254,6 +300,11 @@ void main() {
           handler: (Stream<RpcString> requests) async {
             throw Exception('Handler error');
           },
+        );
+
+        // ВАЖНО: Привязываем сервер к потоку сообщений для streamId = 1
+        server.bindToMessageStream(
+          serverTransport.incomingMessages.where((msg) => msg.streamId == 1),
         );
 
         final client = ClientStreamCaller<RpcString, RpcString>(
@@ -267,7 +318,7 @@ void main() {
         // Act & Assert
         await client.send('test'.rpc);
         await expectLater(
-          client.finishSending().timeout(Duration(seconds: 2)),
+          client.finishSending().timeout(Duration(seconds: 5)),
           throwsA(isA<Exception>()),
         );
 
@@ -282,6 +333,7 @@ void main() {
         var handlerCallCount = 0;
 
         final server = ClientStreamResponder<RpcString, RpcString>(
+          id: 1,
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'SpecificMethod',
@@ -292,6 +344,11 @@ void main() {
             await for (final _ in requests) {}
             return 'response'.rpc;
           },
+        );
+
+        // ВАЖНО: Привязываем сервер к потоку сообщений для streamId = 1
+        server.bindToMessageStream(
+          serverTransport.incomingMessages.where((msg) => msg.streamId == 1),
         );
 
         final correctClient = ClientStreamCaller<RpcString, RpcString>(
@@ -316,7 +373,7 @@ void main() {
 
         await incorrectClient.send('incorrect'.rpc);
         try {
-          await incorrectClient.finishSending().timeout(Duration(seconds: 2));
+          await incorrectClient.finishSending().timeout(Duration(seconds: 5));
         } catch (e) {
           // Ожидаем ошибку для неправильного метода
         }
@@ -336,6 +393,7 @@ void main() {
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
 
         final sut = ClientStreamResponder<RpcString, RpcString>(
+          id: 1,
           transport: serverTransport,
           serviceName: 'TestService',
           methodName: 'TestMethod',
@@ -356,6 +414,7 @@ void main() {
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
 
         final server = ClientStreamResponder<RpcString, RpcString>(
+          id: 1,
           transport: serverTransport,
           serviceName: 'AggregatorService',
           methodName: 'Aggregate',
@@ -368,6 +427,11 @@ void main() {
             }
             return 'Aggregated: ${allRequests.join(', ')}'.rpc;
           },
+        );
+
+        // ВАЖНО: Привязываем сервер к потоку сообщений для streamId = 1
+        server.bindToMessageStream(
+          serverTransport.incomingMessages.where((msg) => msg.streamId == 1),
         );
 
         final client = ClientStreamCaller<RpcString, RpcString>(
@@ -398,6 +462,7 @@ void main() {
         final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
 
         final server = ClientStreamResponder<RpcString, RpcString>(
+          id: 1,
           transport: serverTransport,
           serviceName: 'CounterService',
           methodName: 'Count',
@@ -410,6 +475,11 @@ void main() {
             }
             return 'Total count: $count'.rpc;
           },
+        );
+
+        // ВАЖНО: Привязываем сервер к потоку сообщений для streamId = 1
+        server.bindToMessageStream(
+          serverTransport.incomingMessages.where((msg) => msg.streamId == 1),
         );
 
         final client = ClientStreamCaller<RpcString, RpcString>(

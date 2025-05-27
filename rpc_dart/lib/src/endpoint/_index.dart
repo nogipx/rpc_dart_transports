@@ -51,11 +51,26 @@ abstract base class RpcEndpointBase {
     _middlewares.clear();
 
     try {
-      await _transport.close();
+      // Даем небольшую задержку для завершения обработки текущих запросов
+      await Future.delayed(Duration(milliseconds: 10));
+
+      // Закрываем транспорт и ожидаем завершения с таймаутом
+      await _transport.close().timeout(
+        Duration(seconds: 5),
+        onTimeout: () {
+          logger.warning('Таймаут при закрытии транспорта');
+          // Не выбрасываем исключение, просто логируем предупреждение
+          return;
+        },
+      );
     } catch (e) {
       logger.warning('Ошибка при закрытии транспорта: $e');
+      // Не пробрасываем ошибку дальше, чтобы гарантировать, что метод close()
+      // всегда завершается успешно
+    } finally {
+      // Гарантируем, что эндпоинт помечен как неактивный
+      _isActive = false;
+      logger.info('RpcEndpoint закрыт');
     }
-
-    logger.info('RpcEndpoint закрыт');
   }
 }

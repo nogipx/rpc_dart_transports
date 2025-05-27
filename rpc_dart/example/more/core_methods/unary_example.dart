@@ -2,30 +2,29 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-part of '_index.dart';
+import 'package:rpc_dart/rpc_dart.dart';
 
-/// Запускает пример использования унарного RPC вызова
-Future<void> runUnaryExample() async {
+void main() async {
   await UnaryRpcExample.run();
 }
 
-/// Пример использования унарного RPC вызова с мультиплексированием по Stream ID.
+/// Пример использования унарного RPC вызова (один запрос - один ответ)
 ///
 /// Демонстрирует простой запрос-ответ с использованием UnaryClient и UnaryServer
-/// в новой архитектуре с поддержкой мультиплексирования по уникальным Stream ID
+/// с поддержкой мультиплексирования по уникальным Stream ID
 /// согласно спецификации gRPC.
 class UnaryRpcExample {
-  /// Запускает демонстрацию унарного RPC вызова.
+  /// Запускает демонстрацию унарного RPC вызова
   ///
   /// Создает клиент и сервер с мультиплексированием и выполняет
   /// несколько унарных вызовов разных типов через один транспорт.
   /// Каждый вызов получает уникальный Stream ID.
   static Future<void> run() async {
     RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.debug);
-    print(
-        '\n=== Запуск примера унарного RPC с мультиплексированием по Stream ID ===\n');
+    print('\n=== Пример унарного RPC вызова (1 запрос -> 1 ответ) ===\n');
 
     // Создаем одну пару соединенных транспортов для всех методов
+    print('ИНИЦИАЛИЗАЦИЯ: Создание транспортов и регистрация сервисов');
     final (clientTransport, serverTransport) = RpcInMemoryTransport.pair(
       clientLogger: RpcLogger(
         "ClientTransport",
@@ -53,6 +52,7 @@ class UnaryRpcExample {
     final servers = <UnaryResponder>[];
 
     for (final (serviceName, methodName) in services) {
+      print('СЕРВЕР: Регистрация метода $serviceName/$methodName');
       final server = UnaryResponder<RpcString, RpcString>(
         transport: serverTransport,
         serviceName: serviceName,
@@ -66,16 +66,31 @@ class UnaryRpcExample {
           // Обрабатываем разные запросы в зависимости от сервиса
           switch (serviceName) {
             case 'GreetingService':
-              return 'Здравствуйте! Это ответ от $serviceName'.rpc;
+              final response = 'Здравствуйте! Это ответ от $serviceName';
+              print(
+                  'СЕРВЕР [$serviceName/$methodName]: Отправляем ответ: "$response"');
+              return response.rpc;
             case 'TimeService':
-              return 'Текущее время: ${DateTime.now()}'.rpc;
+              final response = 'Текущее время: ${DateTime.now()}';
+              print(
+                  'СЕРВЕР [$serviceName/$methodName]: Отправляем ответ: "$response"');
+              return response.rpc;
             case 'StatusService':
-              return 'Все системы работают нормально в $serviceName'.rpc;
+              final response = 'Все системы работают нормально в $serviceName';
+              print(
+                  'СЕРВЕР [$serviceName/$methodName]: Отправляем ответ: "$response"');
+              return response.rpc;
             case 'ErrorService':
-              throw Exception('Тестовая ошибка от $serviceName');
+              final errorMessage = 'Тестовая ошибка от $serviceName';
+              print(
+                  'СЕРВЕР [$serviceName/$methodName]: Генерируем ошибку: "$errorMessage"');
+              throw Exception(errorMessage);
             case 'EchoService':
             default:
-              return 'Эхо от $serviceName: $request'.rpc;
+              final response = 'Эхо от $serviceName: $request';
+              print(
+                  'СЕРВЕР [$serviceName/$methodName]: Отправляем ответ: "$response"');
+              return response.rpc;
           }
         },
         logger: RpcLogger(
@@ -86,8 +101,12 @@ class UnaryRpcExample {
       servers.add(server);
     }
 
+    print(
+        '\nИНИЦИАЛИЗАЦИЯ: Все сервисы зарегистрированы, начинаем демонстрацию вызовов\n');
+
     try {
       // Пример 1: Простой вызов приветствия
+      print('\n--- Пример 1: Простой вызов ---');
       print('КЛИЕНТ: Выполняем запрос к GreetingService/SayHello');
       final client1 = UnaryCaller<RpcString, RpcString>(
         transport: clientTransport,
@@ -105,7 +124,8 @@ class UnaryRpcExample {
       await client1.close(); // Теперь не закрывает транспорт
 
       // Пример 2: Запрос времени
-      print('\nКЛИЕНТ: Выполняем запрос к TimeService/GetCurrentTime');
+      print('\n--- Пример 2: Запрос времени ---');
+      print('КЛИЕНТ: Выполняем запрос к TimeService/GetCurrentTime');
       final client2 = UnaryCaller<RpcString, RpcString>(
         transport: clientTransport,
         serviceName: 'TimeService',
@@ -122,8 +142,9 @@ class UnaryRpcExample {
       await client2.close();
 
       // Пример 3: Запрос с таймаутом
+      print('\n--- Пример 3: Запрос с таймаутом ---');
       print(
-          '\nКЛИЕНТ: Выполняем запрос к StatusService/CheckHealth с таймаутом 500мс');
+          'КЛИЕНТ: Выполняем запрос к StatusService/CheckHealth с таймаутом 500мс');
       final client3 = UnaryCaller<RpcString, RpcString>(
         transport: clientTransport,
         serviceName: 'StatusService',
@@ -143,8 +164,9 @@ class UnaryRpcExample {
       await client3.close();
 
       // Пример 4: Вызов с ошибкой
+      print('\n--- Пример 4: Обработка ошибок ---');
       print(
-          '\nКЛИЕНТ: Выполняем запрос к ErrorService/ThrowError (должен вернуть ошибку)');
+          'КЛИЕНТ: Выполняем запрос к ErrorService/ThrowError (должен вернуть ошибку)');
       final client4 = UnaryCaller<RpcString, RpcString>(
         transport: clientTransport,
         serviceName: 'ErrorService',
@@ -158,14 +180,17 @@ class UnaryRpcExample {
       );
       try {
         await client4.call('Ошибка'.rpc);
+        print(
+            'КЛИЕНТ: Этот текст не должен выводиться, т.к. должна быть ошибка');
       } catch (e) {
         print('КЛИЕНТ: Получена ожидаемая ошибка: $e');
       }
       await client4.close();
 
       // Пример 5: Эхо-запрос с очень коротким таймаутом
+      print('\n--- Пример 5: Таймаут соединения ---');
       print(
-          '\nКЛИЕНТ: Выполняем запрос к EchoService/Echo с очень коротким таймаутом (10мс)');
+          'КЛИЕНТ: Выполняем запрос к EchoService/Echo с очень коротким таймаутом (10мс)');
       final client5 = UnaryCaller<RpcString, RpcString>(
         transport: clientTransport,
         serviceName: 'EchoService',
@@ -182,14 +207,17 @@ class UnaryRpcExample {
           'Эхо тест с таймаутом'.rpc,
           timeout: Duration(milliseconds: 10),
         );
+        print(
+            'КЛИЕНТ: Этот текст не должен выводиться, т.к. должен быть таймаут');
       } catch (e) {
         print('КЛИЕНТ: Получена ошибка таймаута: $e');
       }
       await client5.close();
 
       // Демонстрация параллельных запросов к разным сервисам
+      print('\n--- Пример 6: Параллельные запросы ---');
       print(
-          '\nКЛИЕНТ: Демонстрация параллельных запросов с уникальными Stream ID');
+          'КЛИЕНТ: Демонстрация параллельных запросов с уникальными Stream ID');
 
       final parallelRequests = [
         ('GreetingService', 'SayHello', 'Параллельный привет'),
@@ -232,9 +260,12 @@ class UnaryRpcExample {
       }
 
       // Ждем завершения всех параллельных запросов
+      print('КЛИЕНТ: Ожидание завершения всех параллельных запросов...');
       await Future.wait(futures);
+      print('КЛИЕНТ: Все параллельные запросы завершены');
     } finally {
       // Закрываем все серверы (они тоже не закрывают транспорт)
+      print('\nЗАВЕРШЕНИЕ: Освобождение ресурсов');
       for (final server in servers) {
         await server.close();
       }
@@ -244,7 +275,6 @@ class UnaryRpcExample {
       await serverTransport.close();
     }
 
-    print(
-        '\n=== Пример унарного RPC с мультиплексированием по Stream ID завершен ===\n');
+    print('\n=== Пример унарного RPC вызова завершен ===\n');
   }
 }

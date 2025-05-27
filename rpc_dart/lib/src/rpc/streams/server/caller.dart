@@ -4,33 +4,39 @@
 
 part of '../_index.dart';
 
-/// Клиентская часть серверного стриминга.
+/// Клиентская часть серверного стриминга на основе CallProcessor.
 ///
-/// Позволяет отправить один запрос и получить поток ответов.
-/// В отличие от двунаправленного стрима, гарантирует отправку
-/// только одного запроса с последующим завершением потока запросов.
+/// Позволяет отправить ОДИН запрос и получить поток ответов.
+/// Соблюдает семантику серверного стрима - после отправки запроса
+/// автоматически завершает отправку и предоставляет только поток ответов.
 ///
 /// Пример использования:
 /// ```dart
-/// final client = ServerStreamClient<String, String>(
+/// final client = ServerStreamCaller<String, String>(
 ///   transport: clientTransport,
-///   requestSerializer: stringSerializer,
-///   responseSerializer: stringSerializer,
+///   serviceName: "DataService",
+///   methodName: "GetData",
+///   requestCodec: stringCodec,
+///   responseCodec: stringCodec,
 /// );
 ///
-/// // Отправляем один запрос и сразу завершаем поток отправки
-/// await client.sendRequest("Дай мне поток данных");
+/// // Отправляем ОДИН запрос (больше нельзя!)
+/// await client.send("Дай мне поток данных");
 ///
 /// // Получаем поток ответов
-/// client.responses.listen((response) {
-///   print("Получен ответ: ${response.payload}");
-/// });
+/// await for (final response in client.responses) {
+///   print("Получен ответ: $response");
+/// }
 /// ```
-final class ServerStreamCaller<TRequest, TResponse> {
+final class ServerStreamCaller<TRequest extends IRpcSerializable,
+    TResponse extends IRpcSerializable> {
   late final RpcLogger? _logger;
 
-  /// Внутренний клиент двунаправленного стрима
-  late final BidirectionalStreamCaller<TRequest, TResponse> _innerClient;
+  /// Внутренний процессор стрима
+  late final CallProcessor<TRequest, TResponse> _processor;
+
+  /// Флаг отправки запроса (можно отправить только один!)
+  bool _requestSent = false;
 
   /// Создает клиент серверного стриминга
   ///
@@ -49,7 +55,9 @@ final class ServerStreamCaller<TRequest, TResponse> {
     RpcLogger? logger,
   }) {
     _logger = logger?.child('ServerCaller');
-    _innerClient = BidirectionalStreamCaller<TRequest, TResponse>(
+    _logger?.debug('Создание ServerStreamCaller для $serviceName.$methodName');
+
+    _processor = CallProcessor<TRequest, TResponse>(
       transport: transport,
       serviceName: serviceName,
       methodName: methodName,
@@ -64,21 +72,46 @@ final class ServerStreamCaller<TRequest, TResponse> {
   /// Предоставляет доступ к потоку ответов, получаемых от сервера.
   /// Поток завершается, когда сервер завершает отправку ответов
   /// или при возникновении ошибки.
-  Stream<RpcMessage<TResponse>> get responses => _innerClient.responses;
+  Stream<RpcMessage<TResponse>> get responses => _processor.responses;
 
-  /// Отправляет единственный запрос и завершает поток
+  /// Отправляет единственный запрос серверу
   ///
-  /// В отличие от двунаправленного стрима, этот метод автоматически
-  /// завершает поток запросов после отправки единственного запроса.
+  /// ⚠️ ОГРАНИЧЕНИЕ: Можно вызвать только ОДИН раз!
+  /// После отправки запроса автоматически завершает поток отправки.
   ///
   /// [request] Объект запроса для отправки
+  /// Throws [StateError] если запрос уже был отправлен
   Future<void> send(TRequest request) async {
-    await _innerClient.send(request);
-    await _innerClient.finishSending();
+    if (_requestSent) {
+      throw StateError('ServerStream позволяет отправить только один запрос! '
+          'Запрос уже был отправлен.');
+    }
+
+    _logger
+        ?.debug('Отправка единственного запроса в серверный стрим: $request');
+
+    try {
+      _requestSent =
+          true; // Устанавливаем флаг СРАЗУ, чтобы не было повторных вызовов
+
+      // Отправляем запрос через процессор
+      await _processor.send(request);
+      _logger?.debug('Запрос успешно отправлен через CallProcessor');
+
+      // Автоматически завершаем отправку, чтобы сигнализировать серверу
+      // что у нас только один запрос (семантика серверного стрима)
+      await _processor.finishSending();
+      _logger?.debug('Отправка автоматически завершена для серверного стрима');
+    } catch (e, stackTrace) {
+      _logger?.error('Ошибка при отправке запроса в серверный стрим',
+          error: e, stackTrace: stackTrace);
+      rethrow;
+    }
   }
 
   /// Закрывает стрим и освобождает ресурсы
-  ///
-  /// Полностью завершает стрим, освобождая все ресурсы.
-  Future<void> close() async => await _innerClient.close();
+  Future<void> close() async {
+    _logger?.debug('Закрытие ServerStreamCaller');
+    await _processor.close();
+  }
 }

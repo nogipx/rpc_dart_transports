@@ -266,7 +266,10 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
       requestCodec: i.method.requestCodec,
       responseCodec: i.method.responseCodec,
       handler: (request) async {
-        return await i.method.handler(request);
+        // Используем типизированный wrapper для безопасного вызова
+        final typedRequest = request as dynamic; // Dart runtime cast
+        final response = await i.method.callUnaryHandler(typedRequest);
+        return i.method.castResponse(response);
       },
       logger: logger,
     );
@@ -290,22 +293,51 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
       return;
     }
 
-    // Создаем новый респондер
+    final serviceName = i.serviceName;
+    final methodName = i.methodName;
+
+    logger.debug(
+        'Создание ClientStreamResponder для $serviceName.$methodName [streamId: $streamId]');
+
+    // Создаем новый респондер с explicit типами
     final responder = ClientStreamResponder<IRpcSerializable, IRpcSerializable>(
-      id: streamId, // Добавляем id
+      id: streamId,
       transport: transport,
-      serviceName: i.serviceName,
-      methodName: i.methodName,
+      serviceName: serviceName,
+      methodName: methodName,
       requestCodec: i.method.requestCodec,
       responseCodec: i.method.responseCodec,
-      handler: (Stream<dynamic> requests) async {
-        return await i.method.handler(requests);
+      handler: (Stream<IRpcSerializable> requests) async {
+        // Используем типизированные wrapper'ы для безопасного вызова
+        final typedRequests = i.method.castRequestStream(requests);
+        final response = await i.method.callClientStreamHandler(typedRequests);
+        return i.method.castResponse(response);
       },
       logger: logger,
     );
 
     // Сохраняем респондер
     _streamResponders[responder.id] = responder;
+
+    // Создаем поток сообщений для этого streamId
+    Stream<RpcTransportMessage> messageStream;
+
+    final savedMessage = _streamMessages[streamId];
+    if (savedMessage != null &&
+        !savedMessage.isMetadataOnly &&
+        savedMessage.payload != null) {
+      logger.debug(
+          'Создание потока с сохраненным сообщением [streamId: $streamId]');
+      messageStream = _createStreamWithSavedMessage(streamId, savedMessage);
+    } else {
+      logger.debug('Создание обычного потока сообщений [streamId: $streamId]');
+      messageStream =
+          transport.incomingMessages.where((msg) => msg.streamId == streamId);
+    }
+
+    logger.debug(
+        'Привязка потока сообщений к ClientStreamResponder [streamId: $streamId]');
+    responder.bindToMessageStream(messageStream);
   }
 
   /// Этап 5.3: Обработка серверного потокового метода
@@ -318,6 +350,9 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
     final serviceName = i.serviceName;
     final methodName = i.methodName;
 
+    logger.debug(
+        'Создание ServerStreamResponder для $serviceName.$methodName [streamId: $streamId]');
+
     // Создаем обработчик серверного потока
     final responder = ServerStreamResponder(
       id: streamId,
@@ -327,12 +362,52 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
       requestCodec: i.method.requestCodec,
       responseCodec: i.method.responseCodec,
       handler: (request) {
-        return i.method.handler(request);
+        // Используем типизированный wrapper для безопасного вызова
+        final typedRequest = request as dynamic; // Dart runtime cast
+        final responseStream = i.method.callServerStreamHandler(typedRequest);
+        // Кастим поток ответов к базовому типу
+        return responseStream
+            .map((response) => i.method.castResponse(response));
       },
       logger: logger,
     );
 
     _streamResponders[responder.id] = responder;
+
+    // Создаем поток сообщений для этого streamId
+    Stream<RpcTransportMessage> messageStream;
+
+    final savedMessage = _streamMessages[streamId];
+    if (savedMessage != null &&
+        !savedMessage.isMetadataOnly &&
+        savedMessage.payload != null) {
+      logger.debug(
+          'Создание потока с сохраненным сообщением [streamId: $streamId]');
+      // Создаем поток который начинается с сохраненного сообщения
+      messageStream = _createStreamWithSavedMessage(streamId, savedMessage);
+    } else {
+      logger.debug('Создание обычного потока сообщений [streamId: $streamId]');
+      // Обычный поток сообщений для этого streamId
+      messageStream =
+          transport.incomingMessages.where((msg) => msg.streamId == streamId);
+    }
+
+    logger.debug(
+        'Привязка потока сообщений к ServerStreamResponder [streamId: $streamId]');
+    responder.bindToMessageStream(messageStream);
+  }
+
+  /// Создает поток сообщений начинающийся с сохраненного сообщения
+  Stream<RpcTransportMessage> _createStreamWithSavedMessage(
+      int streamId, RpcTransportMessage savedMessage) async* {
+    // Сначала отправляем сохраненное сообщение
+    yield savedMessage;
+
+    // Затем пропускаем остальные сообщения для этого streamId
+    await for (final msg
+        in transport.incomingMessages.where((m) => m.streamId == streamId)) {
+      yield msg;
+    }
   }
 
   /// Этап 5.4: Обработка двунаправленного потокового метода
@@ -345,9 +420,13 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
     final serviceName = i.serviceName;
     final methodName = i.methodName;
 
-    // Создаем обработчик двунаправленного потока
-    final responder = BidirectionalStreamResponder(
-      id: i.streamId,
+    logger.debug(
+        'Создание BidirectionalStreamResponder для $serviceName.$methodName [streamId: $streamId]');
+
+    // Создаем обработчик двунаправленного потока с explicit типами
+    final responder =
+        BidirectionalStreamResponder<IRpcSerializable, IRpcSerializable>(
+      id: streamId,
       transport: transport,
       serviceName: serviceName,
       methodName: methodName,
@@ -357,6 +436,73 @@ final class RpcResponderEndpoint extends RpcEndpointBase {
     );
 
     _streamResponders[responder.id] = responder;
+
+    // Создаем поток сообщений для этого streamId
+    Stream<RpcTransportMessage> messageStream;
+
+    final savedMessage = _streamMessages[streamId];
+    if (savedMessage != null &&
+        !savedMessage.isMetadataOnly &&
+        savedMessage.payload != null) {
+      logger.debug(
+          'Создание потока с сохраненным сообщением [streamId: $streamId]');
+      messageStream = _createStreamWithSavedMessage(streamId, savedMessage);
+    } else {
+      logger.debug('Создание обычного потока сообщений [streamId: $streamId]');
+      messageStream =
+          transport.incomingMessages.where((msg) => msg.streamId == streamId);
+    }
+
+    logger.debug(
+        'Привязка потока сообщений к BidirectionalStreamResponder [streamId: $streamId]');
+    responder.bindToMessageStream(messageStream);
+
+    // Подключаем пользовательский обработчик к потоку запросов
+    _setupBidirectionalHandler(responder, i.method);
+  }
+
+  /// Настраивает обработчик для двунаправленного стрима
+  void _setupBidirectionalHandler(
+    BidirectionalStreamResponder<IRpcSerializable, IRpcSerializable> responder,
+    RpcMethodRegistration method,
+  ) {
+    logger.debug(
+        'Настройка обработчика двунаправленного стрима [id: ${responder.id}]');
+
+    // Подписываемся на поток запросов и связываем с пользовательским обработчиком
+    unawaited(() async {
+      try {
+        logger
+            .debug('Вызов пользовательского обработчика [id: ${responder.id}]');
+
+        // Используем типизированные wrapper'ы для безопасного вызова
+        final typedRequests = method.castRequestStream(responder.requests);
+        final responseStream =
+            method.callBidirectionalStreamHandler(typedRequests);
+
+        logger.debug(
+            'Получен поток ответов от обработчика [id: ${responder.id}]');
+
+        // Подписываемся на поток ответов от обработчика и отправляем их клиенту
+        await for (final response in responseStream) {
+          logger.debug('Отправка ответа от обработчика [id: ${responder.id}]');
+          await responder.send(method.castResponse(response));
+        }
+
+        // Завершаем отправку ответов
+        logger.debug('Завершение отправки ответов [id: ${responder.id}]');
+        await responder.finishReceiving();
+      } catch (e, stackTrace) {
+        logger.error(
+          'Ошибка в обработчике двунаправленного стрима [id: ${responder.id}]',
+          error: e,
+          stackTrace: stackTrace,
+        );
+
+        // Отправляем ошибку клиенту
+        await responder.sendError(RpcStatus.INTERNAL, e.toString());
+      }
+    }());
   }
 
   /// Регистрирует контракт сервиса

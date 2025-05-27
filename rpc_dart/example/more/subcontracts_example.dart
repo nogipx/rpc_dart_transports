@@ -2,13 +2,13 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-part of '_index.dart';
+import 'package:rpc_dart/rpc_dart.dart';
 
 /// Пример использования подконтрактов в RPC
 ///
 /// Демонстрирует, как можно разделить логику на несколько контрактов
 /// и автоматически зарегистрировать их вместе с основным контрактом.
-void runSubcontractsExample() async {
+void main() async {
   // Настройка логирования для лучшей диагностики
   RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.debug);
 

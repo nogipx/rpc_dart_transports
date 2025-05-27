@@ -2,20 +2,22 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-part of '_index.dart';
+import 'package:rpc_dart/rpc_dart.dart';
 
-/// Пример использования двунаправленного стрима через транспорт в памяти.
+void main() async {
+  await BidirectionalStreamExample.run();
+}
+
+/// Пример использования двунаправленного стриминга (обмен сообщениями в обе стороны)
 ///
-/// Демонстрирует, как настроить клиент и сервер в рамках одного потока
-/// для обмена сообщениями через InMemoryTransport.
-class InMemoryRpcExample {
-  /// Запускает демонстрацию работы RPC через транспорт в памяти.
-  ///
-  /// Создает клиент и сервер в одном потоке и организует
-  /// двунаправленный обмен сообщениями между ними.
+/// Демонстрирует, как клиент и сервер могут обмениваться сообщениями в реальном времени
+class BidirectionalStreamExample {
+  /// Запускает демонстрацию двунаправленного стриминга
   static Future<void> run() async {
     RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.debug);
-    print('Запуск примера двунаправленного стрима через транспорт в памяти...');
+
+    print(
+        '\n=== Пример двунаправленного стриминга (N запросов <-> N ответов) ===\n');
 
     // Создаем пару соединенных транспортов для клиента и сервера
     final (clientTransport, serverTransport) = RpcInMemoryTransport.pair();
@@ -25,40 +27,56 @@ class InMemoryRpcExample {
 
     // Инициализируем серверную часть
     final server = BidirectionalStreamResponder<RpcString, RpcString>(
+      id: 1,
       transport: serverTransport,
       serviceName: 'ChatService',
       methodName: 'Connect',
       requestCodec: stringSerializer,
       responseCodec: stringSerializer,
       logger: RpcLogger(
-        'InMemoryRpcExample',
-        colors: RpcLoggerColors.singleColor(AnsiColor.cyan),
+        'BidirectionalStreamExample',
+        colors: RpcLoggerColors.singleColor(AnsiColor.brightYellow),
       ),
+    );
+
+    // ВАЖНО: Привязываем сервер к потоку сообщений для streamId = 1
+    server.bindToMessageStream(
+      serverTransport.incomingMessages.where((msg) => msg.streamId == 1),
     );
 
     // Настраиваем обработку запросов на сервере
     final serverSubscription = server.requests.listen((request) {
-      print('Сервер получил: $request');
+      print('СЕРВЕР: Получен запрос: "$request"');
 
       // Эхо-обработчик с некоторой логикой
       switch (request.value) {
         case 'ping':
+          print('СЕРВЕР: Отправляем pong');
           server.send('pong'.rpc);
           break;
         case 'время':
-          server.send('Текущее время: ${DateTime.now()}'.rpc);
+          final timeResponse = 'Текущее время: ${DateTime.now()}';
+          print('СЕРВЕР: Отправляем: "$timeResponse"');
+          server.send(timeResponse.rpc);
           break;
         case 'случайное число':
           final random = (DateTime.now().millisecondsSinceEpoch % 100) + 1;
-          server.send('Случайное число от 1 до 100: $random'.rpc);
+          final randomResponse = 'Случайное число от 1 до 100: $random';
+          print('СЕРВЕР: Отправляем: "$randomResponse"');
+          server.send(randomResponse.rpc);
           break;
         case 'завершить':
-          server.send('Сервер завершает работу...'.rpc);
+          final goodbyeMessage = 'Сервер завершает работу...';
+          print('СЕРВЕР: Отправляем: "$goodbyeMessage"');
+          server.send(goodbyeMessage.rpc);
           // Завершаем отправку с успешным статусом
+          print('СЕРВЕР: Завершаем двунаправленный поток');
           server.finishReceiving();
           break;
         default:
-          server.send('Эхо: $request'.rpc);
+          final echoResponse = 'Эхо: $request';
+          print('СЕРВЕР: Отправляем: "$echoResponse"');
+          server.send(echoResponse.rpc);
       }
     });
 
@@ -70,21 +88,21 @@ class InMemoryRpcExample {
       requestCodec: stringSerializer,
       responseCodec: stringSerializer,
       logger: RpcLogger(
-        'InMemoryRpcExample',
-        colors: RpcLoggerColors.singleColor(AnsiColor.black),
+        'BidirectionalStreamExample',
+        colors: RpcLoggerColors.singleColor(AnsiColor.brightBlue),
       ),
     );
 
     // Подписываемся на ответы сервера
     final clientSubscription = client.responses.listen((message) {
       if (!message.isMetadataOnly) {
-        print('Клиент получил: ${message.payload}');
+        print('КЛИЕНТ: Получен ответ: "${message.payload}"');
       } else if (message.metadata != null) {
         final statusCode =
             message.metadata!.getHeaderValue(RpcConstants.GRPC_STATUS_HEADER);
 
         if (statusCode != null && message.isEndOfStream) {
-          print('Соединение завершено со статусом: $statusCode');
+          print('КЛИЕНТ: Соединение завершено со статусом: $statusCode');
         }
       }
     });
@@ -99,15 +117,17 @@ class InMemoryRpcExample {
     ];
 
     for (final request in requests) {
-      print('Клиент отправляет: $request');
+      print('КЛИЕНТ: Отправляем запрос: "$request"');
       client.send(request.rpc);
       await Future.delayed(Duration(milliseconds: 100));
     }
 
     // Завершаем отправку запросов с клиента
+    print('КЛИЕНТ: Завершаем отправку запросов');
     client.finishSending();
 
     // Ждем завершения обработки всех сообщений
+    print('КЛИЕНТ: Ждем завершения обработки...');
     await Future.delayed(Duration(milliseconds: 500));
 
     // Закрываем подписки и освобождаем ресурсы
@@ -116,11 +136,6 @@ class InMemoryRpcExample {
     await client.close();
     await server.close();
 
-    print('Пример завершен.');
+    print('\n=== Пример двунаправленного стриминга завершен ===\n');
   }
-}
-
-/// Запускает пример использования двунаправленного стрима через InMemoryTransport.
-Future<void> runInMemoryExample() async {
-  await InMemoryRpcExample.run();
 }

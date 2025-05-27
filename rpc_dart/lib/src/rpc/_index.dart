@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:rpc_dart/rpc_dart.dart';
 export 'streams/_index.dart';
@@ -11,5 +12,6 @@ part 'core/message.dart';
 part 'core/parser.dart';
 part 'core/rpc.dart';
 part 'core/transport.dart';
+part 'core/transport_frame.dart';
 
 part 'transports/in_memory_transport.dart';

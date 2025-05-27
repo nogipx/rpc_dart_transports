@@ -78,7 +78,8 @@ class RpcIsolateTransport {
 
       // Ожидаем SendPort для основной коммуникации
       messageController.stream.listen((message) {
-        if (message is _IsolateMessage && message.type == _IsolateMessageType.init) {
+        if (message is _IsolateMessage &&
+            message.type == _IsolateMessageType.init) {
           // Получаем SendPort для основной коммуникации
           final mainHostSendPort = message.data as SendPort;
 
@@ -277,6 +278,12 @@ class _IsolateHostTransport implements IRpcTransport {
   }
 
   @override
+  bool releaseStreamId(int streamId) {
+    if (_isClosed) return false;
+    return _streamSendingFinished.remove(streamId) != null;
+  }
+
+  @override
   Future<void> close() async {
     if (_isClosed) return;
 
@@ -437,6 +444,12 @@ class _IsolateWorkerTransport implements IRpcTransport {
       type: _IsolateMessageType.finish,
       streamId: streamId,
     ));
+  }
+
+  @override
+  bool releaseStreamId(int streamId) {
+    if (_isClosed) return false;
+    return _streamSendingFinished.remove(streamId) != null;
   }
 
   @override
