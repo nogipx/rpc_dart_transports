@@ -347,7 +347,7 @@ Future<RouterClient> _createTestClient(String name, int port) async {
 
   await client.register(
     clientName: name,
-    groups: ['testers'],
+    groups: ['testers', 'developers'],
   );
 
   return client;
