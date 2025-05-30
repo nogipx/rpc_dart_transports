@@ -4,7 +4,6 @@
 
 import 'dart:async';
 
-import 'package:rpc_dart/rpc_dart.dart';
 import '../router_models.dart';
 import '../router_stats.dart';
 

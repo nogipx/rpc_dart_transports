@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 import 'dart:async';
-import 'package:uuid/uuid.dart';
 
 import 'package:rpc_dart/rpc_dart.dart';
 
@@ -19,9 +18,6 @@ import 'interfaces/router_interface.dart';
 final class RouterResponderContract extends RpcResponderContract {
   /// Основная реализация роутера
   final RouterResponderImpl _routerImpl;
-
-  /// UUID генератор для создания уникальных ID
-  static const Uuid _uuid = Uuid();
 
   /// Логгер для отладки контракта
   final RpcLogger? _logger;
@@ -214,7 +210,7 @@ final class RouterResponderContract extends RpcResponderContract {
             final streamReplaced = _routerImpl.replaceClientStream(clientId!, responseController!);
             if (!streamReplaced) {
               _logger?.warning('Не удалось заменить стрим для клиента: $clientId');
-              responseController?.add(RouterMessage(
+              responseController.add(RouterMessage(
                 type: RouterMessageType.error,
                 errorMessage: 'Ошибка привязки P2P стрима',
                 timestamp: DateTime.now().millisecondsSinceEpoch,

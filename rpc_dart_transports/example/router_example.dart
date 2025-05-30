@@ -332,7 +332,7 @@ Future<void> demonstrateRouting(
       },
       timeout: Duration(seconds: 3),
     );
-    print('💬 Alice получила ответ от Bob: ${response}');
+    print('💬 Alice получила ответ от Bob: $response');
   } catch (e) {
     print('❌ Alice: ошибка request-response = $e');
   }

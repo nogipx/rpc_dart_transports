@@ -7,7 +7,6 @@ import 'dart:async';
 import 'package:rpc_dart/rpc_dart.dart';
 
 import 'router_models.dart';
-import 'router_contract.dart';
 import 'models/_index.dart';
 
 /// Программный интерфейс для работы с роутером

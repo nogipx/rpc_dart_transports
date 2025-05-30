@@ -117,7 +117,7 @@ final class RouterResponderImpl implements IRouterContract {
   @override
   void disconnectClient(String clientId, {String? reason}) {
     final streamController = _clientStreams.remove(clientId);
-    final clientInfo = _clientsInfo.remove(clientId);
+    _clientsInfo.remove(clientId);
 
     if (streamController != null) {
       streamController.close();
@@ -435,6 +435,7 @@ final class RouterResponderImpl implements IRouterContract {
   }
 
   /// Генерирует уникальный ID клиента
+  @override
   String generateClientId() {
     return 'client_${_uuid.v4()}';
   }
