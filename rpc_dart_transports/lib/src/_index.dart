@@ -4,3 +4,4 @@
 
 export 'isolate/isolate_transport.dart';
 export 'websocket/websocket.dart';
+export 'router/_index.dart';

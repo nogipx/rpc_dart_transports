@@ -1,0 +1,121 @@
+sequenceDiagram
+    participant ClientA as Client A (WebSocket)
+    participant WSEndpoint as WebSocket Endpoint
+    participant Router as Router Service
+    participant Registry as Client Registry
+    participant IsoEndpoint as Isolate Endpoint
+    participant ClientB as Client B (Isolate)
+    participant ClientC as Client C (InMemory)
+    participant MemEndpoint as InMemory Endpoint
+
+    Note over Router: Инициализация роутера
+    Router->>WSEndpoint: registerServiceContract(RouterContract)
+    Router->>IsoEndpoint: registerServiceContract(RouterContract)
+    Router->>MemEndpoint: registerServiceContract(RouterContract)
+    
+    WSEndpoint->>WSEndpoint: start()
+    IsoEndpoint->>IsoEndpoint: start()
+    MemEndpoint->>MemEndpoint: start()
+
+    Note over ClientA,MemEndpoint: 1. Подключение клиентов
+
+    ClientA->>WSEndpoint: WebSocket connection
+    WSEndpoint->>ClientA: Connection established
+    
+    ClientB->>IsoEndpoint: Isolate port connection
+    IsoEndpoint->>ClientB: Connection established
+    
+    ClientC->>MemEndpoint: InMemory connection
+    MemEndpoint->>ClientC: Connection established
+
+    Note over ClientA,MemEndpoint: 2. Регистрация клиентов в роутере
+
+    ClientA->>WSEndpoint: RPC call: Router/register<br/>{clientId: "clientA", transportType: "websocket", groups: ["developers"]}
+    WSEndpoint->>Registry: register("clientA", "websocket", wsEndpoint, metadata)
+    Registry->>WSEndpoint: StatusMessage("OK")
+    WSEndpoint->>ClientA: Registration successful
+
+    ClientB->>IsoEndpoint: RPC call: Router/register<br/>{clientId: "clientB", transportType: "isolate", groups: ["developers"]}
+    IsoEndpoint->>Registry: register("clientB", "isolate", isoEndpoint, metadata)
+    Registry->>IsoEndpoint: StatusMessage("OK")
+    IsoEndpoint->>ClientB: Registration successful
+
+    ClientC->>MemEndpoint: RPC call: Router/register<br/>{clientId: "clientC", transportType: "inmemory", groups: ["admins"]}
+    MemEndpoint->>Registry: register("clientC", "inmemory", memEndpoint, metadata)
+    Registry->>MemEndpoint: StatusMessage("OK")
+    MemEndpoint->>ClientC: Registration successful
+
+    Note over ClientA,MemEndpoint: 3. UNICAST: ClientA → ClientB
+
+    ClientA->>WSEndpoint: RPC call: Router/route<br/>{type: UNICAST, targets: ["clientB"], payload: {"message": "Привет от WebSocket!"}}
+    WSEndpoint->>Registry: route(message)
+    Registry->>Registry: findClient("clientB") → isolateEndpoint
+    Registry->>IsoEndpoint: sendToClient("clientB", message)
+    IsoEndpoint->>ClientB: RPC call: RouterClient/receiveMessage<br/>{"from": "clientA", "message": "Привет от WebSocket!"}
+    ClientB->>IsoEndpoint: StatusMessage("Received")
+    IsoEndpoint->>Registry: Message delivered
+    Registry->>WSEndpoint: StatusMessage("Delivered")
+    WSEndpoint->>ClientA: Message sent successfully
+
+    Note over ClientA,MemEndpoint: 4. MULTICAST: ClientB → группа "developers"
+
+    ClientB->>IsoEndpoint: RPC call: Router/route<br/>{type: MULTICAST, groupId: "developers", payload: {"announcement": "Митинг в 15:00"}}
+    IsoEndpoint->>Registry: route(message)
+    Registry->>Registry: getClientsInGroup("developers") → [clientA, clientB]
+    
+    par Отправка ClientA
+        Registry->>WSEndpoint: sendToClient("clientA", message)
+        WSEndpoint->>ClientA: RPC call: RouterClient/receiveMessage<br/>{"from": "clientB", "announcement": "Митинг в 15:00"}
+        ClientA->>WSEndpoint: StatusMessage("Received")
+    and Пропуск отправителя
+        Registry->>Registry: skip sender "clientB"
+    end
+    
+    Registry->>IsoEndpoint: StatusMessage("Multicast delivered")
+    IsoEndpoint->>ClientB: Message sent to group
+
+    Note over ClientA,MemEndpoint: 5. BROADCAST: ClientC → все клиенты
+
+    ClientC->>MemEndpoint: RPC call: Router/route<br/>{type: BROADCAST, payload: {"system": "Система будет перезагружена в 16:00"}}
+    MemEndpoint->>Registry: route(message)
+    Registry->>Registry: getAllClients() → [clientA, clientB, clientC]
+    
+    par Отправка ClientA
+        Registry->>WSEndpoint: sendToClient("clientA", message)
+        WSEndpoint->>ClientA: RPC call: RouterClient/receiveMessage<br/>{"from": "clientC", "system": "Система будет перезагружена в 16:00"}
+        ClientA->>WSEndpoint: StatusMessage("Received")
+    and Отправка ClientB
+        Registry->>IsoEndpoint: sendToClient("clientB", message)
+        IsoEndpoint->>ClientB: RPC call: RouterClient/receiveMessage<br/>{"from": "clientC", "system": "Система будет перезагружена в 16:00"}
+        ClientB->>IsoEndpoint: StatusMessage("Received")
+    and Пропуск отправителя
+        Registry->>Registry: skip sender "clientC"
+    end
+    
+    Registry->>MemEndpoint: StatusMessage("Broadcast delivered")
+    MemEndpoint->>ClientC: Message broadcasted
+
+    Note over ClientA,MemEndpoint: 6. Групповые операции
+
+    ClientA->>WSEndpoint: RPC call: Router/joinGroup<br/>{clientId: "clientA", groupId: "admins"}
+    WSEndpoint->>Registry: addClientToGroup("clientA", "admins")
+    Registry->>WSEndpoint: StatusMessage("Joined group")
+    WSEndpoint->>ClientA: Joined admins group
+
+    Note over ClientA,MemEndpoint: 7. Отключение клиента
+
+    ClientB->>IsoEndpoint: RPC call: Router/unregister<br/>{clientId: "clientB"}
+    IsoEndpoint->>Registry: unregister("clientB")
+    Registry->>IsoEndpoint: StatusMessage("Unregistered")
+    IsoEndpoint->>ClientB: Unregistered successfully
+    
+    ClientB->>IsoEndpoint: Disconnect
+    IsoEndpoint->>Registry: cleanup("clientB")
+
+    Note over ClientA,MemEndpoint: 8. Попытка отправки отключенному клиенту
+
+    ClientA->>WSEndpoint: RPC call: Router/route<br/>{type: UNICAST, targets: ["clientB"], payload: {"test": "message"}}
+    WSEndpoint->>Registry: route(message)
+    Registry->>Registry: findClient("clientB") → not found
+    Registry->>WSEndpoint: StatusMessage("Client not found: clientB")
+    WSEndpoint->>ClientA: Error: Client not found
