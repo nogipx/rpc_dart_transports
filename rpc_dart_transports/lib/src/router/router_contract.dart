@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 import 'dart:async';
-import 'dart:math';
+import 'package:uuid/uuid.dart';
 
 import 'package:rpc_dart/rpc_dart.dart';
 
@@ -27,8 +27,8 @@ final class RouterResponderContract extends RpcResponderContract {
   /// Дистрибьютор для системных событий роутера
   late final StreamDistributor<RouterEvent> _eventDistributor;
 
-  /// Генератор случайных чисел для создания ID
-  final Random _random = Random();
+  /// UUID генератор для создания уникальных ID
+  static const Uuid _uuid = Uuid();
 
   /// Логгер для отладки роутера
   final RpcLogger? _logger;
@@ -332,7 +332,7 @@ final class RouterResponderContract extends RpcResponderContract {
 
   /// Обрабатывает подписку на системные события роутера
   Stream<RouterEvent> _handleEventSubscription(RouterMessage subscriptionRequest) async* {
-    final subscriberId = 'events_${_random.nextInt(999999).toString().padLeft(6, '0')}';
+    final subscriberId = 'events_${_uuid.v4()}';
 
     _logger?.debug('Новая подписка на события: $subscriberId');
 
@@ -510,7 +510,7 @@ final class RouterResponderContract extends RpcResponderContract {
 
   /// Генерирует уникальный ID клиента
   String _generateClientId() {
-    return 'client_${_random.nextInt(999999).toString().padLeft(6, '0')}';
+    return 'client_${_uuid.v4()}';
   }
 
   /// Получает информацию о состоянии роутера
