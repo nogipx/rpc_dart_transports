@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 import 'dart:async';
+import 'dart:math';
 
 import 'package:rpc_dart/rpc_dart.dart';
 
@@ -25,6 +26,9 @@ final class RouterCallerContract extends RpcCallerContract {
 
   /// Контроллер для системных событий роутера
   final StreamController<RouterEvent> _eventsController = StreamController<RouterEvent>.broadcast();
+
+  /// Генератор случайных чисел
+  final Random _random = Random();
 
   /// Логгер для отладки
   final RpcLogger? _logger;
@@ -218,6 +222,115 @@ final class RouterCallerContract extends RpcCallerContract {
     );
   }
 
+  /// Получает список онлайн клиентов
+  Future<List<Map<String, dynamic>>> getOnlineClients({
+    Map<String, dynamic>? filters,
+  }) async {
+    _ensureConnected();
+
+    final request = RouterMessage.getOnlineClients(
+      senderId: _clientId,
+      filters: filters,
+    );
+
+    _outgoingController!.add(request);
+    _logger?.debug('Запрос списка онлайн клиентов');
+
+    final completer = Completer<List<Map<String, dynamic>>>();
+    late StreamSubscription tempSub;
+
+    tempSub = messages.listen((message) {
+      if (message.type == RouterMessageType.onlineClientsResponse && message.senderId == 'router') {
+        tempSub.cancel();
+
+        final clients = (message.payload?['clients'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+        completer.complete(clients);
+      }
+    });
+
+    return await completer.future.timeout(
+      Duration(seconds: 10),
+      onTimeout: () {
+        tempSub.cancel();
+        throw TimeoutException('Таймаут получения списка клиентов');
+      },
+    );
+  }
+
+  /// Отправляет запрос с ожиданием ответа
+  Future<Map<String, dynamic>> sendRequest({
+    required String targetId,
+    required Map<String, dynamic> payload,
+    Duration timeout = const Duration(seconds: 30),
+  }) async {
+    _ensureConnected();
+
+    final requestId = 'req_${DateTime.now().millisecondsSinceEpoch}_${_random.nextInt(10000)}';
+    final request = RouterMessage.request(
+      targetId: targetId,
+      payload: payload,
+      requestId: requestId,
+      senderId: _clientId,
+      timeout: timeout,
+    );
+
+    _outgoingController!.add(request);
+    _logger?.debug('Отправлен запрос к $targetId (requestId: $requestId)');
+
+    final completer = Completer<Map<String, dynamic>>();
+    late StreamSubscription tempSub;
+
+    tempSub = messages.listen((message) {
+      if (message.type == RouterMessageType.response &&
+          message.payload?['requestId'] == requestId) {
+        tempSub.cancel();
+
+        if (message.success == true) {
+          final responsePayload = Map<String, dynamic>.from(message.payload ?? {});
+          responsePayload.remove('requestId'); // Убираем служебное поле
+          completer.complete(responsePayload);
+        } else {
+          completer.completeError(Exception(message.errorMessage ?? 'Ошибка в ответе на запрос'));
+        }
+      }
+    });
+
+    return await completer.future.timeout(
+      timeout,
+      onTimeout: () {
+        tempSub.cancel();
+        throw TimeoutException('Таймаут запроса к $targetId');
+      },
+    );
+  }
+
+  /// Обновляет метаданные клиента
+  Future<void> updateMetadata(Map<String, dynamic> metadata) async {
+    _ensureConnected();
+
+    final message = RouterMessage.updateClientMetadata(
+      metadata: metadata,
+      senderId: _clientId,
+    );
+
+    _outgoingController!.add(message);
+    _logger?.debug('Обновлены метаданные клиента');
+  }
+
+  /// Отправляет heartbeat роутеру
+  Future<void> sendHeartbeat() async {
+    _ensureConnected();
+
+    final heartbeat = RouterMessage(
+      type: RouterMessageType.heartbeat,
+      senderId: _clientId,
+      timestamp: DateTime.now().millisecondsSinceEpoch,
+    );
+
+    _outgoingController!.add(heartbeat);
+    _logger?.debug('Отправлен heartbeat');
+  }
+
   /// Подписывается на системные события роутера
   Future<void> subscribeToEvents() async {
     _ensureConnected();
@@ -268,6 +381,29 @@ final class RouterCallerContract extends RpcCallerContract {
       _logger?.error('Ошибка подписки на события: $e');
       rethrow;
     }
+  }
+
+  /// Отправляет ответ на полученный запрос
+  Future<void> sendResponse({
+    required String targetId,
+    required String requestId,
+    required Map<String, dynamic> payload,
+    bool success = true,
+    String? errorMessage,
+  }) async {
+    _ensureConnected();
+
+    final response = RouterMessage.response(
+      targetId: targetId,
+      requestId: requestId,
+      payload: payload,
+      senderId: _clientId,
+      success: success,
+      errorMessage: errorMessage,
+    );
+
+    _outgoingController!.add(response);
+    _logger?.debug('Отправлен ответ на запрос $requestId к $targetId');
   }
 
   /// Отключается от роутера

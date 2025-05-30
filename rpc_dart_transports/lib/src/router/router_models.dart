@@ -29,6 +29,30 @@ enum RouterMessageType {
 
   /// Сообщение об ошибке
   error,
+
+  /// Запрос списка онлайн клиентов
+  getOnlineClients,
+
+  /// Ответ со списком онлайн клиентов
+  onlineClientsResponse,
+
+  /// Запрос клиентов по фильтру
+  queryClients,
+
+  /// Ответ на запрос клиентов
+  queryClientsResponse,
+
+  /// Request-Response сообщение (запрос)
+  request,
+
+  /// Request-Response сообщение (ответ)
+  response,
+
+  /// Обновление метаданных клиента
+  updateClientMetadata,
+
+  /// Heartbeat для проверки активности
+  heartbeat,
 }
 
 /// Типы системных событий роутера
@@ -204,6 +228,90 @@ class RouterMessage implements IRpcSerializable {
     );
   }
 
+  /// Создает запрос списка онлайн клиентов
+  factory RouterMessage.getOnlineClients({
+    String? senderId,
+    Map<String, dynamic>? filters,
+  }) {
+    return RouterMessage(
+      type: RouterMessageType.getOnlineClients,
+      senderId: senderId,
+      payload: filters,
+      timestamp: DateTime.now().millisecondsSinceEpoch,
+    );
+  }
+
+  /// Создает ответ со списком онлайн клиентов
+  factory RouterMessage.onlineClientsResponse({
+    required List<Map<String, dynamic>> clients,
+    String? senderId,
+  }) {
+    return RouterMessage(
+      type: RouterMessageType.onlineClientsResponse,
+      senderId: senderId,
+      payload: {'clients': clients},
+      success: true,
+      timestamp: DateTime.now().millisecondsSinceEpoch,
+    );
+  }
+
+  /// Создает запрос с ожиданием ответа
+  factory RouterMessage.request({
+    required String targetId,
+    required Map<String, dynamic> payload,
+    required String requestId,
+    String? senderId,
+    Duration? timeout,
+  }) {
+    return RouterMessage(
+      type: RouterMessageType.request,
+      senderId: senderId,
+      targetId: targetId,
+      payload: {
+        ...payload,
+        'requestId': requestId,
+        if (timeout != null) 'timeoutMs': timeout.inMilliseconds,
+      },
+      timestamp: DateTime.now().millisecondsSinceEpoch,
+    );
+  }
+
+  /// Создает ответ на запрос
+  factory RouterMessage.response({
+    required String targetId,
+    required String requestId,
+    required Map<String, dynamic> payload,
+    String? senderId,
+    bool success = true,
+    String? errorMessage,
+  }) {
+    return RouterMessage(
+      type: RouterMessageType.response,
+      senderId: senderId,
+      targetId: targetId,
+      payload: {
+        ...payload,
+        'requestId': requestId,
+      },
+      success: success,
+      errorMessage: errorMessage,
+      timestamp: DateTime.now().millisecondsSinceEpoch,
+    );
+  }
+
+  /// Создает обновление метаданных клиента
+  factory RouterMessage.updateClientMetadata({
+    required Map<String, dynamic> metadata,
+    String? senderId,
+  }) {
+    return RouterMessage(
+      type: RouterMessageType.updateClientMetadata,
+      senderId: senderId,
+      payload: {'metadata': metadata},
+      timestamp: DateTime.now().millisecondsSinceEpoch,
+    );
+  }
+
   /// Создает копию сообщения с измененными полями
   RouterMessage copyWith({
     RouterMessageType? type,
@@ -340,6 +448,21 @@ class RouterEvent implements IRpcSerializable {
     );
   }
 
+  /// Событие обновления возможностей клиента
+  factory RouterEvent.clientCapabilitiesUpdated({
+    required String clientId,
+    required Map<String, dynamic> metadata,
+  }) {
+    return RouterEvent(
+      type: RouterEventType.clientCapabilitiesUpdated,
+      timestamp: DateTime.now().millisecondsSinceEpoch,
+      data: {
+        'clientId': clientId,
+        'metadata': metadata,
+      },
+    );
+  }
+
   /// Событие статистики роутера
   factory RouterEvent.routerStats({
     required int activeClients,
@@ -416,15 +539,74 @@ class RouterClientInfo {
   /// Время подключения
   final DateTime connectedAt;
 
+  /// Время последней активности
+  final DateTime lastActivity;
+
+  /// Метаданные клиента (произвольные данные)
+  final Map<String, dynamic> metadata;
+
+  /// Статус клиента
+  final ClientStatus status;
+
   const RouterClientInfo({
     required this.clientId,
     this.clientName,
     this.groups = const [],
     required this.connectedAt,
+    required this.lastActivity,
+    this.metadata = const {},
+    this.status = ClientStatus.online,
   });
+
+  /// Создает копию с обновленными полями
+  RouterClientInfo copyWith({
+    String? clientName,
+    List<String>? groups,
+    DateTime? lastActivity,
+    Map<String, dynamic>? metadata,
+    ClientStatus? status,
+  }) {
+    return RouterClientInfo(
+      clientId: clientId,
+      clientName: clientName ?? this.clientName,
+      groups: groups ?? this.groups,
+      connectedAt: connectedAt,
+      lastActivity: lastActivity ?? this.lastActivity,
+      metadata: metadata ?? this.metadata,
+      status: status ?? this.status,
+    );
+  }
+
+  /// Преобразует в Map для передачи клиентам
+  Map<String, dynamic> toJson() {
+    return {
+      'clientId': clientId,
+      'clientName': clientName,
+      'groups': groups,
+      'connectedAt': connectedAt.millisecondsSinceEpoch,
+      'lastActivity': lastActivity.millisecondsSinceEpoch,
+      'metadata': metadata,
+      'status': status.name,
+    };
+  }
 
   @override
   String toString() {
-    return 'RouterClientInfo(id: $clientId, name: $clientName, groups: $groups)';
+    return 'RouterClientInfo(id: $clientId, name: $clientName, groups: $groups, status: $status)';
   }
+}
+
+/// Статус клиента в роутере
+enum ClientStatus {
+  /// Клиент онлайн и активен
+  online,
+
+  /// Клиент подключен, но неактивен
+  idle,
+
+  /// Клиент отключается
+  disconnecting,
+
+  /// Клиент офлайн
+  offline,
 }

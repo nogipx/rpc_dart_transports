@@ -266,5 +266,82 @@ Future<void> demonstrateRouting(
     payload: {'message': 'Это сообщение не будет доставлено'},
   );
 
+  await Future.delayed(Duration(seconds: 1));
+
+  print('\n🔍 === Демонстрация DISCOVERY ===');
+  // Alice запрашивает список онлайн клиентов
+  try {
+    final onlineClients = await alice.getOnlineClients();
+    print('🔍 Alice получила список онлайн клиентов:');
+    for (final client in onlineClients) {
+      print('   - ${client['clientName']} (${client['clientId']}) - группы: ${client['groups']}');
+    }
+
+    // Запрос клиентов только из группы 'developers'
+    final developers = await alice.getOnlineClients(
+      filters: {
+        'groups': ['developers']
+      },
+    );
+    print('🔍 Разработчики онлайн: ${developers.length}');
+  } catch (e) {
+    print('❌ Ошибка discovery: $e');
+  }
+
+  await Future.delayed(Duration(seconds: 1));
+
+  print('\n🔄 === Демонстрация REQUEST-RESPONSE ===');
+  // Bob обновляет свои метаданные
+  await bob.updateMetadata({
+    'role': 'backend-developer',
+    'expertise': ['dart', 'flutter', 'databases'],
+    'load': 0.7,
+  });
+
+  await Future.delayed(Duration(milliseconds: 500));
+
+  // Симулируем, что Bob обрабатывает запросы (устанавливаем обработчик до запроса)
+  bob.messages.listen((message) {
+    if (message.type == RouterMessageType.request) {
+      // Автоматически отвечаем на запросы
+      final requestId = message.payload?['requestId'] as String?;
+      final action = message.payload?['action'] as String?;
+
+      if (requestId != null && action == 'get_server_status') {
+        // Отправляем ответ через публичный метод
+        bob.sendResponse(
+          targetId: message.senderId!,
+          requestId: requestId,
+          payload: {
+            'status': 'healthy',
+            'uptime': '2h 34m',
+            'cpu_usage': '23%',
+            'memory_usage': '1.2GB',
+            'active_connections': 15,
+          },
+        );
+        print('🔄 Bob ответил на запрос от ${message.senderId}');
+      }
+    }
+  });
+
+  await Future.delayed(Duration(milliseconds: 500));
+
+  // Alice отправляет запрос Bob'у
+  try {
+    final response = await alice.sendRequest(
+      targetId: bob.clientId!,
+      payload: {
+        'action': 'get_server_status',
+        'include_metrics': true,
+      },
+      timeout: Duration(seconds: 10),
+    );
+
+    print('✅ Alice получила ответ от Bob: $response');
+  } catch (e) {
+    print('❌ Ошибка request-response: $e');
+  }
+
   await Future.delayed(Duration(seconds: 2));
 }
