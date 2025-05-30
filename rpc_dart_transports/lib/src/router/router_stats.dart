@@ -9,11 +9,19 @@ class RouterStats {
   final Map<String, int>? messageStats;
   final DateTime? startTime;
 
+  /// Общее количество обработанных сообщений
+  final int totalMessages;
+
+  /// Количество ошибок роутера
+  final int errorCount;
+
   const RouterStats({
     required this.activeClients,
     required this.clientIds,
     this.messageStats,
     this.startTime,
+    this.totalMessages = 0,
+    this.errorCount = 0,
   });
 
   @override
@@ -23,6 +31,8 @@ class RouterStats {
         'clientIds: $clientIds'
         '${messageStats != null ? ', messageStats: $messageStats' : ''}'
         '${startTime != null ? ', startTime: $startTime' : ''}'
+        ', totalMessages: $totalMessages'
+        ', errorCount: $errorCount'
         ')';
   }
 }

@@ -38,6 +38,13 @@ final class RouterResponderImpl implements IRouterContract {
   /// Время старта роутера
   final DateTime _startTime = DateTime.now();
 
+  /// === ПРОСТАЯ СТАТИСТИКА ===
+  /// Общий счетчик обработанных сообщений
+  int _totalMessages = 0;
+
+  /// Счетчик ошибок роутера
+  int _errorCount = 0;
+
   RouterResponderImpl({RpcLogger? logger}) : _logger = logger?.child('RouterResponder') {
     // Инициализируем дистрибьютор событий
     _eventDistributor = StreamDistributor<RouterEvent>(
@@ -60,6 +67,8 @@ final class RouterResponderImpl implements IRouterContract {
         activeClients: _clientStreams.length,
         clientIds: _clientStreams.keys.toList(),
         startTime: _startTime,
+        totalMessages: _totalMessages,
+        errorCount: _errorCount,
       );
 
   @override
@@ -332,6 +341,9 @@ final class RouterResponderImpl implements IRouterContract {
     // Обновляем активность клиента
     updateClientActivity(senderId);
 
+    // Увеличиваем счетчик сообщений
+    _totalMessages++;
+
     switch (message.type) {
       case RouterMessageType.unicast:
         _handleUnicast(message, senderId);
@@ -355,6 +367,7 @@ final class RouterResponderImpl implements IRouterContract {
         _handleUpdateMetadata(message, senderId);
         break;
       case RouterMessageType.error:
+        _errorCount++;
         _logger?.warning('Ошибка от клиента $senderId: ${message.errorMessage}');
         break;
     }

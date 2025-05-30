@@ -289,8 +289,8 @@ final class RouterResponderContract extends RpcResponderContract {
       final stats = _routerImpl.stats;
       final welcomeEvent = RouterEvent.routerStats(
         activeClients: stats.activeClients,
-        messagesPerSecond: 0, // TODO: реализовать подсчет
-        messageTypeCounts: {}, // TODO: реализовать подсчет
+        messagesPerSecond: 0, // Не реализуем - слишком сложно
+        messageTypeCounts: {'total': stats.totalMessages}, // Простая версия
       );
 
       // Сначала отправляем приветственное событие
