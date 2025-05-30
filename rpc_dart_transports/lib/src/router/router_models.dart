@@ -26,6 +26,9 @@ enum RouterMessageType {
 
   /// Heartbeat для P2P соединения
   heartbeat,
+
+  /// Обновление метаданных клиента
+  updateMetadata,
 }
 
 /// Типы системных событий роутера
@@ -186,6 +189,19 @@ class RouterMessage implements IRpcSerializable {
       },
       success: success,
       errorMessage: errorMessage,
+      timestamp: DateTime.now().millisecondsSinceEpoch,
+    );
+  }
+
+  /// Создает сообщение обновления метаданных
+  factory RouterMessage.updateMetadata({
+    required Map<String, dynamic> metadata,
+    String? senderId,
+  }) {
+    return RouterMessage(
+      type: RouterMessageType.updateMetadata,
+      senderId: senderId,
+      payload: {'metadata': metadata},
       timestamp: DateTime.now().millisecondsSinceEpoch,
     );
   }

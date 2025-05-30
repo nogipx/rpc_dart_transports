@@ -351,6 +351,9 @@ final class RouterResponderImpl implements IRouterContract {
       case RouterMessageType.heartbeat:
         _handleHeartbeat(message, senderId);
         break;
+      case RouterMessageType.updateMetadata:
+        _handleUpdateMetadata(message, senderId);
+        break;
       case RouterMessageType.error:
         _logger?.warning('Ошибка от клиента $senderId: ${message.errorMessage}');
         break;
@@ -407,10 +410,28 @@ final class RouterResponderImpl implements IRouterContract {
     _logger?.debug('Broadcast переслан: $senderId -> все ($sentCount получателей)');
   }
 
-  /// Обрабатывает heartbeat
+  /// Обрабатывает heartbeat сообщение
   void _handleHeartbeat(RouterMessage message, String senderId) {
+    _logger?.debug('Heartbeat от клиента: $senderId');
     updateClientActivity(senderId);
-    _logger?.debug('Heartbeat получен от $senderId');
+  }
+
+  /// Обрабатывает обновление метаданных клиента
+  void _handleUpdateMetadata(RouterMessage message, String senderId) {
+    _logger?.debug('Обновление метаданных от клиента: $senderId');
+
+    final metadata = message.payload?['metadata'] as Map<String, dynamic>?;
+    if (metadata == null) {
+      _logger?.warning('Сообщение updateMetadata без метаданных от клиента: $senderId');
+      return;
+    }
+
+    final success = updateClientMetadata(senderId, metadata);
+    if (success) {
+      _logger?.info('Метаданные обновлены для клиента: $senderId');
+    } else {
+      _logger?.warning('Не удалось обновить метаданные для клиента: $senderId');
+    }
   }
 
   /// Генерирует уникальный ID клиента

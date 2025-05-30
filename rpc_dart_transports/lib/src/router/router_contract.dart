@@ -76,24 +76,6 @@ final class RouterResponderContract extends RpcResponderContract {
       handler: _handleGetOnlineClients,
     );
 
-    // Обновить метаданные клиента
-    addUnaryMethod<RouterUpdateMetadataRequest, RpcBool>(
-      methodName: 'updateMetadata',
-      requestCodec: RpcCodec<RouterUpdateMetadataRequest>(
-        (json) => RouterUpdateMetadataRequest.fromJson(json),
-      ),
-      responseCodec: RpcCodec<RpcBool>((json) => RpcBool.fromJson(json)),
-      handler: _handleUpdateMetadata,
-    );
-
-    // Heartbeat
-    addUnaryMethod<RpcNull, RpcNull>(
-      methodName: 'heartbeat',
-      requestCodec: RpcCodec<RpcNull>((json) => RpcNull.fromJson(json)),
-      responseCodec: RpcCodec<RpcNull>((json) => RpcNull.fromJson(json)),
-      handler: _handleHeartbeat,
-    );
-
     // === P2P ТРАНСПОРТ ===
 
     // Двунаправленный стрим для P2P сообщений между клиентами
@@ -179,21 +161,6 @@ final class RouterResponderContract extends RpcResponderContract {
     _logger?.debug('Отправлен список клиентов (${clients.length})');
 
     return RouterClientsList(clients);
-  }
-
-  /// Обновляет метаданные клиента
-  Future<RpcBool> _handleUpdateMetadata(RouterUpdateMetadataRequest request) async {
-    // TODO: Нужно получать clientId из контекста RPC запроса
-    // В текущей реализации rpc_dart не предоставляет доступ к метаданным запроса
-    _logger?.warning('Метод updateMetadata требует передачи clientId в контексте запроса');
-    return const RpcBool(false);
-  }
-
-  /// Обрабатывает heartbeat
-  Future<RpcNull> _handleHeartbeat(RpcNull request) async {
-    // TODO: Нужно получать clientId из контекста RPC запроса
-    _logger?.warning('Метод heartbeat требует передачи clientId в контексте запроса');
-    return const RpcNull();
   }
 
   // === ОБРАБОТЧИК P2P ТРАНСПОРТА ===

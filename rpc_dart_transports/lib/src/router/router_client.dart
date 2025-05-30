@@ -135,32 +135,42 @@ class RouterClient {
 
   /// Обновляет метаданные клиента
   Future<bool> updateMetadata(Map<String, dynamic> metadata) async {
-    final request = RouterUpdateMetadataRequest(metadata: metadata);
+    if (!isRegistered) {
+      throw StateError('Клиент должен быть зарегистрирован');
+    }
 
-    final response = await _callerEndpoint.unaryRequest<RouterUpdateMetadataRequest, RpcBool>(
-      serviceName: _serviceName,
-      methodName: 'updateMetadata',
-      requestCodec: RpcCodec<RouterUpdateMetadataRequest>(
-          (json) => RouterUpdateMetadataRequest.fromJson(json)),
-      responseCodec: RpcCodec<RpcBool>((json) => RpcBool.fromJson(json)),
-      request: request,
-    );
+    // Используем P2P поток если инициализирован
+    if (_p2pStreamController != null) {
+      final updateMessage = RouterMessage.updateMetadata(
+        metadata: metadata,
+        senderId: _clientId,
+      );
 
-    _logger?.debug('Обновление метаданных: ${response.value}');
-    return response.value;
+      _p2pStreamController!.add(updateMessage);
+      _logger?.debug('Обновление метаданных отправлено через P2P: $metadata');
+      return true; // P2P метод не возвращает результат
+    } else {
+      // Fallback на unary метод (УСТАРЕЛ - больше не поддерживается сервером)
+      _logger?.warning(
+          'P2P не инициализировано, updateMetadata недоступен. Используйте initializeP2P()');
+      return false;
+    }
   }
 
-  /// Отправляет heartbeat роутеру
+  /// Отправляет heartbeat
   Future<void> heartbeat() async {
-    await _callerEndpoint.unaryRequest<RpcNull, RpcNull>(
-      serviceName: _serviceName,
-      methodName: 'heartbeat',
-      requestCodec: RpcCodec<RpcNull>((json) => RpcNull.fromJson(json)),
-      responseCodec: RpcCodec<RpcNull>((json) => RpcNull.fromJson(json)),
-      request: const RpcNull(),
-    );
+    if (!isRegistered) {
+      throw StateError('Клиент должен быть зарегистрирован');
+    }
 
-    _logger?.debug('Heartbeat отправлен');
+    // Используем P2P поток если инициализирован
+    if (_p2pStreamController != null) {
+      sendHeartbeat();
+    } else {
+      // Fallback на unary метод (УСТАРЕЛ - больше не поддерживается сервером)
+      _logger
+          ?.warning('P2P не инициализировано, heartbeat недоступен. Используйте initializeP2P()');
+    }
   }
 
   // === P2P СООБЩЕНИЯ ===
@@ -206,6 +216,22 @@ class RouterClient {
     _p2pStreamController!.add(identityMessage);
 
     _logger?.info('P2P соединение инициализировано для клиента: $_clientId');
+  }
+
+  /// Отправляет heartbeat через P2P поток
+  void sendHeartbeat() {
+    if (!isRegistered || _p2pStreamController == null) {
+      throw StateError('P2P соединение не инициализировано');
+    }
+
+    final heartbeatMessage = RouterMessage(
+      type: RouterMessageType.heartbeat,
+      senderId: _clientId,
+      timestamp: DateTime.now().millisecondsSinceEpoch,
+    );
+
+    _p2pStreamController!.add(heartbeatMessage);
+    _logger?.debug('Heartbeat отправлен');
   }
 
   /// Отправляет unicast сообщение
