@@ -118,7 +118,7 @@ final class RouterCallerContract extends RpcCallerContract {
       });
 
       return await completer.future.timeout(
-        Duration(seconds: 10),
+        Duration(seconds: 5),
         onTimeout: () {
           tempSub.cancel();
           throw TimeoutException('Таймаут регистрации в роутере');

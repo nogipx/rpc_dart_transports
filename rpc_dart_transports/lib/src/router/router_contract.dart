@@ -66,7 +66,21 @@ final class RouterResponderContract extends RpcResponderContract {
       late StreamSubscription clientSubscription;
       clientSubscription = clientMessages.listen(
         (message) {
-          _handleClientMessage(message, clientId);
+          // Обрабатываем регистрацию здесь
+          if (clientId == null && message.type == RouterMessageType.register) {
+            clientId = _generateClientId();
+            _clientStreams[clientId!] = clientController!;
+
+            _logger?.info('Клиент зарегистрирован: $clientId');
+
+            // Отправляем подтверждение регистрации
+            clientController!.add(RouterMessage.registerResponse(
+              clientId: clientId!,
+              success: true,
+            ));
+          } else {
+            _handleClientMessage(message, clientId);
+          }
         },
         onError: (error) {
           _logger?.error('Ошибка в клиентском стриме: $error');
@@ -86,25 +100,7 @@ final class RouterResponderContract extends RpcResponderContract {
       }).doOnListen(() {
         // При подключении ждем сообщение регистрации
         _logger?.debug('Клиент подключился, ожидаем регистрацию');
-      }).transform(StreamTransformer.fromHandlers(
-        handleData: (message, sink) {
-          // Если это первое сообщение и clientId еще не установлен
-          if (clientId == null && message.type == RouterMessageType.register) {
-            clientId = _generateClientId();
-            _clientStreams[clientId!] = clientController!;
-
-            _logger?.info('Клиент зарегистрирован: $clientId');
-
-            // Отправляем подтверждение регистрации
-            sink.add(RouterMessage.registerResponse(
-              clientId: clientId!,
-              success: true,
-            ));
-          } else {
-            sink.add(message);
-          }
-        },
-      ));
+      });
     } catch (e, stackTrace) {
       _logger?.error('Ошибка в соединении клиента: $e', error: e, stackTrace: stackTrace);
       _disconnectClient(clientId);

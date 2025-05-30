@@ -12,7 +12,7 @@ import 'package:web_socket_channel/io.dart';
 /// Пример использования Router для маршрутизации сообщений между клиентами
 void main() async {
   // Включаем подробное логирование
-  RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.debug);
+  RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.info);
 
   print('🚀 Запуск примера Router RPC\n');
 
@@ -30,8 +30,8 @@ void main() async {
 Future<void> startRouterServer() async {
   print('📡 Запуск WebSocket сервера роутера...');
 
-  final server = await HttpServer.bind('localhost', 8080);
-  print('✅ Сервер запущен на ws://localhost:8080\n');
+  final server = await HttpServer.bind('localhost', 8081);
+  print('✅ Сервер запущен на ws://localhost:8081\n');
 
   // Создаем роутер контракт
   final routerContract = RouterResponderContract(
@@ -139,7 +139,7 @@ Future<void> runClients() async {
 Future<RouterCallerContract> createAndConnectClient(String name) async {
   // Создаем WebSocket транспорт
   final transport = RpcWebSocketCallerTransport.connect(
-    Uri.parse('ws://localhost:8080'),
+    Uri.parse('ws://localhost:8081'),
     logger: RpcLogger('Client_$name'),
   );
 
