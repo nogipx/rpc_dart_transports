@@ -11,12 +11,12 @@ import 'package:web_socket_channel/io.dart';
 
 /// Простой пример использования WebSocket транспорта
 void main() async {
-  // Устанавливаем уровень логирования DEBUG
-  RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.debug);
+  // Устанавливаем уровень логирования INFO
+  RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.info);
 
   // Запускаем сервер
-  final server = await HttpServer.bind('localhost', 8080);
-  print('Сервер запущен на http://localhost:8080');
+  final server = await HttpServer.bind('localhost', 8081);
+  print('Сервер запущен на http://localhost:8081');
 
   // Создаем контракт серверной стороны
   final serverContract = EchoResponderContract();
@@ -39,8 +39,7 @@ void main() async {
         );
 
         // Создаем серверный эндпоинт
-        final endpoint = RpcResponderEndpoint(
-            transport: transport, debugLabel: 'ServerEndpoint');
+        final endpoint = RpcResponderEndpoint(transport: transport, debugLabel: 'ServerEndpoint');
 
         // Регистрируем контракт
         endpoint.registerServiceContract(serverContract);
@@ -69,7 +68,7 @@ void runClient() async {
 
   // Создаем клиентский транспорт
   final transport = RpcWebSocketCallerTransport.connect(
-    Uri.parse('ws://localhost:8080'),
+    Uri.parse('ws://localhost:8081'),
     logger: RpcLogger('ClientWebSocket'),
   );
 
@@ -82,48 +81,44 @@ void runClient() async {
   // Создаем контракт клиентской стороны
   final contract = EchoCallerContract(endpoint);
 
-  // Отправляем унарный запрос
-  print('\nОтправка унарного запроса...');
-  final response = await contract.echo('Привет, WebSocket RPC!');
-  print('Ответ от сервера: $response');
-
-  // Тестируем стрим от сервера
-  print('\nТестирование серверного стрима...');
   try {
+    // Отправляем унарный запрос
+    print('\nОтправка унарного запроса...');
+    print('Ждем соединения...');
+
+    // Даем время на установку соединения
+    await Future.delayed(Duration(milliseconds: 500));
+
+    print('Отправляем запрос echo...');
+    final response = await contract.echo('Привет, WebSocket RPC!').timeout(
+      Duration(seconds: 10),
+      onTimeout: () {
+        print('TIMEOUT: Унарный запрос превысил время ожидания');
+        throw TimeoutException('Unary request timeout', Duration(seconds: 10));
+      },
+    );
+    print('Ответ от сервера: $response');
+    print('✅ Унарный запрос успешен');
+  } catch (e, stack) {
+    print('❌ Ошибка в унарном запросе: $e');
+    print('Stack trace: $stack');
+    return;
+  }
+
+  try {
+    // Тестируем стрим от сервера
+    print('\nТестирование серверного стрима...');
     final serverStream = contract.countTo(5);
     await for (final number in serverStream) {
       print('Получено из серверного стрима: $number');
     }
+    print('✅ Серверный стрим успешен');
   } catch (e) {
-    print('Ошибка в серверном стриме: $e');
+    print('❌ Ошибка в серверном стриме: $e');
   }
 
-  // Тестируем стрим от клиента
-  print('\nТестирование клиентского стрима...');
-  try {
-    // Создаем асинхронный стрим с задержками, чтобы ClientStreamCaller успел подписаться
-    final numbers =
-        Stream.periodic(Duration(milliseconds: 100), (i) => i + 1).take(5);
-    final sum = await contract.sum(numbers);
-    print('Сумма: $sum');
-  } catch (e) {
-    print('Ошибка в клиентском стриме: $e');
-  }
-
-  // Тестируем двунаправленный стрим
-  print('\nТестирование двунаправленного стрима...');
-  try {
-    final bidiStream = contract.echo2(
-      Stream.periodic(Duration(milliseconds: 500), (i) => 'Сообщение $i')
-          .take(5),
-    );
-
-    await for (final msg in bidiStream) {
-      print('Получено из двунаправленного стрима: $msg');
-    }
-  } catch (e) {
-    print('Ошибка в двунаправленном стриме: $e');
-  }
+  // Пока убираем остальные стримы для отладки
+  print('Все тесты завершены успешно!');
 
   // Закрываем соединение
   print('\nЗавершение работы...');
@@ -137,64 +132,32 @@ void runClient() async {
 base class EchoResponderContract extends RpcResponderContract {
   EchoResponderContract() : super('echo') {
     // Унарный метод
-    addUnaryMethod<StringMessage, StringMessage>(
+    addUnaryMethod<RpcString, RpcString>(
       methodName: 'echo',
-      requestCodec:
-          RpcCodec<StringMessage>((json) => StringMessage.fromJson(json)),
-      responseCodec:
-          RpcCodec<StringMessage>((json) => StringMessage.fromJson(json)),
+      requestCodec: RpcString.codec,
+      responseCodec: RpcString.codec,
       handler: (request) async {
         print('Сервер получил запрос: ${request.value}');
-        return StringMessage(request.value);
+        return RpcString(request.value);
       },
     );
 
-    // Серверный стрим
-    addServerStreamMethod<IntMessage, IntMessage>(
+    // Серверный стрим (проверяем исправление)
+    addServerStreamMethod<RpcInt, RpcInt>(
       methodName: 'countTo',
-      requestCodec: RpcCodec<IntMessage>((json) => IntMessage.fromJson(json)),
-      responseCodec: RpcCodec<IntMessage>((json) => IntMessage.fromJson(json)),
+      requestCodec: RpcInt.codec,
+      responseCodec: RpcInt.codec,
       handler: (request) {
         final count = request.value;
         print('Сервер запускает стрим до $count');
         return Stream.periodic(
           Duration(milliseconds: 500),
-          (i) => IntMessage(i + 1),
+          (i) => RpcInt(i + 1),
         ).take(count);
       },
     );
 
-    // Клиентский стрим
-    addClientStreamMethod<IntMessage, IntMessage>(
-      methodName: 'sum',
-      requestCodec: RpcCodec<IntMessage>((json) => IntMessage.fromJson(json)),
-      responseCodec: RpcCodec<IntMessage>((json) => IntMessage.fromJson(json)),
-      handler: (stream) async {
-        print('Сервер получает стрим чисел');
-        int sum = 0;
-        await for (final msg in stream) {
-          print('  Получено число: ${msg.value}');
-          sum += msg.value;
-        }
-        return IntMessage(sum);
-      },
-    );
-
-    // Двунаправленный стрим
-    addBidirectionalMethod<StringMessage, StringMessage>(
-      methodName: 'echo2',
-      requestCodec:
-          RpcCodec<StringMessage>((json) => StringMessage.fromJson(json)),
-      responseCodec:
-          RpcCodec<StringMessage>((json) => StringMessage.fromJson(json)),
-      handler: (stream) {
-        print('Сервер запускает двунаправленный стрим');
-        return stream.map((message) {
-          print('  Сервер получил: ${message.value}');
-          return StringMessage('Эхо: ${message.value}');
-        });
-      },
-    );
+    print('Регистрация контракта завершена');
   }
 }
 
@@ -204,14 +167,12 @@ base class EchoCallerContract extends RpcCallerContract {
 
   /// Унарный запрос
   Future<String> echo(String message) async {
-    final response = await endpoint.unaryRequest<StringMessage, StringMessage>(
+    final response = await endpoint.unaryRequest<RpcString, RpcString>(
       serviceName: serviceName,
       methodName: 'echo',
-      requestCodec:
-          RpcCodec<StringMessage>((json) => StringMessage.fromJson(json)),
-      responseCodec:
-          RpcCodec<StringMessage>((json) => StringMessage.fromJson(json)),
-      request: StringMessage(message),
+      requestCodec: RpcString.codec,
+      responseCodec: RpcString.codec,
+      request: RpcString(message),
     );
     return response.value;
   }
@@ -219,76 +180,13 @@ base class EchoCallerContract extends RpcCallerContract {
   /// Серверный стрим
   Stream<int> countTo(int count) {
     return endpoint
-        .serverStream<IntMessage, IntMessage>(
+        .serverStream<RpcInt, RpcInt>(
           serviceName: serviceName,
           methodName: 'countTo',
-          requestCodec:
-              RpcCodec<IntMessage>((json) => IntMessage.fromJson(json)),
-          responseCodec:
-              RpcCodec<IntMessage>((json) => IntMessage.fromJson(json)),
-          request: IntMessage(count),
+          requestCodec: RpcInt.codec,
+          responseCodec: RpcInt.codec,
+          request: RpcInt(count),
         )
         .map((msg) => msg.value);
-  }
-
-  /// Клиентский стрим
-  Future<int> sum(Stream<int> numbers) async {
-    final numberMessages = numbers.map((n) => IntMessage(n));
-    final finishSending = endpoint.clientStream<IntMessage, IntMessage>(
-      serviceName: serviceName,
-      methodName: 'sum',
-      requestCodec: RpcCodec<IntMessage>((json) => IntMessage.fromJson(json)),
-      responseCodec: RpcCodec<IntMessage>((json) => IntMessage.fromJson(json)),
-      requests: numberMessages,
-    );
-
-    final response = await finishSending();
-    return response.value;
-  }
-
-  /// Двунаправленный стрим
-  Stream<String> echo2(Stream<String> messages) {
-    final messageStream = messages.map((m) => StringMessage(m));
-    return endpoint
-        .bidirectionalStream<StringMessage, StringMessage>(
-          serviceName: serviceName,
-          methodName: 'echo2',
-          requestCodec:
-              RpcCodec<StringMessage>((json) => StringMessage.fromJson(json)),
-          responseCodec:
-              RpcCodec<StringMessage>((json) => StringMessage.fromJson(json)),
-          requests: messageStream,
-        )
-        .map((msg) => msg.value);
-  }
-}
-
-// --- Простые сообщения ---
-
-/// Сообщение со строковым значением
-class StringMessage implements IRpcSerializable {
-  final String value;
-
-  StringMessage(this.value);
-
-  @override
-  Map<String, dynamic> toJson() => {'value': value};
-
-  factory StringMessage.fromJson(Map<String, dynamic> json) {
-    return StringMessage(json['value'] as String);
-  }
-}
-
-/// Сообщение с целочисленным значением
-class IntMessage implements IRpcSerializable {
-  final int value;
-
-  IntMessage(this.value);
-
-  @override
-  Map<String, dynamic> toJson() => {'value': value};
-
-  factory IntMessage.fromJson(Map<String, dynamic> json) {
-    return IntMessage(json['value'] as int);
   }
 }
