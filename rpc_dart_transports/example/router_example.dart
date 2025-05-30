@@ -243,6 +243,22 @@ Future<void> demonstrateRouting(
 
   await Future.delayed(Duration(milliseconds: 500));
 
+  print('\n📡 === Демонстрация СОБЫТИЙ РОУТЕРА ===');
+  // Alice подписывается на системные события
+  try {
+    await alice.subscribeToEvents();
+    print('✅ Alice подписалась на события роутера');
+
+    // Слушаем события
+    alice.events.listen((event) {
+      print('🔔 Alice получила событие ${event.type}: ${event.data}');
+    });
+
+    await Future.delayed(Duration(seconds: 1));
+  } catch (e) {
+    print('❌ Alice: ошибка подписки на события = $e');
+  }
+
   print('\n🚫 === Демонстрация ошибки ===');
   // Пытаемся отправить сообщение несуществующему клиенту
   await alice.sendUnicast(

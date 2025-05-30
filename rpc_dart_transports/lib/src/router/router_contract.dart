@@ -18,6 +18,9 @@ final class RouterResponderContract extends RpcResponderContract {
   /// Активные клиентские соединения: clientId -> StreamController
   final Map<String, StreamController<RouterMessage>> _clientStreams = {};
 
+  /// Дистрибьютор для системных событий роутера
+  late final StreamDistributor<RouterEvent> _eventDistributor;
+
   /// Генератор случайных чисел для создания ID
   final Random _random = Random();
 
@@ -27,6 +30,17 @@ final class RouterResponderContract extends RpcResponderContract {
   RouterResponderContract({RpcLogger? logger})
       : _logger = logger?.child('RouterContract'),
         super('router') {
+    // Инициализируем дистрибьютор событий
+    _eventDistributor = StreamDistributor<RouterEvent>(
+      config: StreamDistributorConfig(
+        enableAutoCleanup: true,
+        inactivityThreshold: Duration(minutes: 5),
+        cleanupInterval: Duration(minutes: 1),
+        autoRemoveOnCancel: true,
+      ),
+      logger: _logger?.child('EventDistributor'),
+    );
+
     setup(); // Автоматически настраиваем контракт
   }
 
@@ -44,6 +58,19 @@ final class RouterResponderContract extends RpcResponderContract {
         (json) => RouterMessage.fromJson(json),
       ),
       handler: _handleClientConnection,
+    );
+
+    // Регистрируем серверный поток для системных событий
+    // Клиент отправляет пустой запрос для подписки
+    addServerStreamMethod<RouterMessage, RouterEvent>(
+      methodName: 'events',
+      requestCodec: RpcCodec<RouterMessage>(
+        (json) => RouterMessage.fromJson(json),
+      ),
+      responseCodec: RpcCodec<RouterEvent>(
+        (json) => RouterEvent.fromJson(json),
+      ),
+      handler: _handleEventSubscription,
     );
 
     _logger?.info('Router контракт настроен');
@@ -77,6 +104,13 @@ final class RouterResponderContract extends RpcResponderContract {
             clientController!.add(RouterMessage.registerResponse(
               clientId: clientId!,
               success: true,
+            ));
+
+            // Уведомляем подписчиков о новом клиенте
+            _broadcastEvent(RouterEvent.clientConnected(
+              clientId: clientId!,
+              clientName: message.payload?['clientName'] as String?,
+              capabilities: (message.payload?['groups'] as List?)?.cast<String>(),
             ));
           } else {
             _handleClientMessage(message, clientId);
@@ -235,6 +269,63 @@ final class RouterResponderContract extends RpcResponderContract {
     }
 
     _logger?.info('Клиент отключен: $clientId (активных: ${_clientStreams.length})');
+
+    // Уведомляем подписчиков об отключении клиента
+    _broadcastEvent(RouterEvent.clientDisconnected(
+      clientId: clientId,
+      reason: 'Клиент отключился',
+    ));
+
+    // Отправляем событие изменения топологии
+    _broadcastEvent(RouterEvent.topologyChanged(
+      activeClients: _clientStreams.length,
+      clientIds: _clientStreams.keys.toList(),
+      capabilities: {}, // TODO: добавить отслеживание capabilities
+    ));
+  }
+
+  /// Обрабатывает подписку на системные события роутера
+  Stream<RouterEvent> _handleEventSubscription(RouterMessage subscriptionRequest) async* {
+    final subscriberId = 'events_${_random.nextInt(999999).toString().padLeft(6, '0')}';
+
+    _logger?.debug('Новая подписка на события: $subscriberId');
+
+    try {
+      // Создаем стрим через дистрибьютор
+      final eventStream = _eventDistributor.createClientStreamWithId(
+        subscriberId,
+        onCancel: () {
+          _logger?.debug('Отмена подписки на события: $subscriberId');
+        },
+      );
+
+      // Отправляем приветственное событие с текущей статистикой
+      final currentStats = RouterEvent.routerStats(
+        activeClients: _clientStreams.length,
+        messagesPerSecond: 0, // TODO: реализовать подсчет
+        messageTypeCounts: {}, // TODO: реализовать подсчет
+      );
+
+      // Публикуем приветственное событие конкретному клиенту
+      _eventDistributor.publishToClient(subscriberId, currentStats);
+
+      // Возвращаем поток событий
+      yield* eventStream;
+    } catch (e, stackTrace) {
+      _logger?.error('Ошибка в подписке на события: $e', error: e, stackTrace: stackTrace);
+      rethrow;
+    }
+  }
+
+  /// Отправляет событие всем подписчикам
+  void _broadcastEvent(RouterEvent event) {
+    final activeSubscribers = _eventDistributor.activeClientCount;
+    _logger?.debug('Отправка события ${event.type} $activeSubscribers подписчикам');
+
+    // Используем дистрибьютор для широковещательной рассылки
+    final deliveredCount = _eventDistributor.publish(event);
+
+    _logger?.debug('Событие ${event.type} доставлено $deliveredCount подписчикам');
   }
 
   /// Генерирует уникальный ID клиента
@@ -247,6 +338,22 @@ final class RouterResponderContract extends RpcResponderContract {
         activeClients: _clientStreams.length,
         clientIds: _clientStreams.keys.toList(),
       );
+
+  /// Освобождает ресурсы роутера
+  Future<void> dispose() async {
+    _logger?.info('Закрытие роутера...');
+
+    // Закрываем все клиентские соединения
+    final clientIds = _clientStreams.keys.toList();
+    for (final clientId in clientIds) {
+      _disconnectClient(clientId);
+    }
+
+    // Закрываем дистрибьютор событий
+    await _eventDistributor.dispose();
+
+    _logger?.info('Роутер закрыт');
+  }
 }
 
 /// Статистика роутера

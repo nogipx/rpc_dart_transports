@@ -23,6 +23,9 @@ final class RouterCallerContract extends RpcCallerContract {
   final StreamController<RouterMessage> _messagesController =
       StreamController<RouterMessage>.broadcast();
 
+  /// Контроллер для системных событий роутера
+  final StreamController<RouterEvent> _eventsController = StreamController<RouterEvent>.broadcast();
+
   /// Логгер для отладки
   final RpcLogger? _logger;
 
@@ -43,6 +46,9 @@ final class RouterCallerContract extends RpcCallerContract {
 
   /// Поток входящих сообщений от других клиентов
   Stream<RouterMessage> get messages => _messagesController.stream;
+
+  /// Поток системных событий роутера
+  Stream<RouterEvent> get events => _eventsController.stream;
 
   /// Подключается к роутеру и регистрирует клиента
   Future<String> connect({
@@ -212,6 +218,58 @@ final class RouterCallerContract extends RpcCallerContract {
     );
   }
 
+  /// Подписывается на системные события роутера
+  Future<void> subscribeToEvents() async {
+    _ensureConnected();
+
+    _logger?.info('Подписка на системные события роутера...');
+
+    try {
+      // Создаем пустое сообщение для подписки
+      final subscriptionRequest = RouterMessage(
+        type: RouterMessageType.register, // Используем любой тип
+        timestamp: DateTime.now().millisecondsSinceEpoch,
+      );
+
+      // Подписываемся на серверный поток событий
+      final eventStream = endpoint.serverStream<RouterMessage, RouterEvent>(
+        serviceName: 'router',
+        methodName: 'events',
+        requestCodec: RpcCodec<RouterMessage>(
+          (json) => RouterMessage.fromJson(json),
+        ),
+        responseCodec: RpcCodec<RouterEvent>(
+          (json) => RouterEvent.fromJson(json),
+        ),
+        request: subscriptionRequest,
+      );
+
+      // Перенаправляем события в локальный контроллер
+      eventStream.listen(
+        (event) {
+          _logger?.debug('Получено системное событие: ${event.type}');
+          if (!_eventsController.isClosed) {
+            _eventsController.add(event);
+          }
+        },
+        onError: (error) {
+          _logger?.error('Ошибка в потоке событий: $error');
+          if (!_eventsController.isClosed) {
+            _eventsController.addError(error);
+          }
+        },
+        onDone: () {
+          _logger?.info('Поток системных событий завершен');
+        },
+      );
+
+      _logger?.info('Подписка на события успешно установлена');
+    } catch (e) {
+      _logger?.error('Ошибка подписки на события: $e');
+      rethrow;
+    }
+  }
+
   /// Отключается от роутера
   Future<void> disconnect() async {
     await _disconnect();
@@ -256,6 +314,10 @@ final class RouterCallerContract extends RpcCallerContract {
 
     if (!_messagesController.isClosed) {
       await _messagesController.close();
+    }
+
+    if (!_eventsController.isClosed) {
+      await _eventsController.close();
     }
   }
 }
