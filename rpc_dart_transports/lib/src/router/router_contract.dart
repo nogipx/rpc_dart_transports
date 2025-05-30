@@ -9,6 +9,160 @@ import 'package:rpc_dart/rpc_dart.dart';
 
 import 'router_models.dart';
 
+/// Запрос регистрации клиента
+class RouterRegisterRequest implements IRpcSerializable {
+  final String? clientName;
+  final List<String>? groups;
+  final Map<String, dynamic>? metadata;
+
+  const RouterRegisterRequest({
+    this.clientName,
+    this.groups,
+    this.metadata,
+  });
+
+  factory RouterRegisterRequest.fromJson(Map<String, dynamic> json) {
+    return RouterRegisterRequest(
+      clientName: json['clientName'] as String?,
+      groups: (json['groups'] as List?)?.cast<String>(),
+      metadata: json['metadata'] as Map<String, dynamic>?,
+    );
+  }
+
+  @override
+  Map<String, dynamic> toJson() {
+    return {
+      if (clientName != null) 'clientName': clientName,
+      if (groups != null) 'groups': groups,
+      if (metadata != null) 'metadata': metadata,
+    };
+  }
+}
+
+/// Ответ на регистрацию клиента
+class RouterRegisterResponse implements IRpcSerializable {
+  final String clientId;
+  final bool success;
+  final String? errorMessage;
+
+  const RouterRegisterResponse({
+    required this.clientId,
+    required this.success,
+    this.errorMessage,
+  });
+
+  factory RouterRegisterResponse.fromJson(Map<String, dynamic> json) {
+    return RouterRegisterResponse(
+      clientId: json['clientId'] as String,
+      success: json['success'] as bool,
+      errorMessage: json['errorMessage'] as String?,
+    );
+  }
+
+  @override
+  Map<String, dynamic> toJson() {
+    return {
+      'clientId': clientId,
+      'success': success,
+      if (errorMessage != null) 'errorMessage': errorMessage,
+    };
+  }
+}
+
+/// Запрос списка онлайн клиентов
+class RouterGetOnlineClientsRequest implements IRpcSerializable {
+  final List<String>? groups;
+  final Map<String, dynamic>? metadata;
+
+  const RouterGetOnlineClientsRequest({
+    this.groups,
+    this.metadata,
+  });
+
+  factory RouterGetOnlineClientsRequest.fromJson(Map<String, dynamic> json) {
+    return RouterGetOnlineClientsRequest(
+      groups: (json['groups'] as List?)?.cast<String>(),
+      metadata: json['metadata'] as Map<String, dynamic>?,
+    );
+  }
+
+  @override
+  Map<String, dynamic> toJson() {
+    return {
+      if (groups != null) 'groups': groups,
+      if (metadata != null) 'metadata': metadata,
+    };
+  }
+}
+
+/// Запрос обновления метаданных
+class RouterUpdateMetadataRequest implements IRpcSerializable {
+  final Map<String, dynamic> metadata;
+
+  const RouterUpdateMetadataRequest({
+    required this.metadata,
+  });
+
+  factory RouterUpdateMetadataRequest.fromJson(Map<String, dynamic> json) {
+    return RouterUpdateMetadataRequest(
+      metadata: json['metadata'] as Map<String, dynamic>,
+    );
+  }
+
+  @override
+  Map<String, dynamic> toJson() {
+    return {
+      'metadata': metadata,
+    };
+  }
+}
+
+/// Ответ ping
+class RouterPongResponse implements IRpcSerializable {
+  final int timestamp;
+  final int serverTimestamp;
+
+  const RouterPongResponse({
+    required this.timestamp,
+    required this.serverTimestamp,
+  });
+
+  factory RouterPongResponse.fromJson(Map<String, dynamic> json) {
+    return RouterPongResponse(
+      timestamp: json['timestamp'] as int,
+      serverTimestamp: json['serverTimestamp'] as int,
+    );
+  }
+
+  @override
+  Map<String, dynamic> toJson() {
+    return {
+      'timestamp': timestamp,
+      'serverTimestamp': serverTimestamp,
+    };
+  }
+}
+
+/// Список клиентов как ответ
+class RouterClientsList implements IRpcSerializable {
+  final List<RouterClientInfo> clients;
+
+  const RouterClientsList(this.clients);
+
+  factory RouterClientsList.fromJson(Map<String, dynamic> json) {
+    return RouterClientsList(
+      (json['clients'] as List).map((item) => RouterClientInfo.fromJson(item)).toList(),
+    );
+  }
+
+  @override
+  Map<String, dynamic> toJson() {
+    return {
+      'clients': clients.map((client) => client.toJson()).toList(),
+    };
+  }
+}
+
 /// Контракт роутера для маршрутизации RPC сообщений между клиентами.
 ///
 /// Обеспечивает stateless маршрутизацию сообщений между различными
@@ -54,25 +208,80 @@ final class RouterResponderContract extends RpcResponderContract {
   void setup() {
     _logger?.info('Настройка Router контракта');
 
-    // Регистрируем двунаправленный стрим для клиентского соединения
+    // === ПРЯМЫЕ RPC МЕТОДЫ К РОУТЕРУ ===
+
+    // Регистрация клиента
+    addUnaryMethod<RouterRegisterRequest, RouterRegisterResponse>(
+      methodName: 'register',
+      requestCodec: RpcCodec<RouterRegisterRequest>(
+        (json) => RouterRegisterRequest.fromJson(json),
+      ),
+      responseCodec: RpcCodec<RouterRegisterResponse>(
+        (json) => RouterRegisterResponse.fromJson(json),
+      ),
+      handler: _handleRegister,
+    );
+
+    // Ping роутера
+    addUnaryMethod<RpcInt, RouterPongResponse>(
+      methodName: 'ping',
+      requestCodec: RpcCodec<RpcInt>((json) => RpcInt.fromJson(json)),
+      responseCodec: RpcCodec<RouterPongResponse>(
+        (json) => RouterPongResponse.fromJson(json),
+      ),
+      handler: _handlePing,
+    );
+
+    // Получить список онлайн клиентов
+    addUnaryMethod<RouterGetOnlineClientsRequest, RouterClientsList>(
+      methodName: 'getOnlineClients',
+      requestCodec: RpcCodec<RouterGetOnlineClientsRequest>(
+        (json) => RouterGetOnlineClientsRequest.fromJson(json),
+      ),
+      responseCodec: RpcCodec<RouterClientsList>(
+        (json) => RouterClientsList.fromJson(json),
+      ),
+      handler: _handleGetOnlineClients,
+    );
+
+    // Обновить метаданные клиента
+    addUnaryMethod<RouterUpdateMetadataRequest, RpcBool>(
+      methodName: 'updateMetadata',
+      requestCodec: RpcCodec<RouterUpdateMetadataRequest>(
+        (json) => RouterUpdateMetadataRequest.fromJson(json),
+      ),
+      responseCodec: RpcCodec<RpcBool>((json) => RpcBool.fromJson(json)),
+      handler: _handleUpdateMetadata,
+    );
+
+    // Heartbeat
+    addUnaryMethod<RpcNull, RpcNull>(
+      methodName: 'heartbeat',
+      requestCodec: RpcCodec<RpcNull>((json) => RpcNull.fromJson(json)),
+      responseCodec: RpcCodec<RpcNull>((json) => RpcNull.fromJson(json)),
+      handler: _handleHeartbeat,
+    );
+
+    // === P2P ТРАНСПОРТ ===
+
+    // Двунаправленный стрим для P2P сообщений между клиентами
     addBidirectionalMethod<RouterMessage, RouterMessage>(
-      methodName: 'connect',
+      methodName: 'p2p',
       requestCodec: RpcCodec<RouterMessage>(
         (json) => RouterMessage.fromJson(json),
       ),
       responseCodec: RpcCodec<RouterMessage>(
         (json) => RouterMessage.fromJson(json),
       ),
-      handler: _handleClientConnection,
+      handler: _handleP2PConnection,
     );
 
-    // Регистрируем серверный поток для системных событий
-    // Клиент отправляет пустой запрос для подписки
-    addServerStreamMethod<RouterMessage, RouterEvent>(
+    // === СОБЫТИЯ РОУТЕРА ===
+
+    // Серверный поток для системных событий
+    addServerStreamMethod<RpcNull, RouterEvent>(
       methodName: 'events',
-      requestCodec: RpcCodec<RouterMessage>(
-        (json) => RouterMessage.fromJson(json),
-      ),
+      requestCodec: RpcCodec<RpcNull>((json) => RpcNull.fromJson(json)),
       responseCodec: RpcCodec<RouterEvent>(
         (json) => RouterEvent.fromJson(json),
       ),
@@ -82,96 +291,169 @@ final class RouterResponderContract extends RpcResponderContract {
     _logger?.info('Router контракт настроен');
   }
 
-  /// Обрабатывает двунаправленное соединение с клиентом
-  Stream<RouterMessage> _handleClientConnection(
+  // === ОБРАБОТЧИКИ ПРЯМЫХ RPC МЕТОДОВ ===
+
+  /// Регистрирует нового клиента
+  Future<RouterRegisterResponse> _handleRegister(RouterRegisterRequest request) async {
+    try {
+      final clientId = _generateClientId();
+
+      final now = DateTime.now();
+      final clientInfo = RouterClientInfo(
+        clientId: clientId,
+        clientName: request.clientName,
+        groups: request.groups ?? [],
+        connectedAt: now,
+        lastActivity: now,
+        metadata: request.metadata ?? {},
+        status: ClientStatus.online,
+      );
+
+      _clientsInfo[clientId] = clientInfo;
+
+      _logger?.info('Клиент зарегистрирован: $clientId (${clientInfo.clientName})');
+
+      // Уведомляем подписчиков о новом клиенте
+      _broadcastEvent(RouterEvent.clientConnected(
+        clientId: clientId,
+        clientName: clientInfo.clientName,
+        capabilities: clientInfo.groups,
+      ));
+
+      return RouterRegisterResponse(
+        clientId: clientId,
+        success: true,
+      );
+    } catch (e, stackTrace) {
+      _logger?.error('Ошибка регистрации клиента: $e', error: e, stackTrace: stackTrace);
+      return RouterRegisterResponse(
+        clientId: '',
+        success: false,
+        errorMessage: e.toString(),
+      );
+    }
+  }
+
+  /// Обрабатывает ping запрос
+  Future<RouterPongResponse> _handlePing(RpcInt clientTimestamp) async {
+    final serverTimestamp = DateTime.now().millisecondsSinceEpoch;
+
+    _logger?.debug('Ping получен, timestamp: ${clientTimestamp.value}');
+
+    return RouterPongResponse(
+      timestamp: clientTimestamp.value,
+      serverTimestamp: serverTimestamp,
+    );
+  }
+
+  /// Получает список онлайн клиентов
+  Future<RouterClientsList> _handleGetOnlineClients(RouterGetOnlineClientsRequest request) async {
+    // Фильтруем клиентов
+    var clients = _clientsInfo.values.where(
+        (client) => client.status == ClientStatus.online || client.status == ClientStatus.idle);
+
+    // Применяем фильтры если есть
+    if (request.groups != null && request.groups!.isNotEmpty) {
+      clients =
+          clients.where((client) => request.groups!.any((group) => client.groups.contains(group)));
+    }
+
+    if (request.metadata != null && request.metadata!.isNotEmpty) {
+      clients = clients.where((client) {
+        return request.metadata!.entries
+            .every((entry) => client.metadata[entry.key] == entry.value);
+      });
+    }
+
+    final result = clients.toList();
+
+    _logger?.debug('Отправлен список клиентов (${result.length})');
+
+    return RouterClientsList(result);
+  }
+
+  /// Обновляет метаданные клиента
+  Future<RpcBool> _handleUpdateMetadata(RouterUpdateMetadataRequest request) async {
+    // TODO: Нужно получать clientId из контекста RPC запроса
+    // В текущей реализации rpc_dart не предоставляет доступ к метаданным запроса
+    // Возможные решения:
+    // 1. Добавить clientId в параметры запроса
+    // 2. Использовать session-based authentication
+    // 3. Расширить RPC endpoint контекст
+    _logger?.warning('Метод updateMetadata требует передачи clientId в контексте запроса');
+    return const RpcBool(false);
+  }
+
+  /// Обрабатывает heartbeat
+  Future<RpcNull> _handleHeartbeat(RpcNull request) async {
+    // TODO: Нужно получать clientId из контекста RPC запроса
+    // В текущей реализации rpc_dart не предоставляет доступ к метаданным запроса
+    _logger?.warning('Метод heartbeat требует передачи clientId в контексте запроса');
+    return const RpcNull();
+  }
+
+  // === ОБРАБОТЧИК P2P ТРАНСПОРТА ===
+
+  /// Обрабатывает P2P соединение между клиентами
+  Stream<RouterMessage> _handleP2PConnection(
     Stream<RouterMessage> clientMessages,
   ) async* {
     String? clientId;
     StreamController<RouterMessage>? clientController;
+    StreamSubscription? clientSubscription;
 
     try {
-      _logger?.debug('Новое клиентское соединение');
+      _logger?.debug('Новое P2P соединение');
 
       // Создаем контроллер для отправки сообщений клиенту
       clientController = StreamController<RouterMessage>();
 
       // Слушаем сообщения от клиента
-      late StreamSubscription clientSubscription;
       clientSubscription = clientMessages.listen(
         (message) {
-          // Обрабатываем регистрацию здесь
-          if (clientId == null && message.type == RouterMessageType.register) {
-            clientId = _generateClientId();
+          // Первое сообщение должно содержать clientId для привязки к зарегистрированному клиенту
+          if (clientId == null) {
+            clientId = message.senderId;
+            if (clientId == null || !_clientsInfo.containsKey(clientId)) {
+              _logger?.warning('P2P соединение без валидного clientId: ${message.senderId}');
+              return;
+            }
+
             _clientStreams[clientId!] = clientController!;
-
-            // Создаем информацию о клиенте
-            final now = DateTime.now();
-            final clientInfo = RouterClientInfo(
-              clientId: clientId!,
-              clientName: message.payload?['clientName'] as String?,
-              groups: (message.payload?['groups'] as List?)?.cast<String>() ?? [],
-              connectedAt: now,
-              lastActivity: now,
-              metadata: (message.payload?['metadata'] as Map<String, dynamic>?) ?? {},
-              status: ClientStatus.online,
-            );
-            _clientsInfo[clientId!] = clientInfo;
-
-            _logger?.info('Клиент зарегистрирован: $clientId (${clientInfo.clientName})');
-
-            // Отправляем подтверждение регистрации
-            clientController!.add(RouterMessage.registerResponse(
-              clientId: clientId!,
-              success: true,
-            ));
-
-            // Уведомляем подписчиков о новом клиенте
-            _broadcastEvent(RouterEvent.clientConnected(
-              clientId: clientId!,
-              clientName: clientInfo.clientName,
-              capabilities: clientInfo.groups,
-            ));
+            _logger?.info('P2P соединение установлено для клиента: $clientId');
           } else {
-            _handleClientMessage(message, clientId);
+            _handleP2PMessage(message, clientId!);
           }
         },
         onError: (error) {
-          _logger?.error('Ошибка в клиентском стриме: $error');
+          _logger?.error('Ошибка в P2P стриме: $error');
           _disconnectClient(clientId);
         },
         onDone: () {
-          _logger?.debug('Клиентский стрим завершен для $clientId');
+          _logger?.debug('P2P стрим завершен для $clientId');
           _disconnectClient(clientId);
         },
       );
 
       // Возвращаем стрим ответов клиенту
-      yield* clientController.stream.doOnCancel(() {
-        _logger?.debug('Отмена стрима для клиента $clientId');
-        clientSubscription.cancel();
-        _disconnectClient(clientId);
-      }).doOnListen(() {
-        // При подключении ждем сообщение регистрации
-        _logger?.debug('Клиент подключился, ожидаем регистрацию');
-      });
+      yield* clientController.stream;
     } catch (e, stackTrace) {
-      _logger?.error('Ошибка в соединении клиента: $e', error: e, stackTrace: stackTrace);
+      _logger?.error('Ошибка в P2P соединении: $e', error: e, stackTrace: stackTrace);
       _disconnectClient(clientId);
       rethrow;
+    } finally {
+      // Очистка ресурсов
+      await clientSubscription?.cancel();
+      await clientController?.close();
     }
   }
 
-  /// Обрабатывает сообщение от клиента
-  void _handleClientMessage(RouterMessage message, String? senderId) {
-    if (senderId == null) {
-      _logger?.warning('Получено сообщение от незарегистрированного клиента');
-      return;
-    }
-
+  /// Обрабатывает P2P сообщение от клиента
+  void _handleP2PMessage(RouterMessage message, String senderId) {
     // Обновляем время последней активности
     _updateClientActivity(senderId);
 
-    _logger?.debug('Сообщение от $senderId: ${message.type}');
+    _logger?.debug('P2P сообщение от $senderId: ${message.type}');
 
     switch (message.type) {
       case RouterMessageType.unicast:
@@ -183,26 +465,14 @@ final class RouterResponderContract extends RpcResponderContract {
       case RouterMessageType.broadcast:
         _handleBroadcast(message, senderId);
         break;
-      case RouterMessageType.ping:
-        _handlePing(message, senderId);
-        break;
-      case RouterMessageType.getOnlineClients:
-        _handleGetOnlineClients(message, senderId);
-        break;
       case RouterMessageType.request:
         _handleRequest(message, senderId);
         break;
       case RouterMessageType.response:
         _handleResponse(message, senderId);
         break;
-      case RouterMessageType.updateClientMetadata:
-        _handleUpdateClientMetadata(message, senderId);
-        break;
-      case RouterMessageType.heartbeat:
-        _handleHeartbeat(message, senderId);
-        break;
       default:
-        _logger?.warning('Неизвестный тип сообщения: ${message.type}');
+        _logger?.warning('Неподдерживаемый тип P2P сообщения: ${message.type}');
     }
   }
 
@@ -272,17 +542,6 @@ final class RouterResponderContract extends RpcResponderContract {
     _logger?.debug('Broadcast: $senderId -> все ($sentCount клиентов)');
   }
 
-  /// Обрабатывает ping сообщение
-  void _handlePing(RouterMessage message, String senderId) {
-    final pongMessage = RouterMessage.pong(
-      timestamp: message.timestamp ?? DateTime.now().millisecondsSinceEpoch,
-      senderId: 'router',
-    );
-    _sendToClient(senderId, pongMessage);
-
-    _logger?.debug('Ping-Pong: $senderId');
-  }
-
   /// Отправляет сообщение конкретному клиенту
   void _sendToClient(String clientId, RouterMessage message) {
     final controller = _clientStreams[clientId];
@@ -331,7 +590,7 @@ final class RouterResponderContract extends RpcResponderContract {
   }
 
   /// Обрабатывает подписку на системные события роутера
-  Stream<RouterEvent> _handleEventSubscription(RouterMessage subscriptionRequest) async* {
+  Stream<RouterEvent> _handleEventSubscription(RpcNull subscriptionRequest) async* {
     final subscriberId = 'events_${_uuid.v4()}';
 
     _logger?.debug('Новая подписка на события: $subscriberId');
@@ -383,44 +642,6 @@ final class RouterResponderContract extends RpcResponderContract {
         status: ClientStatus.online,
       );
     }
-  }
-
-  /// Обрабатывает запрос списка онлайн клиентов
-  void _handleGetOnlineClients(RouterMessage message, String senderId) {
-    final filters = message.payload ?? <String, dynamic>{};
-
-    // Фильтруем клиентов
-    var clients = _clientsInfo.values.where(
-        (client) => client.status == ClientStatus.online || client.status == ClientStatus.idle);
-
-    // Применяем фильтры если есть
-    if (filters.containsKey('groups')) {
-      final requiredGroups = (filters['groups'] as List?)?.cast<String>() ?? [];
-      clients =
-          clients.where((client) => requiredGroups.any((group) => client.groups.contains(group)));
-    }
-
-    if (filters.containsKey('metadata')) {
-      final requiredMetadata = filters['metadata'] as Map<String, dynamic>?;
-      if (requiredMetadata != null) {
-        clients = clients.where((client) {
-          return requiredMetadata.entries
-              .every((entry) => client.metadata[entry.key] == entry.value);
-        });
-      }
-    }
-
-    // Преобразуем в JSON
-    final clientsList = clients.map((client) => client.toJson()).toList();
-
-    // Отправляем ответ
-    final response = RouterMessage.onlineClientsResponse(
-      clients: clientsList,
-      senderId: 'router',
-    );
-    _sendToClient(senderId, response);
-
-    _logger?.debug('Отправлен список клиентов ($clientsList.length) клиенту $senderId');
   }
 
   /// Обрабатывает request-response сообщение
@@ -476,38 +697,6 @@ final class RouterResponderContract extends RpcResponderContract {
     _logger?.debug('Response переслан: $senderId -> $targetId');
   }
 
-  /// Обрабатывает обновление метаданных клиента
-  void _handleUpdateClientMetadata(RouterMessage message, String senderId) {
-    final metadata = message.payload?['metadata'] as Map<String, dynamic>?;
-    if (metadata == null) {
-      _logger?.warning('UpdateClientMetadata без metadata от $senderId');
-      return;
-    }
-
-    final clientInfo = _clientsInfo[senderId];
-    if (clientInfo != null) {
-      // Обновляем метаданные клиента
-      _clientsInfo[senderId] = clientInfo.copyWith(
-        metadata: {...clientInfo.metadata, ...metadata},
-        lastActivity: DateTime.now(),
-      );
-
-      // Уведомляем подписчиков об обновлении
-      _broadcastEvent(RouterEvent.clientCapabilitiesUpdated(
-        clientId: senderId,
-        metadata: _clientsInfo[senderId]!.metadata,
-      ));
-
-      _logger?.debug('Обновлены метаданные клиента $senderId');
-    }
-  }
-
-  /// Обрабатывает heartbeat сообщение
-  void _handleHeartbeat(RouterMessage message, String senderId) {
-    // Просто обновляем активность (уже сделано в _handleClientMessage)
-    _logger?.debug('Heartbeat от $senderId');
-  }
-
   /// Генерирует уникальный ID клиента
   String _generateClientId() {
     return 'client_${_uuid.v4()}';
@@ -549,48 +738,5 @@ class RouterStats {
   @override
   String toString() {
     return 'RouterStats(activeClients: $activeClients, clientIds: $clientIds)';
-  }
-}
-
-/// Расширение для Stream с дополнительными методами
-extension StreamExtensions<T> on Stream<T> {
-  /// Выполняет действие при отмене подписки
-  Stream<T> doOnCancel(void Function() onCancel) {
-    late StreamController<T> controller;
-    late StreamSubscription<T> subscription;
-
-    controller = StreamController<T>(
-      onListen: () {
-        subscription = listen(
-          controller.add,
-          onError: controller.addError,
-          onDone: controller.close,
-        );
-      },
-      onCancel: () {
-        onCancel();
-        return subscription.cancel();
-      },
-    );
-
-    return controller.stream;
-  }
-
-  /// Выполняет действие при подключении
-  Stream<T> doOnListen(void Function() onListen) {
-    late StreamController<T> controller;
-
-    controller = StreamController<T>(
-      onListen: () {
-        onListen();
-        listen(
-          controller.add,
-          onError: controller.addError,
-          onDone: controller.close,
-        );
-      },
-    );
-
-    return controller.stream;
   }
 }

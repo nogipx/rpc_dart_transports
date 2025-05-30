@@ -6,12 +6,6 @@ import 'package:rpc_dart/rpc_dart.dart';
 
 /// Типы сообщений роутера
 enum RouterMessageType {
-  /// Регистрация клиента
-  register,
-
-  /// Ответ на регистрацию
-  registerResponse,
-
   /// Unicast сообщение (1:1)
   unicast,
 
@@ -21,26 +15,8 @@ enum RouterMessageType {
   /// Broadcast сообщение (1:ALL)
   broadcast,
 
-  /// Ping для проверки соединения
-  ping,
-
-  /// Pong ответ на ping
-  pong,
-
   /// Сообщение об ошибке
   error,
-
-  /// Запрос списка онлайн клиентов
-  getOnlineClients,
-
-  /// Ответ со списком онлайн клиентов
-  onlineClientsResponse,
-
-  /// Запрос клиентов по фильтру
-  queryClients,
-
-  /// Ответ на запрос клиентов
-  queryClientsResponse,
 
   /// Request-Response сообщение (запрос)
   request,
@@ -48,10 +24,7 @@ enum RouterMessageType {
   /// Request-Response сообщение (ответ)
   response,
 
-  /// Обновление метаданных клиента
-  updateClientMetadata,
-
-  /// Heartbeat для проверки активности
+  /// Heartbeat для P2P соединения
   heartbeat,
 }
 
@@ -116,37 +89,6 @@ class RouterMessage implements IRpcSerializable {
     this.success,
   });
 
-  /// Создает сообщение регистрации клиента
-  factory RouterMessage.register({
-    String? clientName,
-    List<String>? groups,
-  }) {
-    return RouterMessage(
-      type: RouterMessageType.register,
-      payload: {
-        if (clientName != null) 'clientName': clientName,
-        if (groups != null) 'groups': groups,
-      },
-      timestamp: DateTime.now().millisecondsSinceEpoch,
-    );
-  }
-
-  /// Создает ответ на регистрацию
-  factory RouterMessage.registerResponse({
-    required String clientId,
-    required bool success,
-    String? errorMessage,
-  }) {
-    return RouterMessage(
-      type: RouterMessageType.registerResponse,
-      senderId: 'router',
-      payload: {'clientId': clientId},
-      success: success,
-      errorMessage: errorMessage,
-      timestamp: DateTime.now().millisecondsSinceEpoch,
-    );
-  }
-
   /// Создает unicast сообщение
   factory RouterMessage.unicast({
     required String targetId,
@@ -190,30 +132,6 @@ class RouterMessage implements IRpcSerializable {
     );
   }
 
-  /// Создает ping сообщение
-  factory RouterMessage.ping({
-    String? senderId,
-  }) {
-    return RouterMessage(
-      type: RouterMessageType.ping,
-      senderId: senderId,
-      timestamp: DateTime.now().millisecondsSinceEpoch,
-    );
-  }
-
-  /// Создает pong сообщение
-  factory RouterMessage.pong({
-    required int timestamp,
-    String? senderId,
-  }) {
-    return RouterMessage(
-      type: RouterMessageType.pong,
-      senderId: senderId,
-      payload: {'originalTimestamp': timestamp},
-      timestamp: DateTime.now().millisecondsSinceEpoch,
-    );
-  }
-
   /// Создает сообщение об ошибке
   factory RouterMessage.error(
     String errorMessage, {
@@ -224,33 +142,6 @@ class RouterMessage implements IRpcSerializable {
       senderId: senderId,
       errorMessage: errorMessage,
       success: false,
-      timestamp: DateTime.now().millisecondsSinceEpoch,
-    );
-  }
-
-  /// Создает запрос списка онлайн клиентов
-  factory RouterMessage.getOnlineClients({
-    String? senderId,
-    Map<String, dynamic>? filters,
-  }) {
-    return RouterMessage(
-      type: RouterMessageType.getOnlineClients,
-      senderId: senderId,
-      payload: filters,
-      timestamp: DateTime.now().millisecondsSinceEpoch,
-    );
-  }
-
-  /// Создает ответ со списком онлайн клиентов
-  factory RouterMessage.onlineClientsResponse({
-    required List<Map<String, dynamic>> clients,
-    String? senderId,
-  }) {
-    return RouterMessage(
-      type: RouterMessageType.onlineClientsResponse,
-      senderId: senderId,
-      payload: {'clients': clients},
-      success: true,
       timestamp: DateTime.now().millisecondsSinceEpoch,
     );
   }
@@ -295,19 +186,6 @@ class RouterMessage implements IRpcSerializable {
       },
       success: success,
       errorMessage: errorMessage,
-      timestamp: DateTime.now().millisecondsSinceEpoch,
-    );
-  }
-
-  /// Создает обновление метаданных клиента
-  factory RouterMessage.updateClientMetadata({
-    required Map<String, dynamic> metadata,
-    String? senderId,
-  }) {
-    return RouterMessage(
-      type: RouterMessageType.updateClientMetadata,
-      senderId: senderId,
-      payload: {'metadata': metadata},
       timestamp: DateTime.now().millisecondsSinceEpoch,
     );
   }
@@ -588,6 +466,22 @@ class RouterClientInfo {
       'metadata': metadata,
       'status': status.name,
     };
+  }
+
+  /// Создает экземпляр из JSON
+  factory RouterClientInfo.fromJson(Map<String, dynamic> json) {
+    return RouterClientInfo(
+      clientId: json['clientId'] as String,
+      clientName: json['clientName'] as String?,
+      groups: (json['groups'] as List?)?.cast<String>() ?? [],
+      connectedAt: DateTime.fromMillisecondsSinceEpoch(json['connectedAt'] as int),
+      lastActivity: DateTime.fromMillisecondsSinceEpoch(json['lastActivity'] as int),
+      metadata: (json['metadata'] as Map<String, dynamic>?) ?? {},
+      status: ClientStatus.values.firstWhere(
+        (e) => e.name == json['status'],
+        orElse: () => ClientStatus.online,
+      ),
+    );
   }
 
   @override
