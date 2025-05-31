@@ -3,10 +3,7 @@
 test:
     fvm dart test
 
-gen:
-    fvm dart pub global run packo runner -r
-
-get:
+pubget:
     fvm dart pub global run packo pubget -r
 
 prepare:
@@ -18,10 +15,10 @@ prepare:
     open coverage/html/index.html
 
 compile:
-    cd example && rm pubspec.lock
-    cd example && fvm dart pub get
-    cd example && fvm dart compile exe bin/main.dart -o bin/examples
-    cd example && chmod +x bin/examples
+    rm pubspec.lock
+    fvm dart pub get
+    fvm dart compile exe bin/rpc_dart_router.dart -o bin/rpc_dart_router
+    chmod +x bin/rpc_dart_router
 
 dry:
     fvm dart pub publish --dry-run

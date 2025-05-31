@@ -7,3 +7,4 @@
 pubspec.lock
 **/coverage/html/
 **/coverage/test/
+bin/rpc_dart_router

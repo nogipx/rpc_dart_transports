@@ -53,7 +53,8 @@ class _ChatScreenState extends State<ChatScreen> {
       });
 
       // Подключаемся к роутеру через WebSocket
-      final channel = WebSocketChannel.connect(Uri.parse('ws://192.168.1.121:8000'));
+      final channel = WebSocketChannel.connect(Uri.parse('wss://45.89.55.213:11111'));
+      // final channel = WebSocketChannel.connect(Uri.parse('ws://192.168.1.121:8002'));
       final transport = RpcWebSocketCallerTransport(channel);
       final endpoint = RpcCallerEndpoint(transport: transport);
 
@@ -111,7 +112,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _handleDirectMessage(message);
         break;
       default:
-        print('Получено P2P сообщение: ${message.type} от ${message.senderId}');
+        debugPrint('Получено P2P сообщение: ${message.type} от ${message.senderId}');
     }
   }
 
@@ -124,7 +125,7 @@ class _ChatScreenState extends State<ChatScreen> {
           _messages.add(chatMessage);
         });
       } catch (e) {
-        print('Ошибка парсинга сообщения чата: $e');
+        debugPrint('Ошибка парсинга сообщения чата: $e');
       }
     }
   }
@@ -149,7 +150,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _addSystemMessage('👋 Клиент $clientId покинул чат');
         break;
       default:
-        print('Событие роутера: ${event.type}');
+        debugPrint('Событие роутера: ${event.type}');
     }
   }
 
