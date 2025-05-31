@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-import 'package:rpc_dart_transports/rpc_dart_transports.dart';
 
 import '../services/chat_service.dart';
 import '../models/chat_models.dart';
@@ -139,28 +138,30 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
     // Иначе показываем состояние подключения
     switch (chatService.connectionState) {
-      case ReconnectState.connected:
+      case ChatConnectionState.connected:
         return 'Комната: ${chatService.currentRoom}';
-      case ReconnectState.reconnecting:
+      case ChatConnectionState.reconnecting:
         return 'Переподключение к серверу...';
-      case ReconnectState.waiting:
-        return 'Ожидание подключения...';
-      case ReconnectState.disconnected:
-      case ReconnectState.stopped:
+      case ChatConnectionState.disconnected:
         return 'Нет подключения';
+      case ChatConnectionState.connecting:
+        return 'Подключение к серверу...';
+      case ChatConnectionState.error:
+        return 'Ошибка подключения';
     }
   }
 
   /// Получает цвет для подзаголовка AppBar
   Color _getSubtitleColor(BuildContext context, ChatService chatService) {
     switch (chatService.connectionState) {
-      case ReconnectState.connected:
+      case ChatConnectionState.connected:
         return Theme.of(context).textTheme.bodySmall?.color ?? Colors.grey;
-      case ReconnectState.reconnecting:
-      case ReconnectState.waiting:
-        return Colors.orange;
-      case ReconnectState.disconnected:
-      case ReconnectState.stopped:
+      case ChatConnectionState.reconnecting:
+      case ChatConnectionState.disconnected:
+        return Colors.red;
+      case ChatConnectionState.connecting:
+        return Colors.blue;
+      case ChatConnectionState.error:
         return Colors.red;
     }
   }
@@ -251,17 +252,20 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     IconData statusIcon;
 
     switch (chatService.connectionState) {
-      case ReconnectState.connected:
+      case ChatConnectionState.connected:
         statusColor = Colors.green;
         statusIcon = Icons.wifi;
         break;
-      case ReconnectState.reconnecting:
-      case ReconnectState.waiting:
+      case ChatConnectionState.reconnecting:
+      case ChatConnectionState.disconnected:
         statusColor = Colors.orange;
         statusIcon = Icons.wifi_off;
         break;
-      case ReconnectState.disconnected:
-      case ReconnectState.stopped:
+      case ChatConnectionState.connecting:
+        statusColor = Colors.blue;
+        statusIcon = Icons.wifi;
+        break;
+      case ChatConnectionState.error:
         statusColor = Colors.red;
         statusIcon = Icons.wifi_off;
         break;
@@ -795,17 +799,20 @@ class _ConnectionDetailsBottomSheet extends StatelessWidget {
     IconData statusIcon;
 
     switch (chatService.connectionState) {
-      case ReconnectState.connected:
+      case ChatConnectionState.connected:
         statusColor = Colors.green;
         statusIcon = Icons.wifi;
         break;
-      case ReconnectState.reconnecting:
-      case ReconnectState.waiting:
-        statusColor = Colors.orange;
+      case ChatConnectionState.reconnecting:
+      case ChatConnectionState.disconnected:
+        statusColor = Colors.red;
         statusIcon = Icons.wifi_off;
         break;
-      case ReconnectState.disconnected:
-      case ReconnectState.stopped:
+      case ChatConnectionState.connecting:
+        statusColor = Colors.blue;
+        statusIcon = Icons.wifi;
+        break;
+      case ChatConnectionState.error:
         statusColor = Colors.red;
         statusIcon = Icons.wifi_off;
         break;
@@ -878,7 +885,7 @@ class _ConnectionDetailsBottomSheet extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              if (chatService.connectionState != ReconnectState.connected)
+              if (chatService.connectionState != ChatConnectionState.connected)
                 FilledButton.icon(
                   onPressed: () async {
                     Navigator.pop(context);
@@ -887,7 +894,7 @@ class _ConnectionDetailsBottomSheet extends StatelessWidget {
                   icon: const Icon(Icons.refresh),
                   label: const Text('Переподключиться'),
                 ),
-              if (chatService.connectionState != ReconnectState.connected)
+              if (chatService.connectionState != ChatConnectionState.connected)
                 const SizedBox(width: 12),
               TextButton(onPressed: () => Navigator.pop(context), child: const Text('Закрыть')),
             ],
@@ -918,18 +925,18 @@ class _ConnectionDetailsBottomSheet extends StatelessWidget {
   }
 
   /// Получает текстовое описание состояния подключения
-  String _getConnectionStateText(ReconnectState state) {
+  String _getConnectionStateText(ChatConnectionState state) {
     switch (state) {
-      case ReconnectState.connected:
+      case ChatConnectionState.connected:
         return 'Подключено';
-      case ReconnectState.reconnecting:
+      case ChatConnectionState.reconnecting:
         return 'Переподключение...';
-      case ReconnectState.waiting:
-        return 'Ожидание...';
-      case ReconnectState.disconnected:
+      case ChatConnectionState.connecting:
+        return 'Подключение...';
+      case ChatConnectionState.disconnected:
         return 'Отключено';
-      case ReconnectState.stopped:
-        return 'Остановлено';
+      case ChatConnectionState.error:
+        return 'Ошибка';
     }
   }
 }

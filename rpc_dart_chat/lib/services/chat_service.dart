@@ -6,13 +6,15 @@ import 'package:rpc_dart_transports/rpc_dart_transports.dart';
 
 import '../models/chat_models.dart';
 
-/// Сервис для управления чатом
+/// Сервис для управления чатом с поддержкой различных транспортов
 class ChatService extends ChangeNotifier {
   static const String _defaultRoom = 'general';
 
-  RouterClientWithReconnect? _routerClient;
+  RpcRouterClient? _routerClient;
+  RpcCallerEndpoint? _endpoint;
   String? _clientId;
   String? _currentUsername;
+  String? _serverUrl;
 
   // Состояние чата
   final Map<String, List<ChatMessage>> _messagesByRoom = {_defaultRoom: []};
@@ -26,10 +28,19 @@ class ChatService extends ChangeNotifier {
   final Set<String> _currentlyTyping = {};
 
   // Состояние подключения
-  ReconnectState _connectionState = ReconnectState.disconnected;
+  ChatConnectionState _connectionState = ChatConnectionState.disconnected;
+  String? _connectionError;
+
+  // Таймер для переподключения
+  Timer? _reconnectTimer;
+  int _reconnectAttempts = 0;
+  static const int _maxReconnectAttempts = 5;
 
   // Таймер для периодического обновления
   Timer? _updateTimer;
+
+  // Выбранный транспорт
+  TransportType _transportType = TransportType.http2;
 
   // Геттеры для состояния
   List<ChatMessage> get currentMessages => _messagesByRoom[_currentRoom] ?? [];
@@ -40,73 +51,85 @@ class ChatService extends ChangeNotifier {
   String? get currentUsername => _currentUsername;
   String? get clientId => _clientId;
   bool get isConnected =>
-      _routerClient != null && _clientId != null && _connectionState == ReconnectState.connected;
+      _routerClient != null &&
+      _clientId != null &&
+      _connectionState == ChatConnectionState.connected;
   Set<String> get currentlyTyping => _currentlyTyping;
-  ReconnectState get connectionState => _connectionState;
+  ChatConnectionState get connectionState => _connectionState;
+  String? get connectionError => _connectionError;
+  TransportType get transportType => _transportType;
 
-  /// Подключается к роутеру
+  /// Подключается к роутеру с выбранным транспортом
   Future<void> connect({
     required String serverUrl,
     required String username,
+    TransportType transportType = TransportType.http2,
     RpcLogger? logger,
   }) async {
     try {
       _currentUsername = username;
+      _serverUrl = serverUrl;
+      _transportType = transportType;
+      _connectionError = null;
 
       // Устанавливаем состояние подключения
-      _connectionState = ReconnectState.reconnecting;
+      _connectionState = ChatConnectionState.connecting;
       notifyListeners();
 
-      // Создаем клиент с переподключением
-      _routerClient = RouterClientWithReconnect(
-        serverUri: Uri.parse(serverUrl),
-        reconnectConfig: ReconnectConfig(
-          strategy: ReconnectStrategy.exponentialBackoff,
-          enableJitter: true,
-        ),
-        logger: logger,
+      // Создаем транспорт в зависимости от типа
+      IRpcTransport transport;
+      switch (transportType) {
+        case TransportType.websocket:
+          transport = RpcWebSocketCallerTransport.connect(Uri.parse(serverUrl));
+          break;
+        case TransportType.http2:
+          final uri = Uri.parse(serverUrl);
+          transport = await RpcHttp2CallerTransport.connect(host: uri.host, port: uri.port);
+          break;
+        case TransportType.inMemory:
+          throw UnsupportedError(
+            'In-Memory транспорт не поддерживается для клиентского подключения',
+          );
+      }
+
+      // Создаем endpoint с выбранным транспортом
+      _endpoint = RpcCallerEndpoint(
+        transport: transport,
+        debugLabel: 'ChatClient_${transportType.name}',
       );
 
-      // Подключаемся
-      await _routerClient!.connect();
+      // Создаем роутер клиент (теперь транспорт-агностичный!)
+      _routerClient = RpcRouterClient(
+        callerEndpoint: _endpoint!,
+        logger: logger?.child('ChatClient'),
+      );
 
-      // Регистрируемся
+      // Регистрируемся в роутере
       _clientId = await _routerClient!.register(
         clientName: username,
         groups: [_currentRoom],
         metadata: {
           'platform': 'flutter',
-          'version': '1.0.0',
+          'transport': transportType.name,
+          'version': '2.0.0',
           'joinedAt': DateTime.now().millisecondsSinceEpoch,
         },
       );
 
-      // Инициализируем P2P
+      // Инициализируем P2P соединение
       await _routerClient!.initializeP2P(
         onP2PMessage: _handleP2PMessage,
         filterRouterHeartbeats: true,
+        enableAutoHeartbeat: true,
       );
 
-      // Подписываемся на события
+      // Подписываемся на события роутера
       await _routerClient!.subscribeToEvents();
       _routerClient!.events.listen(_handleRouterEvent);
 
-      // Слушаем состояние подключения
-      _routerClient!.connectionState.listen((state) {
-        _connectionState = state;
-
-        // Запускаем периодическое обновление при подключении
-        if (state == ReconnectState.connected) {
-          _startPeriodicUpdates();
-        } else {
-          _stopPeriodicUpdates();
-        }
-
-        notifyListeners();
-      });
-
-      // Устанавливаем начальное состояние как подключенное
-      _connectionState = ReconnectState.connected;
+      // Устанавливаем состояние как подключенное
+      _connectionState = ChatConnectionState.connected;
+      _reconnectAttempts = 0;
 
       // Добавляем дефолтную комнату
       _availableRooms.add(
@@ -120,23 +143,100 @@ class ChatService extends ChangeNotifier {
 
       // Отправляем приветственное сообщение
       _addMessage(
-        ChatMessage.system(message: '✅ Добро пожаловать в чат, $username!', room: _currentRoom),
+        ChatMessage.system(
+          message:
+              '✅ Добро пожаловать в чат, $username! Транспорт: ${transportType.name.toUpperCase()}',
+          room: _currentRoom,
+        ),
       );
+
+      // Запускаем периодическое обновление
+      _startPeriodicUpdates();
 
       // Обновляем список пользователей
       await _updateOnlineUsers();
 
       notifyListeners();
     } catch (e) {
-      // При ошибке подключения устанавливаем состояние disconnected
-      _connectionState = ReconnectState.disconnected;
+      _connectionState = ChatConnectionState.disconnected;
+      _connectionError = e.toString();
       notifyListeners();
+
+      // Пробуем переподключиться автоматически
+      _scheduleReconnect();
+
       throw Exception('Ошибка подключения: $e');
     }
   }
 
+  /// Автоматическое переподключение
+  void _scheduleReconnect() {
+    if (_reconnectAttempts >= _maxReconnectAttempts) {
+      _connectionError = 'Превышено максимальное количество попыток переподключения';
+      notifyListeners();
+      return;
+    }
+
+    _reconnectAttempts++;
+    final delay = Duration(seconds: min(30, 2 * _reconnectAttempts)); // Exponential backoff
+
+    _connectionState = ChatConnectionState.reconnecting;
+    notifyListeners();
+
+    _reconnectTimer = Timer(delay, () async {
+      if (_currentUsername != null && _serverUrl != null) {
+        try {
+          await connect(
+            serverUrl: _serverUrl!,
+            username: _currentUsername!,
+            transportType: _transportType,
+          );
+        } catch (e) {
+          // Ошибка переподключения, пробуем снова
+          _scheduleReconnect();
+        }
+      }
+    });
+  }
+
+  /// Принудительное переподключение
+  Future<void> reconnect() async {
+    _reconnectTimer?.cancel();
+    _reconnectAttempts = 0;
+
+    if (_currentUsername != null && _serverUrl != null) {
+      await disconnect();
+      await connect(
+        serverUrl: _serverUrl!,
+        username: _currentUsername!,
+        transportType: _transportType,
+      );
+    }
+  }
+
+  /// Смена транспорта на лету
+  Future<void> switchTransport(TransportType newTransport) async {
+    if (!isConnected || newTransport == _transportType) return;
+
+    final username = _currentUsername!;
+    final serverUrl = _serverUrl!;
+
+    await disconnect();
+    await connect(serverUrl: serverUrl, username: username, transportType: newTransport);
+
+    _addMessage(
+      ChatMessage.system(
+        message: '🔄 Переключено на транспорт: ${newTransport.name.toUpperCase()}',
+        room: _currentRoom,
+      ),
+    );
+  }
+
   /// Отключается от чата
   Future<void> disconnect() async {
+    // Останавливаем переподключение
+    _reconnectTimer?.cancel();
+
     // Останавливаем периодические обновления
     _stopPeriodicUpdates();
 
@@ -147,9 +247,12 @@ class ChatService extends ChangeNotifier {
     _typingTimers.clear();
     _currentlyTyping.clear();
 
-    // Закрываем соединение
+    // Закрываем соединения
     await _routerClient?.dispose();
+    await _endpoint?.close();
+
     _routerClient = null;
+    _endpoint = null;
     _clientId = null;
 
     // Очищаем состояние
@@ -158,7 +261,8 @@ class ChatService extends ChangeNotifier {
     _onlineUsers.clear();
     _availableRooms.clear();
     _currentRoom = _defaultRoom;
-    _connectionState = ReconnectState.disconnected;
+    _connectionState = ChatConnectionState.disconnected;
+    _connectionError = null;
 
     notifyListeners();
   }
@@ -298,13 +402,6 @@ class ChatService extends ChangeNotifier {
     });
   }
 
-  /// Принудительно переподключается
-  Future<void> reconnect() async {
-    if (_routerClient != null) {
-      await _routerClient!.reconnect();
-    }
-  }
-
   /// Обрабатывает P2P сообщения
   void _handleP2PMessage(RouterMessage message) {
     final payload = message.payload;
@@ -400,9 +497,8 @@ class ChatService extends ChangeNotifier {
 
     if (action == 'start') {
       _currentlyTyping.add(username);
-
-      // Автоматически убираем через 5 секунд
-      Timer(Duration(seconds: 5), () {
+      // Автоматически убираем через 5 секунд если нет stop
+      Timer(const Duration(seconds: 5), () {
         _currentlyTyping.remove(username);
         notifyListeners();
       });
@@ -413,37 +509,38 @@ class ChatService extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Обрабатывает реакции
+  /// Обрабатывает реакции на сообщения
   void _handleReaction(Map<String, dynamic> data) {
     final messageId = data['messageId'] as String?;
     final emoji = data['emoji'] as String?;
     final action = data['action'] as String?;
+    final username = data['username'] as String?;
 
-    if (messageId == null || emoji == null || action == null) return;
+    if (messageId == null || emoji == null || username == null) return;
 
-    final messages = _messagesByRoom[_currentRoom] ?? [];
-    for (int i = 0; i < messages.length; i++) {
-      if (messages[i].id == messageId) {
+    // Находим сообщение и добавляем/убираем реакцию
+    for (final messages in _messagesByRoom.values) {
+      final messageIndex = messages.indexWhere((msg) => msg.id == messageId);
+      if (messageIndex != -1) {
+        final message = messages[messageIndex];
+        final reactions = Map<String, int>.from(message.reactions);
+
         if (action == 'add') {
-          messages[i] = messages[i].addReaction(emoji);
+          reactions[emoji] = (reactions[emoji] ?? 0) + 1;
         } else if (action == 'remove') {
-          messages[i] = messages[i].removeReaction(emoji);
+          final count = (reactions[emoji] ?? 0) - 1;
+          if (count <= 0) {
+            reactions.remove(emoji);
+          } else {
+            reactions[emoji] = count;
+          }
         }
+
+        messages[messageIndex] = message.copyWith(reactions: reactions);
         notifyListeners();
         break;
       }
     }
-  }
-
-  /// Добавляет сообщение в текущую комнату
-  void _addMessage(ChatMessage message) {
-    final roomMessages = _messagesByRoom[message.room] ?? [];
-    roomMessages.add(message);
-    _messagesByRoom[message.room] = roomMessages;
-
-    // Сообщение добавлено
-
-    notifyListeners();
   }
 
   /// Обновляет список онлайн пользователей
@@ -452,33 +549,24 @@ class ChatService extends ChangeNotifier {
 
     try {
       final clients = await _routerClient!.getOnlineClients();
-      final previousCount = _onlineUsers.length;
-
       _onlineUsers.clear();
 
       for (final client in clients) {
         _onlineUsers.add(
           UserProfile(
             userId: client.clientId,
-            username: client.clientName ?? 'Пользователь',
+            username: client.clientName ?? 'Неизвестный',
+            status: UserStatus.online,
             lastSeen: client.lastActivity,
-            rooms: Set.from(client.groups),
             metadata: client.metadata,
           ),
         );
       }
 
-      // Если количество пользователей изменилось, показываем уведомление
-      if (_onlineUsers.length != previousCount) {
-        debugPrint('👥 Список участников обновлен: ${_onlineUsers.length} пользователей онлайн');
-      }
-
       notifyListeners();
     } catch (e) {
-      debugPrint('Ошибка обновления списка пользователей: $e');
-
       // При ошибке попробуем переподключиться через некоторое время
-      if (_connectionState == ReconnectState.connected) {
+      if (_connectionState == ChatConnectionState.connected) {
         Timer(const Duration(seconds: 5), () {
           if (isConnected) {
             _updateOnlineUsers();
@@ -488,11 +576,23 @@ class ChatService extends ChangeNotifier {
     }
   }
 
-  /// Генерирует ID комнаты
+  /// Добавляет сообщение в локальную историю
+  void _addMessage(ChatMessage message) {
+    final roomMessages = _messagesByRoom[message.room] ?? [];
+    roomMessages.add(message);
+    _messagesByRoom[message.room] = roomMessages;
+
+    // Ограничиваем количество сообщений в комнате (например, последние 1000)
+    if (roomMessages.length > 1000) {
+      _messagesByRoom[message.room] = roomMessages.sublist(roomMessages.length - 1000);
+    }
+
+    notifyListeners();
+  }
+
+  /// Генерирует ID комнаты на основе имени
   String _generateRoomId(String name) {
-    final clean = name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
-    final random = Random().nextInt(1000);
-    return '${clean}_$random';
+    return name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
   }
 
   @override

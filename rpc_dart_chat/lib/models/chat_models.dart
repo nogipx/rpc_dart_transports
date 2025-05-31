@@ -12,6 +12,12 @@ enum MessageType { text, system, private, reaction, typing, userJoined, userLeft
 /// Статус пользователя
 enum UserStatus { online, idle, busy, offline }
 
+/// Типы транспортов для подключения к роутеру
+enum TransportType { websocket, http2, inMemory }
+
+/// Состояние подключения клиента
+enum ChatConnectionState { disconnected, connecting, connected, reconnecting, error }
+
 /// Сообщение чата
 class ChatMessage implements IRpcSerializable {
   final String id;

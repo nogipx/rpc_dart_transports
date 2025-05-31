@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:rpc_dart_transports/rpc_dart_transports.dart';
 
 import '../services/chat_service.dart';
+import '../models/chat_models.dart';
 
 /// Экран приветствия и подключения к серверу
 class WelcomeScreen extends StatefulWidget {
@@ -20,6 +21,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
 
   bool _isConnecting = false;
   String? _connectionError;
+  TransportType _selectedTransport = TransportType.http2;
 
   late AnimationController _logoAnimationController;
   late Animation<double> _logoScale;
@@ -72,12 +74,19 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
   Future<void> _loadSavedData() async {
     final prefs = await SharedPreferences.getInstance();
     final savedUsername = prefs.getString('username');
-    final savedServerUrl = prefs.getString('serverUrl') ?? 'ws://45.89.55.213:80';
+    final savedServerUrl = prefs.getString('serverUrl') ?? 'http://localhost:11112';
+    final savedTransport = prefs.getString('transport') ?? TransportType.http2.name;
 
     if (savedUsername != null) {
       _usernameController.text = savedUsername;
     }
     _serverUrlController.text = savedServerUrl;
+
+    // Восстанавливаем выбранный транспорт
+    _selectedTransport = TransportType.values.firstWhere(
+      (t) => t.name == savedTransport,
+      orElse: () => TransportType.http2,
+    );
   }
 
   /// Генерирует случайное имя пользователя
@@ -93,6 +102,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('username', _usernameController.text);
     await prefs.setString('serverUrl', _serverUrlController.text);
+    await prefs.setString('transport', _selectedTransport.name);
   }
 
   /// Подключается к серверу
@@ -111,10 +121,11 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
       // Сохраняем данные
       await _saveUserData();
 
-      // Подключаемся
+      // Подключаемся с выбранным транспортом
       await chatService.connect(
         serverUrl: _serverUrlController.text.trim(),
         username: _usernameController.text.trim(),
+        transportType: _selectedTransport,
         logger: RpcLogger('ChatApp'),
       );
     } catch (e) {
@@ -131,6 +142,110 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
         });
       }
     }
+  }
+
+  /// Обновляет URL для выбранного транспорта
+  void _updateUrlForTransport(TransportType transport) {
+    final currentUrl = _serverUrlController.text;
+
+    // Получаем базовый хост и порт
+    String host = 'localhost';
+    int port = 11112; // HTTP/2 порт по умолчанию
+
+    if (currentUrl.isNotEmpty) {
+      final uri = Uri.tryParse(currentUrl);
+      if (uri != null) {
+        host = uri.host;
+        // Извлекаем порт с учетом того, что он может быть указан в path или port
+        port =
+            uri.port != 0
+                ? uri.port
+                : (uri.pathSegments.isNotEmpty
+                    ? int.tryParse(uri.pathSegments.first) ?? 11112
+                    : 11112);
+      }
+    }
+
+    String newUrl;
+    switch (transport) {
+      case TransportType.websocket:
+        // WebSocket обычно на порту -1
+        newUrl = 'ws://$host:${port == 11112 ? 11111 : port}';
+        break;
+      case TransportType.http2:
+        newUrl = 'http://$host:$port';
+        break;
+      case TransportType.inMemory:
+        newUrl = 'memory://local';
+        break;
+    }
+
+    _serverUrlController.text = newUrl;
+  }
+
+  /// Виджет выбора транспорта
+  Widget _buildTransportSelector() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Тип транспорта', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 8),
+            Column(
+              children:
+                  TransportType.values.map((transport) {
+                    String title;
+                    String subtitle;
+                    IconData icon;
+                    bool enabled = true;
+
+                    switch (transport) {
+                      case TransportType.websocket:
+                        title = 'WebSocket';
+                        subtitle = 'Традиционный, надежный';
+                        icon = Icons.wifi;
+                        break;
+                      case TransportType.http2:
+                        title = 'HTTP/2';
+                        subtitle = 'Высокая производительность';
+                        icon = Icons.speed;
+                        break;
+                      case TransportType.inMemory:
+                        title = 'In-Memory';
+                        subtitle = 'Только для тестирования';
+                        icon = Icons.memory;
+                        enabled = false; // Пока не поддерживается
+                        break;
+                    }
+
+                    return RadioListTile<TransportType>(
+                      value: transport,
+                      groupValue: _selectedTransport,
+                      onChanged:
+                          enabled
+                              ? (value) {
+                                if (value != null) {
+                                  setState(() {
+                                    _selectedTransport = value;
+                                    _updateUrlForTransport(value);
+                                  });
+                                }
+                              }
+                              : null,
+                      title: Row(
+                        children: [Icon(icon, size: 20), const SizedBox(width: 8), Text(title)],
+                      ),
+                      subtitle: Text(subtitle),
+                      dense: true,
+                    );
+                  }).toList(),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -156,129 +271,110 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
               padding: const EdgeInsets.all(24.0),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 400),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // Анимированный логотип
-                    AnimatedBuilder(
-                      animation: _logoAnimationController,
-                      builder: (context, child) {
-                        return Transform.scale(
-                          scale: _logoScale.value,
-                          child: Transform.rotate(
-                            angle: _logoRotation.value,
-                            child: Container(
-                              width: 120,
-                              height: 120,
-                              decoration: BoxDecoration(
-                                color: colorScheme.primary,
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: colorScheme.primary.withValues(alpha: 0.3),
-                                    blurRadius: 20,
-                                    offset: const Offset(0, 10),
-                                  ),
-                                ],
-                              ),
-                              child: Icon(
-                                Icons.chat_bubble_outline,
-                                size: 60,
-                                color: colorScheme.onPrimary,
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Анимированный логотип
+                      AnimatedBuilder(
+                        animation: _logoAnimationController,
+                        builder: (context, child) {
+                          return Transform.scale(
+                            scale: _logoScale.value,
+                            child: Transform.rotate(
+                              angle: _logoRotation.value,
+                              child: Container(
+                                width: 120,
+                                height: 120,
+                                decoration: BoxDecoration(
+                                  color: colorScheme.primary,
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: colorScheme.primary.withValues(alpha: 0.3),
+                                      blurRadius: 20,
+                                      offset: const Offset(0, 10),
+                                    ),
+                                  ],
+                                ),
+                                child: Icon(
+                                  Icons.chat_bubble_outline,
+                                  size: 60,
+                                  color: colorScheme.onPrimary,
+                                ),
                               ),
                             ),
-                          ),
-                        );
-                      },
-                    ),
-
-                    const SizedBox(height: 32),
-
-                    // Заголовок
-                    Text(
-                      'RPC Dart Chat',
-                      style: theme.textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.onSurface,
+                          );
+                        },
                       ),
-                    ),
 
-                    const SizedBox(height: 8),
+                      const SizedBox(height: 32),
 
-                    Text(
-                      'Современный чат на Flutter и RPC',
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: colorScheme.onSurface.withValues(alpha: 0.7),
+                      // Заголовок
+                      Text(
+                        'RPC Dart Chat 2.0',
+                        style: theme.textTheme.headlineMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.onSurface,
+                        ),
                       ),
-                      textAlign: TextAlign.center,
-                    ),
 
-                    const SizedBox(height: 48),
+                      const SizedBox(height: 8),
 
-                    // Форма подключения
-                    Card(
-                      elevation: 8,
-                      child: Padding(
-                        padding: const EdgeInsets.all(24.0),
-                        child: Form(
-                          key: _formKey,
+                      Text(
+                        'Транспорт-агностичный чат',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onSurface.withValues(alpha: 0.7),
+                        ),
+                      ),
+
+                      const SizedBox(height: 40),
+
+                      // Форма подключения
+                      Card(
+                        elevation: 4,
+                        child: Padding(
+                          padding: const EdgeInsets.all(24.0),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              Text(
-                                'Подключение к серверу',
-                                style: theme.textTheme.titleLarge?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-
-                              const SizedBox(height: 24),
-
                               // Поле имени пользователя
                               TextFormField(
                                 controller: _usernameController,
-                                decoration: InputDecoration(
-                                  labelText: 'Ваше имя',
-                                  hintText: 'Введите ваше имя',
-                                  prefixIcon: const Icon(Icons.person),
-                                  suffixIcon: IconButton(
-                                    icon: const Icon(Icons.shuffle),
-                                    onPressed: () {
-                                      final random = DateTime.now().millisecondsSinceEpoch % 1000;
-                                      _usernameController.text = 'Пользователь_$random';
-                                    },
-                                    tooltip: 'Случайное имя',
-                                  ),
+                                decoration: const InputDecoration(
+                                  labelText: 'Имя пользователя',
+                                  prefixIcon: Icon(Icons.person),
                                 ),
                                 validator: (value) {
                                   if (value == null || value.trim().isEmpty) {
-                                    return 'Введите ваше имя';
+                                    return 'Введите имя пользователя';
                                   }
                                   if (value.trim().length < 2) {
-                                    return 'Имя должно содержать минимум 2 символа';
+                                    return 'Слишком короткое имя';
                                   }
                                   return null;
                                 },
                                 textInputAction: TextInputAction.next,
                               ),
 
-                              const SizedBox(height: 16),
+                              const SizedBox(height: 20),
 
                               // Поле URL сервера
                               TextFormField(
                                 controller: _serverUrlController,
                                 decoration: const InputDecoration(
-                                  labelText: 'Адрес сервера',
-                                  hintText: 'ws://localhost:11111',
+                                  labelText: 'URL сервера',
                                   prefixIcon: Icon(Icons.dns),
+                                  helperText: 'ws://host:port или http://host:port',
                                 ),
                                 validator: (value) {
                                   if (value == null || value.trim().isEmpty) {
-                                    return 'Введите адрес сервера';
+                                    return 'Введите URL сервера';
                                   }
-                                  if (!value.startsWith('ws://') && !value.startsWith('wss://')) {
-                                    return 'URL должен начинаться с ws:// или wss://';
+                                  final uri = Uri.tryParse(value.trim());
+                                  if (uri == null) {
+                                    return 'Некорректный URL';
                                   }
                                   return null;
                                 },
@@ -287,37 +383,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                               ),
 
                               const SizedBox(height: 24),
-
-                              // Ошибка подключения
-                              if (_connectionError != null)
-                                Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: colorScheme.errorContainer,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.error_outline,
-                                        color: colorScheme.onErrorContainer,
-                                        size: 20,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          _connectionError!,
-                                          style: TextStyle(
-                                            color: colorScheme.onErrorContainer,
-                                            fontSize: 13,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-
-                              if (_connectionError != null) const SizedBox(height: 16),
 
                               // Кнопка подключения
                               FilledButton.icon(
@@ -338,14 +403,73 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                                   padding: const EdgeInsets.symmetric(vertical: 16),
                                 ),
                               ),
+
+                              // Ошибка подключения
+                              if (_connectionError != null) ...[
+                                const SizedBox(height: 16),
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.errorContainer,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.error_outline,
+                                        color: colorScheme.onErrorContainer,
+                                        size: 20,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          _connectionError!,
+                                          style: TextStyle(
+                                            color: colorScheme.onErrorContainer,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ),
                       ),
-                    ),
 
-                    const SizedBox(height: 32),
-                  ],
+                      const SizedBox(height: 24),
+
+                      // Селектор транспорта
+                      _buildTransportSelector(),
+
+                      const SizedBox(height: 24),
+
+                      // Информация
+                      Card(
+                        color: colorScheme.surfaceContainerHighest,
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            children: [
+                              Icon(Icons.info_outline, color: colorScheme.primary, size: 24),
+                              const SizedBox(height: 8),
+                              Text('Примеры серверов:', style: theme.textTheme.titleSmall),
+                              const SizedBox(height: 8),
+                              Text(
+                                '• HTTP/2: http://localhost:11112\n'
+                                '• WebSocket: ws://localhost:11111\n'
+                                '• Удаленный: http://example.com:443',
+                                style: theme.textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
+                                textAlign: TextAlign.left,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
