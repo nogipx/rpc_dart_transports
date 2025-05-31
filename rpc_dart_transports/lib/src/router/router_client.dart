@@ -37,13 +37,24 @@ class RouterClient {
   StreamSubscription<RouterEvent>? _eventsSubscription;
   final StreamController<RouterEvent> _eventsController = StreamController.broadcast();
 
+  /// Таймер для автоматического heartbeat
+  Timer? _heartbeatTimer;
+
+  /// Интервал автоматического heartbeat (по умолчанию 20 секунд)
+  final Duration _heartbeatInterval;
+
+  /// Включен ли автоматический heartbeat
+  bool _autoHeartbeatEnabled = false;
+
   final RpcLogger? _logger;
 
   RouterClient({
     required RpcCallerEndpoint callerEndpoint,
     RpcLogger? logger,
+    Duration heartbeatInterval = const Duration(seconds: 20),
   })  : _callerEndpoint = callerEndpoint,
-        _logger = logger?.child('RouterClient');
+        _logger = logger?.child('RouterClient'),
+        _heartbeatInterval = heartbeatInterval;
 
   /// Получает ID клиента (если зарегистрирован)
   String? get clientId => _clientId;
@@ -177,10 +188,13 @@ class RouterClient {
   /// Инициализирует P2P соединение
   Future<void> initializeP2P({
     void Function(RouterMessage message)? onP2PMessage,
+    bool enableAutoHeartbeat = true,
   }) async {
     if (_clientId == null) {
       throw StateError('Клиент должен быть зарегистрирован перед инициализацией P2P');
     }
+
+    _logger?.info('Инициализация P2P соединения для клиента: $_clientId');
 
     // Создаем стрим контроллер для исходящих сообщений
     _p2pStreamController = StreamController<RouterMessage>();
@@ -195,26 +209,83 @@ class RouterClient {
     );
 
     // Слушаем ответы и пересылаем в колбэк
-    _p2pResponseStream!.listen((message) {
-      _logger?.debug('Получено P2P сообщение: ${message.type} от ${message.senderId}');
+    _p2pResponseStream!.listen(
+      (message) {
+        _logger?.debug('Получено P2P сообщение: ${message.type} от ${message.senderId}');
 
-      // Обрабатываем response сообщения внутри клиента
-      if (message.type == RouterMessageType.response) {
-        _handleResponse(message);
-      }
+        // Обрабатываем response сообщения внутри клиента
+        if (message.type == RouterMessageType.response) {
+          _handleResponse(message);
+        }
 
-      // Передаем все сообщения в пользовательский колбэк
-      onP2PMessage?.call(message);
-    });
+        // Обрабатываем подтверждение соединения от роутера
+        if (message.type == RouterMessageType.heartbeat &&
+            message.senderId == 'router' &&
+            message.payload?['connected'] == true) {
+          _logger?.info('P2P соединение подтверждено роутером');
+        }
+
+        // Передаем все сообщения в пользовательский колбэк
+        onP2PMessage?.call(message);
+      },
+      onError: (error) {
+        _logger?.error('Ошибка в P2P стриме: $error');
+        _stopAutoHeartbeat();
+      },
+      onDone: () {
+        _logger?.info('P2P стрим закрыт');
+        _stopAutoHeartbeat();
+      },
+    );
 
     // Отправляем первое сообщение для привязки к зарегистрированному клиенту
     final identityMessage = RouterMessage(
       type: RouterMessageType.heartbeat,
       senderId: _clientId,
+      timestamp: DateTime.now().millisecondsSinceEpoch,
     );
     _p2pStreamController!.add(identityMessage);
 
+    // Включаем автоматический heartbeat если запрошено
+    if (enableAutoHeartbeat) {
+      _startAutoHeartbeat();
+    }
+
     _logger?.info('P2P соединение инициализировано для клиента: $_clientId');
+  }
+
+  /// Запускает автоматический heartbeat
+  void _startAutoHeartbeat() {
+    if (_autoHeartbeatEnabled) {
+      return; // Уже запущен
+    }
+
+    _autoHeartbeatEnabled = true;
+    _logger?.info('Запуск автоматического heartbeat (интервал: ${_heartbeatInterval.inSeconds}s)');
+
+    _heartbeatTimer = Timer.periodic(_heartbeatInterval, (_) {
+      if (_p2pStreamController != null && !_p2pStreamController!.isClosed) {
+        try {
+          sendHeartbeat();
+        } catch (e) {
+          _logger?.error('Ошибка автоматического heartbeat: $e');
+        }
+      } else {
+        _stopAutoHeartbeat();
+      }
+    });
+  }
+
+  /// Останавливает автоматический heartbeat
+  void _stopAutoHeartbeat() {
+    if (!_autoHeartbeatEnabled) {
+      return; // Уже остановлен
+    }
+
+    _autoHeartbeatEnabled = false;
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
+    _logger?.debug('Автоматический heartbeat остановлен');
   }
 
   /// Отправляет heartbeat через P2P поток
@@ -391,6 +462,9 @@ class RouterClient {
   /// Закрывает все соединения
   Future<void> dispose() async {
     _logger?.info('Закрытие RouterClient...');
+
+    // Останавливаем автоматический heartbeat
+    _stopAutoHeartbeat();
 
     // Отменяем все активные запросы
     for (final timer in _requestTimers.values) {

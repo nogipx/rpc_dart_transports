@@ -38,6 +38,15 @@ final class RouterResponderImpl implements IRouterContract {
   /// Время старта роутера
   final DateTime _startTime = DateTime.now();
 
+  /// Таймер для периодической проверки активности клиентов
+  Timer? _healthCheckTimer;
+
+  /// Интервал проверки активности клиентов (по умолчанию 30 секунд)
+  final Duration _healthCheckInterval;
+
+  /// Таймаут неактивности клиента (по умолчанию 2 минуты)
+  final Duration _clientInactivityTimeout;
+
   /// === ПРОСТАЯ СТАТИСТИКА ===
   /// Общий счетчик обработанных сообщений
   int _totalMessages = 0;
@@ -45,7 +54,13 @@ final class RouterResponderImpl implements IRouterContract {
   /// Счетчик ошибок роутера
   int _errorCount = 0;
 
-  RouterResponderImpl({RpcLogger? logger}) : _logger = logger?.child('RouterResponder') {
+  RouterResponderImpl({
+    RpcLogger? logger,
+    Duration healthCheckInterval = const Duration(seconds: 30),
+    Duration clientInactivityTimeout = const Duration(minutes: 2),
+  })  : _logger = logger?.child('RouterResponder'),
+        _healthCheckInterval = healthCheckInterval,
+        _clientInactivityTimeout = clientInactivityTimeout {
     // Инициализируем дистрибьютор событий
     _eventDistributor = StreamDistributor<RouterEvent>(
       config: StreamDistributorConfig(
@@ -57,7 +72,11 @@ final class RouterResponderImpl implements IRouterContract {
       logger: _logger?.child('EventDistributor'),
     );
 
-    _logger?.info('RouterResponder создан');
+    // Запускаем периодическую проверку здоровья клиентов
+    _startHealthCheckTimer();
+
+    _logger?.info(
+        'RouterResponder создан (healthCheck: ${_healthCheckInterval.inSeconds}s, timeout: ${_clientInactivityTimeout.inMinutes}m)');
   }
 
   // === IRouter implementation ===
@@ -75,10 +94,14 @@ final class RouterResponderImpl implements IRouterContract {
   Future<void> dispose() async {
     _logger?.info('Закрытие роутера...');
 
+    // Останавливаем мониторинг
+    _healthCheckTimer?.cancel();
+    _healthCheckTimer = null;
+
     // Закрываем все клиентские соединения
     final clientIds = _clientStreams.keys.toList();
     for (final clientId in clientIds) {
-      disconnectClient(clientId);
+      disconnectClient(clientId, reason: 'Router shutdown');
     }
 
     // Закрываем дистрибьютор событий
@@ -126,17 +149,19 @@ final class RouterResponderImpl implements IRouterContract {
   @override
   void disconnectClient(String clientId, {String? reason}) {
     final streamController = _clientStreams.remove(clientId);
-    _clientsInfo.remove(clientId);
+    final clientInfo = _clientsInfo.remove(clientId);
 
     if (streamController != null) {
       streamController.close();
       _logger?.info('Клиент отключен: $clientId${reason != null ? ' ($reason)' : ''}');
 
       // Уведомляем подписчиков об отключении клиента
-      emitEvent(RouterEvent.clientDisconnected(
-        clientId: clientId,
-        reason: reason,
-      ));
+      if (clientInfo != null) {
+        emitEvent(RouterEvent.clientDisconnected(
+          clientId: clientId,
+          reason: reason,
+        ));
+      }
     }
   }
 
@@ -299,6 +324,17 @@ final class RouterResponderImpl implements IRouterContract {
     Map<String, dynamic>? metadata,
   }) async {
     try {
+      // Проверяем, не зарегистрирован ли уже клиент
+      if (_clientsInfo.containsKey(clientId)) {
+        _logger?.warning('Клиент $clientId уже зарегистрирован, обновляем информацию');
+
+        // Закрываем старое соединение если есть
+        final oldStream = _clientStreams[clientId];
+        if (oldStream != null && !oldStream.isClosed) {
+          await oldStream.close();
+        }
+      }
+
       // Сохраняем стрим клиента
       _clientStreams[clientId] = streamController;
 
@@ -327,6 +363,7 @@ final class RouterResponderImpl implements IRouterContract {
       return true;
     } catch (e, stackTrace) {
       _logger?.error('Ошибка регистрации клиента: $e', error: e, stackTrace: stackTrace);
+      _errorCount++;
       return false;
     }
   }
@@ -370,6 +407,73 @@ final class RouterResponderImpl implements IRouterContract {
         _errorCount++;
         _logger?.warning('Ошибка от клиента $senderId: ${message.errorMessage}');
         break;
+    }
+  }
+
+  // === НОВЫЕ МЕТОДЫ ДЛЯ МОНИТОРИНГА ===
+
+  /// Запускает таймер для периодической проверки здоровья клиентов
+  void _startHealthCheckTimer() {
+    _healthCheckTimer?.cancel();
+
+    _logger?.info('Запуск мониторинга клиентов (интервал: ${_healthCheckInterval.inSeconds}s)');
+
+    _healthCheckTimer = Timer.periodic(_healthCheckInterval, (_) {
+      _performHealthCheck();
+    });
+  }
+
+  /// Выполняет проверку здоровья всех клиентов
+  void _performHealthCheck() {
+    if (_clientsInfo.isEmpty) {
+      return; // Нет клиентов для проверки
+    }
+
+    final now = DateTime.now();
+    final clientsToDisconnect = <String>[];
+    final clientsToMarkIdle = <String>[];
+
+    for (final entry in _clientsInfo.entries) {
+      final clientId = entry.key;
+      final clientInfo = entry.value;
+      final inactivityDuration = now.difference(clientInfo.lastActivity);
+
+      // Проверяем таймаут неактивности
+      if (inactivityDuration > _clientInactivityTimeout) {
+        _logger?.warning('Клиент $clientId неактивен ${inactivityDuration.inMinutes}м, отключаем');
+        clientsToDisconnect.add(clientId);
+      } else if (inactivityDuration > _healthCheckInterval * 2 &&
+          clientInfo.status != ClientStatus.idle) {
+        // Помечаем как неактивный если нет активности больше 2 интервалов
+        _logger?.debug('Клиент $clientId помечен как неактивный');
+        clientsToMarkIdle.add(clientId);
+      }
+    }
+
+    // Отключаем неактивных клиентов
+    for (final clientId in clientsToDisconnect) {
+      disconnectClient(clientId, reason: 'Inactivity timeout');
+    }
+
+    // Помечаем клиентов как неактивных
+    for (final clientId in clientsToMarkIdle) {
+      final clientInfo = _clientsInfo[clientId];
+      if (clientInfo != null) {
+        _clientsInfo[clientId] = clientInfo.copyWith(status: ClientStatus.idle);
+      }
+    }
+
+    if (clientsToDisconnect.isNotEmpty || clientsToMarkIdle.isNotEmpty) {
+      _logger?.info(
+          'Health check: отключено ${clientsToDisconnect.length}, неактивных ${clientsToMarkIdle.length}, всего ${_clientsInfo.length}');
+
+      // Отправляем событие об изменении топологии
+      emitEvent(RouterEvent.topologyChanged(
+        activeClients: _clientStreams.length,
+        clientIds: _clientStreams.keys.toList(),
+        capabilities:
+            Map.fromEntries(_clientsInfo.entries.map((e) => MapEntry(e.key, e.value.groups))),
+      ));
     }
   }
 
@@ -461,10 +565,15 @@ final class RouterResponderImpl implements IRouterContract {
 
     // Закрываем старый стрим если есть
     final oldStream = _clientStreams[clientId];
-    oldStream?.close();
+    if (oldStream != null && !oldStream.isClosed) {
+      oldStream.close();
+    }
 
     // Устанавливаем новый стрим
     _clientStreams[clientId] = newStreamController;
+
+    // Обновляем активность
+    updateClientActivity(clientId);
 
     _logger?.debug('Стрим заменен для клиента: $clientId');
     return true;
@@ -473,7 +582,7 @@ final class RouterResponderImpl implements IRouterContract {
   @override
   void removeClientStream(String clientId) {
     final streamController = _clientStreams.remove(clientId);
-    if (streamController != null) {
+    if (streamController != null && !streamController.isClosed) {
       streamController.close();
       _logger?.debug('Стрим удален для клиента: $clientId');
     }

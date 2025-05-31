@@ -6,3 +6,4 @@
 library;
 
 export 'src/_index.dart';
+export 'package:rpc_dart/rpc_dart.dart';

@@ -8,7 +8,6 @@ import 'dart:io';
 import 'package:test/test.dart';
 import 'package:web_socket_channel/io.dart';
 
-import 'package:rpc_dart/rpc_dart.dart';
 import 'package:rpc_dart_transports/rpc_dart_transports.dart';
 
 /// Интеграционные тесты роутера RPC

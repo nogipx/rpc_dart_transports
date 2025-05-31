@@ -1,7 +1,7 @@
 /// Модели данных для чата
 library;
 
-import 'package:rpc_dart/rpc_dart.dart';
+import 'package:rpc_dart_transports/rpc_dart_transports.dart';
 
 enum UserAction { joined, left }
 

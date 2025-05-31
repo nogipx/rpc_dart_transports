@@ -40,8 +40,6 @@ dependencies:
   cupertino_icons: ^1.0.8
 
   # RPC Dart dependencies
-  rpc_dart:
-    path: ../rpc_dart
   rpc_dart_transports:
     path: ../rpc_dart_transports
   
