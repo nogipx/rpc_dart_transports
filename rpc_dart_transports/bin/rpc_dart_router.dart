@@ -176,16 +176,15 @@ Future<void> _startRouter(RouterConfig config) async {
   final logger = RpcLogger('RouterCLI', label: 'CLI');
 
   await logger.info('Запускаем RPC Dart Router...');
-  await logger.debug('Конфигурация: ${config.host}:${config.port}, log: ${config.logLevel.name}');
 
   try {
     // Запускаем WebSocket сервер
     final server = await HttpServer.bind(config.host, config.port);
     await logger.info('Роутер запущен на ws://${config.host}:${config.port}');
 
-    // Создаем единый RouterContract для всех соединений
-    final routerContract = RouterResponderContract();
-    await logger.debug('RouterContract создан');
+    // Создаем общий RouterImpl для всех соединений
+    final sharedRouterImpl = RouterResponderImpl(
+        logger: config.logLevel == RpcLoggerLevel.debug ? logger.child('SharedRouter') : null);
 
     int connectionCount = 0;
 
@@ -193,8 +192,6 @@ Future<void> _startRouter(RouterConfig config) async {
       if (WebSocketTransformer.isUpgradeRequest(request)) {
         connectionCount++;
         final connectionId = connectionCount;
-
-        await logger.debug('Получен WebSocket запрос от ${request.connectionInfo?.remoteAddress}');
 
         final webSocket = await WebSocketTransformer.upgrade(request);
 
@@ -207,31 +204,45 @@ Future<void> _startRouter(RouterConfig config) async {
               : null,
         );
 
+        // Создаем RouterContract с общим RouterImpl
+        final routerContract = RouterResponderContract(
+          logger: config.logLevel == RpcLoggerLevel.debug
+              ? RpcLogger('RouterContract#$connectionId')
+              : null,
+          sharedRouterImpl: sharedRouterImpl,
+        );
+
+        // Регистрируем endpoint в глобальной шине
+        final endpointInfo = EndpointInfo(
+          endpointId: 'endpoint_$connectionId',
+          address: '${request.connectionInfo?.remoteAddress}',
+          connectedAt: DateTime.now(),
+        );
+        GlobalMessageBus().registerEndpoint('endpoint_$connectionId', endpointInfo);
+
         // Создаем RPC эндпоинт для каждого соединения
         final endpoint =
             RpcResponderEndpoint(transport: transport, debugLabel: 'RouterEndpoint#$connectionId');
 
-        // Регистрируем общий роутер контракт
+        // Регистрируем роутер контракт для этого соединения
         endpoint.registerServiceContract(routerContract);
 
         await logger
             .info('Новое подключение #$connectionId: ${request.connectionInfo?.remoteAddress}');
-        if (config.verbose) {
-          await logger.debug('Статистика роутера: ${routerContract.routerImpl.stats}');
-        }
 
-        // Мониторинг закрытия соединения через WebSocket события
+        // Мониторинг закрытия соединения
         webSocket.done.then((_) async {
           await logger.info('Клиент #$connectionId отключился');
+          GlobalMessageBus().unregisterEndpoint('endpoint_$connectionId');
           endpoint.close();
         }).catchError((error) async {
           await logger.warning('Ошибка при отключении клиента #$connectionId: $error');
+          GlobalMessageBus().unregisterEndpoint('endpoint_$connectionId');
           endpoint.close();
         });
 
         // Запускаем endpoint
         endpoint.start();
-        await logger.debug('Endpoint #$connectionId запущен');
       } else {
         await logger
             .warning('Получен не-WebSocket запрос от ${request.connectionInfo?.remoteAddress}');

@@ -34,3 +34,6 @@ export 'models/_index.dart';
 
 // Статистика
 export 'router_stats.dart';
+
+// Глобальная шина сообщений
+export 'global_message_bus.dart';

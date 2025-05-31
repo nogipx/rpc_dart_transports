@@ -22,9 +22,11 @@ final class RouterResponderContract extends RpcResponderContract {
   /// Логгер для отладки контракта
   final RpcLogger? _logger;
 
-  RouterResponderContract({RpcLogger? logger})
-      : _logger = logger?.child('RouterContract'),
-        _routerImpl = RouterResponderImpl(logger: logger),
+  RouterResponderContract({
+    RpcLogger? logger,
+    RouterResponderImpl? sharedRouterImpl,
+  })  : _logger = logger?.child('RouterContract'),
+        _routerImpl = sharedRouterImpl ?? RouterResponderImpl(logger: logger),
         super('router') {
     setup(); // Автоматически настраиваем контракт
   }
@@ -161,14 +163,25 @@ final class RouterResponderContract extends RpcResponderContract {
 
   /// Получает список онлайн клиентов
   Future<RouterClientsList> _handleGetOnlineClients(RouterGetOnlineClientsRequest request) async {
-    final clients = _routerImpl.getActiveClients(
-      groups: request.groups,
-      metadata: request.metadata,
-    );
+    _logger?.info('Запрос списка онлайн клиентов');
+    _logger?.debug('Фильтры: groups=${request.groups}, metadata=${request.metadata}');
 
-    _logger?.debug('Отправлен список клиентов (${clients.length})');
+    try {
+      final clients = _routerImpl.getActiveClients(
+        groups: request.groups,
+        metadata: request.metadata,
+      );
 
-    return RouterClientsList(clients);
+      _logger?.info('Найдено клиентов: ${clients.length}');
+      for (final client in clients) {
+        _logger?.debug('  - ${client.clientName} (${client.clientId}) в группах: ${client.groups}');
+      }
+
+      return RouterClientsList(clients);
+    } catch (e, stackTrace) {
+      _logger?.error('Ошибка получения списка клиентов: $e', error: e, stackTrace: stackTrace);
+      rethrow;
+    }
   }
 
   // === ОБРАБОТЧИК P2P ТРАНСПОРТА ===

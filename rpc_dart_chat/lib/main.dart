@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:rpc_dart_transports/rpc_dart_transports.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -52,7 +54,8 @@ class _ChatScreenState extends State<ChatScreen> {
       });
 
       // Подключаемся к роутеру через WebSocket
-      final channel = WebSocketChannel.connect(Uri.parse('ws://45.89.55.213:1286'));
+      const String serverUrl = 'ws://45.89.55.213:80';
+      final channel = WebSocketChannel.connect(Uri.parse(serverUrl));
       final transport = RpcWebSocketCallerTransport(channel);
       final endpoint = RpcCallerEndpoint(transport: transport);
 
@@ -67,7 +70,10 @@ class _ChatScreenState extends State<ChatScreen> {
       );
 
       // Инициализируем P2P соединение
-      await _routerClient!.initializeP2P(onP2PMessage: _handleP2PMessage);
+      await _routerClient!.initializeP2P(
+        onP2PMessage: _handleP2PMessage,
+        filterRouterHeartbeats: true,
+      );
 
       // Подписываемся на события роутера
       await _routerClient!.subscribeToEvents();
@@ -78,7 +84,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _connectionStatus = 'Подключен как ${_usernameController.text}';
       });
 
-      _addSystemMessage('✅ Подключен к чату! ID: $_clientId');
+      _addSystemMessage('✅ Подключен к чату!');
     } catch (e) {
       setState(() {
         _connectionStatus = 'Ошибка: $e';
@@ -99,6 +105,33 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+  Future<void> _checkOnlineClients() async {
+    if (_routerClient == null) {
+      _addSystemMessage('❌ Роутер клиент не инициализирован');
+      return;
+    }
+
+    _addSystemMessage('🔍 Проверяем список онлайн клиентов...');
+
+    try {
+      final onlineClients = await _routerClient!.getOnlineClients();
+
+      _addSystemMessage('✅ Найдено клиентов: ${onlineClients.length}');
+
+      if (onlineClients.isEmpty) {
+        _addSystemMessage('😴 Других клиентов нет');
+      } else {
+        for (final client in onlineClients) {
+          if (client.clientId != _clientId) {
+            _addSystemMessage('  🧑‍💻 ${client.clientName} (группы: ${client.groups.join(', ')})');
+          }
+        }
+      }
+    } catch (e) {
+      _addSystemMessage('❌ Ошибка: ${e.toString()}');
+    }
+  }
+
   void _handleP2PMessage(RouterMessage message) {
     // Обрабатываем разные типы сообщений
     switch (message.type) {
@@ -109,8 +142,11 @@ class _ChatScreenState extends State<ChatScreen> {
       case RouterMessageType.unicast:
         _handleDirectMessage(message);
         break;
+      case RouterMessageType.heartbeat:
+        // Игнорируем heartbeat сообщения
+        break;
       default:
-        debugPrint('Получено P2P сообщение: ${message.type} от ${message.senderId}');
+        debugPrint('Неизвестный тип сообщения: ${message.type}');
     }
   }
 
@@ -183,7 +219,7 @@ class _ChatScreenState extends State<ChatScreen> {
       );
 
       // Отправляем как multicast в группу 'general'
-      await _routerClient!.sendMulticast('general', {'chatMessage': chatMessage.toJson()});
+      await _routerClient!.sendBroadcast({'chatMessage': chatMessage.toJson()});
 
       // Добавляем свое сообщение в список (поскольку multicast не возвращается отправителю)
       setState(() {
@@ -236,6 +272,35 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                   const SizedBox(width: 8),
                   ElevatedButton(onPressed: _connect, child: const Text('Подключиться')),
+                ],
+              ),
+            ),
+          ] else ...[
+            // Панель управления для подключенного клиента
+            Container(
+              padding: const EdgeInsets.all(8.0),
+              color: Colors.blue[50],
+              child: Row(
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: _checkOnlineClients,
+                    icon: const Icon(Icons.people, size: 16),
+                    label: const Text('Проверить клиентов'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue[100],
+                      foregroundColor: Colors.blue[800],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    onPressed: _disconnect,
+                    icon: const Icon(Icons.logout, size: 16),
+                    label: const Text('Отключиться'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red[100],
+                      foregroundColor: Colors.red[800],
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -315,11 +380,6 @@ class _ChatScreenState extends State<ChatScreen> {
                   ElevatedButton(onPressed: _sendMessage, child: const Text('Отправить')),
                 ],
               ),
-            ),
-          ] else ...[
-            Container(
-              padding: const EdgeInsets.all(16.0),
-              child: ElevatedButton(onPressed: _disconnect, child: const Text('Отключиться')),
             ),
           ],
         ],

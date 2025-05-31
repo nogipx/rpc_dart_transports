@@ -10,6 +10,7 @@ import 'package:rpc_dart/rpc_dart.dart';
 import '../router_models.dart';
 import '../interfaces/router_interface.dart';
 import '../router_stats.dart';
+import '../global_message_bus.dart';
 
 /// Основная реализация роутера
 ///
@@ -18,7 +19,11 @@ import '../router_stats.dart';
 /// и минимизирует потребление ресурсов.
 final class RouterResponderImpl implements IRouterContract {
   /// Активные клиентские соединения: clientId -> StreamController
+  /// УСТАРЕЛО: теперь используется GlobalMessageBus
   final Map<String, StreamController<RouterMessage>> _clientStreams = {};
+
+  /// Глобальная шина сообщений для связи между endpoint'ами
+  final GlobalMessageBus _messageBus = GlobalMessageBus();
 
   /// Информация о клиентах: clientId -> RouterClientInfo
   final Map<String, RouterClientInfo> _clientsInfo = {};
@@ -61,12 +66,16 @@ final class RouterResponderImpl implements IRouterContract {
   })  : _logger = logger?.child('RouterResponder'),
         _healthCheckInterval = healthCheckInterval,
         _clientInactivityTimeout = clientInactivityTimeout {
-    // Инициализируем дистрибьютор событий
+    // ИСПРАВЛЕНО: Синхронизируем EventDistributor с таймаутом клиентов
     _eventDistributor = StreamDistributor<RouterEvent>(
       config: StreamDistributorConfig(
         enableAutoCleanup: true,
-        inactivityThreshold: Duration(minutes: 5),
-        cleanupInterval: Duration(minutes: 1),
+        // Очищаем события раньше чем отключаем клиентов - даем буфер
+        inactivityThreshold: Duration(
+            milliseconds:
+                (clientInactivityTimeout.inMilliseconds * 0.8).round()), // 80% от таймаута клиентов
+        cleanupInterval:
+            Duration(seconds: healthCheckInterval.inSeconds ~/ 2), // В 2 раза чаще health check
         autoRemoveOnCancel: true,
       ),
       logger: _logger?.child('EventDistributor'),
@@ -155,6 +164,27 @@ final class RouterResponderImpl implements IRouterContract {
       streamController.close();
       _logger?.info('Клиент отключен: $clientId${reason != null ? ' ($reason)' : ''}');
 
+      // ИСПРАВЛЕНО: Проактивно очищаем клиента из EventDistributor
+      // чтобы избежать отправки событий в закрытые транспорты
+      final eventClientId = 'events_$clientId';
+      if (_eventDistributor.hasClientStream(eventClientId)) {
+        _eventDistributor.closeClientStream(eventClientId).catchError((e) {
+          _logger?.debug('Ошибка при очистке event stream для $eventClientId: $e');
+        });
+        _logger?.debug('Event stream для отключенного клиента $clientId очищен');
+      }
+
+      // Также попробуем найти по паттерну events_*
+      final allEventClientIds =
+          _eventDistributor.getActiveClientIds().where((id) => id.contains(clientId)).toList();
+
+      for (final eventClientId in allEventClientIds) {
+        _eventDistributor.closeClientStream(eventClientId).catchError((e) {
+          _logger?.debug('Ошибка при очистке event stream $eventClientId: $e');
+        });
+        _logger?.debug('Event stream $eventClientId для отключенного клиента очищен');
+      }
+
       // Уведомляем подписчиков об отключении клиента
       if (clientInfo != null) {
         emitEvent(RouterEvent.clientDisconnected(
@@ -197,16 +227,16 @@ final class RouterResponderImpl implements IRouterContract {
 
   @override
   bool sendToClient(String clientId, RouterMessage message) {
-    final streamController = _clientStreams[clientId];
-    if (streamController != null && !streamController.isClosed) {
-      streamController.add(message);
+    // ИСПРАВЛЕНО: Используем глобальную шину для отправки сообщений
+    final sent = _messageBus.sendToClient(clientId, message);
+    if (sent) {
       updateClientActivity(clientId);
-      _logger?.debug('Сообщение отправлено клиенту $clientId: ${message.type}');
-      return true;
+      _logger
+          ?.debug('Сообщение отправлено клиенту $clientId через глобальную шину: ${message.type}');
     } else {
-      _logger?.warning('Клиент $clientId не найден или отключен');
-      return false;
+      _logger?.warning('Клиент $clientId не найден в глобальной шине или отключен');
     }
+    return sent;
   }
 
   @override
@@ -227,17 +257,17 @@ final class RouterResponderImpl implements IRouterContract {
 
   @override
   int sendBroadcast(RouterMessage message, {String? excludeClientId}) {
-    int sentCount = 0;
+    // ИСПРАВЛЕНО: Используем глобальную шину для broadcast
+    final sentCount = _messageBus.sendBroadcast(message, excludeClientId: excludeClientId);
 
-    for (final clientId in _clientStreams.keys) {
+    // Обновляем активность всех клиентов которым доставили
+    for (final clientId in _messageBus.getRegisteredClientIds()) {
       if (clientId != excludeClientId) {
-        if (sendToClient(clientId, message)) {
-          sentCount++;
-        }
+        updateClientActivity(clientId);
       }
     }
 
-    _logger?.debug('Broadcast сообщение отправлено: $sentCount получателей');
+    _logger?.debug('Broadcast сообщение отправлено через глобальную шину: $sentCount получателей');
     return sentCount;
   }
 
@@ -432,6 +462,8 @@ final class RouterResponderImpl implements IRouterContract {
     final now = DateTime.now();
     final clientsToDisconnect = <String>[];
     final clientsToMarkIdle = <String>[];
+    // ДОБАВЛЕНО: Список клиентов с подозрением на zombie connection
+    final zombieClients = <String>[];
 
     for (final entry in _clientsInfo.entries) {
       final clientId = entry.key;
@@ -448,6 +480,27 @@ final class RouterResponderImpl implements IRouterContract {
         _logger?.debug('Клиент $clientId помечен как неактивный');
         clientsToMarkIdle.add(clientId);
       }
+
+      // ДОБАВЛЕНО: Детекция zombie connections (характерно для соединений без VPN)
+      // Если клиент зарегистрирован, но его StreamController закрыт
+      final streamController = _clientStreams[clientId];
+      if (streamController != null && streamController.isClosed) {
+        _logger
+            ?.warning('Zombie connection обнаружен: $clientId (стрим закрыт, но клиент в реестре)');
+        zombieClients.add(clientId);
+      }
+
+      // Дополнительная проверка через GlobalMessageBus
+      if (!_messageBus.isClientRegistered(clientId) && _clientsInfo.containsKey(clientId)) {
+        _logger?.warning('Рассинхронизация: $clientId есть в реестре, но отсутствует в MessageBus');
+        zombieClients.add(clientId);
+      }
+    }
+
+    // ДОБАВЛЕНО: Быстро очищаем zombie connections
+    for (final clientId in zombieClients) {
+      _logger?.info('Принудительная очистка zombie connection: $clientId');
+      disconnectClient(clientId, reason: 'Zombie connection cleanup (likely NAT/Firewall drop)');
     }
 
     // Отключаем неактивных клиентов
@@ -463,9 +516,11 @@ final class RouterResponderImpl implements IRouterContract {
       }
     }
 
-    if (clientsToDisconnect.isNotEmpty || clientsToMarkIdle.isNotEmpty) {
+    if (clientsToDisconnect.isNotEmpty ||
+        clientsToMarkIdle.isNotEmpty ||
+        zombieClients.isNotEmpty) {
       _logger?.info(
-          'Health check: отключено ${clientsToDisconnect.length}, неактивных ${clientsToMarkIdle.length}, всего ${_clientsInfo.length}');
+          'Health check: отключено ${clientsToDisconnect.length}, неактивных ${clientsToMarkIdle.length}, zombie ${zombieClients.length}, всего ${_clientsInfo.length}');
 
       // Отправляем событие об изменении топологии
       emitEvent(RouterEvent.topologyChanged(
@@ -563,28 +618,34 @@ final class RouterResponderImpl implements IRouterContract {
       return false; // Клиент не зарегистрирован
     }
 
-    // Закрываем старый стрим если есть
+    // ИСПРАВЛЕНО: Регистрируем стрим в глобальной шине
+    _messageBus.registerClientStream(clientId, newStreamController, 'shared_router');
+
+    // Также сохраняем локально для обратной совместимости
     final oldStream = _clientStreams[clientId];
     if (oldStream != null && !oldStream.isClosed) {
       oldStream.close();
     }
-
-    // Устанавливаем новый стрим
     _clientStreams[clientId] = newStreamController;
 
     // Обновляем активность
     updateClientActivity(clientId);
 
-    _logger?.debug('Стрим заменен для клиента: $clientId');
+    _logger?.debug('Стрим заменен для клиента в глобальной шине: $clientId');
     return true;
   }
 
   @override
   void removeClientStream(String clientId) {
+    // ИСПРАВЛЕНО: Удаляем из глобальной шины
+    _messageBus.unregisterClientStream(clientId);
+
+    // Также удаляем локально для обратной совместимости
     final streamController = _clientStreams.remove(clientId);
     if (streamController != null && !streamController.isClosed) {
       streamController.close();
-      _logger?.debug('Стрим удален для клиента: $clientId');
     }
+
+    _logger?.debug('Стрим удален для клиента из глобальной шины: $clientId');
   }
 }
