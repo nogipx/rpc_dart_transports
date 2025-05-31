@@ -232,3 +232,65 @@ dart test
 ```bash
 dart analyze
 ```
+
+### Сборка нативных бинарей
+
+Для создания самостоятельных исполняемых файлов:
+
+```bash
+# Автоматическая сборка для текущей платформы
+./build.sh
+
+# Ручная сборка для текущей платформы
+dart compile exe bin/rpc_dart_router.dart -o build/rpc_dart_router
+
+# Сборка через Dart скрипт (включая Docker для Linux)
+dart run build_all.dart
+```
+
+#### Кроссплатформенная сборка
+
+**Вариант 1: GitHub Actions (рекомендуется)**
+1. Перейдите в раздел **Actions** GitHub репозитория `rpc_dart`
+2. Выберите workflow **"Build RPC Dart Router"**
+3. Нажмите **"Run workflow"** и укажите:
+   - **Version**: `v1.0.0` (или любую другую)
+   - **Create release**: ✅ (для создания релиза)
+   - **Platforms**: `linux-only` (или `all` для всех платформ)
+4. Дождитесь завершения сборки (~3-5 минут)
+5. Скачайте:
+   - **Артефакты** из раздела Artifacts (временные файлы)
+   - **Релиз** из раздела Releases (постоянные файлы)
+
+**Вариант 2: Docker для Linux**
+```bash
+# Для сборки Linux версии на macOS/Windows
+docker build -t rpc-dart-router .
+docker run --rm -v $(pwd)/build:/output rpc-dart-router cp rpc_dart_router-linux /output/
+```
+
+**Вариант 3: Ручная сборка**
+- **Linux**: запустите `dart compile exe` на Linux машине
+- **macOS**: запустите `dart compile exe` на macOS
+- **Windows**: запустите `dart compile exe` на Windows
+
+#### Готовые бинари
+
+После сборки получите:
+- `build/rpc_dart_router-linux` - для Linux серверов
+- `build/rpc_dart_router-macos` - для macOS  
+- `build/rpc_dart_router-windows.exe` - для Windows
+
+Скопируйте нужный файл на целевую платформу и запускайте:
+```bash
+# Linux
+chmod +x rpc_dart_router-linux
+./rpc_dart_router-linux --help
+
+# macOS  
+chmod +x rpc_dart_router-macos
+./rpc_dart_router-macos --help
+
+# Windows
+rpc_dart_router-windows.exe --help
+```

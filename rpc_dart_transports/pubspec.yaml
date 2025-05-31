@@ -11,6 +11,13 @@ environment:
 executables:
   rpc_dart_router: rpc_dart_router
 
+# Скрипты для компиляции
+scripts:
+  build:macos: dart compile exe bin/rpc_dart_router.dart -o build/rpc_dart_router-macos
+  build:linux: dart compile exe bin/rpc_dart_router.dart -o build/rpc_dart_router-linux  
+  build:windows: dart compile exe bin/rpc_dart_router.dart -o build/rpc_dart_router-windows.exe
+  build:all: dart run build_all.dart
+
 dependency_overrides:
   rpc_dart:
     path: ../rpc_dart

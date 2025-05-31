@@ -1,0 +1,226 @@
+name: Build RPC Dart Router
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Версия для сборки (например: v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+        type: string
+      create_release:
+        description: 'Создать релиз с собранными бинарями'
+        required: true
+        default: true
+        type: boolean
+      platforms:
+        description: 'Платформы для сборки'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+        - all
+        - linux-only
+        - macos-only
+        - windows-only
+
+jobs:
+  build-linux:
+    name: Build for Linux
+    runs-on: ubuntu-latest
+    if: inputs.platforms == 'all' || inputs.platforms == 'linux-only'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Setup Dart
+      uses: dart-lang/setup-dart@v1
+      with:
+        sdk: stable
+    
+    - name: Create build directory
+      run: mkdir -p build
+      working-directory: rpc_dart_transports
+    
+    - name: Get dependencies
+      run: dart pub get
+      working-directory: rpc_dart_transports
+    
+    - name: Build executable
+      run: dart compile exe bin/rpc_dart_router.dart -o build/rpc_dart_router-linux
+      working-directory: rpc_dart_transports
+      
+    - name: Test executable
+      run: |
+        chmod +x build/rpc_dart_router-linux
+        ./build/rpc_dart_router-linux --version
+      working-directory: rpc_dart_transports
+      
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: rpc_dart_router-linux
+        path: rpc_dart_transports/build/rpc_dart_router-linux
+        retention-days: 90
+
+  build-macos:
+    name: Build for macOS
+    runs-on: macos-latest
+    if: inputs.platforms == 'all' || inputs.platforms == 'macos-only'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Setup Dart
+      uses: dart-lang/setup-dart@v1
+      with:
+        sdk: stable
+    
+    - name: Create build directory
+      run: mkdir -p build
+      working-directory: rpc_dart_transports
+    
+    - name: Get dependencies
+      run: dart pub get
+      working-directory: rpc_dart_transports
+    
+    - name: Build executable
+      run: dart compile exe bin/rpc_dart_router.dart -o build/rpc_dart_router-macos
+      working-directory: rpc_dart_transports
+      
+    - name: Test executable
+      run: |
+        chmod +x build/rpc_dart_router-macos
+        ./build/rpc_dart_router-macos --version
+      working-directory: rpc_dart_transports
+      
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: rpc_dart_router-macos
+        path: rpc_dart_transports/build/rpc_dart_router-macos
+        retention-days: 90
+
+  build-windows:
+    name: Build for Windows
+    runs-on: windows-latest
+    if: inputs.platforms == 'all' || inputs.platforms == 'windows-only'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Setup Dart
+      uses: dart-lang/setup-dart@v1
+      with:
+        sdk: stable
+    
+    - name: Create build directory
+      run: mkdir -p build
+      working-directory: rpc_dart_transports
+      shell: bash
+    
+    - name: Get dependencies
+      run: dart pub get
+      working-directory: rpc_dart_transports
+    
+    - name: Build executable
+      run: dart compile exe bin/rpc_dart_router.dart -o build/rpc_dart_router-windows.exe
+      working-directory: rpc_dart_transports
+      
+    - name: Test executable
+      run: |
+        ./build/rpc_dart_router-windows.exe --version
+      working-directory: rpc_dart_transports
+      shell: bash
+      
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: rpc_dart_router-windows.exe
+        path: rpc_dart_transports/build/rpc_dart_router-windows.exe
+        retention-days: 90
+
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [build-linux, build-macos, build-windows]
+    if: inputs.create_release && !failure() && !cancelled()
+    
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: dist
+        
+    - name: Display structure
+      run: |
+        echo "📂 Структура собранных файлов:"
+        find dist -type f -name "rpc_dart_router-*" -exec ls -lh {} \;
+        
+    - name: Prepare release files
+      run: |
+        mkdir -p release
+        find dist -name "rpc_dart_router-*" -exec cp {} release/ \;
+        ls -la release/
+        
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ inputs.version }}
+        name: 'RPC Dart Router ${{ inputs.version }}'
+        body: |
+          🚀 **RPC Dart Router ${{ inputs.version }}**
+          
+          CLI инструмент для запуска WebSocket роутера RPC вызовов.
+          
+          ## 📦 Скачивание
+          
+          Выберите файл для вашей платформы:
+          - **Linux**: `rpc_dart_router-linux`
+          - **macOS**: `rpc_dart_router-macos` 
+          - **Windows**: `rpc_dart_router-windows.exe`
+          
+          ## 🚀 Запуск
+          
+          ```bash
+          # Linux/macOS
+          chmod +x rpc_dart_router-*
+          ./rpc_dart_router-linux --help
+          
+          # Windows
+          rpc_dart_router-windows.exe --help
+          ```
+          
+          ## ⚙️ Примеры использования
+          
+          ```bash
+          # Запуск с настройками по умолчанию
+          ./rpc_dart_router-linux
+          
+          # Запуск на localhost:8080
+          ./rpc_dart_router-linux -h localhost -p 8080
+          
+          # Тихий режим
+          ./rpc_dart_router-linux --quiet
+          
+          # Debug режим
+          ./rpc_dart_router-linux -v --log-level debug
+          ```
+          
+          **Платформы сборки:** ${{ inputs.platforms }}
+          **Дата сборки:** ${{ github.run_id }}
+        files: release/*
+        draft: false
+        prerelease: false
+        make_latest: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
