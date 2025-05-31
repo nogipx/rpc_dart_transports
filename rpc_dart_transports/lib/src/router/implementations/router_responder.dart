@@ -11,6 +11,7 @@ import '../router_models.dart';
 import '../interfaces/router_interface.dart';
 import '../router_stats.dart';
 import '../global_message_bus.dart';
+import '../handlers/message_handler.dart';
 
 /// Основная реализация роутера
 ///
@@ -28,8 +29,8 @@ final class RouterResponderImpl implements IRouterContract {
   /// Информация о клиентах: clientId -> RouterClientInfo
   final Map<String, RouterClientInfo> _clientsInfo = {};
 
-  /// Активные запросы: requestId -> Completer
-  final Map<String, Completer<RouterMessage>> _activeRequests = {};
+  /// Обработчик сообщений
+  late final RouterMessageHandler _messageHandler;
 
   /// Дистрибьютор для системных событий роутера
   late final StreamDistributor<RouterEvent> _eventDistributor;
@@ -79,6 +80,13 @@ final class RouterResponderImpl implements IRouterContract {
       logger: _logger?.child('EventDistributor'),
     );
 
+    // Инициализируем обработчик сообщений
+    _messageHandler = RouterMessageHandler(
+      clientManager: this,
+      messageSender: this,
+      logger: _logger,
+    );
+
     // Запускаем периодическую проверку здоровья клиентов
     _startHealthCheckTimer();
 
@@ -104,6 +112,9 @@ final class RouterResponderImpl implements IRouterContract {
     // Останавливаем мониторинг
     _healthCheckTimer?.cancel();
     _healthCheckTimer = null;
+
+    // Закрываем обработчик сообщений
+    _messageHandler.dispose();
 
     // Закрываем все клиентские соединения
     final clientIds = _clientStreams.keys.toList();
@@ -269,55 +280,12 @@ final class RouterResponderImpl implements IRouterContract {
 
   @override
   void handleRequest(RouterMessage message, String senderId) {
-    final targetId = message.targetId;
-    final requestId = message.payload?['requestId'] as String?;
-
-    if (targetId == null || requestId == null) {
-      _logger?.warning('Request сообщение без targetId или requestId от $senderId');
-      return;
-    }
-
-    // Пересылаем запрос целевому клиенту
-    final forwardedMessage = message.copyWith(senderId: senderId);
-    sendToClient(targetId, forwardedMessage);
-
-    // Сохраняем информацию о запросе для таймаута
-    final timeout = message.payload?['timeoutMs'] as int?;
-    if (timeout != null) {
-      Timer(Duration(milliseconds: timeout), () {
-        if (_activeRequests.containsKey(requestId)) {
-          _activeRequests.remove(requestId);
-
-          // Отправляем ошибку таймаута отправителю
-          final timeoutResponse = RouterMessage.response(
-            targetId: senderId,
-            requestId: requestId,
-            payload: {},
-            senderId: 'router',
-            success: false,
-            errorMessage: 'Request timeout',
-          );
-          sendToClient(senderId, timeoutResponse);
-        }
-      });
-    }
-
-    _logger?.debug('Request переслан: $senderId -> $targetId (requestId: $requestId)');
+    _messageHandler.handleRequest(message, senderId);
   }
 
   @override
   void handleResponse(RouterMessage message, String senderId) {
-    final targetId = message.targetId;
-    if (targetId == null) {
-      _logger?.warning('Response сообщение без targetId от $senderId');
-      return;
-    }
-
-    // Пересылаем ответ целевому клиенту
-    final forwardedMessage = message.copyWith(senderId: senderId);
-    sendToClient(targetId, forwardedMessage);
-
-    _logger?.debug('Response переслан: $senderId -> $targetId');
+    _messageHandler.handleResponse(message, senderId);
   }
 
   // === IRouterEventManager implementation ===
@@ -401,39 +369,11 @@ final class RouterResponderImpl implements IRouterContract {
 
   @override
   void handleIncomingMessage(RouterMessage message, String senderId) {
-    // Обновляем активность клиента
-    updateClientActivity(senderId);
-
     // Увеличиваем счетчик сообщений
     _totalMessages++;
 
-    switch (message.type) {
-      case RouterMessageType.unicast:
-        _handleUnicast(message, senderId);
-        break;
-      case RouterMessageType.multicast:
-        _handleMulticast(message, senderId);
-        break;
-      case RouterMessageType.broadcast:
-        _handleBroadcast(message, senderId);
-        break;
-      case RouterMessageType.request:
-        handleRequest(message, senderId);
-        break;
-      case RouterMessageType.response:
-        handleResponse(message, senderId);
-        break;
-      case RouterMessageType.heartbeat:
-        _handleHeartbeat(message, senderId);
-        break;
-      case RouterMessageType.updateMetadata:
-        _handleUpdateMetadata(message, senderId);
-        break;
-      case RouterMessageType.error:
-        _errorCount++;
-        _logger?.warning('Ошибка от клиента $senderId: ${message.errorMessage}');
-        break;
-    }
+    // Делегируем обработку в MessageHandler
+    _messageHandler.handleIncomingMessage(message, senderId);
   }
 
   // === НОВЫЕ МЕТОДЫ ДЛЯ МОНИТОРИНГА ===
@@ -527,78 +467,6 @@ final class RouterResponderImpl implements IRouterContract {
   }
 
   // === Вспомогательные методы ===
-
-  /// Обрабатывает unicast сообщение
-  void _handleUnicast(RouterMessage message, String senderId) {
-    final targetId = message.targetId;
-    if (targetId == null) {
-      _logger?.warning('Unicast сообщение без targetId от $senderId');
-      return;
-    }
-
-    final forwardedMessage = message.copyWith(senderId: senderId);
-    final sent = sendToClient(targetId, forwardedMessage);
-
-    if (!sent) {
-      // Отправляем error сообщение отправителю если целевой клиент не найден
-      final errorMessage = RouterMessage(
-        type: RouterMessageType.error,
-        targetId: senderId,
-        errorMessage: 'Клиент $targetId не найден или отключен',
-        timestamp: DateTime.now().millisecondsSinceEpoch,
-      );
-      sendToClient(senderId, errorMessage);
-      _logger?.warning('Unicast не доставлен - клиент $targetId не найден');
-    } else {
-      _logger?.debug('Unicast переслан: $senderId -> $targetId');
-    }
-  }
-
-  /// Обрабатывает multicast сообщение
-  void _handleMulticast(RouterMessage message, String senderId) {
-    final groupName = message.groupName;
-    if (groupName == null) {
-      _logger?.warning('Multicast сообщение без groupName от $senderId');
-      return;
-    }
-
-    final forwardedMessage = message.copyWith(senderId: senderId);
-    final sentCount = sendToGroup(groupName, forwardedMessage, excludeClientId: senderId);
-
-    _logger?.debug('Multicast переслан: $senderId -> группа $groupName ($sentCount получателей)');
-  }
-
-  /// Обрабатывает broadcast сообщение
-  void _handleBroadcast(RouterMessage message, String senderId) {
-    final forwardedMessage = message.copyWith(senderId: senderId);
-    final sentCount = sendBroadcast(forwardedMessage, excludeClientId: senderId);
-
-    _logger?.debug('Broadcast переслан: $senderId -> все ($sentCount получателей)');
-  }
-
-  /// Обрабатывает heartbeat сообщение
-  void _handleHeartbeat(RouterMessage message, String senderId) {
-    _logger?.debug('Heartbeat от клиента: $senderId');
-    updateClientActivity(senderId);
-  }
-
-  /// Обрабатывает обновление метаданных клиента
-  void _handleUpdateMetadata(RouterMessage message, String senderId) {
-    _logger?.debug('Обновление метаданных от клиента: $senderId');
-
-    final metadata = message.payload?['metadata'] as Map<String, dynamic>?;
-    if (metadata == null) {
-      _logger?.warning('Сообщение updateMetadata без метаданных от клиента: $senderId');
-      return;
-    }
-
-    final success = updateClientMetadata(senderId, metadata);
-    if (success) {
-      _logger?.info('Метаданные обновлены для клиента: $senderId');
-    } else {
-      _logger?.warning('Не удалось обновить метаданные для клиента: $senderId');
-    }
-  }
 
   /// Генерирует уникальный ID клиента
   @override

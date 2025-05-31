@@ -20,6 +20,9 @@ export 'interfaces/router_interface.dart';
 // Реализации
 export 'implementations/router_responder.dart';
 
+// Обработчики
+export 'handlers/message_handler.dart';
+
 // RPC контракты
 export 'router_contract.dart';
 
