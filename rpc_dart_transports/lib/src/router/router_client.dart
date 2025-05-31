@@ -189,6 +189,10 @@ class RouterClient {
   Future<void> initializeP2P({
     void Function(RouterMessage message)? onP2PMessage,
     bool enableAutoHeartbeat = true,
+
+    /// Если true, скрывает служебные heartbeat сообщения от роутера в onP2PMessage.
+    /// Оставьте false для отладки соединений.
+    bool filterRouterHeartbeats = true,
   }) async {
     if (_clientId == null) {
       throw StateError('Клиент должен быть зарегистрирован перед инициализацией P2P');
@@ -225,8 +229,15 @@ class RouterClient {
           _logger?.info('P2P соединение подтверждено роутером');
         }
 
-        // Передаем все сообщения в пользовательский колбэк
-        onP2PMessage?.call(message);
+        // Фильтруем служебные heartbeat'ы от роутера если включена фильтрация
+        final shouldFilterHeartbeat = filterRouterHeartbeats &&
+            message.type == RouterMessageType.heartbeat &&
+            message.senderId == 'router';
+
+        // Передаем сообщения в пользовательский колбэк (кроме отфильтрованных)
+        if (!shouldFilterHeartbeat) {
+          onP2PMessage?.call(message);
+        }
       },
       onError: (error) {
         _logger?.error('Ошибка в P2P стриме: $error');

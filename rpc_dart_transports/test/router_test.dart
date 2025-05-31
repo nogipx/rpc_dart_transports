@@ -198,9 +198,9 @@ void main() {
         // Act
         await alice.sendMulticast('developers', testMessage);
 
-        // Assert
-        await _waitForCondition(() => bobMessages.isNotEmpty && charlieMessages.isNotEmpty,
-            timeout: Duration(seconds: 5));
+        // Assert - ждем multicast сообщений
+        await _waitForCondition(() => bobMessages.isNotEmpty);
+        await _waitForCondition(() => charlieMessages.isNotEmpty);
 
         // Bob и Charlie должны получить сообщение
         expect(bobMessages, hasLength(1));
@@ -437,8 +437,7 @@ void main() {
         }
 
         // Assert - все сообщения должны быть доставлены
-        await _waitForCondition(() => receivedMessages.length == messageCount,
-            timeout: Duration(seconds: 10));
+        await _waitForCondition(() => receivedMessages.length == messageCount);
 
         expect(receivedMessages, hasLength(messageCount));
 
