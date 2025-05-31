@@ -23,26 +23,26 @@ class GlobalMessageBus {
   /// Зарегистрированные endpoint'ы: endpointId -> info
   final Map<String, EndpointInfo> _endpoints = {};
 
-  final RpcLogger? _logger = RpcLogger('GlobalMessageBus');
+  final RpcLogger _logger = RpcLogger('GlobalMessageBus');
 
-  /// Регистрирует P2P стрим клиента в глобальной шине
+  /// Регистрирует P2P стрим клиента
   void registerClientStream(
     String clientId,
     StreamController<RouterMessage> streamController,
     String endpointId,
   ) {
-    _logger?.info('Регистрация P2P стрима: $clientId в endpoint $endpointId');
+    _logger.info('Регистрация P2P стрима: $clientId в endpoint $endpointId');
 
     // Удаляем старый стрим если есть
     final oldStream = _clientStreams.remove(clientId);
     if (oldStream != null && !oldStream.isClosed) {
       oldStream.close();
-      _logger?.debug('Старый стрим для $clientId закрыт');
+      _logger.debug('Старый стрим для $clientId закрыт');
     }
 
     _clientStreams[clientId] = streamController;
     _logger
-        ?.debug('P2P стрим для $clientId зарегистрирован, всего стримов: ${_clientStreams.length}');
+        .debug('P2P стрим для $clientId зарегистрирован, всего стримов: ${_clientStreams.length}');
   }
 
   /// Отключает P2P стрим клиента
@@ -52,27 +52,25 @@ class GlobalMessageBus {
       if (!streamController.isClosed) {
         streamController.close();
       }
-      _logger?.info('P2P стрим для $clientId отключен, осталось стримов: ${_clientStreams.length}');
+      _logger.info('P2P стрим для $clientId отключен, осталось стримов: ${_clientStreams.length}');
     }
   }
 
   /// Регистрирует endpoint в шине
   void registerEndpoint(String endpointId, EndpointInfo info) {
     _endpoints[endpointId] = info;
-    _logger?.debug('Endpoint $endpointId зарегистрирован, всего endpoints: ${_endpoints.length}');
+    _logger.debug('Endpoint $endpointId зарегистрирован, всего endpoints: ${_endpoints.length}');
   }
 
   /// Отключает endpoint
   void unregisterEndpoint(String endpointId) {
     final info = _endpoints.remove(endpointId);
     if (info != null) {
-      _logger?.debug('Endpoint $endpointId отключен, осталось endpoints: ${_endpoints.length}');
+      _logger.debug('Endpoint $endpointId отключен, осталось endpoints: ${_endpoints.length}');
 
       // Отключаем все стримы этого endpoint'а
       final clientsToRemove = <String>[];
       for (final entry in _clientStreams.entries) {
-        // Если стрим принадлежит этому endpoint'у - удаляем
-        // (это упрощенная логика, в реальности нужно было бы отслеживать связи)
         if (info.clientIds.contains(entry.key)) {
           clientsToRemove.add(entry.key);
         }
@@ -84,27 +82,27 @@ class GlobalMessageBus {
     }
   }
 
-  /// Отправляет сообщение конкретному клиенту через глобальную шину
+  /// Отправляет сообщение конкретному клиенту
   bool sendToClient(String clientId, RouterMessage message) {
     final streamController = _clientStreams[clientId];
     if (streamController != null && !streamController.isClosed) {
       try {
         streamController.add(message);
-        _logger?.debug('Сообщение доставлено клиенту $clientId: ${message.type}');
+        _logger.debug('Сообщение доставлено клиенту $clientId: ${message.type}');
         return true;
       } catch (e) {
-        _logger?.warning('Ошибка отправки сообщения клиенту $clientId: $e (автоматически удаляем)');
-        // ИСПРАВЛЕНО: Автоматически удаляем битый стрим для предотвращения повторных ошибок
+        _logger.warning('Ошибка отправки сообщения клиенту $clientId: $e (автоматически удаляем)');
+        // Автоматически удаляем битый стрим
         unregisterClientStream(clientId);
         return false;
       }
     } else {
       if (streamController != null && streamController.isClosed) {
-        _logger?.debug('Клиент $clientId имеет закрытый стрим (автоматически удаляем)');
-        // ИСПРАВЛЕНО: Автоматически удаляем закрытые стримы
+        _logger.debug('Клиент $clientId имеет закрытый стрим (автоматически удаляем)');
+        // Автоматически удаляем закрытые стримы
         unregisterClientStream(clientId);
       } else {
-        _logger?.debug('Клиент $clientId не найден в глобальной шине');
+        _logger.debug('Клиент $clientId не найден');
       }
       return false;
     }
@@ -115,7 +113,7 @@ class GlobalMessageBus {
     int sentCount = 0;
     final clientIds = _clientStreams.keys.toList();
 
-    _logger?.debug(
+    _logger.debug(
         'Отправка broadcast сообщения ${clientIds.length} клиентам (исключая $excludeClientId)');
 
     for (final clientId in clientIds) {
@@ -126,7 +124,7 @@ class GlobalMessageBus {
       }
     }
 
-    _logger?.debug('Broadcast доставлен $sentCount получателям');
+    _logger.debug('Broadcast доставлен $sentCount получателям');
     return sentCount;
   }
 
@@ -153,7 +151,7 @@ class GlobalMessageBus {
 
   /// Очищает все стримы (для тестирования)
   void clear() {
-    _logger?.warning('Очистка всех стримов в глобальной шине');
+    _logger.warning('Очистка всех стримов');
 
     // Закрываем все стримы
     for (final entry in _clientStreams.entries) {
@@ -165,7 +163,7 @@ class GlobalMessageBus {
     _clientStreams.clear();
     _endpoints.clear();
 
-    _logger?.info('Глобальная шина очищена');
+    _logger.info('Шина очищена');
   }
 }
 

@@ -184,7 +184,8 @@ Future<void> _startRouter(RouterConfig config) async {
 
     // Создаем общий RouterImpl для всех соединений
     final sharedRouterImpl = RouterResponderImpl(
-        logger: config.logLevel == RpcLoggerLevel.debug ? logger.child('SharedRouter') : null);
+      logger: config.logLevel == RpcLoggerLevel.debug ? logger.child('SharedRouter') : null,
+    );
 
     int connectionCount = 0;
 

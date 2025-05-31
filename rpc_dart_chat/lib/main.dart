@@ -59,8 +59,8 @@ class _ChatScreenState extends State<ChatScreen> {
       final transport = RpcWebSocketCallerTransport(channel);
       final endpoint = RpcCallerEndpoint(transport: transport);
 
-      // Создаем клиент роутера
-      _routerClient = RouterClient(callerEndpoint: endpoint);
+      // Создаем клиент роутера с логированием
+      _routerClient = RouterClient(callerEndpoint: endpoint, logger: RpcLogger('ChatClient'));
 
       // Регистрируемся в роутере
       _clientId = await _routerClient!.register(

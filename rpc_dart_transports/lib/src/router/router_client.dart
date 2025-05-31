@@ -124,8 +124,7 @@ class RouterClient {
     List<String>? groups,
     Map<String, dynamic>? metadata,
   }) async {
-    print('🔍 RouterClient: Запрос списка онлайн клиентов...');
-    print('    Фильтры: groups=$groups, metadata=$metadata');
+    _logger?.debug('Запрос списка онлайн клиентов (фильтры: groups=$groups, metadata=$metadata)');
 
     try {
       final request = RouterGetOnlineClientsRequest(
@@ -133,7 +132,7 @@ class RouterClient {
         metadata: metadata,
       );
 
-      print('🔍 RouterClient: Отправляем unary запрос getOnlineClients...');
+      _logger?.debug('Отправляем unary запрос getOnlineClients');
       final response =
           await _callerEndpoint.unaryRequest<RouterGetOnlineClientsRequest, RouterClientsList>(
         serviceName: _serviceName,
@@ -144,16 +143,13 @@ class RouterClient {
         request: request,
       );
 
-      print('✅ RouterClient: Получен ответ с ${response.clients.length} клиентами');
+      _logger?.info('Получен список из ${response.clients.length} клиентов');
       for (final client in response.clients) {
-        print('    - ${client.clientName} (${client.clientId}) в группах: ${client.groups}');
+        _logger?.debug('  - ${client.clientName} (${client.clientId}) в группах: ${client.groups}');
       }
 
-      _logger?.debug('Получен список из ${response.clients.length} клиентов');
       return response.clients;
     } catch (e, stackTrace) {
-      print('❌ RouterClient: Ошибка получения списка клиентов: $e');
-      print('❌ RouterClient: StackTrace: $stackTrace');
       _logger?.error('Ошибка получения списка клиентов: $e', error: e, stackTrace: stackTrace);
       rethrow;
     }
@@ -215,15 +211,14 @@ class RouterClient {
     }
 
     _logger?.info('Инициализация P2P соединения для клиента: $_clientId');
-    print('🔗 RouterClient: Инициализация P2P соединения для клиента: $_clientId');
 
     try {
       // Создаем стрим контроллер для исходящих сообщений
-      print('🔗 RouterClient: Создаем StreamController для исходящих P2P сообщений');
+      _logger?.debug('Создаем StreamController для исходящих P2P сообщений');
       _p2pStreamController = StreamController<RouterMessage>();
 
       // Подключаемся к P2P транспорту
-      print('🔗 RouterClient: Подключаемся к bidirectionalStream router.p2p...');
+      _logger?.debug('Подключаемся к bidirectionalStream router.p2p');
       _p2pResponseStream = _callerEndpoint.bidirectionalStream<RouterMessage, RouterMessage>(
         serviceName: _serviceName,
         methodName: 'p2p',
@@ -231,13 +226,12 @@ class RouterClient {
         requestCodec: RpcCodec<RouterMessage>((json) => RouterMessage.fromJson(json)),
         responseCodec: RpcCodec<RouterMessage>((json) => RouterMessage.fromJson(json)),
       );
-      print('✅ RouterClient: BidirectionalStream создан успешно');
+      _logger?.debug('BidirectionalStream создан успешно');
 
       // Слушаем ответы и пересылаем в колбэк
-      print('🔗 RouterClient: Настраиваем слушатель P2P сообщений...');
+      _logger?.debug('Настраиваем слушатель P2P сообщений');
       _p2pResponseStream!.listen(
         (message) {
-          print('📨 RouterClient: Получено P2P сообщение: ${message.type} от ${message.senderId}');
           _logger?.debug('Получено P2P сообщение: ${message.type} от ${message.senderId}');
 
           // Обрабатываем response сообщения внутри клиента
@@ -249,7 +243,6 @@ class RouterClient {
           if (message.type == RouterMessageType.heartbeat &&
               message.senderId == 'router' &&
               message.payload?['connected'] == true) {
-            print('✅ RouterClient: P2P соединение подтверждено роутером');
             _logger?.info('P2P соединение подтверждено роутером');
           }
 
@@ -264,37 +257,32 @@ class RouterClient {
           }
         },
         onError: (error) {
-          print('❌ RouterClient: Ошибка в P2P стриме: $error');
           _logger?.error('Ошибка в P2P стриме: $error');
           _stopAutoHeartbeat();
         },
         onDone: () {
-          print('🔚 RouterClient: P2P стрим закрыт');
           _logger?.info('P2P стрим закрыт');
           _stopAutoHeartbeat();
         },
       );
 
       // Отправляем первое сообщение для привязки к зарегистрированному клиенту
-      print('🔗 RouterClient: Отправляем identity heartbeat для привязки клиента...');
+      _logger?.debug('Отправляем identity heartbeat для привязки клиента');
       final identityMessage = RouterMessage(
         type: RouterMessageType.heartbeat,
         senderId: _clientId,
         timestamp: DateTime.now().millisecondsSinceEpoch,
       );
       _p2pStreamController!.add(identityMessage);
-      print('📤 RouterClient: Identity heartbeat отправлен');
+      _logger?.debug('Identity heartbeat отправлен');
 
       // Включаем автоматический heartbeat если запрошено
       if (enableAutoHeartbeat) {
         _startAutoHeartbeat();
       }
 
-      print('✅ RouterClient: P2P соединение инициализировано для клиента: $_clientId');
       _logger?.info('P2P соединение инициализировано для клиента: $_clientId');
     } catch (e, stackTrace) {
-      print('❌ RouterClient: Ошибка инициализации P2P: $e');
-      print('❌ RouterClient: StackTrace: $stackTrace');
       _logger?.error('Ошибка инициализации P2P: $e', error: e, stackTrace: stackTrace);
 
       // Очищаем состояние при ошибке
@@ -372,9 +360,7 @@ class RouterClient {
 
   /// Отправляет multicast сообщение
   Future<void> sendMulticast(String groupName, Map<String, dynamic> payload) async {
-    print('📤 RouterClient: Отправляем multicast в группу "$groupName"');
-    print('    От клиента: $_clientId');
-    print('    Payload: $payload');
+    _logger?.debug('Отправляем multicast в группу "$groupName" от клиента $_clientId');
 
     _ensureP2PInitialized();
 
@@ -384,10 +370,8 @@ class RouterClient {
       senderId: _clientId,
     );
 
-    print('📤 RouterClient: Добавляем multicast сообщение в P2P stream');
     _p2pStreamController!.add(message);
-    print('✅ RouterClient: Multicast сообщение добавлено в stream');
-    _logger?.debug('Отправлен multicast: $_clientId -> группа $groupName');
+    _logger?.debug('Multicast сообщение отправлено: $_clientId -> группа $groupName');
   }
 
   /// Отправляет broadcast сообщение
@@ -512,17 +496,16 @@ class RouterClient {
   // === ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ===
 
   void _ensureP2PInitialized() {
-    print('🔍 RouterClient: Проверяем состояние P2P...');
-    print('    _clientId: $_clientId');
-    print('    _p2pStreamController: ${_p2pStreamController != null ? 'есть' : 'null'}');
-    print('    _p2pResponseStream: ${_p2pResponseStream != null ? 'есть' : 'null'}');
+    _logger?.debug('Проверяем состояние P2P (clientId: $_clientId, '
+        'streamController: ${_p2pStreamController != null}, '
+        'responseStream: ${_p2pResponseStream != null})');
 
     if (_p2pStreamController == null) {
-      print('❌ RouterClient: P2P соединение не инициализировано!');
+      _logger?.error('P2P соединение не инициализировано');
       throw StateError('P2P соединение не инициализировано. Вызовите initializeP2P()');
     }
 
-    print('✅ RouterClient: P2P соединение готово');
+    _logger?.debug('P2P соединение готово');
   }
 
   /// Закрывает все соединения

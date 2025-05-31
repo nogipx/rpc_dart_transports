@@ -319,8 +319,7 @@ final class RouterResponderContract extends RpcResponderContract {
       await subscription?.cancel();
 
       if (clientId != null) {
-        // НЕ удаляем клиента полностью - только очищаем стрим
-        // Клиент может переподключиться с новым P2P стримом
+        // Очищаем стрим, клиент может переподключиться
         _routerImpl.removeClientStream(clientId!);
         _logger?.info('P2P стрим для клиента $clientId очищен, клиент может переподключиться');
       }
