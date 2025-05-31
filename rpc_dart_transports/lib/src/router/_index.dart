@@ -51,3 +51,6 @@ export 'router_stats.dart';
 
 // Глобальная шина сообщений
 export 'global_message_bus.dart';
+
+// Транспорт-агностичный сервер
+export 'router_server.dart';
