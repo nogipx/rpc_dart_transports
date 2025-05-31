@@ -25,7 +25,7 @@ void main() {
 
     test('server_streaming_rpc_должен_отправлять_множественные_ответы', () async {
       // Arrange
-      final client = await Http2ClientTransport.connect(
+      final client = await RpcHttp2CallerTransport.connect(
         host: 'localhost',
         port: testServer.port,
       );
@@ -91,7 +91,7 @@ void main() {
 
     test('client_streaming_rpc_должен_принимать_множественные_запросы', () async {
       // Arrange
-      final client = await Http2ClientTransport.connect(
+      final client = await RpcHttp2CallerTransport.connect(
         host: 'localhost',
         port: testServer.port,
       );
@@ -157,7 +157,7 @@ void main() {
 
     test('bidirectional_streaming_rpc_должен_обрабатывать_двусторонний_поток', () async {
       // Arrange
-      final client = await Http2ClientTransport.connect(
+      final client = await RpcHttp2CallerTransport.connect(
         host: 'localhost',
         port: testServer.port,
       );
@@ -229,7 +229,7 @@ void main() {
 
     test('смешанные_потоки_должны_работать_параллельно', () async {
       // Arrange
-      final client = await Http2ClientTransport.connect(
+      final client = await RpcHttp2CallerTransport.connect(
         host: 'localhost',
         port: testServer.port,
       );
@@ -274,7 +274,7 @@ void main() {
 }
 
 /// Выполняет server streaming тест
-Future<void> _testServerStreaming(Http2ClientTransport client) async {
+Future<void> _testServerStreaming(RpcHttp2CallerTransport client) async {
   final responses = <String>[];
   final completer = Completer<void>();
 
@@ -302,7 +302,7 @@ Future<void> _testServerStreaming(Http2ClientTransport client) async {
 }
 
 /// Выполняет client streaming тест
-Future<void> _testClientStreaming(Http2ClientTransport client) async {
+Future<void> _testClientStreaming(RpcHttp2CallerTransport client) async {
   final responseCompleter = Completer<String>();
 
   final streamId = client.createStream();
@@ -388,7 +388,7 @@ class Http2StreamingTestServer {
 
     try {
       final connection = http2.ServerTransportConnection.viaSocket(socket);
-      final transport = Http2ServerTransport.create(connection: connection);
+      final transport = RpcHttp2ResponderTransport.create(connection: connection);
 
       final subscription = transport.incomingMessages.listen(
         (message) async {
@@ -413,7 +413,7 @@ class Http2StreamingTestServer {
   final Map<int, String> _streamTypes = <int, String>{};
 
   Future<void> _handleStreamingMessage(
-      Http2ServerTransport transport, RpcTransportMessage message) async {
+      RpcHttp2ResponderTransport transport, RpcTransportMessage message) async {
     try {
       if (message.isMetadataOnly) {
         final methodPath = message.methodPath ?? 'Unknown';
@@ -451,7 +451,7 @@ class Http2StreamingTestServer {
 
   /// Обрабатывает данные для server streaming
   Future<void> _handleServerStreamingData(
-      Http2ServerTransport transport, int streamId, Uint8List data) async {
+      RpcHttp2ResponderTransport transport, int streamId, Uint8List data) async {
     if (_serverStreamingHandler == null) return;
 
     print('📡 Обрабатываем server streaming запрос, размер: ${data.length}');
@@ -473,40 +473,7 @@ class Http2StreamingTestServer {
     }
   }
 
-  Future<void> _handleServerStreaming(Http2ServerTransport transport, int streamId) async {
-    if (_serverStreamingHandler == null) return;
-
-    print('📡 Запуск server streaming для stream $streamId');
-
-    try {
-      // Слушаем входящие сообщения
-      final incomingMessages = transport
-          .getMessagesForStream(streamId)
-          .where((msg) => msg.payload != null && !msg.isEndOfStream)
-          .map((msg) => msg.payload!);
-
-      await for (final requestData in incomingMessages.take(1)) {
-        print('📡 Обрабатываем server streaming запрос, размер: ${requestData.length}');
-
-        // Обрабатываем через handler
-        final responseStream = _serverStreamingHandler!(requestData);
-
-        await for (final responseData in responseStream) {
-          print('📡 Отправляем server streaming ответ, размер: ${responseData.length}');
-          await transport.sendMessage(streamId, responseData);
-          await Future.delayed(Duration(milliseconds: 20)); // Небольшая задержка
-        }
-
-        await transport.finishSending(streamId);
-        print('✅ Server streaming завершен для stream $streamId');
-        break;
-      }
-    } catch (e) {
-      print('❌ Ошибка в server streaming: $e');
-    }
-  }
-
-  Future<void> _handleClientStreaming(Http2ServerTransport transport, int streamId) async {
+  Future<void> _handleClientStreaming(RpcHttp2ResponderTransport transport, int streamId) async {
     if (_clientStreamingHandler == null) return;
 
     print('📥 Запуск client streaming для stream $streamId');
@@ -569,7 +536,8 @@ class Http2StreamingTestServer {
     }
   }
 
-  Future<void> _handleBidirectionalStreaming(Http2ServerTransport transport, int streamId) async {
+  Future<void> _handleBidirectionalStreaming(
+      RpcHttp2ResponderTransport transport, int streamId) async {
     if (_bidirectionalHandler == null) return;
 
     print('🔄 Запуск bidirectional streaming для stream $streamId');

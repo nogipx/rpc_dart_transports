@@ -27,7 +27,7 @@ Future<void> main() async {
 
     // Создаем HTTP/2 клиента
     print('🔌 Подключение HTTP/2 клиента...');
-    final transport = await Http2ClientTransport.connect(
+    final transport = await RpcHttp2CallerTransport.connect(
       host: 'localhost',
       port: serverPort,
       logger: RpcLogger('Http2Client'),
@@ -233,7 +233,7 @@ class _Http2RpcServer {
     try {
       // Создаем HTTP/2 соединение и серверный транспорт
       final connection = http2.ServerTransportConnection.viaSocket(socket);
-      final serverTransport = Http2ServerTransport.create(
+      final serverTransport = RpcHttp2ResponderTransport.create(
         connection: connection,
         logger: _logger,
       );

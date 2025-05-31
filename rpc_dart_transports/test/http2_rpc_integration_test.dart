@@ -3,18 +3,16 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:test/test.dart';
 import 'package:http2/http2.dart' as http2;
-import 'package:rpc_dart/rpc_dart.dart';
 import 'package:rpc_dart_transports/rpc_dart_transports.dart';
 
 void main() {
   group('HTTP/2 RPC Integration Tests (High-Level API)', () {
     late Http2RpcTestServer testServer;
-    late Http2ClientTransport clientTransport;
+    late RpcHttp2CallerTransport clientTransport;
     late RpcCallerEndpoint callerEndpoint;
 
     setUpAll(() async {
@@ -22,7 +20,7 @@ void main() {
       await testServer.start();
 
       // Создаем одно долгоживущее соединение для всех тестов
-      clientTransport = await Http2ClientTransport.connect(
+      clientTransport = await RpcHttp2CallerTransport.connect(
         host: 'localhost',
         port: testServer.port,
         logger: RpcLogger('TestClient'),
@@ -278,7 +276,7 @@ class Http2RpcTestServer {
     try {
       // Создаем HTTP/2 соединение и серверный транспорт
       final connection = http2.ServerTransportConnection.viaSocket(socket);
-      final serverTransport = Http2ServerTransport.create(connection: connection);
+      final serverTransport = RpcHttp2ResponderTransport.create(connection: connection);
 
       // Создаем RpcResponderEndpoint с HTTP/2 транспортом
       final responderEndpoint = RpcResponderEndpoint(transport: serverTransport);

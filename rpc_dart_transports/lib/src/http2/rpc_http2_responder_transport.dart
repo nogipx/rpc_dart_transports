@@ -13,7 +13,7 @@ import 'http2_common.dart';
 ///
 /// Реализует IRpcTransport поверх HTTP/2 протокола для серверной стороны.
 /// Поддерживает мультиплексирование потоков и gRPC-совместимый протокол.
-class Http2ServerTransport implements IRpcTransport {
+class RpcHttp2ResponderTransport implements IRpcTransport {
   /// HTTP/2 соединение
   final http2.ServerTransportConnection _connection;
 
@@ -42,7 +42,7 @@ class Http2ServerTransport implements IRpcTransport {
   /// Логгер
   final RpcLogger? _logger;
 
-  Http2ServerTransport._({
+  RpcHttp2ResponderTransport._({
     required http2.ServerTransportConnection connection,
     RpcLogger? logger,
   })  : _connection = connection,
@@ -51,13 +51,13 @@ class Http2ServerTransport implements IRpcTransport {
   }
 
   /// Создает серверный HTTP/2 транспорт
-  static Http2ServerTransport create({
+  static RpcHttp2ResponderTransport create({
     required http2.ServerTransportConnection connection,
     RpcLogger? logger,
   }) {
     logger?.debug('Создание HTTP/2 серверного транспорта');
 
-    return Http2ServerTransport._(
+    return RpcHttp2ResponderTransport._(
       connection: connection,
       logger: logger,
     );

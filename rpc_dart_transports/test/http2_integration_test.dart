@@ -25,7 +25,7 @@ void main() {
 
     test('полный_цикл_unary_rpc_вызова', () async {
       // Arrange
-      final client = await Http2ClientTransport.connect(
+      final client = await RpcHttp2CallerTransport.connect(
         host: 'localhost',
         port: testServer.port,
       );
@@ -75,7 +75,7 @@ void main() {
 
     test('множественные_параллельные_вызовы', () async {
       // Arrange
-      final client = await Http2ClientTransport.connect(
+      final client = await RpcHttp2CallerTransport.connect(
         host: 'localhost',
         port: testServer.port,
       );
@@ -105,7 +105,7 @@ void main() {
 
     test('обработка_больших_сообщений', () async {
       // Arrange
-      final client = await Http2ClientTransport.connect(
+      final client = await RpcHttp2CallerTransport.connect(
         host: 'localhost',
         port: testServer.port,
       );
@@ -131,7 +131,7 @@ void main() {
 
       // Act & Assert
       expect(
-        () async => await Http2ClientTransport.connect(
+        () async => await RpcHttp2CallerTransport.connect(
           host: 'localhost',
           port: testServer.port,
         ),
@@ -141,7 +141,7 @@ void main() {
 
     test('корректное_закрытие_соединения', () async {
       // Arrange
-      final client = await Http2ClientTransport.connect(
+      final client = await RpcHttp2CallerTransport.connect(
         host: 'localhost',
         port: testServer.port,
       );
@@ -159,7 +159,7 @@ void main() {
 }
 
 /// Выполняет простой RPC вызов и возвращает ответ
-Future<String> _makeRpcCall(Http2ClientTransport client, String message) async {
+Future<String> _makeRpcCall(RpcHttp2CallerTransport client, String message) async {
   final requestData = utf8.encode(message);
   final responseCompleter = Completer<String>();
 
@@ -236,7 +236,7 @@ class Http2TestServer {
     try {
       // Создаем HTTP/2 server connection
       final connection = http2.ServerTransportConnection.viaSocket(socket);
-      final transport = Http2ServerTransport.create(connection: connection);
+      final transport = RpcHttp2ResponderTransport.create(connection: connection);
 
       // Обрабатываем входящие сообщения
       final subscription = transport.incomingMessages.listen(
@@ -258,7 +258,8 @@ class Http2TestServer {
     }
   }
 
-  Future<void> _handleMessage(Http2ServerTransport transport, RpcTransportMessage message) async {
+  Future<void> _handleMessage(
+      RpcHttp2ResponderTransport transport, RpcTransportMessage message) async {
     try {
       if (message.isMetadataOnly) {
         print('📋 Получены метаданные: ${message.methodPath}');

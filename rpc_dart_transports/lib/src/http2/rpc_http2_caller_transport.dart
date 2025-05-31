@@ -14,7 +14,7 @@ import 'http2_common.dart';
 ///
 /// Реализует IRpcTransport поверх HTTP/2 протокола для исходящих вызовов.
 /// Поддерживает мультиплексирование потоков и gRPC-совместимый протокол.
-class Http2ClientTransport implements IRpcTransport {
+class RpcHttp2CallerTransport implements IRpcTransport {
   /// HTTP/2 соединение
   final http2.ClientTransportConnection _connection;
 
@@ -46,7 +46,7 @@ class Http2ClientTransport implements IRpcTransport {
   /// Логгер
   final RpcLogger? _logger;
 
-  Http2ClientTransport._({
+  RpcHttp2CallerTransport._({
     required http2.ClientTransportConnection connection,
     required String host,
     required String scheme,
@@ -57,7 +57,7 @@ class Http2ClientTransport implements IRpcTransport {
         _logger = logger?.child('Http2ClientTransport');
 
   /// Создает клиентский HTTP/2 транспорт через защищенное соединение
-  static Future<Http2ClientTransport> secureConnect({
+  static Future<RpcHttp2CallerTransport> secureConnect({
     required String host,
     int port = 443,
     RpcLogger? logger,
@@ -74,7 +74,7 @@ class Http2ClientTransport implements IRpcTransport {
 
     logger?.debug('HTTP/2 соединение установлено');
 
-    return Http2ClientTransport._(
+    return RpcHttp2CallerTransport._(
       connection: connection,
       host: host,
       scheme: 'https',
@@ -83,7 +83,7 @@ class Http2ClientTransport implements IRpcTransport {
   }
 
   /// Создает клиентский HTTP/2 транспорт через незащищенное соединение
-  static Future<Http2ClientTransport> connect({
+  static Future<RpcHttp2CallerTransport> connect({
     required String host,
     int port = 80,
     RpcLogger? logger,
@@ -95,7 +95,7 @@ class Http2ClientTransport implements IRpcTransport {
 
     logger?.debug('HTTP/2 соединение установлено');
 
-    return Http2ClientTransport._(
+    return RpcHttp2CallerTransport._(
       connection: connection,
       host: host,
       scheme: 'http',
