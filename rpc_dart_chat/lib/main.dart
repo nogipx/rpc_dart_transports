@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:rpc_dart_transports/rpc_dart_transports.dart';
-import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'models/chat_models.dart';
 
@@ -36,7 +35,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _usernameController = TextEditingController();
   final List<ChatMessage> _messages = [];
 
-  RouterClient? _routerClient;
+  RouterClientWithReconnect? _routerClient;
   String? _clientId;
   bool _isConnected = false;
   String _connectionStatus = 'Отключен';
@@ -55,12 +54,16 @@ class _ChatScreenState extends State<ChatScreen> {
 
       // Подключаемся к роутеру через WebSocket
       const String serverUrl = 'ws://45.89.55.213:80';
-      final channel = WebSocketChannel.connect(Uri.parse(serverUrl));
-      final transport = RpcWebSocketCallerTransport(channel);
-      final endpoint = RpcCallerEndpoint(transport: transport);
 
       // Создаем клиент роутера с логированием
-      _routerClient = RouterClient(callerEndpoint: endpoint, logger: RpcLogger('ChatClient'));
+      _routerClient = RouterClientWithReconnect(
+        serverUri: Uri.parse(serverUrl),
+        reconnectConfig: ReconnectConfig(
+          strategy: ReconnectStrategy.exponentialBackoff,
+          enableJitter: true,
+        ),
+        logger: RpcLogger('ChatClient'),
+      );
 
       // Регистрируемся в роутере
       _clientId = await _routerClient!.register(

@@ -37,6 +37,9 @@ export 'router_contract.dart';
 // Клиентская часть
 export 'router_client.dart';
 
+// Клиент с автоматическим переподключением
+export 'router_client_with_reconnect.dart';
+
 // Основные модели данных
 export 'router_models.dart';
 
