@@ -96,7 +96,7 @@ class RouterCLI {
   final RpcLogger logger;
 
   /// Транспорт-агностичный роутер сервер
-  late final RouterServer _routerServer;
+  late final RpcRouterServer _routerServer;
 
   /// Активные серверы по типам транспорта
   final Map<TransportType, HttpServer> _servers = {};
@@ -126,7 +126,7 @@ class RouterCLI {
 
     try {
       // Создаем транспорт-агностичный роутер
-      _routerServer = RouterServer(
+      _routerServer = RpcRouterServer(
         logger: logger.child('RouterServer'),
       );
 

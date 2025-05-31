@@ -22,7 +22,7 @@ Future<void> runHttp2RouterServer() async {
   final logger = RpcLogger('RouterHTTP2Server');
 
   // Создаем транспорт-агностичный роутер сервер
-  final routerServer = RouterServer(
+  final routerServer = RpcRouterServer(
     logger: logger,
   );
 
@@ -61,7 +61,7 @@ Future<void> runHttp2RouterServer() async {
 /// Обрабатывает HTTP/2 соединение
 void _handleHttp2Connection(
   HttpRequest request,
-  RouterServer routerServer,
+  RpcRouterServer routerServer,
   RpcLogger logger,
 ) async {
   try {

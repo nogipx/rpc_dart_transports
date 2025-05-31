@@ -18,14 +18,14 @@ import 'connections/event_subscription.dart';
 /// - Прямых запросов к роутеру (ping, getClients, etc.)
 /// - P2P сообщений между клиентами
 /// - Подписки на события роутера
-class RouterClient {
+class RpcRouterClient {
   static const String _serviceName = 'router';
 
   /// ID клиента, полученный при регистрации
   String? _clientId;
 
   /// RPC клиент для прямых вызовов
-  late final RouterRpcClient _rpcClient;
+  late final RpcClient _rpcClient;
 
   /// P2P соединение
   RouterP2PConnection? _p2pConnection;
@@ -35,13 +35,13 @@ class RouterClient {
 
   final RpcLogger? _logger;
 
-  RouterClient({
+  RpcRouterClient({
     required RpcCallerEndpoint callerEndpoint,
     RpcLogger? logger,
     Duration heartbeatInterval = const Duration(seconds: 20),
   }) : _logger = logger?.child('RouterClient') {
     // Инициализируем компоненты
-    _rpcClient = RouterRpcClient(
+    _rpcClient = RpcClient(
       callerEndpoint: callerEndpoint,
       serviceName: _serviceName,
       logger: _logger,
@@ -126,8 +126,8 @@ class RouterClient {
     if (_p2pConnection != null && _p2pConnection!.isInitialized) {
       _p2pConnection!.sendHeartbeat();
     } else {
-      _logger?.warning(
-          'P2P не инициализировано, heartbeat недоступен. Используйте initializeP2P()');
+      _logger
+          ?.warning('P2P не инициализировано, heartbeat недоступен. Используйте initializeP2P()');
     }
   }
 
@@ -140,8 +140,7 @@ class RouterClient {
     bool filterRouterHeartbeats = true,
   }) async {
     if (_clientId == null) {
-      throw StateError(
-          'Клиент должен быть зарегистрирован перед инициализацией P2P');
+      throw StateError('Клиент должен быть зарегистрирован перед инициализацией P2P');
     }
 
     _logger?.info('Инициализация P2P соединения для клиента: $_clientId');
@@ -162,8 +161,7 @@ class RouterClient {
   }
 
   /// Отправляет unicast сообщение
-  Future<void> sendUnicast(
-      String targetId, Map<String, dynamic> payload) async {
+  Future<void> sendUnicast(String targetId, Map<String, dynamic> payload) async {
     _ensureP2PInitialized();
 
     final message = RouterMessage.unicast(
@@ -177,10 +175,8 @@ class RouterClient {
   }
 
   /// Отправляет multicast сообщение
-  Future<void> sendMulticast(
-      String groupName, Map<String, dynamic> payload) async {
-    _logger?.debug(
-        'Отправляем multicast в группу "$groupName" от клиента $_clientId');
+  Future<void> sendMulticast(String groupName, Map<String, dynamic> payload) async {
+    _logger?.debug('Отправляем multicast в группу "$groupName" от клиента $_clientId');
     _ensureP2PInitialized();
 
     final message = RouterMessage.multicast(
@@ -190,8 +186,7 @@ class RouterClient {
     );
 
     _p2pConnection!.sendMessage(message);
-    _logger?.debug(
-        'Multicast сообщение отправлено: $_clientId -> группа $groupName');
+    _logger?.debug('Multicast сообщение отправлено: $_clientId -> группа $groupName');
   }
 
   /// Отправляет broadcast сообщение
@@ -246,8 +241,7 @@ class RouterClient {
   void _ensureP2PInitialized() {
     if (_p2pConnection == null || !_p2pConnection!.isInitialized) {
       _logger?.error('P2P соединение не инициализировано');
-      throw StateError(
-          'P2P соединение не инициализировано. Вызовите initializeP2P()');
+      throw StateError('P2P соединение не инициализировано. Вызовите initializeP2P()');
     }
   }
 

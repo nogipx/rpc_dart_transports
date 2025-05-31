@@ -12,7 +12,7 @@ import 'global_message_bus.dart';
 ///
 /// Может работать с любым транспортом: WebSocket, HTTP/2, изоляты и т.д.
 /// Управляет общим состоянием роутера между всеми соединениями.
-class RouterServer {
+class RpcRouterServer {
   /// Общая реализация роутера для всех соединений
   final RouterResponderImpl _sharedRouterImpl;
 
@@ -28,7 +28,7 @@ class RouterServer {
   /// Активные контракты
   final Map<String, RouterResponderContract> _contracts = {};
 
-  RouterServer({
+  RpcRouterServer({
     RpcLogger? logger,
     RouterResponderImpl? sharedRouterImpl,
   })  : _logger = logger?.child('RouterServer'),

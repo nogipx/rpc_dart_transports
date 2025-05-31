@@ -37,8 +37,7 @@ void main() {
     });
 
     group('Основная функциональность', () {
-      test('должен регистрировать клиента и возвращать уникальный ID',
-          () async {
+      test('должен регистрировать клиента и возвращать уникальный ID', () async {
         // Arrange & Act
         final client = await _createTestClient('TestClient', port);
 
@@ -101,10 +100,7 @@ void main() {
         // Даем время для установки P2P соединений
         await Future.delayed(Duration(milliseconds: 100));
 
-        final testMessage = {
-          'text': 'Hello Bob!',
-          'timestamp': DateTime.now().toIso8601String()
-        };
+        final testMessage = {'text': 'Hello Bob!', 'timestamp': DateTime.now().toIso8601String()};
 
         // Act
         await alice.sendUnicast(bob.clientId!, testMessage);
@@ -123,8 +119,7 @@ void main() {
         await bob.dispose();
       });
 
-      test('должен отправлять ошибку при unicast несуществующему клиенту',
-          () async {
+      test('должен отправлять ошибку при unicast несуществующему клиенту', () async {
         // Arrange
         final alice = await _createTestClient('Alice', port);
 
@@ -148,11 +143,9 @@ void main() {
         await alice.dispose();
       });
 
-      test(
-          'должен отправлять broadcast сообщение всем клиентам кроме отправителя',
-          () async {
+      test('должен отправлять broadcast сообщение всем клиентам кроме отправителя', () async {
         // Arrange
-        final clients = <RouterClient>[];
+        final clients = <RpcRouterClient>[];
         final messagesPerClient = <List<RouterMessage>>[];
 
         // Создаем 3 клиента
@@ -177,8 +170,8 @@ void main() {
         await clients[0].sendBroadcast(broadcastMessage);
 
         // Assert
-        await _waitForCondition(() =>
-            messagesPerClient.skip(1).every((messages) => messages.isNotEmpty));
+        await _waitForCondition(
+            () => messagesPerClient.skip(1).every((messages) => messages.isNotEmpty));
 
         // Отправитель не должен получить свое сообщение
         expect(messagesPerClient[0], isEmpty);
@@ -227,7 +220,7 @@ void main() {
       test('должен обрабатывать множественные соединения', () async {
         // Arrange
         const clientCount = 5;
-        final clients = <RouterClient>[];
+        final clients = <RpcRouterClient>[];
 
         // Act
         for (int i = 0; i < clientCount; i++) {
@@ -271,8 +264,7 @@ void main() {
 
         // Act - отправляем сообщения последовательно
         for (int i = 0; i < messageCount; i++) {
-          await alice.sendUnicast(
-              bob.clientId!, {'messageId': i, 'content': 'Message $i'});
+          await alice.sendUnicast(bob.clientId!, {'messageId': i, 'content': 'Message $i'});
           // Небольшая пауза между сообщениями
           await Future.delayed(Duration(milliseconds: 50));
         }
@@ -338,7 +330,7 @@ Future<_ServerSetup> _startRouterServer(int port) async {
 }
 
 /// Создает и регистрирует тестового клиента
-Future<RouterClient> _createTestClient(String name, int port) async {
+Future<RpcRouterClient> _createTestClient(String name, int port) async {
   final transport = RpcWebSocketCallerTransport.connect(
     Uri.parse('ws://localhost:$port'),
   );
@@ -348,7 +340,7 @@ Future<RouterClient> _createTestClient(String name, int port) async {
     debugLabel: 'TestClient_$name',
   );
 
-  final client = RouterClient(
+  final client = RpcRouterClient(
     callerEndpoint: endpoint,
   );
 
