@@ -7,7 +7,9 @@ import 'dart:async';
 import 'package:rpc_dart/rpc_dart.dart';
 
 import 'router_models.dart';
-import 'models/_index.dart';
+import 'connections/rpc_client.dart';
+import 'connections/p2p_connection.dart';
+import 'connections/event_subscription.dart';
 
 /// Программный интерфейс для работы с роутером
 ///
@@ -17,34 +19,19 @@ import 'models/_index.dart';
 /// - P2P сообщений между клиентами
 /// - Подписки на события роутера
 class RouterClient {
-  final RpcCallerEndpoint _callerEndpoint;
-  final String _serviceName = 'router';
+  static const String _serviceName = 'router';
 
   /// ID клиента, полученный при регистрации
   String? _clientId;
 
-  /// Стрим для P2P сообщений
-  StreamController<RouterMessage>? _p2pStreamController;
-  Stream<RouterMessage>? _p2pResponseStream;
+  /// RPC клиент для прямых вызовов
+  late final RouterRpcClient _rpcClient;
 
-  /// Активные запросы: requestId -> Completer
-  final Map<String, Completer<Map<String, dynamic>>> _activeRequests = {};
+  /// P2P соединение
+  RouterP2PConnection? _p2pConnection;
 
-  /// Таймеры для активных запросов: requestId -> Timer
-  final Map<String, Timer> _requestTimers = {};
-
-  /// Стрим событий роутера
-  StreamSubscription<RouterEvent>? _eventsSubscription;
-  final StreamController<RouterEvent> _eventsController = StreamController.broadcast();
-
-  /// Таймер для автоматического heartbeat
-  Timer? _heartbeatTimer;
-
-  /// Интервал автоматического heartbeat (по умолчанию 20 секунд)
-  final Duration _heartbeatInterval;
-
-  /// Включен ли автоматический heartbeat
-  bool _autoHeartbeatEnabled = false;
+  /// Подписка на события
+  late final RouterEventSubscription _eventSubscription;
 
   final RpcLogger? _logger;
 
@@ -52,9 +39,20 @@ class RouterClient {
     required RpcCallerEndpoint callerEndpoint,
     RpcLogger? logger,
     Duration heartbeatInterval = const Duration(seconds: 20),
-  })  : _callerEndpoint = callerEndpoint,
-        _logger = logger?.child('RouterClient'),
-        _heartbeatInterval = heartbeatInterval;
+  }) : _logger = logger?.child('RouterClient') {
+    // Инициализируем компоненты
+    _rpcClient = RouterRpcClient(
+      callerEndpoint: callerEndpoint,
+      serviceName: _serviceName,
+      logger: _logger,
+    );
+
+    _eventSubscription = RouterEventSubscription(
+      callerEndpoint: callerEndpoint,
+      serviceName: _serviceName,
+      logger: _logger,
+    );
+  }
 
   /// Получает ID клиента (если зарегистрирован)
   String? get clientId => _clientId;
@@ -63,7 +61,7 @@ class RouterClient {
   bool get isRegistered => _clientId != null;
 
   /// Стрим событий роутера
-  Stream<RouterEvent> get events => _eventsController.stream;
+  Stream<RouterEvent> get events => _eventSubscription.events;
 
   // === ПРЯМЫЕ RPC ЗАПРОСЫ К РОУТЕРУ ===
 
@@ -73,50 +71,17 @@ class RouterClient {
     List<String>? groups,
     Map<String, dynamic>? metadata,
   }) async {
-    _logger?.info('Регистрация клиента: $clientName');
-
-    final request = RouterRegisterRequest(
+    _clientId = await _rpcClient.register(
       clientName: clientName,
       groups: groups,
       metadata: metadata,
     );
-
-    final response =
-        await _callerEndpoint.unaryRequest<RouterRegisterRequest, RouterRegisterResponse>(
-      serviceName: _serviceName,
-      methodName: 'register',
-      requestCodec: RpcCodec<RouterRegisterRequest>((json) => RouterRegisterRequest.fromJson(json)),
-      responseCodec:
-          RpcCodec<RouterRegisterResponse>((json) => RouterRegisterResponse.fromJson(json)),
-      request: request,
-    );
-
-    if (!response.success) {
-      throw Exception('Ошибка регистрации: ${response.errorMessage}');
-    }
-
-    _clientId = response.clientId;
-    _logger?.info('Клиент зарегистрирован с ID: $_clientId');
-
     return _clientId!;
   }
 
   /// Пингует роутер
   Future<Duration> ping() async {
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
-
-    final response = await _callerEndpoint.unaryRequest<RpcInt, RouterPongResponse>(
-      serviceName: _serviceName,
-      methodName: 'ping',
-      requestCodec: RpcCodec<RpcInt>((json) => RpcInt.fromJson(json)),
-      responseCodec: RpcCodec<RouterPongResponse>((json) => RouterPongResponse.fromJson(json)),
-      request: RpcInt(timestamp),
-    );
-
-    final latency = Duration(milliseconds: response.serverTimestamp - timestamp);
-    _logger?.debug('Ping: ${latency.inMilliseconds}ms');
-
-    return latency;
+    return _rpcClient.ping();
   }
 
   /// Получает список онлайн клиентов
@@ -124,35 +89,10 @@ class RouterClient {
     List<String>? groups,
     Map<String, dynamic>? metadata,
   }) async {
-    _logger?.debug('Запрос списка онлайн клиентов (фильтры: groups=$groups, metadata=$metadata)');
-
-    try {
-      final request = RouterGetOnlineClientsRequest(
-        groups: groups,
-        metadata: metadata,
-      );
-
-      _logger?.debug('Отправляем unary запрос getOnlineClients');
-      final response =
-          await _callerEndpoint.unaryRequest<RouterGetOnlineClientsRequest, RouterClientsList>(
-        serviceName: _serviceName,
-        methodName: 'getOnlineClients',
-        requestCodec: RpcCodec<RouterGetOnlineClientsRequest>(
-            (json) => RouterGetOnlineClientsRequest.fromJson(json)),
-        responseCodec: RpcCodec<RouterClientsList>((json) => RouterClientsList.fromJson(json)),
-        request: request,
-      );
-
-      _logger?.info('Получен список из ${response.clients.length} клиентов');
-      for (final client in response.clients) {
-        _logger?.debug('  - ${client.clientName} (${client.clientId}) в группах: ${client.groups}');
-      }
-
-      return response.clients;
-    } catch (e, stackTrace) {
-      _logger?.error('Ошибка получения списка клиентов: $e', error: e, stackTrace: stackTrace);
-      rethrow;
-    }
+    return _rpcClient.getOnlineClients(
+      groups: groups,
+      metadata: metadata,
+    );
   }
 
   /// Обновляет метаданные клиента
@@ -161,18 +101,16 @@ class RouterClient {
       throw StateError('Клиент должен быть зарегистрирован');
     }
 
-    // Используем P2P поток если инициализирован
-    if (_p2pStreamController != null) {
+    if (_p2pConnection != null && _p2pConnection!.isInitialized) {
       final updateMessage = RouterMessage.updateMetadata(
         metadata: metadata,
         senderId: _clientId,
       );
 
-      _p2pStreamController!.add(updateMessage);
+      _p2pConnection!.sendMessage(updateMessage);
       _logger?.debug('Обновление метаданных отправлено через P2P: $metadata');
-      return true; // P2P метод не возвращает результат
+      return true;
     } else {
-      // Fallback на unary метод (УСТАРЕЛ - больше не поддерживается сервером)
       _logger?.warning(
           'P2P не инициализировано, updateMetadata недоступен. Используйте initializeP2P()');
       return false;
@@ -185,11 +123,9 @@ class RouterClient {
       throw StateError('Клиент должен быть зарегистрирован');
     }
 
-    // Используем P2P поток если инициализирован
-    if (_p2pStreamController != null) {
-      sendHeartbeat();
+    if (_p2pConnection != null && _p2pConnection!.isInitialized) {
+      _p2pConnection!.sendHeartbeat();
     } else {
-      // Fallback на unary метод (УСТАРЕЛ - больше не поддерживается сервером)
       _logger
           ?.warning('P2P не инициализировано, heartbeat недоступен. Используйте initializeP2P()');
     }
@@ -201,9 +137,6 @@ class RouterClient {
   Future<void> initializeP2P({
     void Function(RouterMessage message)? onP2PMessage,
     bool enableAutoHeartbeat = true,
-
-    /// Если true, скрывает служебные heartbeat сообщения от роутера в onP2PMessage.
-    /// Оставьте false для отладки соединений.
     bool filterRouterHeartbeats = true,
   }) async {
     if (_clientId == null) {
@@ -212,136 +145,19 @@ class RouterClient {
 
     _logger?.info('Инициализация P2P соединения для клиента: $_clientId');
 
-    try {
-      // Создаем стрим контроллер для исходящих сообщений
-      _logger?.debug('Создаем StreamController для исходящих P2P сообщений');
-      _p2pStreamController = StreamController<RouterMessage>();
-
-      // Подключаемся к P2P транспорту
-      _logger?.debug('Подключаемся к bidirectionalStream router.p2p');
-      _p2pResponseStream = _callerEndpoint.bidirectionalStream<RouterMessage, RouterMessage>(
-        serviceName: _serviceName,
-        methodName: 'p2p',
-        requests: _p2pStreamController!.stream,
-        requestCodec: RpcCodec<RouterMessage>((json) => RouterMessage.fromJson(json)),
-        responseCodec: RpcCodec<RouterMessage>((json) => RouterMessage.fromJson(json)),
-      );
-      _logger?.debug('BidirectionalStream создан успешно');
-
-      // Слушаем ответы и пересылаем в колбэк
-      _logger?.debug('Настраиваем слушатель P2P сообщений');
-      _p2pResponseStream!.listen(
-        (message) {
-          _logger?.debug('Получено P2P сообщение: ${message.type} от ${message.senderId}');
-
-          // Обрабатываем response сообщения внутри клиента
-          if (message.type == RouterMessageType.response) {
-            _handleResponse(message);
-          }
-
-          // Обрабатываем подтверждение соединения от роутера
-          if (message.type == RouterMessageType.heartbeat &&
-              message.senderId == 'router' &&
-              message.payload?['connected'] == true) {
-            _logger?.info('P2P соединение подтверждено роутером');
-          }
-
-          // Фильтруем служебные heartbeat'ы от роутера если включена фильтрация
-          final shouldFilterHeartbeat = filterRouterHeartbeats &&
-              message.type == RouterMessageType.heartbeat &&
-              message.senderId == 'router';
-
-          // Передаем сообщения в пользовательский колбэк (кроме отфильтрованных)
-          if (!shouldFilterHeartbeat) {
-            onP2PMessage?.call(message);
-          }
-        },
-        onError: (error) {
-          _logger?.error('Ошибка в P2P стриме: $error');
-          _stopAutoHeartbeat();
-        },
-        onDone: () {
-          _logger?.info('P2P стрим закрыт');
-          _stopAutoHeartbeat();
-        },
-      );
-
-      // Отправляем первое сообщение для привязки к зарегистрированному клиенту
-      _logger?.debug('Отправляем identity heartbeat для привязки клиента');
-      final identityMessage = RouterMessage(
-        type: RouterMessageType.heartbeat,
-        senderId: _clientId,
-        timestamp: DateTime.now().millisecondsSinceEpoch,
-      );
-      _p2pStreamController!.add(identityMessage);
-      _logger?.debug('Identity heartbeat отправлен');
-
-      // Включаем автоматический heartbeat если запрошено
-      if (enableAutoHeartbeat) {
-        _startAutoHeartbeat();
-      }
-
-      _logger?.info('P2P соединение инициализировано для клиента: $_clientId');
-    } catch (e, stackTrace) {
-      _logger?.error('Ошибка инициализации P2P: $e', error: e, stackTrace: stackTrace);
-
-      // Очищаем состояние при ошибке
-      _p2pStreamController?.close();
-      _p2pStreamController = null;
-      _p2pResponseStream = null;
-
-      rethrow; // Пробрасываем ошибку дальше
-    }
-  }
-
-  /// Запускает автоматический heartbeat
-  void _startAutoHeartbeat() {
-    if (_autoHeartbeatEnabled) {
-      return; // Уже запущен
-    }
-
-    _autoHeartbeatEnabled = true;
-    _logger?.info('Запуск автоматического heartbeat (интервал: ${_heartbeatInterval.inSeconds}s)');
-
-    _heartbeatTimer = Timer.periodic(_heartbeatInterval, (_) {
-      if (_p2pStreamController != null && !_p2pStreamController!.isClosed) {
-        try {
-          sendHeartbeat();
-        } catch (e) {
-          _logger?.error('Ошибка автоматического heartbeat: $e');
-        }
-      } else {
-        _stopAutoHeartbeat();
-      }
-    });
-  }
-
-  /// Останавливает автоматический heartbeat
-  void _stopAutoHeartbeat() {
-    if (!_autoHeartbeatEnabled) {
-      return; // Уже остановлен
-    }
-
-    _autoHeartbeatEnabled = false;
-    _heartbeatTimer?.cancel();
-    _heartbeatTimer = null;
-    _logger?.debug('Автоматический heartbeat остановлен');
-  }
-
-  /// Отправляет heartbeat через P2P поток
-  void sendHeartbeat() {
-    if (!isRegistered || _p2pStreamController == null) {
-      throw StateError('P2P соединение не инициализировано');
-    }
-
-    final heartbeatMessage = RouterMessage(
-      type: RouterMessageType.heartbeat,
-      senderId: _clientId,
-      timestamp: DateTime.now().millisecondsSinceEpoch,
+    // Создаем новое P2P соединение
+    _p2pConnection = RouterP2PConnection(
+      callerEndpoint: _rpcClient.callerEndpoint,
+      serviceName: _serviceName,
+      clientId: _clientId,
+      logger: _logger,
     );
 
-    _p2pStreamController!.add(heartbeatMessage);
-    _logger?.debug('Heartbeat отправлен');
+    await _p2pConnection!.initialize(
+      onP2PMessage: onP2PMessage,
+      enableAutoHeartbeat: enableAutoHeartbeat,
+      filterRouterHeartbeats: filterRouterHeartbeats,
+    );
   }
 
   /// Отправляет unicast сообщение
@@ -354,14 +170,13 @@ class RouterClient {
       senderId: _clientId,
     );
 
-    _p2pStreamController!.add(message);
+    _p2pConnection!.sendMessage(message);
     _logger?.debug('Отправлен unicast: $_clientId -> $targetId');
   }
 
   /// Отправляет multicast сообщение
   Future<void> sendMulticast(String groupName, Map<String, dynamic> payload) async {
     _logger?.debug('Отправляем multicast в группу "$groupName" от клиента $_clientId');
-
     _ensureP2PInitialized();
 
     final message = RouterMessage.multicast(
@@ -370,7 +185,7 @@ class RouterClient {
       senderId: _clientId,
     );
 
-    _p2pStreamController!.add(message);
+    _p2pConnection!.sendMessage(message);
     _logger?.debug('Multicast сообщение отправлено: $_clientId -> группа $groupName');
   }
 
@@ -383,14 +198,14 @@ class RouterClient {
       senderId: _clientId,
     );
 
-    _p2pStreamController!.add(message);
+    _p2pConnection!.sendMessage(message);
     _logger?.debug('Отправлен broadcast от $_clientId');
   }
 
   /// Отправляет произвольное P2P сообщение
   Future<void> sendP2PMessage(RouterMessage message) async {
     _ensureP2PInitialized();
-    _p2pStreamController!.add(message);
+    _p2pConnection!.sendMessage(message);
     _logger?.debug('Отправлено P2P сообщение: ${message.type}');
   }
 
@@ -402,135 +217,46 @@ class RouterClient {
   }) async {
     _ensureP2PInitialized();
 
-    final requestId = 'req_${DateTime.now().millisecondsSinceEpoch}';
-    final completer = Completer<Map<String, dynamic>>();
-
-    // Сохраняем completer для обработки ответа
-    _activeRequests[requestId] = completer;
-
-    // Устанавливаем таймер
-    _requestTimers[requestId] = Timer(timeout, () {
-      if (_activeRequests.containsKey(requestId)) {
-        _activeRequests.remove(requestId);
-        _requestTimers.remove(requestId);
-        if (!completer.isCompleted) {
-          completer.completeError(TimeoutException('Request timeout', timeout));
-        }
-      }
-    });
-
-    // Отправляем запрос
-    final message = RouterMessage.request(
-      targetId: targetId,
-      requestId: requestId,
-      payload: payload,
-      senderId: _clientId,
+    return _p2pConnection!.sendRequest(
+      targetId,
+      payload,
+      timeout: timeout,
     );
-
-    _p2pStreamController!.add(message);
-    _logger?.debug('Отправлен request: $_clientId -> $targetId (requestId: $requestId)');
-
-    return completer.future;
-  }
-
-  /// Обрабатывает входящий response
-  void _handleResponse(RouterMessage message) {
-    final requestId = message.payload?['requestId'] as String?;
-    if (requestId == null) return;
-
-    final completer = _activeRequests.remove(requestId);
-    final timer = _requestTimers.remove(requestId);
-
-    if (completer != null && !completer.isCompleted) {
-      timer?.cancel();
-
-      if (message.success == true) {
-        // Убираем requestId из payload для ответа
-        final responsePayload = Map<String, dynamic>.from(message.payload ?? {});
-        responsePayload.remove('requestId');
-        completer.complete(responsePayload);
-      } else {
-        completer.completeError(Exception(message.errorMessage ?? 'Request failed'));
-      }
-    }
   }
 
   // === СОБЫТИЯ РОУТЕРА ===
 
   /// Подписывается на события роутера
   Future<void> subscribeToEvents() async {
-    if (_eventsSubscription != null) {
-      _logger?.warning('Уже подписан на события роутера');
-      return;
-    }
-
-    final eventStream = _callerEndpoint.serverStream<RpcNull, RouterEvent>(
-      serviceName: _serviceName,
-      methodName: 'events',
-      request: const RpcNull(),
-      requestCodec: RpcCodec<RpcNull>((json) => RpcNull.fromJson(json)),
-      responseCodec: RpcCodec<RouterEvent>((json) => RouterEvent.fromJson(json)),
-    );
-
-    _eventsSubscription = eventStream.listen(
-      (event) {
-        _logger?.debug('Получено событие роутера: ${event.type}');
-        _eventsController.add(event);
-      },
-      onError: (error) {
-        _logger?.error('Ошибка в стриме событий роутера: $error');
-        _eventsController.addError(error);
-      },
-    );
-
-    _logger?.info('Подписка на события роутера активирована');
+    await _eventSubscription.subscribe();
   }
 
   /// Отписывается от событий роутера
   Future<void> unsubscribeFromEvents() async {
-    await _eventsSubscription?.cancel();
-    _eventsSubscription = null;
-    _logger?.info('Отписка от событий роутера');
+    await _eventSubscription.unsubscribe();
   }
 
   // === ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ===
 
   void _ensureP2PInitialized() {
-    _logger?.debug('Проверяем состояние P2P (clientId: $_clientId, '
-        'streamController: ${_p2pStreamController != null}, '
-        'responseStream: ${_p2pResponseStream != null})');
-
-    if (_p2pStreamController == null) {
+    if (_p2pConnection == null || !_p2pConnection!.isInitialized) {
       _logger?.error('P2P соединение не инициализировано');
       throw StateError('P2P соединение не инициализировано. Вызовите initializeP2P()');
     }
-
-    _logger?.debug('P2P соединение готово');
   }
 
   /// Закрывает все соединения
   Future<void> dispose() async {
     _logger?.info('Закрытие RouterClient...');
 
-    // Останавливаем автоматический heartbeat
-    _stopAutoHeartbeat();
-
-    // Отменяем все активные запросы
-    for (final timer in _requestTimers.values) {
-      timer.cancel();
-    }
-    _activeRequests.clear();
-    _requestTimers.clear();
-
     // Закрываем P2P соединение
-    await _p2pStreamController?.close();
-    _p2pStreamController = null;
+    if (_p2pConnection != null) {
+      await _p2pConnection!.dispose();
+      _p2pConnection = null;
+    }
 
     // Отписываемся от событий
-    await _eventsSubscription?.cancel();
-    _eventsSubscription = null;
-
-    await _eventsController.close();
+    await _eventSubscription.dispose();
 
     _logger?.info('RouterClient закрыт');
   }

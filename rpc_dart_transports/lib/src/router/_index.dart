@@ -23,6 +23,11 @@ export 'implementations/router_responder.dart';
 // Обработчики
 export 'handlers/message_handler.dart';
 
+// Соединения
+export 'connections/rpc_client.dart';
+export 'connections/p2p_connection.dart';
+export 'connections/event_subscription.dart';
+
 // RPC контракты
 export 'router_contract.dart';
 
