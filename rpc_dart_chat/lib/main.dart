@@ -53,7 +53,7 @@ class _ChatScreenState extends State<ChatScreen> {
       });
 
       // Подключаемся к роутеру через WebSocket
-      final channel = WebSocketChannel.connect(Uri.parse('ws://localhost:8080'));
+      final channel = WebSocketChannel.connect(Uri.parse('ws://192.168.1.121:8000'));
       final transport = RpcWebSocketCallerTransport(channel);
       final endpoint = RpcCallerEndpoint(transport: transport);
 
