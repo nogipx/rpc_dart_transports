@@ -13,7 +13,136 @@ and the Flutter guide for
 
 # RPC Dart Transports
 
-Пакет с транспортными уровнями для RPC Dart, включающий WebSocket, Isolate и Router транспорты.
+Библиотека транспортов для RPC Dart - предоставляет различные способы передачи RPC сообщений.
+
+## Поддерживаемые транспорты
+
+### 🌐 WebSocket Transport
+- Двунаправленная связь через WebSocket
+- Поддержка мультиплексирования потоков
+- Автоматическое переподключение
+
+### 🔄 Isolate Transport  
+- Связь между Dart изолятами
+- Высокая производительность для CPU-интенсивных задач
+- Изоляция ошибок
+
+### 🚀 HTTP/2 Transport (NEW!)
+- Современный HTTP/2 протокол
+- gRPC-совместимый формат сообщений
+- Мультиплексирование потоков
+- Поддержка TLS/SSL
+
+### 🔀 Router
+- Маршрутизация сообщений между клиентами
+- P2P соединения через центральный роутер
+- Управление группами клиентов
+
+## HTTP/2 Transport
+
+HTTP/2 транспорт реализует gRPC-совместимый протокол поверх HTTP/2. Поддерживает как клиентские, так и серверные соединения.
+
+### Особенности
+
+- **Мультиплексирование**: Множественные RPC вызовы через одно соединение
+- **gRPC совместимость**: Использует стандартные gRPC headers и frame формат
+- **TLS поддержка**: Защищенные HTTPS соединения
+- **Stream управление**: Автоматическое управление HTTP/2 streams
+
+### Использование
+
+#### Клиентское соединение
+
+```dart
+import 'package:rpc_dart_transports/rpc_dart_transports.dart';
+
+// HTTP соединение
+final transport = await Http2ClientTransport.connect(
+  host: 'localhost',
+  port: 8080,
+);
+
+// HTTPS соединение
+final secureTransport = await Http2ClientTransport.secureConnect(
+  host: 'api.example.com',
+  port: 443,
+);
+
+// Создание RPC вызова
+final streamId = transport.createStream();
+final metadata = RpcMetadata.forClientRequest('MyService', 'MyMethod');
+
+await transport.sendMetadata(streamId, metadata);
+await transport.sendMessage(streamId, requestData);
+await transport.finishSending(streamId);
+
+// Обработка ответов
+transport.getMessagesForStream(streamId).listen((message) {
+  if (message.payload != null) {
+    // Обработка данных ответа
+    print('Received: ${utf8.decode(message.payload!)}');
+  }
+});
+```
+
+#### Серверное соединение
+
+```dart
+import 'package:http2/http2.dart' as http2;
+
+// Создание HTTP/2 сервера (требует дополнительной настройки)
+final serverConnection = http2.ServerTransportConnection.viaSocket(socket);
+final transport = Http2ServerTransport.create(
+  connection: serverConnection,
+  logger: logger,
+);
+
+// Обработка входящих сообщений
+transport.incomingMessages.listen((message) {
+  if (message.isMetadataOnly) {
+    // Обработка метаданных запроса
+    print('Method: ${message.methodPath}');
+  } else if (message.payload != null) {
+    // Обработка данных запроса
+    final requestData = message.payload!;
+    
+    // Отправка ответа
+    final responseData = processRequest(requestData);
+    transport.sendMessage(message.streamId, responseData);
+    transport.finishSending(message.streamId);
+  }
+});
+```
+
+### gRPC совместимость
+
+HTTP/2 транспорт использует стандартный gRPC протокол:
+
+- **Headers**: Стандартные HTTP/2 pseudo-headers (`:method`, `:path`, `:scheme`, `:authority`)
+- **Content-Type**: `application/grpc+proto`
+- **Frame format**: 5-байтовый префикс + protobuf данные
+- **Status codes**: Стандартные gRPC статус коды
+
+### Примеры
+
+Смотрите `example/http2_example.dart` для полного примера использования.
+
+## Установка
+
+Добавьте в `pubspec.yaml`:
+
+```yaml
+dependencies:
+  rpc_dart_transports:
+    git:
+      url: https://github.com/nogipx/rpc_dart.git
+      ref: main
+      path: rpc_dart_transports
+```
+
+## Лицензия
+
+LGPL-3.0-or-later
 
 ## Компоненты
 
@@ -147,10 +276,6 @@ dart test
 ```
 
 Все тесты проходят: **46/46** ✅
-
-## Лицензия
-
-LGPL-3.0
 
 ## CLI Роутер
 

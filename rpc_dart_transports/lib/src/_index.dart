@@ -5,3 +5,4 @@
 export 'isolate/isolate_transport.dart';
 export 'websocket/_index.dart';
 export 'router/_index.dart';
+export 'http2/_index.dart';
