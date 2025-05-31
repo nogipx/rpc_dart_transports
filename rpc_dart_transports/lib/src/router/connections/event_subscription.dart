@@ -20,7 +20,8 @@ class RouterEventSubscription {
   StreamSubscription<RouterEvent>? _eventsSubscription;
 
   /// Контроллер для публикации событий
-  final StreamController<RouterEvent> _eventsController = StreamController.broadcast();
+  final StreamController<RouterEvent> _eventsController =
+      StreamController.broadcast();
 
   RouterEventSubscription({
     required RpcCallerEndpoint callerEndpoint,
@@ -49,7 +50,8 @@ class RouterEventSubscription {
         methodName: 'events',
         request: const RpcNull(),
         requestCodec: RpcCodec<RpcNull>((json) => RpcNull.fromJson(json)),
-        responseCodec: RpcCodec<RouterEvent>((json) => RouterEvent.fromJson(json)),
+        responseCodec:
+            RpcCodec<RouterEvent>((json) => RouterEvent.fromJson(json)),
       );
 
       _eventsSubscription = eventStream.listen(
@@ -69,7 +71,8 @@ class RouterEventSubscription {
 
       _logger?.info('Подписка на события роутера активирована');
     } catch (e, stackTrace) {
-      _logger?.error('Ошибка подписки на события: $e', error: e, stackTrace: stackTrace);
+      _logger?.error('Ошибка подписки на события: $e',
+          error: e, stackTrace: stackTrace);
       rethrow;
     }
   }

@@ -30,12 +30,14 @@ Future<void> main() async {
   // Эмуляция 2 клиентов для тестирования
 
   print('👤 Эмуляция клиента #1 (мобильный)...');
-  await testClientRegistration('mobile-user-1', ['mobile', 'chat'], routerContract);
+  await testClientRegistration(
+      'mobile-user-1', ['mobile', 'chat'], routerContract);
 
   await Future.delayed(Duration(seconds: 2));
 
   print('\n👤 Эмуляция клиента #2 (десктоп)...');
-  await testClientRegistration('desktop-user-1', ['desktop', 'chat'], routerContract);
+  await testClientRegistration(
+      'desktop-user-1', ['desktop', 'chat'], routerContract);
 
   await Future.delayed(Duration(seconds: 3));
 
@@ -44,7 +46,8 @@ Future<void> main() async {
   print('   - Активных клиентов: ${stats.activeClients}');
   print('   - Всего сообщений: ${stats.totalMessages}');
   print('   - Ошибок: ${stats.errorCount}');
-  print('   - Время работы: ${DateTime.now().difference(stats.startTime!).inSeconds}с');
+  print(
+      '   - Время работы: ${DateTime.now().difference(stats.startTime!).inSeconds}с');
 
   print('\n⏳ Ждем 5 минут для демонстрации очистки неактивных клиентов...');
   print('   (В реальности достаточно 2 минут неактивности)');

@@ -37,7 +37,8 @@ class RouterClientWithReconnect {
       StreamController<ReconnectState>.broadcast();
 
   /// Контроллер для событий роутера (проксирует события из текущего клиента)
-  final StreamController<RouterEvent> _eventsController = StreamController<RouterEvent>.broadcast();
+  final StreamController<RouterEvent> _eventsController =
+      StreamController<RouterEvent>.broadcast();
 
   /// Сохраненные параметры регистрации
   String? _savedClientName;
@@ -129,7 +130,9 @@ class RouterClientWithReconnect {
       );
 
       // Восстанавливаем регистрацию если была
-      if (_savedClientName != null || _savedGroups != null || _savedMetadata != null) {
+      if (_savedClientName != null ||
+          _savedGroups != null ||
+          _savedMetadata != null) {
         await _restoreRegistration();
       }
 
@@ -310,7 +313,8 @@ class RouterClientWithReconnect {
   }
 
   /// Отправляет unicast сообщение
-  Future<void> sendUnicast(String targetId, Map<String, dynamic> payload) async {
+  Future<void> sendUnicast(
+      String targetId, Map<String, dynamic> payload) async {
     if (_routerClient == null) {
       throw StateError('Клиент не подключен');
     }
@@ -318,7 +322,8 @@ class RouterClientWithReconnect {
   }
 
   /// Отправляет multicast сообщение
-  Future<void> sendMulticast(String groupName, Map<String, dynamic> payload) async {
+  Future<void> sendMulticast(
+      String groupName, Map<String, dynamic> payload) async {
     if (_routerClient == null) {
       throw StateError('Клиент не подключен');
     }

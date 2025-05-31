@@ -56,7 +56,8 @@ class RouterMessageHandler {
         handleUpdateMetadata(message, senderId);
         break;
       case RouterMessageType.error:
-        _logger?.warning('Ошибка от клиента $senderId: ${message.errorMessage}');
+        _logger
+            ?.warning('Ошибка от клиента $senderId: ${message.errorMessage}');
         break;
     }
   }
@@ -96,18 +97,21 @@ class RouterMessageHandler {
     }
 
     final forwardedMessage = message.copyWith(senderId: senderId);
-    final sentCount =
-        _messageSender.sendToGroup(groupName, forwardedMessage, excludeClientId: senderId);
+    final sentCount = _messageSender.sendToGroup(groupName, forwardedMessage,
+        excludeClientId: senderId);
 
-    _logger?.debug('Multicast переслан: $senderId -> группа $groupName ($sentCount получателей)');
+    _logger?.debug(
+        'Multicast переслан: $senderId -> группа $groupName ($sentCount получателей)');
   }
 
   /// Обрабатывает broadcast сообщение
   void handleBroadcast(RouterMessage message, String senderId) {
     final forwardedMessage = message.copyWith(senderId: senderId);
-    final sentCount = _messageSender.sendBroadcast(forwardedMessage, excludeClientId: senderId);
+    final sentCount = _messageSender.sendBroadcast(forwardedMessage,
+        excludeClientId: senderId);
 
-    _logger?.debug('Broadcast переслан: $senderId -> все ($sentCount получателей)');
+    _logger?.debug(
+        'Broadcast переслан: $senderId -> все ($sentCount получателей)');
   }
 
   /// Обрабатывает request сообщение
@@ -116,7 +120,8 @@ class RouterMessageHandler {
     final requestId = message.payload?['requestId'] as String?;
 
     if (targetId == null || requestId == null) {
-      _logger?.warning('Request сообщение без targetId или requestId от $senderId');
+      _logger?.warning(
+          'Request сообщение без targetId или requestId от $senderId');
       return;
     }
 
@@ -145,7 +150,8 @@ class RouterMessageHandler {
       });
     }
 
-    _logger?.debug('Request переслан: $senderId -> $targetId (requestId: $requestId)');
+    _logger?.debug(
+        'Request переслан: $senderId -> $targetId (requestId: $requestId)');
   }
 
   /// Обрабатывает response сообщение
@@ -175,7 +181,8 @@ class RouterMessageHandler {
 
     final metadata = message.payload?['metadata'] as Map<String, dynamic>?;
     if (metadata == null) {
-      _logger?.warning('Сообщение updateMetadata без метаданных от клиента: $senderId');
+      _logger?.warning(
+          'Сообщение updateMetadata без метаданных от клиента: $senderId');
       return;
     }
 

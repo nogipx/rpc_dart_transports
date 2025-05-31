@@ -49,13 +49,15 @@ class WebSocketMessageProcessor {
   /// Обрабатывает входящее бинарное сообщение
   List<RpcTransportMessage> _handleBinaryMessage(Uint8List binaryData) {
     try {
-      _logger?.debug('Обработка бинарного сообщения длиной: ${binaryData.length} байт');
+      _logger?.debug(
+          'Обработка бинарного сообщения длиной: ${binaryData.length} байт');
 
       // Пытаемся декодировать заголовок сообщения
       final header = RpcTransportFrame.decode(binaryData);
 
       if (header == null) {
-        _logger?.warning('Невозможно декодировать заголовок транспортного сообщения');
+        _logger?.warning(
+            'Невозможно декодировать заголовок транспортного сообщения');
         return [];
       }
 
@@ -73,8 +75,9 @@ class WebSocketMessageProcessor {
       }
 
       // Извлекаем полезную нагрузку (если есть)
-      final Uint8List? payload =
-          binaryData.length > headerSize ? binaryData.sublist(headerSize) : null;
+      final Uint8List? payload = binaryData.length > headerSize
+          ? binaryData.sublist(headerSize)
+          : null;
 
       _logger?.debug('Размер payload: ${payload?.length} байт');
 
@@ -100,10 +103,12 @@ class WebSocketMessageProcessor {
   }
 
   /// Обрабатывает сообщение с метаданными
-  RpcTransportMessage _processMetadataMessage(RpcTransportFrame header, Uint8List? payload) {
+  RpcTransportMessage _processMetadataMessage(
+      RpcTransportFrame header, Uint8List? payload) {
     final streamId = header.streamId;
 
-    _logger?.debug('Обработка метаданных для stream $streamId, path: ${header.methodPath}');
+    _logger?.debug(
+        'Обработка метаданных для stream $streamId, path: ${header.methodPath}');
 
     // Если есть путь метода, сохраняем его
     if (header.methodPath != null) {
@@ -141,22 +146,26 @@ class WebSocketMessageProcessor {
       methodPath: header.methodPath,
     );
 
-    _logger?.debug('Создано транспортное сообщение с метаданными для stream $streamId');
+    _logger?.debug(
+        'Создано транспортное сообщение с метаданными для stream $streamId');
     return transportMessage;
   }
 
   /// Обрабатывает сообщение с данными
-  List<RpcTransportMessage> _processDataMessage(RpcTransportFrame header, Uint8List? payload) {
+  List<RpcTransportMessage> _processDataMessage(
+      RpcTransportFrame header, Uint8List? payload) {
     final streamId = header.streamId;
 
     _logger?.debug('Обработка данных для stream $streamId');
 
     if (payload == null) {
-      _logger?.warning('Получено сообщение данных без payload для stream $streamId');
+      _logger?.warning(
+          'Получено сообщение данных без payload для stream $streamId');
       return [];
     }
 
-    _logger?.debug('Получены данные размером: ${payload.length} байт для stream $streamId');
+    _logger?.debug(
+        'Получены данные размером: ${payload.length} байт для stream $streamId');
 
     // Используем парсер для обработки gRPC фреймов
     try {
@@ -173,7 +182,8 @@ class WebSocketMessageProcessor {
       }).toList();
     } catch (e) {
       // Если парсер не смог обработать данные, передаем их как есть
-      _logger?.warning('Невозможно декодировать gRPC фрейм, передаем данные как есть: $e');
+      _logger?.warning(
+          'Невозможно декодировать gRPC фрейм, передаем данные как есть: $e');
 
       return [
         RpcTransportMessage(
@@ -211,7 +221,8 @@ class WebSocketMessageProcessor {
 
         // Читаем значение
         if (offset + valueLength > payload.length) break;
-        String value = utf8.decode(payload.sublist(offset, offset + valueLength));
+        String value =
+            utf8.decode(payload.sublist(offset, offset + valueLength));
         offset += valueLength;
 
         headers.add(RpcHeader(name, value));

@@ -38,7 +38,8 @@ void main() async {
         );
 
         // Создаем серверный эндпоинт
-        final endpoint = RpcResponderEndpoint(transport: transport, debugLabel: 'ServerEndpoint');
+        final endpoint = RpcResponderEndpoint(
+            transport: transport, debugLabel: 'ServerEndpoint');
 
         // Регистрируем контракт
         endpoint.registerServiceContract(serverContract);

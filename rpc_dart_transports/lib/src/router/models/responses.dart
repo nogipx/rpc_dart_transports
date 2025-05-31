@@ -69,7 +69,9 @@ class RouterClientsList implements IRpcSerializable {
 
   factory RouterClientsList.fromJson(Map<String, dynamic> json) {
     return RouterClientsList(
-      (json['clients'] as List).map((item) => RouterClientInfo.fromJson(item)).toList(),
+      (json['clients'] as List)
+          .map((item) => RouterClientInfo.fromJson(item))
+          .toList(),
     );
   }
 

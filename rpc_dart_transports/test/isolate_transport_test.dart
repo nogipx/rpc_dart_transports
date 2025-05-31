@@ -118,7 +118,8 @@ void main() {
 
         // Assert
         for (final streamId in streamIds) {
-          expect(streamId % 2, equals(1), reason: 'Stream ID должен быть нечетным');
+          expect(streamId % 2, equals(1),
+              reason: 'Stream ID должен быть нечетным');
         }
 
         // Cleanup
@@ -295,8 +296,9 @@ void main() {
         await Future.delayed(Duration(milliseconds: 200));
 
         // Assert
-        final finishMessages =
-            receivedMessages.where((msg) => msg.isEndOfStream && msg.streamId == streamId).toList();
+        final finishMessages = receivedMessages
+            .where((msg) => msg.isEndOfStream && msg.streamId == streamId)
+            .toList();
 
         expect(finishMessages.length, equals(1)); // Только одно сообщение
 
@@ -325,9 +327,12 @@ void main() {
         transport.getMessagesForStream(streamId2).listen(stream2Messages.add);
 
         // Act
-        await transport.sendMessage(streamId1, Uint8List.fromList('message1'.codeUnits));
-        await transport.sendMessage(streamId2, Uint8List.fromList('message2'.codeUnits));
-        await transport.sendMessage(streamId1, Uint8List.fromList('message3'.codeUnits));
+        await transport.sendMessage(
+            streamId1, Uint8List.fromList('message1'.codeUnits));
+        await transport.sendMessage(
+            streamId2, Uint8List.fromList('message2'.codeUnits));
+        await transport.sendMessage(
+            streamId1, Uint8List.fromList('message3'.codeUnits));
 
         // Даем время для обработки в изоляте
         await Future.delayed(Duration(milliseconds: 200));
@@ -418,9 +423,11 @@ void main() {
         expect(receivedMessages.length, greaterThan(0));
 
         // Проверяем, что получили и метаданные, и данные
-        final metadataMessages = receivedMessages.where((msg) => msg.isMetadataOnly).toList();
-        final dataMessages =
-            receivedMessages.where((msg) => !msg.isMetadataOnly && msg.payload != null).toList();
+        final metadataMessages =
+            receivedMessages.where((msg) => msg.isMetadataOnly).toList();
+        final dataMessages = receivedMessages
+            .where((msg) => !msg.isMetadataOnly && msg.payload != null)
+            .toList();
 
         expect(metadataMessages.length, greaterThan(0));
         expect(dataMessages.length, greaterThan(0));
@@ -479,7 +486,8 @@ void _testEchoServer(IRpcTransport transport, Map<String, dynamic> params) {
 
 /// Сервер для тестирования параметров
 @pragma('vm:entry-point')
-void _testParameterServer(IRpcTransport transport, Map<String, dynamic> params) {
+void _testParameterServer(
+    IRpcTransport transport, Map<String, dynamic> params) {
   final responsePrefix = params['responsePrefix'] as String? ?? '[DEFAULT]: ';
 
   transport.incomingMessages.listen((message) async {
@@ -501,11 +509,13 @@ void _faultyServer(IRpcTransport transport, Map<String, dynamic> params) {
 
 /// Мульти-стрим сервер для тестирования фильтрации
 @pragma('vm:entry-point')
-void _testMultiStreamServer(IRpcTransport transport, Map<String, dynamic> params) {
+void _testMultiStreamServer(
+    IRpcTransport transport, Map<String, dynamic> params) {
   transport.incomingMessages.listen((message) async {
     if (!message.isMetadataOnly && message.payload != null) {
       final originalText = String.fromCharCodes(message.payload!);
-      final responseText = 'Response for stream ${message.streamId}: $originalText';
+      final responseText =
+          'Response for stream ${message.streamId}: $originalText';
       final responseData = Uint8List.fromList(responseText.codeUnits);
 
       await transport.sendMessage(message.streamId, responseData);
@@ -515,7 +525,8 @@ void _testMultiStreamServer(IRpcTransport transport, Map<String, dynamic> params
 
 /// Полный цикл сервер для интеграционных тестов
 @pragma('vm:entry-point')
-void _testFullCycleServer(IRpcTransport transport, Map<String, dynamic> params) {
+void _testFullCycleServer(
+    IRpcTransport transport, Map<String, dynamic> params) {
   final responseCount = params['responseCount'] as int? ?? 1;
 
   transport.incomingMessages.listen((message) async {
@@ -533,7 +544,8 @@ void _testFullCycleServer(IRpcTransport transport, Map<String, dynamic> params) 
 
       // Отправляем финальные метаданные
       final finalMetadata = RpcMetadata.forTrailer(RpcStatus.OK);
-      await transport.sendMetadata(message.streamId, finalMetadata, endStream: true);
+      await transport.sendMetadata(message.streamId, finalMetadata,
+          endStream: true);
     }
   });
 }
@@ -544,8 +556,10 @@ void _testErrorServer(IRpcTransport transport, Map<String, dynamic> params) {
   transport.incomingMessages.listen((message) async {
     if (!message.isMetadataOnly && message.payload != null) {
       // Отправляем ошибку
-      final errorMetadata = RpcMetadata.forTrailer(RpcStatus.INTERNAL, message: 'Test error');
-      await transport.sendMetadata(message.streamId, errorMetadata, endStream: true);
+      final errorMetadata =
+          RpcMetadata.forTrailer(RpcStatus.INTERNAL, message: 'Test error');
+      await transport.sendMetadata(message.streamId, errorMetadata,
+          endStream: true);
     }
   });
 }

@@ -24,11 +24,13 @@ class RouterRpcHandler {
         _logger = logger?.child('RpcHandler');
 
   /// Регистрирует нового клиента
-  Future<RouterRegisterResponse> handleRegister(RouterRegisterRequest request) async {
+  Future<RouterRegisterResponse> handleRegister(
+      RouterRegisterRequest request) async {
     try {
       final clientId = _routerImpl.generateClientId();
 
-      _logger?.info('Предварительная регистрация клиента: $clientId (${request.clientName})');
+      _logger?.info(
+          'Предварительная регистрация клиента: $clientId (${request.clientName})');
 
       // Создаем временный контроллер для начальной регистрации
       // Он будет заменен при установке P2P соединения
@@ -51,14 +53,16 @@ class RouterRpcHandler {
         );
       }
 
-      _logger?.info('Клиент предварительно зарегистрирован: $clientId, ожидается P2P соединение');
+      _logger?.info(
+          'Клиент предварительно зарегистрирован: $clientId, ожидается P2P соединение');
 
       return RouterRegisterResponse(
         clientId: clientId,
         success: success,
       );
     } catch (e, stackTrace) {
-      _logger?.error('Ошибка регистрации клиента: $e', error: e, stackTrace: stackTrace);
+      _logger?.error('Ошибка регистрации клиента: $e',
+          error: e, stackTrace: stackTrace);
       return RouterRegisterResponse(
         clientId: '',
         success: false,
@@ -80,9 +84,11 @@ class RouterRpcHandler {
   }
 
   /// Получает список онлайн клиентов
-  Future<RouterClientsList> handleGetOnlineClients(RouterGetOnlineClientsRequest request) async {
+  Future<RouterClientsList> handleGetOnlineClients(
+      RouterGetOnlineClientsRequest request) async {
     _logger?.info('Запрос списка онлайн клиентов');
-    _logger?.debug('Фильтры: groups=${request.groups}, metadata=${request.metadata}');
+    _logger?.debug(
+        'Фильтры: groups=${request.groups}, metadata=${request.metadata}');
 
     try {
       final clients = _routerImpl.getActiveClients(
@@ -92,12 +98,14 @@ class RouterRpcHandler {
 
       _logger?.info('Найдено клиентов: ${clients.length}');
       for (final client in clients) {
-        _logger?.debug('  - ${client.clientName} (${client.clientId}) в группах: ${client.groups}');
+        _logger?.debug(
+            '  - ${client.clientName} (${client.clientId}) в группах: ${client.groups}');
       }
 
       return RouterClientsList(clients);
     } catch (e, stackTrace) {
-      _logger?.error('Ошибка получения списка клиентов: $e', error: e, stackTrace: stackTrace);
+      _logger?.error('Ошибка получения списка клиентов: $e',
+          error: e, stackTrace: stackTrace);
       rethrow;
     }
   }

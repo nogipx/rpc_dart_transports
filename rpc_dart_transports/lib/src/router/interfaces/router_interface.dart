@@ -46,7 +46,8 @@ abstract interface class IRouterMessageSender {
   bool sendToClient(String clientId, RouterMessage message);
 
   /// Отправить сообщение группе клиентов
-  int sendToGroup(String groupName, RouterMessage message, {String? excludeClientId});
+  int sendToGroup(String groupName, RouterMessage message,
+      {String? excludeClientId});
 
   /// Отправить broadcast сообщение всем клиентам
   int sendBroadcast(RouterMessage message, {String? excludeClientId});
@@ -69,7 +70,11 @@ abstract interface class IRouterEventManager {
 
 /// Полный интерфейс роутера, объединяющий все компоненты
 abstract interface class IRouterContract
-    implements IRouter, IRouterClientManager, IRouterMessageSender, IRouterEventManager {
+    implements
+        IRouter,
+        IRouterClientManager,
+        IRouterMessageSender,
+        IRouterEventManager {
   /// Обработчик регистрации клиента
   Future<bool> registerClient(
     String clientId,
@@ -89,7 +94,8 @@ abstract interface class IRouterContract
   String generateClientId();
 
   /// Заменяет стрим контроллер для клиента (для P2P соединений)
-  bool replaceClientStream(String clientId, StreamController<RouterMessage> newStreamController);
+  bool replaceClientStream(
+      String clientId, StreamController<RouterMessage> newStreamController);
 
   /// Удаляет стрим клиента без полного отключения
   void removeClientStream(String clientId);

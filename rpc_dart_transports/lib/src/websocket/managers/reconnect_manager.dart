@@ -153,7 +153,8 @@ class WebSocketReconnectManager {
     if (_shouldReconnect()) {
       _scheduleReconnect();
     } else {
-      _logger?.info('Достигнуто максимальное количество попыток переподключения');
+      _logger
+          ?.info('Достигнуто максимальное количество попыток переподключения');
       _setState(ReconnectState.stopped);
     }
   }
@@ -250,7 +251,8 @@ class WebSocketReconnectManager {
 
       case ReconnectStrategy.linear:
         final linearDelay = Duration(
-          milliseconds: _config.initialDelay.inMilliseconds * (_attemptCount + 1),
+          milliseconds:
+              _config.initialDelay.inMilliseconds * (_attemptCount + 1),
         );
         return _capDelay(linearDelay);
 
@@ -263,7 +265,8 @@ class WebSocketReconnectManager {
   void _updateDelay() {
     if (_config.strategy == ReconnectStrategy.exponentialBackoff) {
       _currentDelay = Duration(
-        milliseconds: (_currentDelay.inMilliseconds * _config.backoffMultiplier).round(),
+        milliseconds:
+            (_currentDelay.inMilliseconds * _config.backoffMultiplier).round(),
       );
       _currentDelay = _capDelay(_currentDelay);
     }
@@ -279,7 +282,8 @@ class WebSocketReconnectManager {
     // Добавляем jitter если включен
     if (_config.enableJitter) {
       final jitterMs = _random.nextInt(1000); // до 1 секунды
-      cappedDelay = Duration(milliseconds: cappedDelay.inMilliseconds + jitterMs);
+      cappedDelay =
+          Duration(milliseconds: cappedDelay.inMilliseconds + jitterMs);
     }
 
     return cappedDelay;

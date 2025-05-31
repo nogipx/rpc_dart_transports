@@ -41,8 +41,8 @@ class GlobalMessageBus {
     }
 
     _clientStreams[clientId] = streamController;
-    _logger
-        .debug('P2P стрим для $clientId зарегистрирован, всего стримов: ${_clientStreams.length}');
+    _logger.debug(
+        'P2P стрим для $clientId зарегистрирован, всего стримов: ${_clientStreams.length}');
   }
 
   /// Отключает P2P стрим клиента
@@ -52,21 +52,24 @@ class GlobalMessageBus {
       if (!streamController.isClosed) {
         streamController.close();
       }
-      _logger.info('P2P стрим для $clientId отключен, осталось стримов: ${_clientStreams.length}');
+      _logger.info(
+          'P2P стрим для $clientId отключен, осталось стримов: ${_clientStreams.length}');
     }
   }
 
   /// Регистрирует endpoint в шине
   void registerEndpoint(String endpointId, EndpointInfo info) {
     _endpoints[endpointId] = info;
-    _logger.debug('Endpoint $endpointId зарегистрирован, всего endpoints: ${_endpoints.length}');
+    _logger.debug(
+        'Endpoint $endpointId зарегистрирован, всего endpoints: ${_endpoints.length}');
   }
 
   /// Отключает endpoint
   void unregisterEndpoint(String endpointId) {
     final info = _endpoints.remove(endpointId);
     if (info != null) {
-      _logger.debug('Endpoint $endpointId отключен, осталось endpoints: ${_endpoints.length}');
+      _logger.debug(
+          'Endpoint $endpointId отключен, осталось endpoints: ${_endpoints.length}');
 
       // Отключаем все стримы этого endpoint'а
       final clientsToRemove = <String>[];
@@ -88,17 +91,20 @@ class GlobalMessageBus {
     if (streamController != null && !streamController.isClosed) {
       try {
         streamController.add(message);
-        _logger.debug('Сообщение доставлено клиенту $clientId: ${message.type}');
+        _logger
+            .debug('Сообщение доставлено клиенту $clientId: ${message.type}');
         return true;
       } catch (e) {
-        _logger.warning('Ошибка отправки сообщения клиенту $clientId: $e (автоматически удаляем)');
+        _logger.warning(
+            'Ошибка отправки сообщения клиенту $clientId: $e (автоматически удаляем)');
         // Автоматически удаляем битый стрим
         unregisterClientStream(clientId);
         return false;
       }
     } else {
       if (streamController != null && streamController.isClosed) {
-        _logger.debug('Клиент $clientId имеет закрытый стрим (автоматически удаляем)');
+        _logger.debug(
+            'Клиент $clientId имеет закрытый стрим (автоматически удаляем)');
         // Автоматически удаляем закрытые стримы
         unregisterClientStream(clientId);
       } else {

@@ -32,8 +32,8 @@ void main() {
             logger: RpcLogger('TestServerWebSocket'),
           );
 
-          final endpoint =
-              RpcResponderEndpoint(transport: transport, debugLabel: 'TestServerEndpoint');
+          final endpoint = RpcResponderEndpoint(
+              transport: transport, debugLabel: 'TestServerEndpoint');
 
           final contract = TestEchoContract();
           endpoint.registerServiceContract(contract);
@@ -67,11 +67,14 @@ void main() {
 
       try {
         // Отправляем простой запрос
-        final response = await endpoint.unaryRequest<SimpleMessage, SimpleMessage>(
+        final response =
+            await endpoint.unaryRequest<SimpleMessage, SimpleMessage>(
           serviceName: 'test',
           methodName: 'echo',
-          requestCodec: RpcCodec<SimpleMessage>((json) => SimpleMessage.fromJson(json)),
-          responseCodec: RpcCodec<SimpleMessage>((json) => SimpleMessage.fromJson(json)),
+          requestCodec:
+              RpcCodec<SimpleMessage>((json) => SimpleMessage.fromJson(json)),
+          responseCodec:
+              RpcCodec<SimpleMessage>((json) => SimpleMessage.fromJson(json)),
           request: SimpleMessage('Hello World'),
         );
 
@@ -102,8 +105,10 @@ base class TestEchoContract extends RpcResponderContract {
   TestEchoContract() : super('test') {
     addUnaryMethod<SimpleMessage, SimpleMessage>(
       methodName: 'echo',
-      requestCodec: RpcCodec<SimpleMessage>((json) => SimpleMessage.fromJson(json)),
-      responseCodec: RpcCodec<SimpleMessage>((json) => SimpleMessage.fromJson(json)),
+      requestCodec:
+          RpcCodec<SimpleMessage>((json) => SimpleMessage.fromJson(json)),
+      responseCodec:
+          RpcCodec<SimpleMessage>((json) => SimpleMessage.fromJson(json)),
       handler: (request) async {
         print('Сервер получил: ${request.value}');
         return SimpleMessage('Echo: ${request.value}');

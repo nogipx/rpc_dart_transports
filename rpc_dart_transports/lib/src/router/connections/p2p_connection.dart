@@ -58,7 +58,8 @@ class RouterP2PConnection {
     bool filterRouterHeartbeats = true,
   }) async {
     if (_clientId == null) {
-      throw StateError('Клиент должен быть зарегистрирован перед инициализацией P2P');
+      throw StateError(
+          'Клиент должен быть зарегистрирован перед инициализацией P2P');
     }
 
     _logger?.info('Инициализация P2P соединения для клиента: $_clientId');
@@ -70,12 +71,15 @@ class RouterP2PConnection {
 
       // Подключаемся к P2P транспорту
       _logger?.debug('Подключаемся к bidirectionalStream router.p2p');
-      _p2pResponseStream = _callerEndpoint.bidirectionalStream<RouterMessage, RouterMessage>(
+      _p2pResponseStream =
+          _callerEndpoint.bidirectionalStream<RouterMessage, RouterMessage>(
         serviceName: _serviceName,
         methodName: 'p2p',
         requests: _p2pStreamController!.stream,
-        requestCodec: RpcCodec<RouterMessage>((json) => RouterMessage.fromJson(json)),
-        responseCodec: RpcCodec<RouterMessage>((json) => RouterMessage.fromJson(json)),
+        requestCodec:
+            RpcCodec<RouterMessage>((json) => RouterMessage.fromJson(json)),
+        responseCodec:
+            RpcCodec<RouterMessage>((json) => RouterMessage.fromJson(json)),
       );
       _logger?.debug('BidirectionalStream создан успешно');
 
@@ -83,7 +87,8 @@ class RouterP2PConnection {
       _logger?.debug('Настраиваем слушатель P2P сообщений');
       _p2pResponseStream!.listen(
         (message) {
-          _logger?.debug('Получено P2P сообщение: ${message.type} от ${message.senderId}');
+          _logger?.debug(
+              'Получено P2P сообщение: ${message.type} от ${message.senderId}');
 
           // Обрабатываем response сообщения внутри клиента
           if (message.type == RouterMessageType.response) {
@@ -134,7 +139,8 @@ class RouterP2PConnection {
 
       _logger?.info('P2P соединение инициализировано для клиента: $_clientId');
     } catch (e, stackTrace) {
-      _logger?.error('Ошибка инициализации P2P: $e', error: e, stackTrace: stackTrace);
+      _logger?.error('Ошибка инициализации P2P: $e',
+          error: e, stackTrace: stackTrace);
 
       // Очищаем состояние при ошибке
       await dispose();
@@ -198,7 +204,8 @@ class RouterP2PConnection {
     );
 
     _p2pStreamController!.add(message);
-    _logger?.debug('Отправлен request: $_clientId -> $targetId (requestId: $requestId)');
+    _logger?.debug(
+        'Отправлен request: $_clientId -> $targetId (requestId: $requestId)');
 
     return completer.future;
   }
@@ -210,7 +217,8 @@ class RouterP2PConnection {
     }
 
     _autoHeartbeatEnabled = true;
-    _logger?.info('Запуск автоматического heartbeat (интервал: ${_heartbeatInterval.inSeconds}s)');
+    _logger?.info(
+        'Запуск автоматического heartbeat (интервал: ${_heartbeatInterval.inSeconds}s)');
 
     _heartbeatTimer = Timer.periodic(_heartbeatInterval, (_) {
       if (_p2pStreamController != null && !_p2pStreamController!.isClosed) {
@@ -250,11 +258,13 @@ class RouterP2PConnection {
 
       if (message.success == true) {
         // Убираем requestId из payload для ответа
-        final responsePayload = Map<String, dynamic>.from(message.payload ?? {});
+        final responsePayload =
+            Map<String, dynamic>.from(message.payload ?? {});
         responsePayload.remove('requestId');
         completer.complete(responsePayload);
       } else {
-        completer.completeError(Exception(message.errorMessage ?? 'Request failed'));
+        completer
+            .completeError(Exception(message.errorMessage ?? 'Request failed'));
       }
     }
   }
@@ -263,7 +273,8 @@ class RouterP2PConnection {
   void _ensureInitialized() {
     if (_p2pStreamController == null) {
       _logger?.error('P2P соединение не инициализировано');
-      throw StateError('P2P соединение не инициализировано. Вызовите initialize()');
+      throw StateError(
+          'P2P соединение не инициализировано. Вызовите initialize()');
     }
   }
 

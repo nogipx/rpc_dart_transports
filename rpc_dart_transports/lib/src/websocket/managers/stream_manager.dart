@@ -38,9 +38,11 @@ class WebSocketStreamManager {
 
     final released = _idManager.releaseId(streamId);
     if (released) {
-      _logger?.debug('Освобожден ID $streamId, активных потоков: ${_idManager.activeCount}');
+      _logger?.debug(
+          'Освобожден ID $streamId, активных потоков: ${_idManager.activeCount}');
     } else {
-      _logger?.debug('ID уже был освобожден или никогда не использовался [streamId: $streamId]');
+      _logger?.debug(
+          'ID уже был освобожден или никогда не использовался [streamId: $streamId]');
     }
 
     return released;
@@ -63,7 +65,8 @@ class WebSocketStreamManager {
 
     if (_idManager.isActive(streamId)) {
       _idManager.releaseId(streamId);
-      _logger?.debug('Освобожден ID $streamId, активных потоков: ${_idManager.activeCount}');
+      _logger?.debug(
+          'Освобожден ID $streamId, активных потоков: ${_idManager.activeCount}');
     }
 
     // Также удаляем из состояния отправки

@@ -247,7 +247,8 @@ class RouterMessage implements IRpcSerializable {
     return RouterMessage(
       type: RouterMessageType.values.firstWhere(
         (e) => e.name == json['type'],
-        orElse: () => throw ArgumentError('Unknown router message type: ${json['type']}'),
+        orElse: () =>
+            throw ArgumentError('Unknown router message type: ${json['type']}'),
       ),
       senderId: json['senderId'] as String?,
       targetId: json['targetId'] as String?,
@@ -405,7 +406,8 @@ class RouterEvent implements IRpcSerializable {
     return RouterEvent(
       type: RouterEventType.values.firstWhere(
         (e) => e.name == json['type'],
-        orElse: () => throw ArgumentError('Unknown router event type: ${json['type']}'),
+        orElse: () =>
+            throw ArgumentError('Unknown router event type: ${json['type']}'),
       ),
       timestamp: json['timestamp'] as int,
       data: json['data'] as Map<String, dynamic>,
@@ -490,8 +492,10 @@ class RouterClientInfo {
       clientId: json['clientId'] as String,
       clientName: json['clientName'] as String?,
       groups: (json['groups'] as List?)?.cast<String>() ?? [],
-      connectedAt: DateTime.fromMillisecondsSinceEpoch(json['connectedAt'] as int),
-      lastActivity: DateTime.fromMillisecondsSinceEpoch(json['lastActivity'] as int),
+      connectedAt:
+          DateTime.fromMillisecondsSinceEpoch(json['connectedAt'] as int),
+      lastActivity:
+          DateTime.fromMillisecondsSinceEpoch(json['lastActivity'] as int),
       metadata: (json['metadata'] as Map<String, dynamic>?) ?? {},
       status: ClientStatus.values.firstWhere(
         (e) => e.name == json['status'],

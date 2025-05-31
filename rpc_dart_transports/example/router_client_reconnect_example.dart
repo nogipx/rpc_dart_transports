@@ -231,7 +231,8 @@ class ChatClientWithReconnect {
 
   /// Обрабатывает входящие чат-сообщения
   void _handleChatMessage(RouterMessage message) {
-    if (message.type == RouterMessageType.multicast && message.payload?['chatMessage'] != null) {
+    if (message.type == RouterMessageType.multicast &&
+        message.payload?['chatMessage'] != null) {
       final chatText = message.payload!['chatMessage'] as String;
       final senderName = message.payload!['senderName'] as String;
       final timestamp = DateTime.now().toString().substring(11, 19);

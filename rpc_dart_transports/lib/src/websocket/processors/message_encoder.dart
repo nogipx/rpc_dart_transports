@@ -51,12 +51,13 @@ class WebSocketMessageEncoder {
         message.setRange(headerBytes.length, message.length, headersBytes);
       }
 
-      _logger
-          ?.debug('Закодированы метаданные для stream $streamId, размер: ${message.length} байт');
+      _logger?.debug(
+          'Закодированы метаданные для stream $streamId, размер: ${message.length} байт');
 
       return message;
     } catch (e, stackTrace) {
-      _logger?.error('Ошибка при кодировании метаданных: $e', error: e, stackTrace: stackTrace);
+      _logger?.error('Ошибка при кодировании метаданных: $e',
+          error: e, stackTrace: stackTrace);
       rethrow;
     }
   }
@@ -82,7 +83,8 @@ class WebSocketMessageEncoder {
 
       // Кодируем данные с использованием gRPC формата
       final encodedData = RpcMessageFrame.encode(data);
-      _logger?.debug('Размер закодированных данных: ${encodedData.length} байт');
+      _logger
+          ?.debug('Размер закодированных данных: ${encodedData.length} байт');
 
       // Комбинируем заголовок и данные
       final headerBytes = header.encode();
@@ -96,7 +98,8 @@ class WebSocketMessageEncoder {
       // Копируем данные
       message.setRange(headerBytes.length, message.length, encodedData);
 
-      _logger?.debug('Закодированы данные для stream $streamId, размер: ${message.length} байт');
+      _logger?.debug(
+          'Закодированы данные для stream $streamId, размер: ${message.length} байт');
 
       return message;
     } catch (e, stackTrace) {
@@ -157,7 +160,8 @@ class WebSocketMessageEncoder {
       // Добавляем значение
       headersBytes.addAll(valueBytes);
 
-      _logger?.debug('  Закодирован заголовок: ${header.name} = ${header.value}');
+      _logger
+          ?.debug('  Закодирован заголовок: ${header.name} = ${header.value}');
     }
 
     return headersBytes;

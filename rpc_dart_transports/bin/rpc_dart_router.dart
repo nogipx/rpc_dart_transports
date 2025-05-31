@@ -109,12 +109,14 @@ RouterConfig _parseConfig(ArgResults argResults) {
   // Валидация порта
   final port = int.tryParse(portStr);
   if (port == null || port < 1 || port > 65535) {
-    throw FormatException('Порт должен быть числом от 1 до 65535, получен: $portStr');
+    throw FormatException(
+        'Порт должен быть числом от 1 до 65535, получен: $portStr');
   }
 
   // Конфликт флагов
   if (quiet && verbose) {
-    throw FormatException('Нельзя использовать --quiet и --verbose одновременно');
+    throw FormatException(
+        'Нельзя использовать --quiet и --verbose одновременно');
   }
 
   // Парсинг уровня логирования
@@ -162,10 +164,13 @@ void _printUsage(ArgParser parser) {
   print('Опции:');
   print(parser.usage);
   print('\nПримеры:');
-  print('  rpc_dart_router                           # Запуск с настройками по умолчанию');
-  print('  rpc_dart_router -h localhost -p 8080     # Запуск на localhost:8080');
+  print(
+      '  rpc_dart_router                           # Запуск с настройками по умолчанию');
+  print(
+      '  rpc_dart_router -h localhost -p 8080     # Запуск на localhost:8080');
   print('  rpc_dart_router --quiet                   # Тихий режим');
-  print('  rpc_dart_router -v --log-level debug     # Подробный режим с debug логами');
+  print(
+      '  rpc_dart_router -v --log-level debug     # Подробный режим с debug логами');
 }
 
 Future<void> _startRouter(RouterConfig config) async {
@@ -184,7 +189,9 @@ Future<void> _startRouter(RouterConfig config) async {
 
     // Создаем общий RouterImpl для всех соединений
     final sharedRouterImpl = RouterResponderImpl(
-      logger: config.logLevel == RpcLoggerLevel.debug ? logger.child('SharedRouter') : null,
+      logger: config.logLevel == RpcLoggerLevel.debug
+          ? logger.child('SharedRouter')
+          : null,
     );
 
     int connectionCount = 0;
@@ -219,17 +226,18 @@ Future<void> _startRouter(RouterConfig config) async {
           address: '${request.connectionInfo?.remoteAddress}',
           connectedAt: DateTime.now(),
         );
-        GlobalMessageBus().registerEndpoint('endpoint_$connectionId', endpointInfo);
+        GlobalMessageBus()
+            .registerEndpoint('endpoint_$connectionId', endpointInfo);
 
         // Создаем RPC эндпоинт для каждого соединения
-        final endpoint =
-            RpcResponderEndpoint(transport: transport, debugLabel: 'RouterEndpoint#$connectionId');
+        final endpoint = RpcResponderEndpoint(
+            transport: transport, debugLabel: 'RouterEndpoint#$connectionId');
 
         // Регистрируем роутер контракт для этого соединения
         endpoint.registerServiceContract(routerContract);
 
-        await logger
-            .info('Новое подключение #$connectionId: ${request.connectionInfo?.remoteAddress}');
+        await logger.info(
+            'Новое подключение #$connectionId: ${request.connectionInfo?.remoteAddress}');
 
         // Мониторинг закрытия соединения
         webSocket.done.then((_) async {
@@ -237,7 +245,8 @@ Future<void> _startRouter(RouterConfig config) async {
           GlobalMessageBus().unregisterEndpoint('endpoint_$connectionId');
           endpoint.close();
         }).catchError((error) async {
-          await logger.warning('Ошибка при отключении клиента #$connectionId: $error');
+          await logger
+              .warning('Ошибка при отключении клиента #$connectionId: $error');
           GlobalMessageBus().unregisterEndpoint('endpoint_$connectionId');
           endpoint.close();
         });
@@ -245,8 +254,8 @@ Future<void> _startRouter(RouterConfig config) async {
         // Запускаем endpoint
         endpoint.start();
       } else {
-        await logger
-            .warning('Получен не-WebSocket запрос от ${request.connectionInfo?.remoteAddress}');
+        await logger.warning(
+            'Получен не-WebSocket запрос от ${request.connectionInfo?.remoteAddress}');
         request.response
           ..statusCode = HttpStatus.forbidden
           ..write('WebSocket connections only')

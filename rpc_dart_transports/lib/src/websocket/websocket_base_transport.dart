@@ -80,7 +80,8 @@ abstract class RpcWebSocketTransportBase implements IRpcTransport {
   /// Обрабатывает входящее WebSocket сообщение
   void _handleIncomingMessage(dynamic message) {
     try {
-      final transportMessages = _messageProcessor.processIncomingMessage(message);
+      final transportMessages =
+          _messageProcessor.processIncomingMessage(message);
 
       for (final transportMessage in transportMessages) {
         // Обрабатываем завершение потока
@@ -116,7 +117,8 @@ abstract class RpcWebSocketTransportBase implements IRpcTransport {
   }
 
   @override
-  Stream<RpcTransportMessage> get incomingMessages => _incomingController.stream;
+  Stream<RpcTransportMessage> get incomingMessages =>
+      _incomingController.stream;
 
   @override
   Stream<RpcTransportMessage> getMessagesForStream(int streamId) {
@@ -168,7 +170,8 @@ abstract class RpcWebSocketTransportBase implements IRpcTransport {
         _streamManager.markStreamSendingFinished(streamId);
       }
     } catch (e, stackTrace) {
-      _logger?.error('Ошибка при отправке метаданных: $e', error: e, stackTrace: stackTrace);
+      _logger?.error('Ошибка при отправке метаданных: $e',
+          error: e, stackTrace: stackTrace);
       rethrow;
     }
   }
@@ -219,7 +222,8 @@ abstract class RpcWebSocketTransportBase implements IRpcTransport {
     if (_closed) return;
 
     if (_streamManager.isStreamSendingFinished(streamId)) {
-      _logger?.debug('Стрим $streamId уже завершен, пропускаем отправку флага завершения');
+      _logger?.debug(
+          'Стрим $streamId уже завершен, пропускаем отправку флага завершения');
       return;
     }
 
@@ -240,7 +244,8 @@ abstract class RpcWebSocketTransportBase implements IRpcTransport {
       _streamManager.markStreamSendingFinished(streamId);
       _streamManager.releaseStreamId(streamId);
     } catch (e, stackTrace) {
-      _logger?.error('Ошибка при завершении отправки: $e', error: e, stackTrace: stackTrace);
+      _logger?.error('Ошибка при завершении отправки: $e',
+          error: e, stackTrace: stackTrace);
       rethrow;
     }
   }
