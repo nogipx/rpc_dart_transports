@@ -23,7 +23,8 @@ void main() {
       await testServer.stop();
     });
 
-    test('server_streaming_rpc_должен_отправлять_множественные_ответы', () async {
+    test('server_streaming_rpc_должен_отправлять_множественные_ответы',
+        () async {
       // Arrange
       final client = await RpcHttp2CallerTransport.connect(
         host: 'localhost',
@@ -67,15 +68,18 @@ void main() {
         );
 
         // Отправляем запрос
-        final metadata = RpcMetadata.forClientRequest('StreamService', 'ServerStream');
+        final metadata =
+            RpcMetadata.forClientRequest('StreamService', 'ServerStream');
         await client.sendMetadata(streamId, metadata);
-        await client.sendMessage(streamId, Uint8List.fromList(utf8.encode('Hello Stream')));
+        await client.sendMessage(
+            streamId, Uint8List.fromList(utf8.encode('Hello Stream')));
         await client.finishSending(streamId);
 
         // Assert
         await completer.future.timeout(
           Duration(seconds: 10),
-          onTimeout: () => throw TimeoutException('Timeout waiting for server streaming responses'),
+          onTimeout: () => throw TimeoutException(
+              'Timeout waiting for server streaming responses'),
         );
 
         expect(responses.length, equals(5));
@@ -89,7 +93,8 @@ void main() {
       }
     });
 
-    test('client_streaming_rpc_должен_принимать_множественные_запросы', () async {
+    test('client_streaming_rpc_должен_принимать_множественные_запросы',
+        () async {
       // Arrange
       final client = await RpcHttp2CallerTransport.connect(
         host: 'localhost',
@@ -107,7 +112,8 @@ void main() {
             allMessages.add(message);
             print('📥 Сервер получил: $message');
           }
-          return utf8.encode('Received ${allMessages.length} messages: ${allMessages.join(", ")}');
+          return utf8.encode(
+              'Received ${allMessages.length} messages: ${allMessages.join(", ")}');
         });
 
         // Act
@@ -129,7 +135,8 @@ void main() {
         );
 
         // Отправляем метаданные
-        final metadata = RpcMetadata.forClientRequest('StreamService', 'ClientStream');
+        final metadata =
+            RpcMetadata.forClientRequest('StreamService', 'ClientStream');
         await client.sendMetadata(streamId, metadata);
 
         // Отправляем множественные сообщения
@@ -137,7 +144,8 @@ void main() {
           await Future.delayed(Duration(milliseconds: 100));
           final message = 'Message #$i';
           print('📤 Отправляем: $message');
-          await client.sendMessage(streamId, Uint8List.fromList(utf8.encode(message)));
+          await client.sendMessage(
+              streamId, Uint8List.fromList(utf8.encode(message)));
         }
 
         // Завершаем отправку
@@ -146,16 +154,19 @@ void main() {
         // Assert
         final response = await responseCompleter.future.timeout(
           Duration(seconds: 3),
-          onTimeout: () => throw TimeoutException('Timeout waiting for client streaming response'),
+          onTimeout: () => throw TimeoutException(
+              'Timeout waiting for client streaming response'),
         );
 
-        expect(response, equals('Received 3 messages: Message #1, Message #2, Message #3'));
+        expect(response,
+            equals('Received 3 messages: Message #1, Message #2, Message #3'));
       } finally {
         await client.close();
       }
     });
 
-    test('bidirectional_streaming_rpc_должен_обрабатывать_двусторонний_поток', () async {
+    test('bidirectional_streaming_rpc_должен_обрабатывать_двусторонний_поток',
+        () async {
       // Arrange
       final client = await RpcHttp2CallerTransport.connect(
         host: 'localhost',
@@ -198,7 +209,8 @@ void main() {
         );
 
         // Отправляем метаданные
-        final metadata = RpcMetadata.forClientRequest('StreamService', 'BidirectionalStream');
+        final metadata = RpcMetadata.forClientRequest(
+            'StreamService', 'BidirectionalStream');
         await client.sendMetadata(streamId, metadata);
 
         // Отправляем сообщения с интервалами
@@ -206,7 +218,8 @@ void main() {
           await Future.delayed(Duration(milliseconds: 200));
           final message = 'Bidirectional Message #$i';
           print('🔄 Клиент отправляет: $message');
-          await client.sendMessage(streamId, Uint8List.fromList(utf8.encode(message)));
+          await client.sendMessage(
+              streamId, Uint8List.fromList(utf8.encode(message)));
         }
 
         // Завершаем отправку
@@ -215,7 +228,8 @@ void main() {
         // Assert
         await responseCompleter.future.timeout(
           Duration(seconds: 10),
-          onTimeout: () => throw TimeoutException('Timeout waiting for bidirectional responses'),
+          onTimeout: () => throw TimeoutException(
+              'Timeout waiting for bidirectional responses'),
         );
 
         expect(responses.length, equals(3));
@@ -262,7 +276,8 @@ void main() {
         // Act & Assert
         await Future.wait(futures).timeout(
           Duration(seconds: 10),
-          onTimeout: () => throw TimeoutException('Timeout in parallel streaming test'),
+          onTimeout: () =>
+              throw TimeoutException('Timeout in parallel streaming test'),
         );
 
         print('✅ Все параллельные streaming вызовы завершены успешно');
@@ -292,7 +307,8 @@ Future<void> _testServerStreaming(RpcHttp2CallerTransport client) async {
     onError: (error) => completer.completeError(error),
   );
 
-  final metadata = RpcMetadata.forClientRequest('StreamService', 'ServerStream');
+  final metadata =
+      RpcMetadata.forClientRequest('StreamService', 'ServerStream');
   await client.sendMetadata(streamId, metadata);
   await client.sendMessage(streamId, Uint8List.fromList(utf8.encode('Test')));
   await client.finishSending(streamId);
@@ -320,12 +336,15 @@ Future<void> _testClientStreaming(RpcHttp2CallerTransport client) async {
     },
   );
 
-  final metadata = RpcMetadata.forClientRequest('StreamService', 'ClientStream');
+  final metadata =
+      RpcMetadata.forClientRequest('StreamService', 'ClientStream');
   await client.sendMetadata(streamId, metadata);
 
   for (int i = 1; i <= 2; i++) {
-    await Future.delayed(Duration(milliseconds: 50)); // Задержка между сообщениями
-    await client.sendMessage(streamId, Uint8List.fromList(utf8.encode('Message $i')));
+    await Future.delayed(
+        Duration(milliseconds: 50)); // Задержка между сообщениями
+    await client.sendMessage(
+        streamId, Uint8List.fromList(utf8.encode('Message $i')));
   }
   await client.finishSending(streamId);
 
@@ -346,15 +365,18 @@ class Http2StreamingTestServer {
 
   int get port => _port;
 
-  void setServerStreamingHandler(Stream<Uint8List> Function(Uint8List) handler) {
+  void setServerStreamingHandler(
+      Stream<Uint8List> Function(Uint8List) handler) {
     _serverStreamingHandler = handler;
   }
 
-  void setClientStreamingHandler(Future<Uint8List> Function(Stream<Uint8List>) handler) {
+  void setClientStreamingHandler(
+      Future<Uint8List> Function(Stream<Uint8List>) handler) {
     _clientStreamingHandler = handler;
   }
 
-  void setBidirectionalHandler(Stream<Uint8List> Function(Stream<Uint8List>) handler) {
+  void setBidirectionalHandler(
+      Stream<Uint8List> Function(Stream<Uint8List>) handler) {
     _bidirectionalHandler = handler;
   }
 
@@ -384,11 +406,13 @@ class Http2StreamingTestServer {
   }
 
   void _handleConnection(Socket socket) {
-    print('📞 Новое streaming подключение от ${socket.remoteAddress}:${socket.remotePort}');
+    print(
+        '📞 Новое streaming подключение от ${socket.remoteAddress}:${socket.remotePort}');
 
     try {
       final connection = http2.ServerTransportConnection.viaSocket(socket);
-      final transport = RpcHttp2ResponderTransport.create(connection: connection);
+      final transport =
+          RpcHttp2ResponderTransport.create(connection: connection);
 
       final subscription = transport.incomingMessages.listen(
         (message) async {
@@ -441,7 +465,8 @@ class Http2StreamingTestServer {
 
         // Для server streaming обрабатываем данные сразу
         if (streamType != null && streamType.contains('ServerStream')) {
-          await _handleServerStreamingData(transport, message.streamId, message.payload!);
+          await _handleServerStreamingData(
+              transport, message.streamId, message.payload!);
         }
       }
     } catch (e) {
@@ -450,8 +475,8 @@ class Http2StreamingTestServer {
   }
 
   /// Обрабатывает данные для server streaming
-  Future<void> _handleServerStreamingData(
-      RpcHttp2ResponderTransport transport, int streamId, Uint8List data) async {
+  Future<void> _handleServerStreamingData(RpcHttp2ResponderTransport transport,
+      int streamId, Uint8List data) async {
     if (_serverStreamingHandler == null) return;
 
     print('📡 Обрабатываем server streaming запрос, размер: ${data.length}');
@@ -461,7 +486,8 @@ class Http2StreamingTestServer {
       final responseStream = _serverStreamingHandler!(data);
 
       await for (final responseData in responseStream) {
-        print('📡 Отправляем server streaming ответ, размер: ${responseData.length}');
+        print(
+            '📡 Отправляем server streaming ответ, размер: ${responseData.length}');
         await transport.sendMessage(streamId, responseData);
         await Future.delayed(Duration(milliseconds: 20)); // Небольшая задержка
       }
@@ -473,7 +499,8 @@ class Http2StreamingTestServer {
     }
   }
 
-  Future<void> _handleClientStreaming(RpcHttp2ResponderTransport transport, int streamId) async {
+  Future<void> _handleClientStreaming(
+      RpcHttp2ResponderTransport transport, int streamId) async {
     if (_clientStreamingHandler == null) return;
 
     print('📥 Запуск client streaming для stream $streamId');
@@ -486,7 +513,8 @@ class Http2StreamingTestServer {
       final subscription = transport.getMessagesForStream(streamId).listen(
         (msg) {
           if (msg.payload != null) {
-            print('📥 Получено client streaming сообщение, размер: ${msg.payload!.length}');
+            print(
+                '📥 Получено client streaming сообщение, размер: ${msg.payload!.length}');
             if (!messageController.isClosed) {
               messageController.add(msg.payload!);
             }
@@ -553,7 +581,8 @@ class Http2StreamingTestServer {
       final responseStream = _bidirectionalHandler!(incomingMessages);
 
       await for (final responseData in responseStream) {
-        print('🔄 Отправляем bidirectional ответ, размер: ${responseData.length}');
+        print(
+            '🔄 Отправляем bidirectional ответ, размер: ${responseData.length}');
         await transport.sendMessage(streamId, responseData);
         await Future.delayed(Duration(milliseconds: 20)); // Небольшая задержка
       }

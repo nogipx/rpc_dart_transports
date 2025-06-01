@@ -3,15 +3,10 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
-import 'dart:isolate';
 
 import 'package:args/args.dart';
-import 'package:rpc_dart/rpc_dart.dart';
 import 'package:rpc_dart_transports/rpc_dart_transports.dart';
-import 'package:rpc_dart_transports/src/http2/rpc_http2_responder_transport.dart';
-import 'package:http2/http2.dart' as http2;
 
 const String version = '2.0.0';
 
@@ -29,7 +24,9 @@ void main(List<String> arguments) async {
 
       // Специальная обработка HTTP/2 ошибок
       if (error.toString().contains('HTTP/2 error') ||
-          error.toString().contains('Connection is being forcefully terminated')) {
+          error
+              .toString()
+              .contains('Connection is being forcefully terminated')) {
         print(
             '🔗 HTTP/2 соединение было принудительно закрыто (это нормально при отключении клиентов)');
         print('♻️  Роутер продолжает работу...');
@@ -78,7 +75,8 @@ Future<void> _mainWithErrorHandling(List<String> arguments) async {
       await routerCli.stop().timeout(
         Duration(seconds: 10),
         onTimeout: () {
-          print('⚠️ Graceful shutdown превысил 10 секунд, принудительное завершение');
+          print(
+              '⚠️ Graceful shutdown превысил 10 секунд, принудительное завершение');
           exit(1);
         },
       );
@@ -157,7 +155,8 @@ class RouterCLI {
     logger.info('  • Порт: ${config.port}');
     logger.info('  • Транспорт: HTTP/2 gRPC');
     logger.info('  • Логирование: ${config.logLevel}');
-    logger.info('  • Статистика: ${config.enableStats ? 'включена' : 'отключена'}');
+    logger.info(
+        '  • Статистика: ${config.enableStats ? 'включена' : 'отключена'}');
 
     try {
       // Создаем транспорт-агностичный роутер
@@ -184,7 +183,8 @@ class RouterCLI {
 
   /// Запускает HTTP/2 сервер с настоящим gRPC-style протоколом
   Future<void> _startHttp2Server() async {
-    logger.info('🚀 Запуск HTTP/2 gRPC сервера на ${config.host}:${config.port}');
+    logger
+        .info('🚀 Запуск HTTP/2 gRPC сервера на ${config.host}:${config.port}');
 
     // Используем новый удобный API!
     _http2Server = await RpcHttp2ResponderTransport.bind(
@@ -193,7 +193,8 @@ class RouterCLI {
       logger: config.verbose ? logger.child('Http2Server') : null,
     );
 
-    logger.info('🚀 HTTP/2 gRPC сервер запущен на http://${config.host}:${config.port}');
+    logger.info(
+        '🚀 HTTP/2 gRPC сервер запущен на http://${config.host}:${config.port}');
 
     // Слушаем новые транспорты для каждого соединения
     final subscription = _http2Server!.transports.listen(
@@ -234,32 +235,40 @@ class RouterCLI {
             logger.debug(
                 'HTTP/2 сообщение получено от $actualConnectionId: stream ${message.streamId}');
           } catch (e) {
-            logger.debug('Ошибка при обработке HTTP/2 сообщения от $actualConnectionId: $e');
+            logger.debug(
+                'Ошибка при обработке HTTP/2 сообщения от $actualConnectionId: $e');
           }
         },
         onError: (error) async {
           try {
             // Логируем ошибку но не падаем
-            if (error.toString().contains('Connection is being forcefully terminated') ||
+            if (error
+                    .toString()
+                    .contains('Connection is being forcefully terminated') ||
                 error.toString().contains('HTTP/2 error')) {
               logger.debug(
                   '🔗 HTTP/2 соединение $actualConnectionId закрыто клиентом (нормально): $error');
             } else {
-              logger.warning('❌ Ошибка HTTP/2 соединения $actualConnectionId: $error');
+              logger.warning(
+                  '❌ Ошибка HTTP/2 соединения $actualConnectionId: $error');
             }
 
             // Graceful закрытие соединения
-            await _routerServer.closeConnection(actualConnectionId, reason: 'HTTP/2 error: $error');
+            await _routerServer.closeConnection(actualConnectionId,
+                reason: 'HTTP/2 error: $error');
           } catch (e) {
-            logger.debug('Ошибка при закрытии соединения $actualConnectionId: $e');
+            logger.debug(
+                'Ошибка при закрытии соединения $actualConnectionId: $e');
           }
         },
         onDone: () async {
           try {
             logger.info('🔌 HTTP/2 клиент отключился: $actualConnectionId');
-            await _routerServer.closeConnection(actualConnectionId, reason: 'HTTP/2 closed');
+            await _routerServer.closeConnection(actualConnectionId,
+                reason: 'HTTP/2 closed');
           } catch (e) {
-            logger.debug('Ошибка при закрытии соединения $actualConnectionId в onDone: $e');
+            logger.debug(
+                'Ошибка при закрытии соединения $actualConnectionId в onDone: $e');
           }
         },
         cancelOnError: false, // Не отменяем подписку при ошибках
@@ -297,7 +306,9 @@ class RouterCLI {
       print('🚀 Транспорты:');
       final transportCounts = <String, int>{};
       for (final conn in connections) {
-        final transport = conn.transport.replaceAll('Rpc', '').replaceAll('ResponderTransport', '');
+        final transport = conn.transport
+            .replaceAll('Rpc', '')
+            .replaceAll('ResponderTransport', '');
         transportCounts[transport] = (transportCounts[transport] ?? 0) + 1;
       }
       for (final entry in transportCounts.entries) {
@@ -359,7 +370,8 @@ class RouterCLI {
         await _http2Server!.close().timeout(Duration(seconds: 5));
         logger.debug('HTTP/2 сервер закрыт');
       } catch (e) {
-        logger.warning('Ошибка закрытия HTTP/2 сервера: $e (принудительно продолжаем)');
+        logger.warning(
+            'Ошибка закрытия HTTP/2 сервера: $e (принудительно продолжаем)');
       }
       _http2Server = null;
     }
@@ -369,11 +381,13 @@ class RouterCLI {
       await _routerServer.dispose().timeout(Duration(seconds: 5));
       logger.debug('RouterServer закрыт');
     } catch (e) {
-      logger.warning('Ошибка закрытия RouterServer: $e (принудительно продолжаем)');
+      logger.warning(
+          'Ошибка закрытия RouterServer: $e (принудительно продолжаем)');
     }
 
     final uptime = DateTime.now().difference(_startTime);
-    logger.info('✅ Роутер остановлен (время работы: ${_formatDuration(uptime)})');
+    logger
+        .info('✅ Роутер остановлен (время работы: ${_formatDuration(uptime)})');
   }
 
   /// Форматирует длительность в читаемый вид
@@ -463,12 +477,14 @@ RouterConfig _parseConfig(ArgResults argResults) {
   // Валидация порта
   final port = int.tryParse(portStr);
   if (port == null || port < 1 || port > 65535) {
-    throw FormatException('Порт должен быть числом от 1 до 65535, получен: $portStr');
+    throw FormatException(
+        'Порт должен быть числом от 1 до 65535, получен: $portStr');
   }
 
   // Конфликт флагов
   if (quiet && verbose) {
-    throw FormatException('Нельзя использовать --quiet и --verbose одновременно');
+    throw FormatException(
+        'Нельзя использовать --quiet и --verbose одновременно');
   }
 
   // Парсинг уровня логирования

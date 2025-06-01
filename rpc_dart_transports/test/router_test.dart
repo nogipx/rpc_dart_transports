@@ -63,7 +63,8 @@ void main() {
         await client2.dispose();
       });
 
-      test('должен включать клиента в список онлайн после регистрации', () async {
+      test('должен включать клиента в список онлайн после регистрации',
+          () async {
         // Arrange
         final client1 = await _createTestClient('Alice', port);
         final client2 = await _createTestClient('Bob', port);
@@ -131,7 +132,10 @@ void main() {
         // Даем время для установки P2P соединений
         await Future.delayed(Duration(milliseconds: 200));
 
-        final testMessage = {'text': 'Hello Bob!', 'timestamp': DateTime.now().toIso8601String()};
+        final testMessage = {
+          'text': 'Hello Bob!',
+          'timestamp': DateTime.now().toIso8601String()
+        };
 
         // Act
         await alice.sendUnicast(bob.clientId!, testMessage);
@@ -150,7 +154,8 @@ void main() {
         await bob.dispose();
       });
 
-      test('должен отправлять ошибку при отправке несуществующему клиенту', () async {
+      test('должен отправлять ошибку при отправке несуществующему клиенту',
+          () async {
         // Arrange
         final alice = await _createTestClient('Alice', port);
 
@@ -176,7 +181,8 @@ void main() {
     });
 
     group('Multicast сообщения', () {
-      test('должен отправлять сообщение всем клиентам кроме отправителя', () async {
+      test('должен отправлять сообщение всем клиентам кроме отправителя',
+          () async {
         // Arrange
         final alice = await _createTestClient('Alice', port);
         final bob = await _createTestClient('Bob', port);
@@ -193,7 +199,10 @@ void main() {
         // Даем больше времени для установки всех P2P соединений
         await Future.delayed(Duration(milliseconds: 300));
 
-        final testMessage = {'announcement': 'Team meeting at 15:00', 'group': 'developers'};
+        final testMessage = {
+          'announcement': 'Team meeting at 15:00',
+          'group': 'developers'
+        };
 
         // Act
         await alice.sendMulticast('developers', testMessage);
@@ -225,7 +234,8 @@ void main() {
     });
 
     group('Broadcast сообщения', () {
-      test('должен отправлять сообщение всем клиентам кроме отправителя', () async {
+      test('должен отправлять сообщение всем клиентам кроме отправителя',
+          () async {
         // Arrange
         final clients = <RpcRouterClient>[];
         final messagesPerClient = <List<RouterMessage>>[];
@@ -256,7 +266,9 @@ void main() {
 
         // Assert
         await _waitForCondition(
-            () => messagesPerClient.skip(1).every((messages) => messages.isNotEmpty),
+            () => messagesPerClient
+                .skip(1)
+                .every((messages) => messages.isNotEmpty),
             timeout: Duration(seconds: 5));
 
         // Отправитель не должен получить свое сообщение
@@ -327,7 +339,8 @@ void main() {
         await bob.dispose();
       });
 
-      test('должен выбрасывать TimeoutException при отсутствии ответа', () async {
+      test('должен выбрасывать TimeoutException при отсутствии ответа',
+          () async {
         // Arrange
         final alice = await _createTestClient('Alice', port);
         final bob = await _createTestClient('Bob', port);
@@ -368,7 +381,8 @@ void main() {
         final subscription = client.events.listen(events.add);
 
         // Assert - должно прийти приветственное событие
-        await _waitForCondition(() => events.isNotEmpty, timeout: Duration(seconds: 3));
+        await _waitForCondition(() => events.isNotEmpty,
+            timeout: Duration(seconds: 3));
 
         expect(events, hasLength(1));
         final welcomeEvent = events.first;
@@ -381,7 +395,8 @@ void main() {
     });
 
     group('Производительность и стабильность', () {
-      test('должен обрабатывать множественные одновременные соединения', () async {
+      test('должен обрабатывать множественные одновременные соединения',
+          () async {
         // Arrange
         const clientCount = 4; // Уменьшаем для стабильности
         final clients = <RpcRouterClient>[];
@@ -431,7 +446,8 @@ void main() {
 
         // Act - отправляем сообщения с небольшими паузами
         for (int i = 0; i < messageCount; i++) {
-          await alice.sendUnicast(bob.clientId!, {'messageId': i, 'content': 'Message $i'});
+          await alice.sendUnicast(
+              bob.clientId!, {'messageId': i, 'content': 'Message $i'});
           // Небольшая пауза между сообщениями для стабильности
           await Future.delayed(Duration(milliseconds: 20));
         }
@@ -442,7 +458,8 @@ void main() {
         expect(receivedMessages, hasLength(messageCount));
 
         // Проверяем, что все сообщения уникальны
-        final messageIds = receivedMessages.map((m) => m.payload?['messageId']).toSet();
+        final messageIds =
+            receivedMessages.map((m) => m.payload?['messageId']).toSet();
         expect(messageIds, hasLength(messageCount));
 
         await alice.dispose();

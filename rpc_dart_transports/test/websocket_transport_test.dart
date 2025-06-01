@@ -50,7 +50,7 @@ void main() {
       );
 
       // Ждем подключения
-      await Future.delayed(Duration(milliseconds: 100));
+      await Future.delayed(Duration(milliseconds: 300));
       expect(serverSockets.length, equals(1));
 
       // Создаем серверный транспорт

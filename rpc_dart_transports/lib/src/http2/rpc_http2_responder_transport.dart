@@ -4,7 +4,6 @@
 
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:http2/http2.dart' as http2;
 import 'package:rpc_dart/rpc_dart.dart';
@@ -94,7 +93,8 @@ class RpcHttp2ResponderTransport implements IRpcTransport {
         _handleIncomingStream(stream);
       },
       onError: (error, stackTrace) {
-        _logger?.error('Ошибка в соединении HTTP/2', error: error, stackTrace: stackTrace);
+        _logger?.error('Ошибка в соединении HTTP/2',
+            error: error, stackTrace: stackTrace);
 
         if (!_messageController.isClosed) {
           _messageController.addError(error, stackTrace);
@@ -123,7 +123,8 @@ class RpcHttp2ResponderTransport implements IRpcTransport {
         _handleIncomingMessage(streamId, message);
       },
       onError: (error, stackTrace) {
-        _logger?.error('Ошибка в stream $streamId', error: error, stackTrace: stackTrace);
+        _logger?.error('Ошибка в stream $streamId',
+            error: error, stackTrace: stackTrace);
 
         if (!_messageController.isClosed) {
           _messageController.addError(error, stackTrace);
@@ -152,7 +153,8 @@ class RpcHttp2ResponderTransport implements IRpcTransport {
 
   /// Обрабатывает входящее сообщение от клиента
   void _handleIncomingMessage(int streamId, http2.StreamMessage message) {
-    _logger?.debug('Получено сообщение для stream $streamId, тип: ${message.runtimeType}');
+    _logger?.debug(
+        'Получено сообщение для stream $streamId, тип: ${message.runtimeType}');
 
     try {
       if (message is http2.HeadersStreamMessage) {
@@ -173,7 +175,8 @@ class RpcHttp2ResponderTransport implements IRpcTransport {
   }
 
   /// Обрабатывает входящие HTTP/2 headers от клиента
-  void _handleIncomingHeaders(int streamId, http2.HeadersStreamMessage message) {
+  void _handleIncomingHeaders(
+      int streamId, http2.HeadersStreamMessage message) {
     _logger?.debug('Обработка входящих headers для stream $streamId');
 
     // Извлекаем путь метода из headers
@@ -201,7 +204,8 @@ class RpcHttp2ResponderTransport implements IRpcTransport {
       _messageController.add(transportMessage);
     }
 
-    _logger?.debug('Входящие headers обработаны для stream $streamId, метод: $methodPath');
+    _logger?.debug(
+        'Входящие headers обработаны для stream $streamId, метод: $methodPath');
   }
 
   /// Обрабатывает входящие HTTP/2 данные от клиента
@@ -235,10 +239,13 @@ class RpcHttp2ResponderTransport implements IRpcTransport {
         }
       }
 
-      _logger?.debug('Обработано ${messages.length} входящих сообщений для stream $streamId');
+      _logger?.debug(
+          'Обработано ${messages.length} входящих сообщений для stream $streamId');
     } catch (e, stackTrace) {
-      _logger?.error('Ошибка при распаковке входящих gRPC данных для stream $streamId',
-          error: e, stackTrace: stackTrace);
+      _logger?.error(
+          'Ошибка при распаковке входящих gRPC данных для stream $streamId',
+          error: e,
+          stackTrace: stackTrace);
 
       if (!_messageController.isClosed) {
         _messageController.addError(e, stackTrace);
@@ -268,10 +275,11 @@ class RpcHttp2ResponderTransport implements IRpcTransport {
     if (incomingStream != null) {
       try {
         incomingStream.sendData(Uint8List(0), endStream: true);
-        _logger?.debug('Отправлен END_STREAM при освобождении входящего stream $streamId');
+        _logger?.debug(
+            'Отправлен END_STREAM при освобождении входящего stream $streamId');
       } catch (e) {
-        _logger
-            ?.debug('Не удалось отправить END_STREAM, используем terminate для stream $streamId');
+        _logger?.debug(
+            'Не удалось отправить END_STREAM, используем terminate для stream $streamId');
         incomingStream.terminate();
       }
     }
@@ -281,10 +289,11 @@ class RpcHttp2ResponderTransport implements IRpcTransport {
     if (outgoingStream != null) {
       try {
         outgoingStream.sendData(Uint8List(0), endStream: true);
-        _logger?.debug('Отправлен END_STREAM при освобождении исходящего stream $streamId');
+        _logger?.debug(
+            'Отправлен END_STREAM при освобождении исходящего stream $streamId');
       } catch (e) {
-        _logger
-            ?.debug('Не удалось отправить END_STREAM, используем terminate для stream $streamId');
+        _logger?.debug(
+            'Не удалось отправить END_STREAM, используем terminate для stream $streamId');
         outgoingStream.terminate();
       }
     }
@@ -312,7 +321,8 @@ class RpcHttp2ResponderTransport implements IRpcTransport {
     // Для серверных ответов ищем входящий stream
     final incomingStream = _incomingStreams[streamId];
     if (incomingStream == null) {
-      _logger?.warning('Incoming stream $streamId not found, skipping metadata send');
+      _logger?.warning(
+          'Incoming stream $streamId not found, skipping metadata send');
       return;
     }
 
@@ -348,11 +358,13 @@ class RpcHttp2ResponderTransport implements IRpcTransport {
 
     final incomingStream = _incomingStreams[streamId];
     if (incomingStream == null) {
-      _logger?.warning('Incoming stream $streamId not found, skipping message send');
+      _logger?.warning(
+          'Incoming stream $streamId not found, skipping message send');
       return;
     }
 
-    _logger?.debug('Отправка ответных данных для stream $streamId, размер: ${data.length} байт');
+    _logger?.debug(
+        'Отправка ответных данных для stream $streamId, размер: ${data.length} байт');
 
     try {
       // Упаковываем данные в gRPC frame формат
@@ -374,7 +386,8 @@ class RpcHttp2ResponderTransport implements IRpcTransport {
 
     final incomingStream = _incomingStreams[streamId];
     if (incomingStream == null) {
-      _logger?.debug('Incoming stream $streamId not found, skipping finish sending');
+      _logger?.debug(
+          'Incoming stream $streamId not found, skipping finish sending');
       return;
     }
 
@@ -386,7 +399,8 @@ class RpcHttp2ResponderTransport implements IRpcTransport {
 
       _logger?.debug('Отправка ответа завершена для stream $streamId');
     } catch (e) {
-      _logger?.warning('Ошибка при завершении отправки для stream $streamId: $e');
+      _logger
+          ?.warning('Ошибка при завершении отправки для stream $streamId: $e');
     }
   }
 
@@ -417,14 +431,17 @@ class RpcHttp2ResponderTransport implements IRpcTransport {
       try {
         // Пытаемся закрыть stream мягко
         stream.sendData(Uint8List(0), endStream: true);
-        _logger?.debug('Отправлен END_STREAM для входящего stream ${stream.id}');
+        _logger
+            ?.debug('Отправлен END_STREAM для входящего stream ${stream.id}');
       } catch (e) {
-        _logger?.debug('Не удалось отправить END_STREAM для stream ${stream.id}: $e');
+        _logger?.debug(
+            'Не удалось отправить END_STREAM для stream ${stream.id}: $e');
         // В крайнем случае используем terminate
         try {
           stream.terminate();
         } catch (e2) {
-          _logger?.warning('Ошибка при terminate входящего stream ${stream.id}: $e2');
+          _logger?.warning(
+              'Ошибка при terminate входящего stream ${stream.id}: $e2');
         }
       }
     }
@@ -434,13 +451,16 @@ class RpcHttp2ResponderTransport implements IRpcTransport {
     for (final stream in _outgoingStreams.values) {
       try {
         stream.sendData(Uint8List(0), endStream: true);
-        _logger?.debug('Отправлен END_STREAM для исходящего stream ${stream.id}');
+        _logger
+            ?.debug('Отправлен END_STREAM для исходящего stream ${stream.id}');
       } catch (e) {
-        _logger?.debug('Не удалось отправить END_STREAM для stream ${stream.id}: $e');
+        _logger?.debug(
+            'Не удалось отправить END_STREAM для stream ${stream.id}: $e');
         try {
           stream.terminate();
         } catch (e2) {
-          _logger?.warning('Ошибка при terminate исходящего stream ${stream.id}: $e2');
+          _logger?.warning(
+              'Ошибка при terminate исходящего stream ${stream.id}: $e2');
         }
       }
     }
@@ -497,7 +517,8 @@ class RpcHttp2Server {
   }
 
   /// Поток новых транспортов для каждого соединения
-  Stream<RpcHttp2ResponderTransport> get transports => _transportController.stream;
+  Stream<RpcHttp2ResponderTransport> get transports =>
+      _transportController.stream;
 
   /// Адрес сервера
   InternetAddress get address => _serverSocket.address;
@@ -507,12 +528,14 @@ class RpcHttp2Server {
 
   /// Начинает слушать входящие соединения
   void _startListening() {
-    _logger?.info('Начало прослушивания HTTP/2 соединений на ${address.address}:$port');
+    _logger?.info(
+        'Начало прослушивания HTTP/2 соединений на ${address.address}:$port');
 
     _socketSubscription = _serverSocket.listen(
       (socket) => _handleSocket(socket),
       onError: (error, stackTrace) {
-        _logger?.error('Ошибка в HTTP/2 сервере', error: error, stackTrace: stackTrace);
+        _logger?.error('Ошибка в HTTP/2 сервере',
+            error: error, stackTrace: stackTrace);
         if (!_transportController.isClosed) {
           _transportController.addError(error, stackTrace);
         }
@@ -547,8 +570,10 @@ class RpcHttp2Server {
         _logger?.info('HTTP/2 транспорт создан для $clientAddress:$clientPort');
       }
     } catch (e, stackTrace) {
-      _logger?.error('Ошибка создания HTTP/2 транспорта для $clientAddress:$clientPort',
-          error: e, stackTrace: stackTrace);
+      _logger?.error(
+          'Ошибка создания HTTP/2 транспорта для $clientAddress:$clientPort',
+          error: e,
+          stackTrace: stackTrace);
       try {
         socket.destroy();
       } catch (_) {

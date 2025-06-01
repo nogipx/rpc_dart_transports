@@ -14,7 +14,8 @@ Future<void> main() async {
   RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.debug);
 
   print('🚀 === ДЕМОНСТРАЦИЯ ВСЕХ ТИПОВ RPC С HTTP/2 ТРАНСПОРТОМ === 🚀\n');
-  print('📱 Покажем Unary, Server Streaming, Client Streaming и Bidirectional!\n');
+  print(
+      '📱 Покажем Unary, Server Streaming, Client Streaming и Bidirectional!\n');
 
   // Запускаем HTTP/2 сервер с настоящим RPC обработчиком
   print('📡 Запуск HTTP/2 сервера с RPC обработчиком...');
@@ -228,7 +229,8 @@ class _Http2RpcServer {
   }
 
   void _handleConnection(Socket socket) {
-    print('📞 Новое HTTP/2 подключение от ${socket.remoteAddress}:${socket.remotePort}');
+    print(
+        '📞 Новое HTTP/2 подключение от ${socket.remoteAddress}:${socket.remotePort}');
 
     try {
       // Создаем HTTP/2 соединение и серверный транспорт
@@ -261,7 +263,8 @@ class _Http2RpcServer {
   void _registerDemoService(RpcResponderEndpoint endpoint) {
     final contract = _DemoServiceContract();
     endpoint.registerServiceContract(contract);
-    print('📋 Зарегистрирован DemoService с ${contract.methods.length} методами');
+    print(
+        '📋 Зарегистрирован DemoService с ${contract.methods.length} методами');
   }
 
   Future<void> stop() async {
@@ -338,7 +341,8 @@ final class _DemoServiceContract extends RpcResponderContract {
           print('🔄 HTTP/2 AccumulateMessages: получено "${request.value}"');
         }
 
-        final result = 'HTTP/2 накоплено ${messages.length} сообщений: ${messages.join(", ")}';
+        final result =
+            'HTTP/2 накоплено ${messages.length} сообщений: ${messages.join(", ")}';
         print('🔄 HTTP/2 AccumulateMessages: завершен с результатом');
         return RpcString(result);
       },

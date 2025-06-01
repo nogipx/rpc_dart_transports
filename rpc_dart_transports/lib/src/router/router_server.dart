@@ -32,7 +32,8 @@ class RpcRouterServer {
     RpcLogger? logger,
     RouterResponderImpl? sharedRouterImpl,
   })  : _logger = logger?.child('RouterServer'),
-        _sharedRouterImpl = sharedRouterImpl ?? RouterResponderImpl(logger: logger);
+        _sharedRouterImpl =
+            sharedRouterImpl ?? RouterResponderImpl(logger: logger);
 
   /// Доступ к реализации роутера
   RouterResponderImpl get routerImpl => _sharedRouterImpl;
@@ -96,7 +97,8 @@ class RpcRouterServer {
 
   /// Закрывает конкретное соединение
   Future<void> closeConnection(String connectionId, {String? reason}) async {
-    _logger?.info('Закрытие соединения $connectionId${reason != null ? ' ($reason)' : ''}');
+    _logger?.info(
+        'Закрытие соединения $connectionId${reason != null ? ' ($reason)' : ''}');
 
     try {
       // Удаляем из глобальной шины

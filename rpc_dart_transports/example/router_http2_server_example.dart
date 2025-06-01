@@ -71,7 +71,8 @@ void _handleHttp2Connection(
 
     // На данный момент HTTP/2 транспорт требует ServerTransportConnection
     // Это упрощенный пример - в реальности нужно настроить HTTP/2 соединение
-    logger.info('HTTP/2 роутер требует более сложной настройки HTTP/2 соединения');
+    logger.info(
+        'HTTP/2 роутер требует более сложной настройки HTTP/2 соединения');
 
     // Для демонстрации просто возвращаем 501 Not Implemented
     request.response
@@ -83,7 +84,8 @@ void _handleHttp2Connection(
 
     // Показываем статистику каждые 10 секунд
   } catch (e, stackTrace) {
-    logger.error('Ошибка обработки HTTP/2 соединения: $e', error: e, stackTrace: stackTrace);
+    logger.error('Ошибка обработки HTTP/2 соединения: $e',
+        error: e, stackTrace: stackTrace);
 
     // Возвращаем HTTP ошибку
     request.response

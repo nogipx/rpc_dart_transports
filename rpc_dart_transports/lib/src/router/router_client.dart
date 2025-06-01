@@ -126,8 +126,8 @@ class RpcRouterClient {
     if (_p2pConnection != null && _p2pConnection!.isInitialized) {
       _p2pConnection!.sendHeartbeat();
     } else {
-      _logger
-          ?.warning('P2P не инициализировано, heartbeat недоступен. Используйте initializeP2P()');
+      _logger?.warning(
+          'P2P не инициализировано, heartbeat недоступен. Используйте initializeP2P()');
     }
   }
 
@@ -140,7 +140,8 @@ class RpcRouterClient {
     bool filterRouterHeartbeats = true,
   }) async {
     if (_clientId == null) {
-      throw StateError('Клиент должен быть зарегистрирован перед инициализацией P2P');
+      throw StateError(
+          'Клиент должен быть зарегистрирован перед инициализацией P2P');
     }
 
     _logger?.info('Инициализация P2P соединения для клиента: $_clientId');
@@ -161,7 +162,8 @@ class RpcRouterClient {
   }
 
   /// Отправляет unicast сообщение
-  Future<void> sendUnicast(String targetId, Map<String, dynamic> payload) async {
+  Future<void> sendUnicast(
+      String targetId, Map<String, dynamic> payload) async {
     _ensureP2PInitialized();
 
     final message = RouterMessage.unicast(
@@ -175,8 +177,10 @@ class RpcRouterClient {
   }
 
   /// Отправляет multicast сообщение
-  Future<void> sendMulticast(String groupName, Map<String, dynamic> payload) async {
-    _logger?.debug('Отправляем multicast в группу "$groupName" от клиента $_clientId');
+  Future<void> sendMulticast(
+      String groupName, Map<String, dynamic> payload) async {
+    _logger?.debug(
+        'Отправляем multicast в группу "$groupName" от клиента $_clientId');
     _ensureP2PInitialized();
 
     final message = RouterMessage.multicast(
@@ -186,7 +190,8 @@ class RpcRouterClient {
     );
 
     _p2pConnection!.sendMessage(message);
-    _logger?.debug('Multicast сообщение отправлено: $_clientId -> группа $groupName');
+    _logger?.debug(
+        'Multicast сообщение отправлено: $_clientId -> группа $groupName');
   }
 
   /// Отправляет broadcast сообщение
@@ -241,7 +246,8 @@ class RpcRouterClient {
   void _ensureP2PInitialized() {
     if (_p2pConnection == null || !_p2pConnection!.isInitialized) {
       _logger?.error('P2P соединение не инициализировано');
-      throw StateError('P2P соединение не инициализировано. Вызовите initializeP2P()');
+      throw StateError(
+          'P2P соединение не инициализировано. Вызовите initializeP2P()');
     }
   }
 
