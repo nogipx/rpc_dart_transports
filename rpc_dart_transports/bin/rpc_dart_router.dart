@@ -5,8 +5,10 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:args/args.dart';
+import 'package:rpc_dart/rpc_dart.dart';
 import 'package:rpc_dart_transports/rpc_dart_transports.dart';
 import 'package:rpc_dart_transports/src/http2/rpc_http2_responder_transport.dart';
 import 'package:http2/http2.dart' as http2;
@@ -14,6 +16,38 @@ import 'package:http2/http2.dart' as http2;
 const String version = '2.0.0';
 
 void main(List<String> arguments) async {
+  // Запускаем в защищенной зоне для перехвата всех ошибок
+  runZonedGuarded<void>(
+    () async {
+      await _mainWithErrorHandling(arguments);
+    },
+    (error, stackTrace) {
+      // Глобальный обработчик unhandled exceptions
+      print('🚨 === НЕОБРАБОТАННАЯ ОШИБКА ===');
+      print('❌ Тип: ${error.runtimeType}');
+      print('📝 Ошибка: $error');
+
+      // Специальная обработка HTTP/2 ошибок
+      if (error.toString().contains('HTTP/2 error') ||
+          error.toString().contains('Connection is being forcefully terminated')) {
+        print(
+            '🔗 HTTP/2 соединение было принудительно закрыто (это нормально при отключении клиентов)');
+        print('♻️  Роутер продолжает работу...');
+        return; // Не завершаем процесс для HTTP/2 ошибок
+      }
+
+      if (_isVerbose) {
+        print('📍 Stack trace: $stackTrace');
+      }
+
+      print('🛑 Завершение работы из-за критической ошибки...');
+      exit(1);
+    },
+  );
+}
+
+/// Основная логика с обработкой ошибок
+Future<void> _mainWithErrorHandling(List<String> arguments) async {
   final parser = _buildArgParser();
 
   try {
@@ -192,21 +226,43 @@ class RouterCLI {
 
       logger.info('✅ HTTP/2 клиент подключен: $actualConnectionId');
 
-      // Мониторим завершение соединения через транспорт
+      // Мониторим завершение соединения через транспорт с улучшенной обработкой ошибок
       transport.incomingMessages.listen(
         (message) {
-          // Сообщения автоматически обрабатываются RouterServer'ом
-          logger.debug(
-              'HTTP/2 сообщение получено от $actualConnectionId: stream ${message.streamId}');
+          try {
+            // Сообщения автоматически обрабатываются RouterServer'ом
+            logger.debug(
+                'HTTP/2 сообщение получено от $actualConnectionId: stream ${message.streamId}');
+          } catch (e) {
+            logger.debug('Ошибка при обработке HTTP/2 сообщения от $actualConnectionId: $e');
+          }
         },
         onError: (error) async {
-          logger.warning('❌ Ошибка HTTP/2 соединения $actualConnectionId: $error');
-          await _routerServer.closeConnection(actualConnectionId, reason: 'HTTP/2 error: $error');
+          try {
+            // Логируем ошибку но не падаем
+            if (error.toString().contains('Connection is being forcefully terminated') ||
+                error.toString().contains('HTTP/2 error')) {
+              logger.debug(
+                  '🔗 HTTP/2 соединение $actualConnectionId закрыто клиентом (нормально): $error');
+            } else {
+              logger.warning('❌ Ошибка HTTP/2 соединения $actualConnectionId: $error');
+            }
+
+            // Graceful закрытие соединения
+            await _routerServer.closeConnection(actualConnectionId, reason: 'HTTP/2 error: $error');
+          } catch (e) {
+            logger.debug('Ошибка при закрытии соединения $actualConnectionId: $e');
+          }
         },
         onDone: () async {
-          logger.info('🔌 HTTP/2 клиент отключился: $actualConnectionId');
-          await _routerServer.closeConnection(actualConnectionId, reason: 'HTTP/2 closed');
+          try {
+            logger.info('🔌 HTTP/2 клиент отключился: $actualConnectionId');
+            await _routerServer.closeConnection(actualConnectionId, reason: 'HTTP/2 closed');
+          } catch (e) {
+            logger.debug('Ошибка при закрытии соединения $actualConnectionId в onDone: $e');
+          }
         },
+        cancelOnError: false, // Не отменяем подписку при ошибках
       );
     } catch (e, stackTrace) {
       logger.error('Ошибка обработки HTTP/2 транспорта',
