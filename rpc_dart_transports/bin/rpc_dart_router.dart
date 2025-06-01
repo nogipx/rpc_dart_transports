@@ -8,7 +8,8 @@ import 'dart:io';
 
 import 'package:args/args.dart';
 import 'package:rpc_dart_transports/rpc_dart_transports.dart';
-import 'package:web_socket_channel/io.dart';
+import 'package:rpc_dart_transports/src/http2/rpc_http2_responder_transport.dart';
+import 'package:http2/http2.dart' as http2;
 
 const String version = '2.0.0';
 
@@ -36,7 +37,22 @@ void main(List<String> arguments) async {
 
     // Graceful shutdown
     await _waitForShutdownSignal();
-    await routerCli.stop();
+
+    // Graceful shutdown с таймаутом
+    print('🔄 Graceful shutdown в процессе...');
+    try {
+      await routerCli.stop().timeout(
+        Duration(seconds: 10),
+        onTimeout: () {
+          print('⚠️ Graceful shutdown превысил 10 секунд, принудительное завершение');
+          exit(1);
+        },
+      );
+      print('✅ Graceful shutdown завершен успешно');
+    } catch (e) {
+      print('❌ Ошибка при graceful shutdown: $e');
+      exit(1);
+    }
   } on FormatException catch (e) {
     print('❌ Ошибка в аргументах: ${e.message}');
     print('');
@@ -54,9 +70,7 @@ void main(List<String> arguments) async {
 /// Конфигурация роутера
 class RouterConfig {
   final String host;
-  final int websocketPort;
-  final int http2Port;
-  final List<String> transports;
+  final int port;
   final bool enableStats;
   final String logLevel;
   final bool verbose;
@@ -64,25 +78,17 @@ class RouterConfig {
 
   const RouterConfig({
     this.host = '0.0.0.0',
-    this.websocketPort = 11111,
-    this.http2Port = 11112,
-    this.transports = const ['http2'], // HTTP/2 по умолчанию
-    this.enableStats = true, // Включаем статистику по умолчанию
+    this.port = 11112, // HTTP/2 порт по умолчанию
+    this.enableStats = true,
     this.logLevel = 'info',
     this.verbose = false,
     this.clientTimeoutSeconds = 300,
   });
 }
 
-/// Типы поддерживаемых транспортов
-enum TransportType {
-  websocket,
-  http2,
-}
-
 bool _isVerbose = false;
 
-/// Основной класс CLI роутера
+/// Основной класс CLI роутера (только HTTP/2)
 class RouterCLI {
   final RouterConfig config;
   final RpcLogger logger;
@@ -90,8 +96,11 @@ class RouterCLI {
   /// Транспорт-агностичный роутер сервер
   late final RpcRouterServer _routerServer;
 
-  /// Активные серверы по типам транспорта
-  final Map<TransportType, HttpServer> _servers = {};
+  /// HTTP/2 сервер
+  RpcHttp2Server? _http2Server;
+
+  /// Подписки для HTTP/2 соединений
+  final List<StreamSubscription> _http2Subscriptions = [];
 
   /// Таймер статистики
   Timer? _statsTimer;
@@ -104,14 +113,15 @@ class RouterCLI {
     RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.info);
   }
 
-  /// Запускает роутер со всеми настроенными транспортами
+  /// Запускает HTTP/2 роутер
   Future<void> start() async {
     _startTime = DateTime.now();
 
-    logger.info('🚀 Запуск RPC Dart Router v$version');
+    logger.info('🚀 Запуск RPC Dart Router v$version (HTTP/2 gRPC)');
     logger.info('Конфигурация:');
     logger.info('  • Хост: ${config.host}');
-    logger.info('  • Транспорты: ${config.transports.join(', ')}');
+    logger.info('  • Порт: ${config.port}');
+    logger.info('  • Транспорт: HTTP/2 gRPC');
     logger.info('  • Логирование: ${config.logLevel}');
     logger.info('  • Статистика: ${config.enableStats ? 'включена' : 'отключена'}');
 
@@ -121,10 +131,8 @@ class RouterCLI {
         logger: logger.child('RouterServer'),
       );
 
-      // Запускаем все указанные транспорты
-      for (final transport in config.transports) {
-        await _startTransport(transport);
-      }
+      // Запускаем HTTP/2 сервер
+      await _startHttp2Server();
 
       // Запускаем статистику если включена
       if (config.enableStats) {
@@ -140,154 +148,69 @@ class RouterCLI {
     }
   }
 
-  /// Запускает конкретный транспорт
-  Future<void> _startTransport(String transport) async {
-    switch (transport) {
-      case 'websocket':
-        await _startWebSocketServer();
-        break;
-      case 'http2':
-        await _startHttp2Server();
-        break;
-      default:
-        throw FormatException('Неизвестный транспорт: $transport');
-    }
-  }
-
-  /// Запускает WebSocket сервер
-  Future<void> _startWebSocketServer() async {
-    final server = await HttpServer.bind(config.host, config.websocketPort);
-    _servers[TransportType.websocket] = server;
-
-    logger.info('🌐 WebSocket сервер запущен на ws://${config.host}:${config.websocketPort}');
-
-    server.listen((request) async {
-      if (WebSocketTransformer.isUpgradeRequest(request)) {
-        await _handleWebSocketConnection(request);
-      } else {
-        await _handleNonWebSocketRequest(request);
-      }
-    });
-  }
-
-  /// Запускает HTTP/2 сервер
+  /// Запускает HTTP/2 сервер с настоящим gRPC-style протоколом
   Future<void> _startHttp2Server() async {
-    final server = await HttpServer.bind(config.host, config.http2Port);
-    _servers[TransportType.http2] = server;
+    logger.info('🚀 Запуск HTTP/2 gRPC сервера на ${config.host}:${config.port}');
 
-    logger.info('🚀 HTTP/2 сервер запущен на http://${config.host}:${config.http2Port}');
+    // Используем новый удобный API!
+    _http2Server = await RpcHttp2ResponderTransport.bind(
+      host: config.host,
+      port: config.port,
+      logger: config.verbose ? logger.child('Http2Server') : null,
+    );
 
-    server.listen((request) async {
-      await _handleHttp2Connection(request);
-    });
+    logger.info('🚀 HTTP/2 gRPC сервер запущен на http://${config.host}:${config.port}');
+
+    // Слушаем новые транспорты для каждого соединения
+    final subscription = _http2Server!.transports.listen(
+      (transport) => _handleHttp2Transport(transport),
+      onError: (error, stackTrace) {
+        logger.error('Ошибка HTTP/2 сервера',
+            error: error, stackTrace: config.verbose ? stackTrace : null);
+      },
+      onDone: () {
+        logger.info('HTTP/2 сервер остановлен');
+      },
+    );
+
+    _http2Subscriptions.add(subscription);
   }
 
-  /// Обрабатывает WebSocket соединение
-  Future<void> _handleWebSocketConnection(HttpRequest request) async {
+  /// Обрабатывает новый HTTP/2 транспорт
+  void _handleHttp2Transport(RpcHttp2ResponderTransport transport) {
+    final connectionId = 'http2_${DateTime.now().millisecondsSinceEpoch}';
+
+    logger.debug('🔗 Новый HTTP/2 транспорт: $connectionId');
+
     try {
-      final webSocket = await WebSocketTransformer.upgrade(request);
-      final clientAddress = request.connectionInfo?.remoteAddress.toString() ?? 'unknown';
-
-      logger.debug('🔗 WebSocket подключение: $clientAddress');
-
-      // Создаем WebSocket транспорт
-      final channel = IOWebSocketChannel(webSocket);
-      final transport = RpcWebSocketResponderTransport(
-        channel,
-        logger: config.verbose ? logger.child('WSTransport') : null,
-      );
-
       // Создаем соединение через RouterServer
-      final connectionId = _routerServer.createConnection(
+      final actualConnectionId = _routerServer.createConnection(
         transport: transport,
-        connectionLabel: 'ws_${clientAddress}_${DateTime.now().millisecondsSinceEpoch}',
-        clientAddress: clientAddress,
+        connectionLabel: connectionId,
+        clientAddress: 'http2-client',
       );
 
-      logger.info('✅ WebSocket клиент подключен: $connectionId');
+      logger.info('✅ HTTP/2 клиент подключен: $actualConnectionId');
 
-      // Мониторим завершение соединения
-      webSocket.done.then((_) async {
-        logger.info('🔌 WebSocket клиент отключился: $connectionId');
-        await _routerServer.closeConnection(connectionId, reason: 'WebSocket closed');
-      }).catchError((error) async {
-        logger.warning('❌ Ошибка WebSocket соединения $connectionId: $error');
-        await _routerServer.closeConnection(connectionId, reason: 'WebSocket error: $error');
-      });
+      // Мониторим завершение соединения через транспорт
+      transport.incomingMessages.listen(
+        (message) {
+          // Сообщения автоматически обрабатываются RouterServer'ом
+          logger.debug(
+              'HTTP/2 сообщение получено от $actualConnectionId: stream ${message.streamId}');
+        },
+        onError: (error) async {
+          logger.warning('❌ Ошибка HTTP/2 соединения $actualConnectionId: $error');
+          await _routerServer.closeConnection(actualConnectionId, reason: 'HTTP/2 error: $error');
+        },
+        onDone: () async {
+          logger.info('🔌 HTTP/2 клиент отключился: $actualConnectionId');
+          await _routerServer.closeConnection(actualConnectionId, reason: 'HTTP/2 closed');
+        },
+      );
     } catch (e, stackTrace) {
-      logger.error('Ошибка WebSocket соединения',
+      logger.error('Ошибка обработки HTTP/2 транспорта',
           error: e, stackTrace: config.verbose ? stackTrace : null);
-      request.response.statusCode = 500;
-      await request.response.close();
-    }
-  }
-
-  /// Обрабатывает не-WebSocket запрос к WebSocket серверу
-  Future<void> _handleNonWebSocketRequest(HttpRequest request) async {
-    logger.debug('Получен не-WebSocket запрос: ${request.method} ${request.uri}');
-
-    // Возвращаем информацию о роутере
-    final stats = _routerServer.getStats();
-    final uptime = DateTime.now().difference(_startTime);
-
-    final info = {
-      'service': 'RPC Dart Router',
-      'version': version,
-      'transport': 'WebSocket',
-      'uptime_seconds': uptime.inSeconds,
-      'active_connections': stats.activeConnections,
-      'total_connections': stats.totalConnections,
-      'endpoints': {
-        'websocket': 'ws://${config.host}:${config.websocketPort}',
-        if (config.transports.contains('http2'))
-          'http2': 'http://${config.host}:${config.http2Port}',
-      }
-    };
-
-    request.response
-      ..statusCode = 200
-      ..headers.contentType = ContentType.json
-      ..write(jsonEncode(info))
-      ..close();
-  }
-
-  /// Обрабатывает HTTP/2 соединение
-  Future<void> _handleHttp2Connection(HttpRequest request) async {
-    try {
-      final clientAddress = request.connectionInfo?.remoteAddress.toString() ?? 'unknown';
-
-      logger.debug('🔗 HTTP/2 запрос: ${request.method} ${request.uri} от $clientAddress');
-
-      // Пока что HTTP/2 транспорт требует более сложной настройки
-      // Возвращаем информацию о доступности
-      final stats = _routerServer.getStats();
-      final uptime = DateTime.now().difference(_startTime);
-
-      final info = {
-        'service': 'RPC Dart Router',
-        'version': version,
-        'transport': 'HTTP/2',
-        'status': 'available',
-        'note': 'HTTP/2 router requires proper gRPC-style connection setup',
-        'uptime_seconds': uptime.inSeconds,
-        'active_connections': stats.activeConnections,
-        'suggestion': 'Use RouterClient with RpcHttp2CallerTransport for proper connection',
-        'websocket_endpoint': 'ws://${config.host}:${config.websocketPort}',
-      };
-
-      request.response
-        ..statusCode = 200
-        ..headers.contentType = ContentType.json
-        ..write(jsonEncode(info))
-        ..close();
-    } catch (e, stackTrace) {
-      logger.error('Ошибка HTTP/2 соединения',
-          error: e, stackTrace: config.verbose ? stackTrace : null);
-
-      request.response
-        ..statusCode = 500
-        ..write('Internal server error')
-        ..close();
     }
   }
 
@@ -330,51 +253,29 @@ class RouterCLI {
 
   /// Показывает сводку после запуска
   void _printStartupSummary() {
-    print('\n🎉 === РОУТЕР ЗАПУЩЕН ===');
-    print('📡 Доступные endpoints:');
+    print('\n🎉 === HTTP/2 gRPC РОУТЕР ЗАПУЩЕН ===');
+    print('📡 Доступный endpoint:');
+    print('   • HTTP/2 gRPC: http://${config.host}:${config.port}');
 
-    for (final transport in config.transports) {
-      switch (transport) {
-        case 'websocket':
-          print('   • WebSocket: ws://${config.host}:${config.websocketPort}');
-          break;
-        case 'http2':
-          print('   • HTTP/2: http://${config.host}:${config.http2Port}');
-          break;
-      }
-    }
-
-    print('\n💡 Примеры подключения:');
-    if (config.transports.contains('websocket')) {
-      print('```dart');
-      print('// WebSocket клиент');
-      print('final transport = RpcWebSocketCallerTransport.connect(');
-      print("  Uri.parse('ws://${config.host}:${config.websocketPort}'),");
-      print(');');
-      print('final endpoint = RpcCallerEndpoint(transport: transport);');
-      print('final client = RouterClient(callerEndpoint: endpoint);');
-      print('```');
-    }
-
-    if (config.transports.contains('http2')) {
-      print('```dart');
-      print('// HTTP/2 клиент');
-      print('final transport = await RpcHttp2CallerTransport.connect(');
-      print("  host: '${config.host}',");
-      print('  port: ${config.http2Port},');
-      print(');');
-      print('final endpoint = RpcCallerEndpoint(transport: transport);');
-      print('final client = RouterClient(callerEndpoint: endpoint);');
-      print('```');
-    }
+    print('\n💡 Пример подключения:');
+    print('```dart');
+    print('// HTTP/2 gRPC клиент');
+    print('final transport = await RpcHttp2CallerTransport.connect(');
+    print("  host: '${config.host}',");
+    print('  port: ${config.port},');
+    print(');');
+    print('final endpoint = RpcCallerEndpoint(transport: transport);');
+    print('final client = RpcRouterClient(callerEndpoint: endpoint);');
+    print('await client.register(clientName: "my_client");');
+    print('await client.initializeP2P();');
+    print('```');
 
     print('\n🔧 Управление:');
     print('   • Ctrl+C или SIGTERM для graceful shutdown');
-    print('   • GET /health для проверки состояния');
     if (config.enableStats) {
       print('   • Статистика выводится каждые 30с');
     }
-    print('========================\n');
+    print('=====================================\n');
   }
 
   /// Останавливает роутер
@@ -383,15 +284,37 @@ class RouterCLI {
 
     // Останавливаем таймер статистики
     _statsTimer?.cancel();
+    _statsTimer = null;
 
-    // Закрываем все серверы
-    for (final entry in _servers.entries) {
-      logger.info('Закрытие ${entry.key.name} сервера...');
-      await entry.value.close();
+    // Отменяем HTTP/2 подписки
+    for (final subscription in _http2Subscriptions) {
+      try {
+        await subscription.cancel();
+      } catch (e) {
+        logger.warning('Ошибка отмены HTTP/2 подписки: $e');
+      }
+    }
+    _http2Subscriptions.clear();
+
+    // Закрываем HTTP/2 сервер
+    if (_http2Server != null) {
+      logger.info('Закрытие HTTP/2 сервера...');
+      try {
+        await _http2Server!.close().timeout(Duration(seconds: 5));
+        logger.debug('HTTP/2 сервер закрыт');
+      } catch (e) {
+        logger.warning('Ошибка закрытия HTTP/2 сервера: $e (принудительно продолжаем)');
+      }
+      _http2Server = null;
     }
 
-    // Закрываем роутер сервер
-    await _routerServer.dispose();
+    // Закрываем роутер сервер с таймаутом
+    try {
+      await _routerServer.dispose().timeout(Duration(seconds: 5));
+      logger.debug('RouterServer закрыт');
+    } catch (e) {
+      logger.warning('Ошибка закрытия RouterServer: $e (принудительно продолжаем)');
+    }
 
     final uptime = DateTime.now().difference(_startTime);
     logger.info('✅ Роутер остановлен (время работы: ${_formatDuration(uptime)})');
@@ -418,24 +341,13 @@ ArgParser _buildArgParser() {
       'host',
       abbr: 'h',
       defaultsTo: '0.0.0.0',
-      help: 'Хост для привязки сервера',
+      help: 'Хост для привязки HTTP/2 сервера',
     )
     ..addOption(
-      'websocket-port',
+      'port',
       abbr: 'p',
-      defaultsTo: '11111',
-      help: 'Порт для WebSocket сервера',
-    )
-    ..addOption(
-      'http2-port',
-      help: 'Порт для HTTP/2 сервера (по умолчанию port + 1)',
-    )
-    ..addMultiOption(
-      'transport',
-      abbr: 't',
-      defaultsTo: ['http2'],
-      allowed: ['websocket', 'http2'],
-      help: 'Типы транспортов для запуска',
+      defaultsTo: '11112',
+      help: 'Порт для HTTP/2 gRPC сервера',
     )
     ..addOption(
       'log-level',
@@ -457,7 +369,7 @@ ArgParser _buildArgParser() {
     ..addFlag(
       'stats',
       abbr: 's',
-      defaultsTo: true,
+      defaultsTo: false,
       help: 'Показывать статистику роутера',
     )
     ..addFlag(
@@ -483,9 +395,7 @@ ArgParser _buildArgParser() {
 /// Парсит конфигурацию из аргументов
 RouterConfig _parseConfig(ArgResults argResults) {
   final host = argResults['host'] as String;
-  final websocketPortStr = argResults['websocket-port'] as String;
-  final http2PortStr = argResults['http2-port'] as String?;
-  final transportStrs = argResults['transport'] as List<String>;
+  final portStr = argResults['port'] as String;
   final logLevelStr = argResults['log-level'] as String;
   final quiet = argResults['quiet'] as bool;
   final verbose = argResults['verbose'] as bool;
@@ -495,42 +405,14 @@ RouterConfig _parseConfig(ArgResults argResults) {
   _isVerbose = verbose;
 
   // Валидация порта
-  final websocketPort = int.tryParse(websocketPortStr);
-  if (websocketPort == null || websocketPort < 1 || websocketPort > 65535) {
-    throw FormatException('Порт должен быть числом от 1 до 65535, получен: $websocketPortStr');
-  }
-
-  // Валидация HTTP/2 порта
-  int? http2Port;
-  if (http2PortStr != null) {
-    http2Port = int.tryParse(http2PortStr);
-    if (http2Port == null || http2Port < 1 || http2Port > 65535) {
-      throw FormatException('HTTP/2 порт должен быть числом от 1 до 65535, получен: $http2PortStr');
-    }
+  final port = int.tryParse(portStr);
+  if (port == null || port < 1 || port > 65535) {
+    throw FormatException('Порт должен быть числом от 1 до 65535, получен: $portStr');
   }
 
   // Конфликт флагов
   if (quiet && verbose) {
     throw FormatException('Нельзя использовать --quiet и --verbose одновременно');
-  }
-
-  // Парсинг транспортов
-  final transports = <String>[];
-  for (final transportStr in transportStrs) {
-    switch (transportStr) {
-      case 'websocket':
-        transports.add('websocket');
-        break;
-      case 'http2':
-        transports.add('http2');
-        break;
-      default:
-        throw FormatException('Неизвестный транспорт: $transportStr');
-    }
-  }
-
-  if (transports.isEmpty) {
-    throw FormatException('Должен быть указан хотя бы один транспорт');
   }
 
   // Парсинг уровня логирования
@@ -571,9 +453,7 @@ RouterConfig _parseConfig(ArgResults argResults) {
 
   return RouterConfig(
     host: host,
-    websocketPort: websocketPort,
-    http2Port: http2Port ?? (websocketPort + 1),
-    transports: transports,
+    port: port,
     enableStats: enableStats,
     logLevel: logLevel.name,
     verbose: verbose,
@@ -583,41 +463,54 @@ RouterConfig _parseConfig(ArgResults argResults) {
 
 /// Показывает справку
 void _printUsage(ArgParser parser) {
-  print('🚀 RPC Dart Router v$version - Транспорт-агностичный роутер для RPC вызовов\n');
+  print('🚀 RPC Dart Router v$version - HTTP/2 gRPC роутер для RPC вызовов\n');
   print('Использование: rpc_dart_router [options]\n');
   print('Опции:');
   print(parser.usage);
   print('\nПримеры:');
-  print('  rpc_dart_router                                    # HTTP/2 на порту 11112');
-  print('  rpc_dart_router -t websocket -t http2              # Оба транспорта');
-  print('  rpc_dart_router -h localhost --websocket-port 8080 # Настройка хоста и порта');
-  print('  rpc_dart_router --http2-port 8443                  # Явный порт для HTTP/2');
-  print('  rpc_dart_router --quiet                            # Тихий режим');
-  print('  rpc_dart_router -v --log-level debug               # Детальная отладка');
-  print('  rpc_dart_router --no-stats                         # Без статистики');
-  print('  rpc_dart_router --client-timeout 300               # Таймаут 5 минут');
-  print('\nТранспорты:');
-  print('  websocket  WebSocket транспорт');
-  print('  http2      HTTP/2 gRPC-style транспорт (по умолчанию)');
+  print('  rpc_dart_router                    # HTTP/2 на порту 11112');
+  print('  rpc_dart_router -p 8080            # HTTP/2 на порту 8080');
+  print('  rpc_dart_router -h 192.168.1.100   # HTTP/2 на определенном IP');
+  print('  rpc_dart_router --quiet             # Тихий режим');
+  print('  rpc_dart_router -v --log-level debug # Детальная отладка');
+  print('  rpc_dart_router --stats             # С периодической статистикой');
+  print('  rpc_dart_router --client-timeout 600 # Таймаут 10 минут');
+  print('\nТранспорт:');
+  print('  HTTP/2 gRPC     Современный бинарный протокол с мультиплексингом');
+  print(
+      '                  Поддерживает все типы RPC вызовов: unary, client/server/bidirectional streams');
 }
 
 /// Ожидает сигнал завершения (Ctrl+C, SIGTERM)
 Future<void> _waitForShutdownSignal() async {
   final completer = Completer<void>();
+  bool shutdownInitiated = false;
 
   // Обрабатываем SIGINT (Ctrl+C)
   ProcessSignal.sigint.watch().listen((signal) {
-    print('\n🛑 Получен сигнал SIGINT, завершение работы...');
-    if (!completer.isCompleted) {
-      completer.complete();
+    if (!shutdownInitiated) {
+      shutdownInitiated = true;
+      print('\n🛑 Получен сигнал SIGINT, завершение работы...');
+      if (!completer.isCompleted) {
+        completer.complete();
+      }
+    } else {
+      print('\n⚡ Повторный SIGINT - принудительное завершение!');
+      exit(130); // Код выхода для SIGINT
     }
   });
 
   // Обрабатываем SIGTERM
   ProcessSignal.sigterm.watch().listen((signal) {
-    print('\n🛑 Получен сигнал SIGTERM, завершение работы...');
-    if (!completer.isCompleted) {
-      completer.complete();
+    if (!shutdownInitiated) {
+      shutdownInitiated = true;
+      print('\n🛑 Получен сигнал SIGTERM, завершение работы...');
+      if (!completer.isCompleted) {
+        completer.complete();
+      }
+    } else {
+      print('\n⚡ Повторный SIGTERM - принудительное завершение!');
+      exit(143); // Код выхода для SIGTERM
     }
   });
 

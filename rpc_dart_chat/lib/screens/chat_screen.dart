@@ -472,7 +472,8 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                         ),
                       ),
                       title: Text(user.username),
-                      subtitle: Text(_formatLastSeen(user.lastSeen)),
+                      subtitle:
+                          user.lastSeen != null ? Text(_formatLastSeen(user.lastSeen!)) : null,
                       trailing: Icon(Icons.circle, color: _getStatusColor(user.status), size: 12),
                     ),
                   ),
@@ -545,7 +546,7 @@ class _MessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isSystem = message.type == MessageType.system;
+    final isSystem = message.type == ChatMessageType.system;
 
     if (isSystem) {
       return _buildSystemMessage(context);

@@ -6,154 +6,200 @@ import 'package:rpc_dart_transports/rpc_dart_transports.dart';
 /// Типы действий пользователей
 enum UserAction { joined, left, typing, stopTyping }
 
-/// Типы сообщений
-enum MessageType { text, system, private, reaction, typing, userJoined, userLeft }
-
 /// Статус пользователя
 enum UserStatus { online, idle, busy, offline }
 
-/// Типы транспортов для подключения к роутеру
-enum TransportType { websocket, http2, inMemory }
-
-/// Состояние подключения клиента
+/// Состояние подключения чата (избегаем конфликта с Flutter ConnectionState)
 enum ChatConnectionState { disconnected, connecting, connected, reconnecting, error }
+
+/// Пользователь чата
+class ChatUser implements IRpcSerializable {
+  final String id;
+  final String name;
+  final bool isOnline;
+  final DateTime? lastSeen;
+  final Map<String, dynamic> metadata;
+
+  const ChatUser({
+    required this.id,
+    required this.name,
+    this.isOnline = false,
+    this.lastSeen,
+    this.metadata = const {},
+  });
+
+  // === ГЕТТЕРЫ ДЛЯ СОВМЕСТИМОСТИ ===
+  String get username => name;
+  UserStatus get status => isOnline ? UserStatus.online : UserStatus.offline;
+
+  @override
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'isOnline': isOnline,
+      'lastSeen': lastSeen?.millisecondsSinceEpoch,
+      'metadata': metadata,
+    };
+  }
+
+  factory ChatUser.fromJson(Map<String, dynamic> json) {
+    return ChatUser(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      isOnline: json['isOnline'] as bool? ?? false,
+      lastSeen:
+          json['lastSeen'] != null
+              ? DateTime.fromMillisecondsSinceEpoch(json['lastSeen'] as int)
+              : null,
+      metadata: json['metadata'] as Map<String, dynamic>? ?? {},
+    );
+  }
+
+  ChatUser copyWith({
+    String? name,
+    bool? isOnline,
+    DateTime? lastSeen,
+    Map<String, dynamic>? metadata,
+  }) {
+    return ChatUser(
+      id: id,
+      name: name ?? this.name,
+      isOnline: isOnline ?? this.isOnline,
+      lastSeen: lastSeen ?? this.lastSeen,
+      metadata: metadata ?? this.metadata,
+    );
+  }
+
+  @override
+  String toString() => 'ChatUser(id: $id, name: $name, isOnline: $isOnline)';
+}
 
 /// Сообщение чата
 class ChatMessage implements IRpcSerializable {
   final String id;
-  final String username;
-  final String message;
-  final String room;
+  final String content;
+  final String senderId;
+  final String senderName;
   final DateTime timestamp;
-  final MessageType type;
+  final ChatMessageType type;
   final String? targetUserId; // Для приватных сообщений
-  final String? replyToId; // Для ответов на сообщения
-  final Map<String, int> reactions; // emoji -> count
-  final bool isEdited;
+  final Map<String, Set<String>> reactions; // userId -> Set<reactionEmoji>
 
   const ChatMessage({
     required this.id,
-    required this.username,
-    required this.message,
-    required this.room,
+    required this.content,
+    required this.senderId,
+    required this.senderName,
     required this.timestamp,
-    this.type = MessageType.text,
+    this.type = ChatMessageType.public,
     this.targetUserId,
-    this.replyToId,
     this.reactions = const {},
-    this.isEdited = false,
   });
 
-  /// Создает системное сообщение
-  factory ChatMessage.system({required String message, required String room}) {
+  // === ГЕТТЕРЫ ДЛЯ СОВМЕСТИМОСТИ ===
+  String get username => senderName;
+  String get message => content;
+  bool get isEdited => false; // Простая реализация
+
+  @override
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'content': content,
+      'senderId': senderId,
+      'senderName': senderName,
+      'timestamp': timestamp.millisecondsSinceEpoch,
+      'type': type.name,
+      'targetUserId': targetUserId,
+      'reactions': reactions.map((userId, reactions) => MapEntry(userId, reactions.toList())),
+    };
+  }
+
+  factory ChatMessage.fromJson(Map<String, dynamic> json) {
+    final reactionsMap = <String, Set<String>>{};
+    final reactionsJson = json['reactions'] as Map<String, dynamic>? ?? {};
+
+    for (final entry in reactionsJson.entries) {
+      final reactionsList = entry.value as List<dynamic>? ?? [];
+      reactionsMap[entry.key] = reactionsList.cast<String>().toSet();
+    }
+
     return ChatMessage(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      username: 'Система',
-      message: message,
-      room: room,
-      timestamp: DateTime.now(),
-      type: MessageType.system,
+      id: json['id'] as String,
+      content: json['content'] as String,
+      senderId: json['senderId'] as String,
+      senderName: json['senderName'] as String,
+      timestamp: DateTime.fromMillisecondsSinceEpoch(json['timestamp'] as int),
+      type: ChatMessageType.values.firstWhere(
+        (e) => e.name == json['type'],
+        orElse: () => ChatMessageType.public,
+      ),
+      targetUserId: json['targetUserId'] as String?,
+      reactions: reactionsMap,
     );
   }
 
-  /// Создает приватное сообщение
-  factory ChatMessage.private({
-    required String username,
-    required String message,
-    required String targetUserId,
+  ChatMessage copyWith({
+    String? content,
+    ChatMessageType? type,
+    String? targetUserId,
+    Map<String, Set<String>>? reactions,
   }) {
     return ChatMessage(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      username: username,
-      message: message,
-      room: 'private',
-      timestamp: DateTime.now(),
-      type: MessageType.private,
-      targetUserId: targetUserId,
-    );
-  }
-
-  /// Создает уведомление о печатании
-  factory ChatMessage.typing({required String username, required String room}) {
-    return ChatMessage(
-      id: 'typing_${DateTime.now().millisecondsSinceEpoch}',
-      username: username,
-      message: 'печатает...',
-      room: room,
-      timestamp: DateTime.now(),
-      type: MessageType.typing,
-    );
-  }
-
-  /// Копирует сообщение с изменениями
-  ChatMessage copyWith({String? message, Map<String, int>? reactions, bool? isEdited}) {
-    return ChatMessage(
       id: id,
-      username: username,
-      message: message ?? this.message,
-      room: room,
+      content: content ?? this.content,
+      senderId: senderId,
+      senderName: senderName,
       timestamp: timestamp,
-      type: type,
-      targetUserId: targetUserId,
-      replyToId: replyToId,
+      type: type ?? this.type,
+      targetUserId: targetUserId ?? this.targetUserId,
       reactions: reactions ?? this.reactions,
-      isEdited: isEdited ?? this.isEdited,
     );
   }
 
-  /// Добавляет реакцию
-  ChatMessage addReaction(String emoji) {
-    final newReactions = Map<String, int>.from(reactions);
-    newReactions[emoji] = (newReactions[emoji] ?? 0) + 1;
-    return copyWith(reactions: newReactions);
+  @override
+  String toString() => 'ChatMessage(id: $id, from: $senderName, type: $type)';
+}
+
+/// Тип сообщения чата
+enum ChatMessageType { public, private, system }
+
+/// Событие чата (пользователь печатает)
+class TypingEvent implements IRpcSerializable {
+  final String userId;
+  final String userName;
+  final bool isTyping;
+  final DateTime timestamp;
+
+  const TypingEvent({
+    required this.userId,
+    required this.userName,
+    required this.isTyping,
+    required this.timestamp,
+  });
+
+  @override
+  Map<String, dynamic> toJson() {
+    return {
+      'userId': userId,
+      'userName': userName,
+      'isTyping': isTyping,
+      'timestamp': timestamp.millisecondsSinceEpoch,
+    };
   }
 
-  /// Убирает реакцию
-  ChatMessage removeReaction(String emoji) {
-    final newReactions = Map<String, int>.from(reactions);
-    if (newReactions.containsKey(emoji)) {
-      final count = newReactions[emoji]! - 1;
-      if (count <= 0) {
-        newReactions.remove(emoji);
-      } else {
-        newReactions[emoji] = count;
-      }
-    }
-    return copyWith(reactions: newReactions);
+  factory TypingEvent.fromJson(Map<String, dynamic> json) {
+    return TypingEvent(
+      userId: json['userId'] as String,
+      userName: json['userName'] as String,
+      isTyping: json['isTyping'] as bool,
+      timestamp: DateTime.fromMillisecondsSinceEpoch(json['timestamp'] as int),
+    );
   }
 
   @override
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'username': username,
-    'message': message,
-    'room': room,
-    'timestamp': timestamp.millisecondsSinceEpoch,
-    'type': type.name,
-    if (targetUserId != null) 'targetUserId': targetUserId,
-    if (replyToId != null) 'replyToId': replyToId,
-    'reactions': reactions,
-    'isEdited': isEdited,
-  };
-
-  factory ChatMessage.fromJson(Map<String, dynamic> json) => ChatMessage(
-    id: json['id'] as String,
-    username: json['username'] as String,
-    message: json['message'] as String,
-    room: json['room'] as String,
-    timestamp: DateTime.fromMillisecondsSinceEpoch(json['timestamp'] as int),
-    type: MessageType.values.firstWhere(
-      (e) => e.name == json['type'],
-      orElse: () => MessageType.text,
-    ),
-    targetUserId: json['targetUserId'] as String?,
-    replyToId: json['replyToId'] as String?,
-    reactions: Map<String, int>.from(json['reactions'] ?? {}),
-    isEdited: json['isEdited'] as bool? ?? false,
-  );
-
-  @override
-  String toString() => 'ChatMessage(id: $id, username: $username, type: $type, room: $room)';
+  String toString() => 'TypingEvent(user: $userName, typing: $isTyping)';
 }
 
 /// Событие пользователя

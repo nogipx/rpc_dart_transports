@@ -3,6 +3,8 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:http2/http2.dart' as http2;
 import 'package:rpc_dart/rpc_dart.dart';
@@ -59,6 +61,26 @@ class RpcHttp2ResponderTransport implements IRpcTransport {
 
     return RpcHttp2ResponderTransport._(
       connection: connection,
+      logger: logger,
+    );
+  }
+
+  /// Создает HTTP/2 сервер, который слушает подключения
+  ///
+  /// Возвращает поток транспортов для каждого нового соединения
+  static Future<RpcHttp2Server> bind({
+    required String host,
+    required int port,
+    RpcLogger? logger,
+  }) async {
+    logger?.info('Создание HTTP/2 сервера на $host:$port');
+
+    final serverSocket = await ServerSocket.bind(host, port);
+
+    logger?.info('HTTP/2 сервер запущен на $host:$port');
+
+    return RpcHttp2Server._(
+      serverSocket: serverSocket,
       logger: logger,
     );
   }
@@ -442,5 +464,118 @@ class RpcHttp2ResponderTransport implements IRpcTransport {
     }
 
     _logger?.debug('HTTP/2 серверный транспорт закрыт');
+  }
+}
+
+/// HTTP/2 сервер для обработки множественных соединений
+///
+/// Автоматически создает новый RpcHttp2ResponderTransport для каждого
+/// входящего TCP соединения и эмитит их в поток транспортов.
+class RpcHttp2Server {
+  /// Серверный сокет
+  final ServerSocket _serverSocket;
+
+  /// Логгер
+  final RpcLogger? _logger;
+
+  /// Контроллер для новых транспортов
+  final StreamController<RpcHttp2ResponderTransport> _transportController =
+      StreamController<RpcHttp2ResponderTransport>.broadcast();
+
+  /// Подписка на соединения
+  StreamSubscription<Socket>? _socketSubscription;
+
+  /// Флаг закрытия
+  bool _isClosed = false;
+
+  RpcHttp2Server._({
+    required ServerSocket serverSocket,
+    RpcLogger? logger,
+  })  : _serverSocket = serverSocket,
+        _logger = logger?.child('Http2Server') {
+    _startListening();
+  }
+
+  /// Поток новых транспортов для каждого соединения
+  Stream<RpcHttp2ResponderTransport> get transports => _transportController.stream;
+
+  /// Адрес сервера
+  InternetAddress get address => _serverSocket.address;
+
+  /// Порт сервера
+  int get port => _serverSocket.port;
+
+  /// Начинает слушать входящие соединения
+  void _startListening() {
+    _logger?.info('Начало прослушивания HTTP/2 соединений на ${address.address}:$port');
+
+    _socketSubscription = _serverSocket.listen(
+      (socket) => _handleSocket(socket),
+      onError: (error, stackTrace) {
+        _logger?.error('Ошибка в HTTP/2 сервере', error: error, stackTrace: stackTrace);
+        if (!_transportController.isClosed) {
+          _transportController.addError(error, stackTrace);
+        }
+      },
+      onDone: () {
+        _logger?.info('HTTP/2 сервер остановлен');
+        close();
+      },
+    );
+  }
+
+  /// Обрабатывает новое TCP соединение
+  void _handleSocket(Socket socket) {
+    final clientAddress = socket.remoteAddress.toString();
+    final clientPort = socket.remotePort;
+
+    _logger?.debug('Новое HTTP/2 TCP соединение: $clientAddress:$clientPort');
+
+    try {
+      // Создаем HTTP/2 соединение
+      final http2Connection = http2.ServerTransportConnection.viaSocket(socket);
+
+      // Создаем транспорт
+      final transport = RpcHttp2ResponderTransport.create(
+        connection: http2Connection,
+        logger: _logger?.child('Transport-$clientAddress'),
+      );
+
+      // Эмитим новый транспорт
+      if (!_transportController.isClosed) {
+        _transportController.add(transport);
+        _logger?.info('HTTP/2 транспорт создан для $clientAddress:$clientPort');
+      }
+    } catch (e, stackTrace) {
+      _logger?.error('Ошибка создания HTTP/2 транспорта для $clientAddress:$clientPort',
+          error: e, stackTrace: stackTrace);
+      try {
+        socket.destroy();
+      } catch (_) {
+        // Игнорируем ошибки при закрытии
+      }
+    }
+  }
+
+  /// Закрывает сервер
+  Future<void> close() async {
+    if (_isClosed) return;
+
+    _logger?.info('Закрытие HTTP/2 сервера...');
+    _isClosed = true;
+
+    // Отменяем подписку на соединения
+    await _socketSubscription?.cancel();
+    _socketSubscription = null;
+
+    // Закрываем серверный сокет
+    await _serverSocket.close();
+
+    // Закрываем контроллер транспортов
+    if (!_transportController.isClosed) {
+      await _transportController.close();
+    }
+
+    _logger?.info('HTTP/2 сервер закрыт');
   }
 }
