@@ -293,20 +293,6 @@ class ChatService extends ChangeNotifier {
     await connect(serverUrl: 'http://localhost:11112', username: username, logger: _logger);
   }
 
-  /// Создает новую комнату (заглушка)
-  Future<void> createRoom(String name, String? description) async {
-    _logger?.info('Создание комнаты "$name" (пока не реализовано)');
-    // Заглушка - в полной реализации здесь был бы RPC вызов
-    throw UnimplementedError('Создание комнат пока не реализовано');
-  }
-
-  /// Присоединяется к комнате (заглушка)
-  Future<void> joinRoom(String roomId) async {
-    _logger?.info('Присоединение к комнате "$roomId" (пока не реализовано)');
-    // Заглушка - в полной реализации здесь был бы RPC вызов
-    throw UnimplementedError('Присоединение к комнатам пока не реализовано');
-  }
-
   // === ОБРАБОТЧИКИ P2P СООБЩЕНИЙ ===
 
   void _handleP2PMessage(RouterMessage routerMessage) {

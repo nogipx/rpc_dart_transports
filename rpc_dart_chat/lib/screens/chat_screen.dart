@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../services/chat_service.dart';
 import '../models/chat_models.dart';
+import 'users_screen.dart';
 
 /// Основной экран чата
 class ChatScreen extends StatefulWidget {
@@ -109,13 +110,11 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     await chatService.disconnect();
   }
 
-  /// Показывает bottom sheet управления комнатами
-  void _showRoomsBottomSheet(BuildContext context, ChatService chatService) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (context) => _RoomsBottomSheet(chatService: chatService),
+  /// Открывает экран со списком пользователей
+  void _showUsersBottomSheet(BuildContext context, ChatService chatService) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => UsersScreen(chatService: chatService)),
     );
   }
 
@@ -212,33 +211,36 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       ),
       actions: [
         // Количество пользователей онлайн (кликабельно)
-        GestureDetector(
-          onTap: () => _showRoomsBottomSheet(context, chatService),
-          child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primaryContainer,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.people,
-                  size: 18,
-                  color: Theme.of(context).colorScheme.onPrimaryContainer,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  '${chatService.onlineUsers.length}',
-                  style: TextStyle(
+        Tooltip(
+          message: 'Активные пользователи',
+          child: GestureDetector(
+            onTap: () => _showUsersBottomSheet(context, chatService),
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.people,
+                    size: 18,
                     color: Theme.of(context).colorScheme.onPrimaryContainer,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
                   ),
-                ),
-              ],
+                  const SizedBox(width: 6),
+                  Text(
+                    '${chatService.onlineUsers.length}',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onPrimaryContainer,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -500,6 +502,20 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     );
   }
 
+  /// Получает цвет статуса пользователя
+  Color _getStatusColor(UserStatus status) {
+    switch (status) {
+      case UserStatus.online:
+        return Colors.green;
+      case UserStatus.idle:
+        return Colors.orange;
+      case UserStatus.busy:
+        return Colors.red;
+      case UserStatus.offline:
+        return Colors.grey;
+    }
+  }
+
   /// Форматирует время последней активности
   String _formatLastSeen(DateTime lastSeen) {
     final now = DateTime.now();
@@ -513,20 +529,6 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       return '${difference.inHours} ч назад';
     } else {
       return DateFormat('dd.MM.yyyy').format(lastSeen);
-    }
-  }
-
-  /// Получает цвет статуса пользователя
-  Color _getStatusColor(UserStatus status) {
-    switch (status) {
-      case UserStatus.online:
-        return Colors.green;
-      case UserStatus.idle:
-        return Colors.orange;
-      case UserStatus.busy:
-        return Colors.red;
-      case UserStatus.offline:
-        return Colors.grey;
     }
   }
 }
@@ -938,355 +940,6 @@ class _ConnectionDetailsBottomSheet extends StatelessWidget {
         return 'Отключено';
       case ChatConnectionState.error:
         return 'Ошибка';
-    }
-  }
-}
-
-/// Bottom sheet управления комнатами
-class _RoomsBottomSheet extends StatefulWidget {
-  final ChatService chatService;
-
-  const _RoomsBottomSheet({required this.chatService});
-
-  @override
-  State<_RoomsBottomSheet> createState() => _RoomsBottomSheetState();
-}
-
-class _RoomsBottomSheetState extends State<_RoomsBottomSheet> {
-  final TextEditingController _roomNameController = TextEditingController();
-  final TextEditingController _roomDescriptionController = TextEditingController();
-
-  @override
-  void dispose() {
-    _roomNameController.dispose();
-    _roomDescriptionController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      initialChildSize: 0.7,
-      minChildSize: 0.5,
-      maxChildSize: 0.95,
-      expand: false,
-      builder: (context, scrollController) {
-        return Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(20),
-              topRight: Radius.circular(20),
-            ),
-          ),
-          child: Column(
-            children: [
-              // Drag handle
-              Container(
-                margin: const EdgeInsets.only(top: 8),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-
-              // Заголовок
-              Container(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    Icon(Icons.meeting_room, color: Theme.of(context).colorScheme.primary),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Управление комнатами',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.close),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Содержимое
-              Expanded(
-                child: DefaultTabController(
-                  length: 2,
-                  child: Column(
-                    children: [
-                      TabBar(
-                        tabs: const [
-                          Tab(icon: Icon(Icons.list), text: 'Комнаты'),
-                          Tab(icon: Icon(Icons.add), text: 'Создать'),
-                        ],
-                        labelColor: Theme.of(context).colorScheme.primary,
-                        unselectedLabelColor: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                      Expanded(
-                        child: TabBarView(
-                          children: [
-                            _buildRoomsList(scrollController),
-                            _buildCreateRoom(scrollController),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  /// Строит список доступных комнат
-  Widget _buildRoomsList(ScrollController scrollController) {
-    return ListView(
-      controller: scrollController,
-      padding: const EdgeInsets.all(16),
-      children: [
-        // Текущая комната
-        Card(
-          color: Theme.of(context).colorScheme.primaryContainer,
-          child: ListTile(
-            leading: Icon(
-              Icons.radio_button_checked,
-              color: Theme.of(context).colorScheme.onPrimaryContainer,
-            ),
-            title: Text(
-              widget.chatService.currentRoom,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onPrimaryContainer,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            subtitle: Text(
-              'Текущая комната',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onPrimaryContainer.withValues(alpha: 0.7),
-              ),
-            ),
-            trailing: Icon(
-              Icons.check_circle,
-              color: Theme.of(context).colorScheme.onPrimaryContainer,
-            ),
-          ),
-        ),
-
-        const SizedBox(height: 16),
-
-        // Доступные комнаты
-        Text('Доступные комнаты', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 8),
-
-        ...widget.chatService.availableRooms
-            .where((room) => room.id != widget.chatService.currentRoom)
-            .map(
-              (room) => Card(
-                child: ListTile(
-                  leading: Icon(
-                    room.isPrivate ? Icons.lock : Icons.public,
-                    color: room.isPrivate ? Colors.orange : Colors.green,
-                  ),
-                  title: Text(room.name),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (room.description != null) Text(room.description!),
-                      Text(
-                        '${room.members.length} участников',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
-                  ),
-                  trailing: TextButton(
-                    onPressed: () => _joinRoom(room.id),
-                    child: const Text('Войти'),
-                  ),
-                  isThreeLine: room.description != null,
-                ),
-              ),
-            ),
-
-        // Если нет других комнат
-        if (widget.chatService.availableRooms.length <= 1)
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.meeting_room_outlined,
-                    size: 48,
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Других комнат пока нет',
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Создайте новую комнату для общения!',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  /// Строит форму создания комнаты
-  Widget _buildCreateRoom(ScrollController scrollController) {
-    return SingleChildScrollView(
-      controller: scrollController,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text('Создание новой комнаты', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 16),
-
-            TextField(
-              controller: _roomNameController,
-              decoration: const InputDecoration(
-                labelText: 'Название комнаты',
-                hintText: 'Введите название комнаты',
-                prefixIcon: Icon(Icons.meeting_room),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            TextField(
-              controller: _roomDescriptionController,
-              decoration: const InputDecoration(
-                labelText: 'Описание (необязательно)',
-                hintText: 'Описание комнаты',
-                prefixIcon: Icon(Icons.description),
-              ),
-              maxLines: 3,
-              minLines: 1,
-            ),
-            const SizedBox(height: 24),
-
-            FilledButton.icon(
-              onPressed: _createRoom,
-              icon: const Icon(Icons.add),
-              label: const Text('Создать комнату'),
-            ),
-
-            const SizedBox(height: 16),
-
-            // Подсказки
-            Card(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.info_outline,
-                          size: 16,
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Подсказки:',
-                          style: Theme.of(
-                            context,
-                          ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '• Используйте понятные названия\n'
-                      '• Все комнаты по умолчанию публичные\n'
-                      '• После создания вы автоматически присоединитесь',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Создает новую комнату
-  Future<void> _createRoom() async {
-    final name = _roomNameController.text.trim();
-    if (name.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Введите название комнаты')));
-      return;
-    }
-
-    try {
-      await widget.chatService.createRoom(
-        name,
-        _roomDescriptionController.text.trim().isNotEmpty
-            ? _roomDescriptionController.text.trim()
-            : null,
-      );
-
-      _roomNameController.clear();
-      _roomDescriptionController.clear();
-
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Комната "$name" создана!')));
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Ошибка создания комнаты: $e')));
-      }
-    }
-  }
-
-  /// Присоединяется к комнате
-  Future<void> _joinRoom(String roomId) async {
-    try {
-      await widget.chatService.joinRoom(roomId);
-
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Вы присоединились к комнате "$roomId"')));
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Ошибка присоединения: $e')));
-      }
     }
   }
 }

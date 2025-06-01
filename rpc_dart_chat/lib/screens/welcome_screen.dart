@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:rpc_dart_transports/rpc_dart_transports.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
@@ -6,7 +7,7 @@ import 'package:provider/provider.dart';
 import '../services/chat_service.dart';
 import 'chat_screen.dart';
 
-/// Экран приветствия с настройками подключения
+/// Современный экран приветствия с чистым дизайном
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
 
@@ -14,24 +15,52 @@ class WelcomeScreen extends StatefulWidget {
   State<WelcomeScreen> createState() => _WelcomeScreenState();
 }
 
-class _WelcomeScreenState extends State<WelcomeScreen> {
+class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateMixin {
   final _usernameController = TextEditingController();
   final _serverUrlController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  final _usernameFocus = FocusNode();
+  final _serverUrlFocus = FocusNode();
 
   bool _isConnecting = false;
   String? _connectionError;
+  bool _isExpanded = false;
+
+  // Только основная анимация появления
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
+    _setupAnimations();
     _loadSavedData();
+    _startAnimations();
+  }
+
+  void _setupAnimations() {
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _animationController, curve: Curves.easeOut));
+  }
+
+  void _startAnimations() {
+    _animationController.forward();
   }
 
   @override
   void dispose() {
+    _animationController.dispose();
     _usernameController.dispose();
     _serverUrlController.dispose();
+    _usernameFocus.dispose();
+    _serverUrlFocus.dispose();
     super.dispose();
   }
 
@@ -41,10 +70,12 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     final savedUsername = prefs.getString('username');
     final savedServerUrl = prefs.getString('serverUrl') ?? 'http://localhost:11112';
 
-    if (savedUsername != null) {
-      _usernameController.text = savedUsername;
+    if (mounted) {
+      if (savedUsername != null) {
+        _usernameController.text = savedUsername;
+      }
+      _serverUrlController.text = savedServerUrl;
     }
-    _serverUrlController.text = savedServerUrl;
   }
 
   /// Сохраняет данные подключения
@@ -58,22 +89,19 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   Future<void> _connect() async {
     if (!_formKey.currentState!.validate()) return;
 
+    HapticFeedback.lightImpact();
+
     setState(() {
       _isConnecting = true;
       _connectionError = null;
     });
 
     try {
-      // Сохраняем данные для следующего раза
       await _saveConnectionData();
 
-      // Создаем сервис чата
       final chatService = ChatService();
-
-      // Создаем логгер для отладки (в релизе можно отключить)
       final logger = RpcLogger('ChatApp');
 
-      // Подключаемся через HTTP/2
       await chatService.connect(
         serverUrl: _serverUrlController.text.trim(),
         username: _usernameController.text.trim(),
@@ -81,17 +109,22 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       );
 
       if (mounted) {
-        // Переходим к экрану чата через Provider
+        HapticFeedback.lightImpact();
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(
-            builder:
-                (context) =>
+          PageRouteBuilder(
+            pageBuilder:
+                (context, animation, secondaryAnimation) =>
                     ChangeNotifierProvider.value(value: chatService, child: const ChatScreen()),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              return FadeTransition(opacity: animation, child: child);
+            },
+            transitionDuration: const Duration(milliseconds: 400),
           ),
         );
       }
     } catch (e) {
+      HapticFeedback.heavyImpact();
       setState(() {
         _connectionError = e.toString();
       });
@@ -107,240 +140,357 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              theme.primaryColor.withValues(alpha: 0.1),
-              theme.primaryColor.withValues(alpha: 0.05),
+      backgroundColor: theme.colorScheme.surface,
+      body: SafeArea(
+        child: AnimatedBuilder(
+          animation: _fadeAnimation,
+          builder: (context, child) {
+            return Opacity(opacity: _fadeAnimation.value, child: _buildContent(theme));
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContent(ThemeData theme) {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24.0),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 400),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _buildHeader(theme),
+              const SizedBox(height: 48),
+              _buildForm(theme),
+              const SizedBox(height: 24),
+              _buildInfoSection(theme),
+              const SizedBox(height: 32),
+              _buildConnectButton(theme),
+              if (_connectionError != null) ...[const SizedBox(height: 20), _buildErrorCard(theme)],
             ],
           ),
         ),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
-              child: Card(
-                elevation: 8,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                child: Padding(
-                  padding: const EdgeInsets.all(32.0),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // Заголовок
-                        Icon(Icons.chat_bubble_outline, size: 64, color: theme.primaryColor),
-                        const SizedBox(height: 16),
-                        Text(
-                          'RPC Dart Chat',
-                          style: theme.textTheme.headlineMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: theme.primaryColor,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Высокопроизводительный чат на HTTP/2',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.textTheme.bodySmall?.color,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 32),
+      ),
+    );
+  }
 
-                        // Поле ввода имени пользователя
-                        TextFormField(
-                          controller: _usernameController,
-                          decoration: InputDecoration(
-                            labelText: 'Имя пользователя',
-                            prefixIcon: const Icon(Icons.person),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                            filled: true,
-                            fillColor: theme.colorScheme.surface,
-                          ),
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Введите имя пользователя';
-                            }
-                            if (value.trim().length < 2) {
-                              return 'Имя должно содержать минимум 2 символа';
-                            }
-                            return null;
-                          },
-                          textInputAction: TextInputAction.next,
-                          autofocus: _usernameController.text.isEmpty,
-                        ),
-                        const SizedBox(height: 16),
+  Widget _buildHeader(ThemeData theme) {
+    return Column(
+      children: [
+        // Простая иконка без излишних эффектов
+        Container(
+          width: 80,
+          height: 80,
+          decoration: BoxDecoration(
+            color: theme.colorScheme.primary,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: theme.colorScheme.primary.withValues(alpha: 0.2),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Icon(
+            Icons.chat_bubble_outline_rounded,
+            size: 40,
+            color: theme.colorScheme.onPrimary,
+          ),
+        ),
+        const SizedBox(height: 24),
 
-                        // Поле ввода URL сервера
-                        TextFormField(
-                          controller: _serverUrlController,
-                          decoration: InputDecoration(
-                            labelText: 'Адрес сервера',
-                            prefixIcon: const Icon(Icons.dns),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                            filled: true,
-                            fillColor: theme.colorScheme.surface,
-                            helperText: 'HTTP/2 endpoint роутера',
-                          ),
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Введите адрес сервера';
-                            }
-                            try {
-                              final uri = Uri.parse(value.trim());
-                              if (!uri.hasScheme || (!uri.scheme.startsWith('http'))) {
-                                return 'URL должен начинаться с http:// или https://';
-                              }
-                            } catch (e) {
-                              return 'Некорректный URL';
-                            }
-                            return null;
-                          },
-                          textInputAction: TextInputAction.done,
-                          keyboardType: TextInputType.url,
-                          onFieldSubmitted: (_) => _connect(),
-                          autofocus: _usernameController.text.isNotEmpty,
-                        ),
-                        const SizedBox(height: 24),
+        // Заголовок
+        Text(
+          'RPC Dart Chat',
+          style: theme.textTheme.headlineMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: theme.colorScheme.onSurface,
+          ),
+        ),
+        const SizedBox(height: 8),
 
-                        // Информация о транспорте
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: theme.primaryColor.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: theme.primaryColor.withValues(alpha: 0.3)),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(Icons.rocket_launch, color: theme.primaryColor, size: 20),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'HTTP/2 Транспорт',
-                                    style: theme.textTheme.titleSmall?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                      color: theme.primaryColor,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                '• Высокая производительность\n'
-                                '• Мультиплексирование\n'
-                                '• Автоматическое переподключение\n'
-                                '• Современный gRPC-стиль протокол',
-                                style: theme.textTheme.bodySmall,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
+        // Подзаголовок
+        Text(
+          'Современный чат на HTTP/2',
+          style: theme.textTheme.bodyLarge?.copyWith(
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+          ),
+        ),
+      ],
+    );
+  }
 
-                        // Примеры серверов
-                        ExpansionTile(
-                          leading: const Icon(Icons.info_outline, size: 20),
-                          title: Text(
-                            'Примеры серверов',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                          children: [
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: theme.colorScheme.surfaceContainerHighest,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                '• Локальный: http://localhost:11112\n'
-                                '• Продакшн: https://example.com:443\n'
-                                '• Разработка: http://192.168.1.100:8080',
-                                style: theme.textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
-                                textAlign: TextAlign.left,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
+  Widget _buildForm(ThemeData theme) {
+    return Form(
+      key: _formKey,
+      child: Column(
+        children: [
+          // Поле имени пользователя
+          _buildTextField(
+            controller: _usernameController,
+            focusNode: _usernameFocus,
+            label: 'Имя пользователя',
+            icon: Icons.person_outline,
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'Введите имя пользователя';
+              }
+              if (value.trim().length < 2) {
+                return 'Имя должно содержать минимум 2 символа';
+              }
+              return null;
+            },
+            textInputAction: TextInputAction.next,
+            onFieldSubmitted: (_) => _serverUrlFocus.requestFocus(),
+          ),
+          const SizedBox(height: 16),
 
-                        // Кнопка подключения
-                        ElevatedButton(
-                          onPressed: _isConnecting ? null : _connect,
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          child:
-                              _isConnecting
-                                  ? const SizedBox(
-                                    height: 20,
-                                    width: 20,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
-                                  )
-                                  : Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      const Icon(Icons.login),
-                                      const SizedBox(width: 8),
-                                      const Text(
-                                        'Подключиться к чату',
-                                        style: TextStyle(fontSize: 16),
-                                      ),
-                                    ],
-                                  ),
-                        ),
+          // Поле адреса сервера
+          _buildTextField(
+            controller: _serverUrlController,
+            focusNode: _serverUrlFocus,
+            label: 'Адрес сервера',
+            icon: Icons.dns_outlined,
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'Введите адрес сервера';
+              }
+              try {
+                final uri = Uri.parse(value.trim());
+                if (!uri.hasScheme || (!uri.scheme.startsWith('http'))) {
+                  return 'URL должен начинаться с http:// или https://';
+                }
+              } catch (e) {
+                return 'Некорректный URL';
+              }
+              return null;
+            },
+            textInputAction: TextInputAction.done,
+            keyboardType: TextInputType.url,
+            onFieldSubmitted: (_) => _connect(),
+          ),
+        ],
+      ),
+    );
+  }
 
-                        // Ошибка подключения
-                        if (_connectionError != null) ...[
-                          const SizedBox(height: 16),
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.errorContainer,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.error_outline,
-                                  color: theme.colorScheme.onErrorContainer,
-                                  size: 20,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    _connectionError!,
-                                    style: TextStyle(
-                                      color: theme.colorScheme.onErrorContainer,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ],
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required FocusNode focusNode,
+    required String label,
+    required IconData icon,
+    required String? Function(String?) validator,
+    required TextInputAction textInputAction,
+    TextInputType? keyboardType,
+    void Function(String)? onFieldSubmitted,
+  }) {
+    return TextFormField(
+      controller: controller,
+      focusNode: focusNode,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        filled: true,
+        fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      ),
+      validator: validator,
+      textInputAction: textInputAction,
+      keyboardType: keyboardType,
+      onFieldSubmitted: onFieldSubmitted,
+    );
+  }
+
+  Widget _buildInfoSection(ThemeData theme) {
+    return Card(
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerHighest,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: ExpansionTile(
+        leading: Icon(Icons.info_outline, color: theme.colorScheme.primary),
+        title: Text(
+          'Информация о подключении',
+          style: TextStyle(fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface),
+        ),
+        initiallyExpanded: _isExpanded,
+        onExpansionChanged: (expanded) {
+          setState(() => _isExpanded = expanded);
+          HapticFeedback.lightImpact();
+        },
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        children: [_buildInfoContent(theme)],
+      ),
+    );
+  }
+
+  Widget _buildInfoContent(ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Возможности
+        Text(
+          'Возможности',
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: theme.colorScheme.primary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        ...[
+          'Высокая производительность HTTP/2',
+          'Автоматическое переподключение',
+          'Современный gRPC протокол',
+          'Мгновенная доставка сообщений',
+        ].map(
+          (feature) => Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Row(
+              children: [
+                Icon(Icons.check_circle_outline, size: 16, color: theme.colorScheme.primary),
+                const SizedBox(width: 8),
+                Expanded(child: Text(feature, style: theme.textTheme.bodySmall)),
+              ],
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // Примеры серверов
+        Text(
+          'Примеры серверов',
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: theme.colorScheme.primary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        ...[
+          {'label': 'Локальный', 'url': 'http://localhost:11112'},
+          {'label': 'Разработка', 'url': 'http://192.168.1.100:8080'},
+        ].map(
+          (example) => Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    example['label']!,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: theme.colorScheme.primary,
                     ),
                   ),
                 ),
-              ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    example['url']!,
+                    style: theme.textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: example['url']!));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('URL скопирован'),
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                    HapticFeedback.lightImpact();
+                  },
+                  icon: Icon(Icons.copy, size: 16),
+                  iconSize: 16,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                ),
+              ],
             ),
           ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildConnectButton(ThemeData theme) {
+    return SizedBox(
+      width: double.infinity,
+      height: 56,
+      child: FilledButton.icon(
+        onPressed: _isConnecting ? null : _connect,
+        icon:
+            _isConnecting
+                ? SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.onPrimary),
+                  ),
+                )
+                : Icon(Icons.login),
+        label: Text(
+          _isConnecting ? 'Подключение...' : 'Подключиться к чату',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        ),
+        style: FilledButton.styleFrom(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorCard(ThemeData theme) {
+    return Card(
+      color: theme.colorScheme.errorContainer,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Icon(Icons.error_outline, color: theme.colorScheme.onErrorContainer),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Ошибка подключения',
+                    style: TextStyle(
+                      color: theme.colorScheme.onErrorContainer,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _connectionError!,
+                    style: TextStyle(
+                      color: theme.colorScheme.onErrorContainer.withValues(alpha: 0.8),
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              onPressed: () {
+                setState(() => _connectionError = null);
+                HapticFeedback.lightImpact();
+              },
+              icon: Icon(Icons.close, color: theme.colorScheme.onErrorContainer),
+            ),
+          ],
         ),
       ),
     );
