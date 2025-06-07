@@ -39,24 +39,19 @@ jobs:
         echo "version=$version" >> $GITHUB_OUTPUT
         echo "🏷️ Version: $version"
       shell: bash
-      working-directory: .
     
     - name: Create build directory
       run: mkdir -p build
-      working-directory: rpc_dart_transports
     
     - name: Get dependencies
       run: dart pub get
-      working-directory: rpc_dart_transports
     
     - name: Run tests
       run: dart test
-      working-directory: rpc_dart_transports
     
     - name: Build executable
       run: |
         dart compile exe bin/rpc_dart_router.dart -o build/${{ matrix.artifact_name }}${{ matrix.executable_ext }}
-      working-directory: rpc_dart_transports
       
     - name: Test executable
       run: |
@@ -66,7 +61,6 @@ jobs:
           chmod +x build/${{ matrix.artifact_name }}${{ matrix.executable_ext }}
           ./build/${{ matrix.artifact_name }}${{ matrix.executable_ext }} --version
         fi
-      working-directory: rpc_dart_transports
       shell: bash
       
     - name: Upload artifact
