@@ -3,18 +3,16 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 import 'dart:async';
-
+import 'dart:convert';
 import 'package:rpc_dart/rpc_dart.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-import 'processors/message_processor.dart';
-import 'processors/message_encoder.dart';
-import 'managers/stream_manager.dart';
-
 /// Базовый класс для WebSocket транспорта
 ///
-/// Содержит общую логику для клиентской и серверной реализаций.
-/// Рефакторен для использования компонентной архитектуры.
+/// Теперь использует встроенные возможности rpc_dart без лишних слоев.
+/// Упрощен до минимума - только WebSocket канал + встроенный функционал.
+///
+/// Протокол сообщений: [streamId:4байта][flags:1байт][gRPC_frame...]
 abstract class RpcWebSocketTransportBase implements IRpcTransport {
   /// WebSocket канал для обмена сообщениями
   final WebSocketChannel _channel;
@@ -23,17 +21,11 @@ abstract class RpcWebSocketTransportBase implements IRpcTransport {
   final StreamController<RpcTransportMessage> _incomingController =
       StreamController<RpcTransportMessage>.broadcast();
 
+  /// Активные парсеры для каждого stream
+  final Map<int, RpcMessageParser> _streamParsers = {};
+
   /// Флаг закрытия транспорта
   bool _closed = false;
-
-  /// Менеджер потоков
-  late final WebSocketStreamManager _streamManager;
-
-  /// Обработчик входящих сообщений
-  late final WebSocketMessageProcessor _messageProcessor;
-
-  /// Кодировщик исходящих сообщений
-  late final WebSocketMessageEncoder _messageEncoder;
 
   /// Логгер для отладки
   final RpcLogger? _logger;
@@ -46,24 +38,10 @@ abstract class RpcWebSocketTransportBase implements IRpcTransport {
     this._channel, {
     RpcLogger? logger,
   }) : _logger = logger {
-    // Инициализируем компоненты
-    _streamManager = WebSocketStreamManager(
-      idManager: idManager,
-      logger: _logger,
-    );
-
-    _messageProcessor = WebSocketMessageProcessor(
-      logger: _logger,
-    );
-
-    _messageEncoder = WebSocketMessageEncoder(
-      logger: _logger,
-    );
-
     _setupListener();
   }
 
-  /// Получает менеджер Stream ID (реализуется в подклассах)
+  /// Получает менеджер Stream ID из rpc_dart (реализуется в подкластах)
   RpcStreamIdManager get idManager;
 
   /// Устанавливает слушатель для входящих WebSocket сообщений
@@ -78,19 +56,39 @@ abstract class RpcWebSocketTransportBase implements IRpcTransport {
   }
 
   /// Обрабатывает входящее WebSocket сообщение
+  ///
+  /// Простой протокол: [streamId:4][flags:1][gRPC_data...]
   void _handleIncomingMessage(dynamic message) {
-    try {
-      final transportMessages =
-          _messageProcessor.processIncomingMessage(message);
+    if (_closed) return;
 
-      for (final transportMessage in transportMessages) {
-        // Обрабатываем завершение потока
-        if (transportMessage.isEndOfStream) {
-          _streamManager.handleEndOfStream(transportMessage.streamId);
+    try {
+      if (message is List<int>) {
+        final bytes = Uint8List.fromList(message);
+
+        // Минимум 5 байт: streamId (4) + flags (1)
+        if (bytes.length < 5) {
+          _logger?.warning('Слишком короткое сообщение: ${bytes.length} байт');
+          return;
         }
 
-        // Добавляем в поток входящих сообщений
-        _incomingController.add(transportMessage);
+        // Извлекаем streamId (big-endian)
+        final streamId = (bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3];
+
+        // Извлекаем флаги
+        final flags = bytes[4];
+        final isEndOfStream = (flags & 0x01) != 0;
+        final isMetadata = (flags & 0x02) != 0;
+
+        // Извлекаем payload
+        final payload = bytes.sublist(5);
+
+        if (isMetadata) {
+          // Обрабатываем метаданные
+          _handleMetadataMessage(streamId, payload, isEndOfStream);
+        } else {
+          // Обрабатываем данные через парсер
+          _handleDataMessage(streamId, payload, isEndOfStream);
+        }
       }
     } catch (e, stackTrace) {
       _logger?.error(
@@ -98,6 +96,92 @@ abstract class RpcWebSocketTransportBase implements IRpcTransport {
         error: e,
         stackTrace: stackTrace,
       );
+    }
+  }
+
+  /// Обрабатывает сообщение с метаданными
+  void _handleMetadataMessage(int streamId, Uint8List payload, bool isEndOfStream) {
+    try {
+      // Десериализуем метаданные из JSON
+      final jsonStr = utf8.decode(payload);
+      final jsonData = json.decode(jsonStr) as Map<String, dynamic>;
+
+      final headers = <RpcHeader>[];
+      if (jsonData['headers'] is List) {
+        for (final headerData in jsonData['headers'] as List) {
+          if (headerData is Map<String, dynamic>) {
+            headers.add(RpcHeader(
+              headerData['name'] as String,
+              headerData['value'] as String,
+            ));
+          }
+        }
+      }
+
+      final methodPath = jsonData['methodPath'] as String?;
+      final metadata = RpcMetadata(headers);
+
+      final transportMessage = RpcTransportMessage(
+        streamId: streamId,
+        metadata: metadata,
+        isEndOfStream: isEndOfStream,
+        methodPath: methodPath,
+      );
+
+      _incomingController.add(transportMessage);
+      _logger?.debug('Получены метаданные для stream $streamId');
+    } catch (e, stackTrace) {
+      _logger?.error('Ошибка при парсинге метаданных: $e', error: e, stackTrace: stackTrace);
+    }
+  }
+
+  /// Обрабатывает сообщение с данными
+  void _handleDataMessage(int streamId, Uint8List payload, bool isEndOfStream) {
+    try {
+      // Если это только флаг завершения без данных
+      if (isEndOfStream && payload.isEmpty) {
+        final transportMessage = RpcTransportMessage(
+          streamId: streamId,
+          isEndOfStream: true,
+        );
+
+        _incomingController.add(transportMessage);
+        _logger?.debug('Получен флаг завершения для stream $streamId');
+
+        // Очищаем парсер при завершении потока
+        _streamParsers.remove(streamId);
+        idManager.releaseId(streamId);
+        return;
+      }
+
+      // Получаем или создаем парсер для этого stream
+      final parser = _streamParsers.putIfAbsent(
+        streamId,
+        () => RpcMessageParser(logger: _logger?.child('Parser-$streamId')),
+      );
+
+      // Парсим gRPC сообщения
+      final messages = parser(payload);
+
+      for (final msgData in messages) {
+        final transportMessage = RpcTransportMessage(
+          streamId: streamId,
+          payload: msgData,
+          isEndOfStream: isEndOfStream && msgData == messages.last,
+        );
+
+        _incomingController.add(transportMessage);
+      }
+
+      _logger?.debug('Обработано ${messages.length} сообщений для stream $streamId');
+
+      // Очищаем парсер при завершении потока
+      if (isEndOfStream) {
+        _streamParsers.remove(streamId);
+        idManager.releaseId(streamId);
+      }
+    } catch (e, stackTrace) {
+      _logger?.error('Ошибка при парсинге данных: $e', error: e, stackTrace: stackTrace);
     }
   }
 
@@ -117,8 +201,7 @@ abstract class RpcWebSocketTransportBase implements IRpcTransport {
   }
 
   @override
-  Stream<RpcTransportMessage> get incomingMessages =>
-      _incomingController.stream;
+  Stream<RpcTransportMessage> get incomingMessages => _incomingController.stream;
 
   @override
   Stream<RpcTransportMessage> getMessagesForStream(int streamId) {
@@ -131,14 +214,19 @@ abstract class RpcWebSocketTransportBase implements IRpcTransport {
       throw StateError('WebSocket транспорт закрыт');
     }
 
-    return _streamManager.createStream();
+    // Используем встроенный менеджер из rpc_dart
+    return idManager.generateId();
   }
 
   @override
   bool releaseStreamId(int streamId) {
     if (_closed) return false;
 
-    return _streamManager.releaseStreamId(streamId);
+    // Очищаем парсер
+    _streamParsers.remove(streamId);
+
+    // Используем встроенный менеджер из rpc_dart
+    return idManager.releaseId(streamId);
   }
 
   @override
@@ -150,28 +238,27 @@ abstract class RpcWebSocketTransportBase implements IRpcTransport {
     if (_closed) return;
 
     try {
-      // Сохраняем путь метода в процессоре
-      if (metadata.methodPath != null) {
-        _messageProcessor.setMethodPath(streamId, metadata.methodPath!);
-      }
+      // Сериализуем метаданные в JSON
+      final metadataJson = {
+        'headers': metadata.headers
+            .map((h) => {
+                  'name': h.name,
+                  'value': h.value,
+                })
+            .toList(),
+        if (metadata.methodPath != null) 'methodPath': metadata.methodPath,
+      };
 
-      // Кодируем и отправляем метаданные
-      final encodedMessage = _messageEncoder.encodeMetadata(
-        streamId,
-        metadata,
-        endStream: endStream,
-      );
+      final jsonStr = json.encode(metadataJson);
+      final payload = utf8.encode(jsonStr);
 
-      _channel.sink.add(encodedMessage);
-      _logger?.debug(
-          'Отправлены метаданные для stream $streamId, endStream: $endStream, path: ${metadata.methodPath}');
+      // Отправляем с флагом метаданных
+      await _sendWithHeader(streamId, Uint8List.fromList(payload),
+          isMetadata: true, endStream: endStream);
 
-      if (endStream) {
-        _streamManager.markStreamSendingFinished(streamId);
-      }
+      _logger?.debug('Отправлены метаданные для stream $streamId, endStream: $endStream');
     } catch (e, stackTrace) {
-      _logger?.error('Ошибка при отправке метаданных: $e',
-          error: e, stackTrace: stackTrace);
+      _logger?.error('Ошибка при отправке метаданных: $e', error: e, stackTrace: stackTrace);
       rethrow;
     }
   }
@@ -182,30 +269,20 @@ abstract class RpcWebSocketTransportBase implements IRpcTransport {
     Uint8List data, {
     bool endStream = false,
   }) async {
-    if (_closed) {
-      _logger?.warning('Попытка отправить данные после закрытия транспорта');
-      return;
-    }
+    if (_closed) return;
 
     try {
-      // Получаем путь метода из процессора
-      final methodPath = _messageProcessor.getMethodPath(streamId);
+      // Кодируем данные через gRPC формат
+      final encoded = RpcMessageFrame.encode(data);
 
-      // Кодируем и отправляем данные
-      final encodedMessage = _messageEncoder.encodeMessage(
-        streamId,
-        data,
-        endStream: endStream,
-        methodPath: methodPath,
-      );
+      // Отправляем с обычными флагами
+      await _sendWithHeader(streamId, encoded, endStream: endStream);
 
-      _channel.sink.add(encodedMessage);
       _logger?.debug(
-          'Отправлено бинарное сообщение для stream $streamId, размер: ${data.length} байт, endStream: $endStream');
+          'Отправлено сообщение для stream $streamId, размер: ${data.length} байт, endStream: $endStream');
 
       if (endStream) {
-        _streamManager.markStreamSendingFinished(streamId);
-        _streamManager.releaseStreamId(streamId);
+        idManager.releaseId(streamId);
       }
     } catch (e, stackTrace) {
       _logger?.error(
@@ -221,33 +298,46 @@ abstract class RpcWebSocketTransportBase implements IRpcTransport {
   Future<void> finishSending(int streamId) async {
     if (_closed) return;
 
-    if (_streamManager.isStreamSendingFinished(streamId)) {
-      _logger?.debug(
-          'Стрим $streamId уже завершен, пропускаем отправку флага завершения');
-      return;
-    }
-
     try {
-      _logger?.debug('Отправка флага завершения потока для ID $streamId');
+      _logger?.debug('Завершение отправки для stream $streamId');
 
-      // Получаем путь метода из процессора
-      final methodPath = _messageProcessor.getMethodPath(streamId);
+      // Отправляем пустое сообщние с флагом завершения
+      await _sendWithHeader(streamId, Uint8List(0), endStream: true);
 
-      // Кодируем и отправляем завершение потока
-      final encodedMessage = _messageEncoder.encodeStreamEnd(
-        streamId,
-        methodPath: methodPath,
-      );
-
-      _channel.sink.add(encodedMessage);
-
-      _streamManager.markStreamSendingFinished(streamId);
-      _streamManager.releaseStreamId(streamId);
+      idManager.releaseId(streamId);
     } catch (e, stackTrace) {
-      _logger?.error('Ошибка при завершении отправки: $e',
-          error: e, stackTrace: stackTrace);
+      _logger?.error('Ошибка при завершении отправки: $e', error: e, stackTrace: stackTrace);
       rethrow;
     }
+  }
+
+  /// Отправляет сообщение с заголовком протокола
+  Future<void> _sendWithHeader(
+    int streamId,
+    Uint8List payload, {
+    bool isMetadata = false,
+    bool endStream = false,
+  }) async {
+    final header = Uint8List(5);
+
+    // streamId (4 байта, big-endian)
+    header[0] = (streamId >> 24) & 0xFF;
+    header[1] = (streamId >> 16) & 0xFF;
+    header[2] = (streamId >> 8) & 0xFF;
+    header[3] = streamId & 0xFF;
+
+    // flags (1 байт)
+    int flags = 0;
+    if (endStream) flags |= 0x01;
+    if (isMetadata) flags |= 0x02;
+    header[4] = flags;
+
+    // Объединяем заголовок и payload
+    final message = Uint8List(header.length + payload.length);
+    message.setRange(0, header.length, header);
+    message.setRange(header.length, message.length, payload);
+
+    _channel.sink.add(message);
   }
 
   @override
@@ -256,12 +346,12 @@ abstract class RpcWebSocketTransportBase implements IRpcTransport {
 
     _closed = true;
 
-    // Очищаем все компоненты
-    _streamManager.clear();
-    _messageProcessor.clear();
+    // Очищаем парсеры
+    _streamParsers.clear();
 
     try {
       await _channel.sink.close();
+      await _incomingController.close();
       _logger?.info('WebSocket транспорт закрыт');
     } catch (e) {
       _logger?.error('Ошибка при закрытии WebSocket: $e');

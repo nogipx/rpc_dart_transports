@@ -16,7 +16,7 @@ void main() {
 
     setUpAll(() async {
       // Устанавливаем уровень логирования DEBUG для тестов
-      RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.debug);
+      RpcLogger.setDefaultMinLogLevel(RpcLoggerLevel.debug);
     });
 
     setUp(() async {
@@ -119,8 +119,7 @@ void main() {
       );
 
       // Отправляем метаданные с клиента - используем готовый метод
-      final metadata =
-          RpcMetadata.forClientRequestWithPath('/test.Service/TestMethod');
+      final metadata = RpcMetadata.forClientRequestWithPath('/test.Service/TestMethod');
 
       await clientTransport.sendMetadata(streamId, metadata);
 
@@ -133,19 +132,13 @@ void main() {
       expect(receivedMessage.metadata, isNotNull);
 
       // Проверяем путь метода
-      expect(receivedMessage.metadata!.methodPath,
-          equals('/test.Service/TestMethod'));
+      expect(receivedMessage.metadata!.methodPath, equals('/test.Service/TestMethod'));
 
       // Проверяем заголовки
       final headers = receivedMessage.metadata!.headers;
+      expect(headers.any((h) => h.name == 'content-type' && h.value == 'application/grpc'), isTrue);
       expect(
-          headers.any(
-              (h) => h.name == 'content-type' && h.value == 'application/grpc'),
-          isTrue);
-      expect(
-          headers.any((h) =>
-              h.name == ':path' && h.value == '/test.Service/TestMethod'),
-          isTrue);
+          headers.any((h) => h.name == ':path' && h.value == '/test.Service/TestMethod'), isTrue);
 
       await serverSubscription.cancel();
       await clientTransport.close();
@@ -309,10 +302,9 @@ void main() {
 
       // Подписываемся на сообщения для конкретного потока
       final stream1Messages = <RpcTransportMessage>[];
-      final stream1Subscription =
-          serverTransport.getMessagesForStream(streamId1).listen(
-                (message) => stream1Messages.add(message),
-              );
+      final stream1Subscription = serverTransport.getMessagesForStream(streamId1).listen(
+            (message) => stream1Messages.add(message),
+          );
 
       // Отправляем данные в разные потоки
       final data1 = Uint8List.fromList([1, 1, 1]);

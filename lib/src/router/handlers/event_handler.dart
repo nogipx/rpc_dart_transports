@@ -24,7 +24,9 @@ class RouterEventHandler {
 
   /// Обрабатывает подписку на события роутера
   Stream<RouterEvent> handleEventSubscription(
-      RpcNull subscriptionRequest) async* {
+    RpcNull subscriptionRequest, {
+    RpcContext? context,
+  }) async* {
     _logger?.debug('Новая подписка на события роутера');
 
     try {
@@ -45,8 +47,7 @@ class RouterEventHandler {
       // Затем возвращаем поток событий
       yield* eventStream;
     } catch (e, stackTrace) {
-      _logger?.error('Ошибка в подписке на события: $e',
-          error: e, stackTrace: stackTrace);
+      _logger?.error('Ошибка в подписке на события: $e', error: e, stackTrace: stackTrace);
       rethrow;
     }
   }

@@ -11,11 +11,10 @@ import 'package:rpc_dart_transports/rpc_dart_transports.dart';
 /// Мощная демонстрация всех типов RPC с настоящим HTTP/2 транспортом! 🚀
 Future<void> main() async {
   // Настраиваем красивое логирование для отладки
-  RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.debug);
+  RpcLogger.setDefaultMinLogLevel(RpcLoggerLevel.debug);
 
   print('🚀 === ДЕМОНСТРАЦИЯ ВСЕХ ТИПОВ RPC С HTTP/2 ТРАНСПОРТОМ === 🚀\n');
-  print(
-      '📱 Покажем Unary, Server Streaming, Client Streaming и Bidirectional!\n');
+  print('📱 Покажем Unary, Server Streaming, Client Streaming и Bidirectional!\n');
 
   // Запускаем HTTP/2 сервер с настоящим RPC обработчиком
   print('📡 Запуск HTTP/2 сервера с RPC обработчиком...');
@@ -141,10 +140,9 @@ Future<void> _demonstrateClientStreamingRpc(RpcCallerEndpoint endpoint) async {
       methodName: 'AccumulateMessages',
       requestCodec: RpcString.codec,
       responseCodec: RpcString.codec,
-      requests: createRequestStream(),
     );
 
-    final response = await getResponse();
+    final response = await getResponse(createRequestStream());
     print('   ✅ Итоговый ответ: "${response.value}"');
   } catch (e) {
     print('   ❌ Ошибка: $e');
@@ -229,8 +227,7 @@ class _Http2RpcServer {
   }
 
   void _handleConnection(Socket socket) {
-    print(
-        '📞 Новое HTTP/2 подключение от ${socket.remoteAddress}:${socket.remotePort}');
+    print('📞 Новое HTTP/2 подключение от ${socket.remoteAddress}:${socket.remotePort}');
 
     try {
       // Создаем HTTP/2 соединение и серверный транспорт
@@ -263,8 +260,7 @@ class _Http2RpcServer {
   void _registerDemoService(RpcResponderEndpoint endpoint) {
     final contract = _DemoServiceContract();
     endpoint.registerServiceContract(contract);
-    print(
-        '📋 Зарегистрирован DemoService с ${contract.methods.length} методами');
+    print('📋 Зарегистрирован DemoService с ${contract.methods.length} методами');
   }
 
   Future<void> stop() async {
@@ -301,7 +297,7 @@ final class _DemoServiceContract extends RpcResponderContract {
     // 1. Unary RPC - Echo метод
     addUnaryMethod<RpcString, RpcString>(
       methodName: 'Echo',
-      handler: (request) async {
+      handler: (request, {context}) async {
         final message = request.value;
         print('🔄 HTTP/2 Echo: получен "$message"');
         return RpcString('HTTP/2 Echo: $message');
@@ -314,7 +310,7 @@ final class _DemoServiceContract extends RpcResponderContract {
     // 2. Server Streaming RPC - поток данных
     addServerStreamMethod<RpcString, RpcString>(
       methodName: 'GetStream',
-      handler: (request) async* {
+      handler: (request, {context}) async* {
         final message = request.value;
         print('🔄 HTTP/2 GetStream: запрос "$message"');
 
@@ -332,7 +328,7 @@ final class _DemoServiceContract extends RpcResponderContract {
     // 3. Client Streaming RPC - накопление сообщений
     addClientStreamMethod<RpcString, RpcString>(
       methodName: 'AccumulateMessages',
-      handler: (requestStream) async {
+      handler: (requestStream, {context}) async {
         print('🔄 HTTP/2 AccumulateMessages: начат');
 
         final messages = <String>[];
@@ -341,8 +337,7 @@ final class _DemoServiceContract extends RpcResponderContract {
           print('🔄 HTTP/2 AccumulateMessages: получено "${request.value}"');
         }
 
-        final result =
-            'HTTP/2 накоплено ${messages.length} сообщений: ${messages.join(", ")}';
+        final result = 'HTTP/2 накоплено ${messages.length} сообщений: ${messages.join(", ")}';
         print('🔄 HTTP/2 AccumulateMessages: завершен с результатом');
         return RpcString(result);
       },
@@ -354,7 +349,7 @@ final class _DemoServiceContract extends RpcResponderContract {
     // 4. Bidirectional Streaming RPC - чат
     addBidirectionalMethod<RpcString, RpcString>(
       methodName: 'Chat',
-      handler: (requestStream) async* {
+      handler: (requestStream, {context}) async* {
         print('🔄 HTTP/2 Chat: начат');
 
         await for (final request in requestStream) {

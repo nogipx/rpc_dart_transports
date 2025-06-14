@@ -24,8 +24,9 @@ class RouterP2PHandler {
 
   /// Обрабатывает P2P соединение между клиентами
   Stream<RouterMessage> handleP2PConnection(
-    Stream<RouterMessage> clientMessages,
-  ) async* {
+    Stream<RouterMessage> clientMessages, {
+    RpcContext? context,
+  }) async* {
     StreamController<RouterMessage>? responseController;
     String? clientId;
     StreamSubscription? subscription;
@@ -55,9 +56,7 @@ class RouterP2PHandler {
         },
         onError: (error) {
           _logger?.error('Ошибка в P2P стриме для $clientId: $error');
-          if (clientId != null &&
-              responseController != null &&
-              !responseController.isClosed) {
+          if (clientId != null && responseController != null && !responseController.isClosed) {
             responseController.add(RouterMessage(
               type: RouterMessageType.error,
               targetId: clientId!,
@@ -88,12 +87,9 @@ class RouterP2PHandler {
       // Возвращаем исходящие сообщения для клиента
       yield* responseController.stream;
     } catch (e, stackTrace) {
-      _logger?.error('Критическая ошибка в P2P соединении: $e',
-          error: e, stackTrace: stackTrace);
+      _logger?.error('Критическая ошибка в P2P соединении: $e', error: e, stackTrace: stackTrace);
 
-      if (clientId != null &&
-          responseController != null &&
-          !responseController.isClosed) {
+      if (clientId != null && responseController != null && !responseController.isClosed) {
         responseController.add(RouterMessage(
           type: RouterMessageType.error,
           targetId: clientId!,
@@ -111,8 +107,7 @@ class RouterP2PHandler {
       if (clientId != null) {
         // Очищаем стрим, клиент может переподключиться
         _routerImpl.removeClientStream(clientId!);
-        _logger?.info(
-            'P2P стрим для клиента $clientId очищен, клиент может переподключиться');
+        _logger?.info('P2P стрим для клиента $clientId очищен, клиент может переподключиться');
       }
 
       if (responseController != null && !responseController.isClosed) {
@@ -145,20 +140,17 @@ class RouterP2PHandler {
     // Проверяем что клиент зарегистрирован
     final clientInfo = _routerImpl.getClientInfo(clientId);
     if (clientInfo == null) {
-      _logger?.warning(
-          'P2P соединение для незарегистрированного клиента: $clientId');
+      _logger?.warning('P2P соединение для незарегистрированного клиента: $clientId');
       responseController.add(RouterMessage(
         type: RouterMessageType.error,
-        errorMessage:
-            'Клиент $clientId не зарегистрирован. Сначала вызовите register()',
+        errorMessage: 'Клиент $clientId не зарегистрирован. Сначала вызовите register()',
         timestamp: DateTime.now().millisecondsSinceEpoch,
       ));
       return;
     }
 
     // Заменяем временный стрим контроллер на реальный P2P стрим
-    final streamReplaced =
-        _routerImpl.replaceClientStream(clientId, responseController);
+    final streamReplaced = _routerImpl.replaceClientStream(clientId, responseController);
     if (!streamReplaced) {
       _logger?.error('Не удалось привязать P2P стрим для клиента: $clientId');
       responseController.add(RouterMessage(
@@ -176,10 +168,7 @@ class RouterP2PHandler {
       type: RouterMessageType.heartbeat,
       senderId: 'router',
       targetId: clientId,
-      payload: {
-        'connected': true,
-        'timestamp': DateTime.now().millisecondsSinceEpoch
-      },
+      payload: {'connected': true, 'timestamp': DateTime.now().millisecondsSinceEpoch},
       success: true,
       timestamp: DateTime.now().millisecondsSinceEpoch,
     ));

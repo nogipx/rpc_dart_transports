@@ -196,7 +196,7 @@ class RouterCLI {
 
   RouterCLI(this.config) : logger = RpcLogger('RouterCLI') {
     // Настраиваем глобальный уровень логирования
-    RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.info);
+    RpcLogger.setDefaultMinLogLevel(RpcLoggerLevel.info);
 
     // Daemon логирование настроится после запуска роутера
   }

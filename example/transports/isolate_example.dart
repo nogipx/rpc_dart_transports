@@ -10,7 +10,7 @@ void main() {
 
 /// Пример использования изолята с пользовательской entrypoint функцией
 Future<void> runIsolateExample() async {
-  RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.debug);
+  RpcLogger.setDefaultMinLogLevel(RpcLoggerLevel.debug);
   print('\n=== Запуск примера с пользовательским entrypoint ===\n');
 
   // Запускаем изолят с пользовательской entrypoint функцией
@@ -97,7 +97,7 @@ void customEchoServer(transport, customParams) {
   // Создаем сериализатор
   final serializer = RpcCodec(RpcString.fromJson);
 
-  RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.debug);
+  RpcLogger.setDefaultMinLogLevel(RpcLoggerLevel.debug);
 
   // Создаем двунаправленный стрим-сервер
   final server = BidirectionalStreamResponder<RpcString, RpcString>(

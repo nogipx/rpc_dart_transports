@@ -11,7 +11,7 @@ import 'package:web_socket_channel/io.dart';
 /// Простой пример использования WebSocket транспорта
 void main() async {
   // Устанавливаем уровень логирования INFO
-  RpcLoggerSettings.setDefaultMinLogLevel(RpcLoggerLevel.info);
+  RpcLogger.setDefaultMinLogLevel(RpcLoggerLevel.info);
 
   // Запускаем сервер
   final server = await HttpServer.bind('localhost', 8081);
@@ -38,8 +38,7 @@ void main() async {
         );
 
         // Создаем серверный эндпоинт
-        final endpoint = RpcResponderEndpoint(
-            transport: transport, debugLabel: 'ServerEndpoint');
+        final endpoint = RpcResponderEndpoint(transport: transport, debugLabel: 'ServerEndpoint');
 
         // Регистрируем контракт
         endpoint.registerServiceContract(serverContract);
@@ -136,7 +135,7 @@ base class EchoResponderContract extends RpcResponderContract {
       methodName: 'echo',
       requestCodec: RpcString.codec,
       responseCodec: RpcString.codec,
-      handler: (request) async {
+      handler: (request, {context}) async {
         print('Сервер получил запрос: ${request.value}');
         return RpcString(request.value);
       },
@@ -147,7 +146,7 @@ base class EchoResponderContract extends RpcResponderContract {
       methodName: 'countTo',
       requestCodec: RpcInt.codec,
       responseCodec: RpcInt.codec,
-      handler: (request) {
+      handler: (request, {context}) {
         final count = request.value;
         print('Сервер запускает стрим до $count');
         return Stream.periodic(

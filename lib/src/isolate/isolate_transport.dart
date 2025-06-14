@@ -78,8 +78,7 @@ class RpcIsolateTransport {
 
       // Ожидаем SendPort для основной коммуникации
       messageController.stream.listen((message) {
-        if (message is _IsolateMessage &&
-            message.type == _IsolateMessageType.init) {
+        if (message is _IsolateMessage && message.type == _IsolateMessageType.init) {
           // Получаем SendPort для основной коммуникации
           final mainHostSendPort = message.data as SendPort;
 
@@ -141,6 +140,9 @@ class RpcIsolateTransport {
 
 /// Транспорт на стороне хоста (основной поток) с поддержкой Stream ID
 class _IsolateHostTransport implements IRpcTransport {
+  @override
+  bool get isClient => true;
+
   final SendPort _workerSendPort;
   final ReceivePort _receivePort;
 
@@ -305,6 +307,9 @@ class _IsolateHostTransport implements IRpcTransport {
 
 /// Транспорт на стороне воркера (изолят) с поддержкой Stream ID
 class _IsolateWorkerTransport implements IRpcTransport {
+  @override
+  bool get isClient => false;
+
   final SendPort _hostSendPort;
   final Stream<dynamic> _messageStream;
 
