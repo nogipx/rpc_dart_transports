@@ -179,7 +179,7 @@ class RouterCLI {
   /// Транспорт-агностичный роутер сервер
   late final RpcRouterServer _routerServer;
 
-  /// HTTP/2 сервер
+  /// HTTP/2 сервер (высокоуровневый)
   RpcHttp2Server? _http2Server;
 
   /// Подписки для HTTP/2 соединений
@@ -380,28 +380,29 @@ class RouterCLI {
   Future<void> _startHttp2Server() async {
     logger.info('🚀 Запуск HTTP/2 gRPC сервера на ${config.host}:${config.port}');
 
-    // Используем новый удобный API!
-    _http2Server = await RpcHttp2ResponderTransport.bind(
+    // Используем высокоуровневый API!
+    _http2Server = RpcHttp2Server(
       host: config.host,
       port: config.port,
       logger: config.verbose ? logger.child('Http2Server') : null,
-    );
+      onEndpointCreated: (endpoint) {
+        // Создаем соединение через RouterServer для каждого endpoint
+        final connectionId = _routerServer.createConnection(
+          transport: endpoint.transport,
+          connectionLabel: 'http2_${DateTime.now().millisecondsSinceEpoch}',
+          clientAddress: 'http2-client',
+        );
 
-    logger.info('🚀 HTTP/2 gRPC сервер запущен на http://${config.host}:${config.port}');
-
-    // Слушаем новые транспорты для каждого соединения
-    final subscription = _http2Server!.transports.listen(
-      (transport) => _handleHttp2Transport(transport),
-      onError: (error, stackTrace) {
-        logger.error('Ошибка HTTP/2 сервера',
+        logger.info('✅ HTTP/2 клиент подключен: $connectionId');
+      },
+      onConnectionError: (error, stackTrace) {
+        logger.error('Ошибка HTTP/2 соединения',
             error: error, stackTrace: config.verbose ? stackTrace : null);
       },
-      onDone: () {
-        logger.info('HTTP/2 сервер остановлен');
-      },
     );
 
-    _http2Subscriptions.add(subscription);
+    await _http2Server!.start();
+    logger.info('🚀 HTTP/2 gRPC сервер запущен на http://${config.host}:${config.port}');
   }
 
   /// Обрабатывает новый HTTP/2 транспорт
@@ -553,7 +554,7 @@ class RouterCLI {
     if (_http2Server != null) {
       logger.info('Закрытие HTTP/2 сервера...');
       try {
-        await _http2Server!.close().timeout(Duration(seconds: 5));
+        await _http2Server!.stop().timeout(Duration(seconds: 5));
         logger.debug('HTTP/2 сервер закрыт');
       } catch (e) {
         logger.warning('Ошибка закрытия HTTP/2 сервера: $e (принудительно продолжаем)');
