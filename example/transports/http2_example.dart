@@ -19,7 +19,8 @@ Future<void> main() async {
   // Запускаем HTTP/2 сервер с настоящим RPC обработчиком
   print('📡 Запуск HTTP/2 сервера с RPC обработчиком...');
   final serverPort = 8765;
-  final rpcServer = await _startFullHttp2RpcServer(serverPort);
+  final rpcServer = _createInkapsulatedHttp2Server(serverPort);
+  await rpcServer.start();
 
   try {
     // Даем серверу время на запуск
@@ -188,105 +189,21 @@ Future<void> _demonstrateBidirectionalRpc(RpcCallerEndpoint endpoint) async {
   print('');
 }
 
-/// Запускает полноценный HTTP/2 RPC сервер
-Future<_Http2RpcServer> _startFullHttp2RpcServer(int port) async {
+/// Создает инкапсулированный HTTP/2 RPC сервер (новый подход!)
+RpcHttp2Server _createInkapsulatedHttp2Server(int port) {
   final logger = RpcLogger('Http2Server');
 
-  // Создаем настоящий HTTP/2 сервер
-  final serverSocket = await ServerSocket.bind('localhost', port);
-  logger.debug('HTTP/2 сервер запущен на порту $port');
-
-  final server = _Http2RpcServer(serverSocket, logger);
-  await server.start();
-
-  return server;
+  // Используем новый инкапсулированный сервер
+  return RpcHttp2Server.createWithContracts(
+    port: port,
+    logger: logger,
+    contracts: [
+      _DemoServiceContract(),
+    ],
+  );
 }
 
-/// Полноценный HTTP/2 RPC сервер
-class _Http2RpcServer {
-  final ServerSocket _serverSocket;
-  final RpcLogger _logger;
-  final List<StreamSubscription> _subscriptions = [];
-  final List<RpcResponderEndpoint> _responderEndpoints = [];
-  bool _isRunning = false;
-
-  _Http2RpcServer(this._serverSocket, this._logger);
-
-  Future<void> start() async {
-    if (_isRunning) return;
-    _isRunning = true;
-
-    _logger.debug('Запуск HTTP/2 RPC сервера');
-
-    final subscription = _serverSocket.listen((socket) {
-      _handleConnection(socket);
-    });
-
-    _subscriptions.add(subscription);
-    print('🚀 HTTP/2 RPC сервер готов принимать соединения');
-  }
-
-  void _handleConnection(Socket socket) {
-    print('📞 Новое HTTP/2 подключение от ${socket.remoteAddress}:${socket.remotePort}');
-
-    try {
-      // Создаем HTTP/2 соединение и серверный транспорт
-      final connection = http2.ServerTransportConnection.viaSocket(socket);
-      final serverTransport = RpcHttp2ResponderTransport.create(
-        connection: connection,
-        logger: _logger,
-      );
-
-      // Создаем RpcResponderEndpoint с HTTP/2 транспортом
-      final responderEndpoint = RpcResponderEndpoint(
-        transport: serverTransport,
-        debugLabel: 'Http2ServerEndpoint',
-      );
-      _responderEndpoints.add(responderEndpoint);
-
-      // Регистрируем демо-сервис
-      _registerDemoService(responderEndpoint);
-
-      // Запускаем endpoint
-      responderEndpoint.start();
-
-      print('✅ RPC endpoint запущен для подключения ${socket.remoteAddress}');
-    } catch (e) {
-      print('❌ Ошибка при создании HTTP/2 RPC соединения: $e');
-      socket.destroy();
-    }
-  }
-
-  void _registerDemoService(RpcResponderEndpoint endpoint) {
-    final contract = _DemoServiceContract();
-    endpoint.registerServiceContract(contract);
-    print('📋 Зарегистрирован DemoService с ${contract.methods.length} методами');
-  }
-
-  Future<void> stop() async {
-    if (!_isRunning) return;
-    _isRunning = false;
-
-    _logger.debug('Остановка HTTP/2 RPC сервера');
-
-    // Закрываем все подписки
-    for (final subscription in _subscriptions) {
-      await subscription.cancel();
-    }
-    _subscriptions.clear();
-
-    // Закрываем все RPC endpoints
-    for (final endpoint in _responderEndpoints) {
-      await endpoint.close();
-    }
-    _responderEndpoints.clear();
-
-    // Закрываем серверный сокет
-    await _serverSocket.close();
-
-    print('🛑 HTTP/2 RPC сервер остановлен');
-  }
-}
+// Старый _Http2RpcServer удален - теперь используем RpcHttp2Server!
 
 /// Контракт демонстрационного RPC сервиса для HTTP/2
 final class _DemoServiceContract extends RpcResponderContract {

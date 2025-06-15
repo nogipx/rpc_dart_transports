@@ -2,16 +2,7 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-import 'dart:async';
-import 'package:uuid/uuid.dart';
-
-import 'package:rpc_dart/rpc_dart.dart';
-
-import '../router_models.dart';
-import '../interfaces/router_interface.dart';
-import '../router_stats.dart';
-import '../global_message_bus.dart';
-import '../handlers/message_handler.dart';
+part of '_index.dart';
 
 /// Основная реализация роутера
 ///
@@ -24,7 +15,7 @@ final class RouterResponderImpl implements IRouterContract {
   final Map<String, StreamController<RouterMessage>> _clientStreams = {};
 
   /// Глобальная шина сообщений для связи между endpoint'ами
-  final GlobalMessageBus _messageBus = GlobalMessageBus();
+  final _GlobalMessageBus _messageBus = _GlobalMessageBus();
 
   /// Информация о клиентах: clientId -> RouterClientInfo
   final Map<String, RouterClientInfo> _clientsInfo = {};
@@ -72,9 +63,8 @@ final class RouterResponderImpl implements IRouterContract {
       config: StreamDistributorConfig(
         enableAutoCleanup: true,
         // Очищаем события раньше чем отключаем клиентов
-        inactivityThreshold: Duration(
-            milliseconds:
-                (clientInactivityTimeout.inMilliseconds * 0.8).round()),
+        inactivityThreshold:
+            Duration(milliseconds: (clientInactivityTimeout.inMilliseconds * 0.8).round()),
         cleanupInterval: Duration(seconds: healthCheckInterval.inSeconds ~/ 2),
         autoRemoveOnCancel: true,
       ),
@@ -141,20 +131,17 @@ final class RouterResponderImpl implements IRouterContract {
     List<String>? groups,
     Map<String, dynamic>? metadata,
   }) {
-    var clients = _clientsInfo.values.where((client) =>
-        client.status == ClientStatus.online ||
-        client.status == ClientStatus.idle);
+    var clients = _clientsInfo.values.where(
+        (client) => client.status == ClientStatus.online || client.status == ClientStatus.idle);
 
     // Применяем фильтры если есть
     if (groups != null && groups.isNotEmpty) {
-      clients = clients.where(
-          (client) => groups.any((group) => client.groups.contains(group)));
+      clients = clients.where((client) => groups.any((group) => client.groups.contains(group)));
     }
 
     if (metadata != null && metadata.isNotEmpty) {
       clients = clients.where((client) {
-        return metadata.entries
-            .every((entry) => client.metadata[entry.key] == entry.value);
+        return metadata.entries.every((entry) => client.metadata[entry.key] == entry.value);
       });
     }
 
@@ -165,8 +152,7 @@ final class RouterResponderImpl implements IRouterContract {
   bool isClientOnline(String clientId) {
     final clientInfo = _clientsInfo[clientId];
     return clientInfo != null &&
-        (clientInfo.status == ClientStatus.online ||
-            clientInfo.status == ClientStatus.idle);
+        (clientInfo.status == ClientStatus.online || clientInfo.status == ClientStatus.idle);
   }
 
   @override
@@ -176,34 +162,28 @@ final class RouterResponderImpl implements IRouterContract {
 
     if (streamController != null) {
       streamController.close();
-      _logger?.info(
-          'Клиент отключен: $clientId${reason != null ? ' ($reason)' : ''}');
+      _logger?.info('Клиент отключен: $clientId${reason != null ? ' ($reason)' : ''}');
 
       // Очищаем клиента из EventDistributor
       final eventClientId = 'events_$clientId';
       if (_eventDistributor.hasClientStream(eventClientId)) {
         _eventDistributor.closeClientStream(eventClientId).catchError((e) {
-          _logger
-              ?.debug('Ошибка при очистке event stream для $eventClientId: $e');
+          _logger?.debug('Ошибка при очистке event stream для $eventClientId: $e');
           return false;
         });
-        _logger
-            ?.debug('Event stream для отключенного клиента $clientId очищен');
+        _logger?.debug('Event stream для отключенного клиента $clientId очищен');
       }
 
       // Также ищем по паттерну events_*
-      final allEventClientIds = _eventDistributor
-          .getActiveClientIds()
-          .where((id) => id.contains(clientId))
-          .toList();
+      final allEventClientIds =
+          _eventDistributor.getActiveClientIds().where((id) => id.contains(clientId)).toList();
 
       for (final eventClientId in allEventClientIds) {
         _eventDistributor.closeClientStream(eventClientId).catchError((e) {
           _logger?.debug('Ошибка при очистке event stream $eventClientId: $e');
           return false;
         });
-        _logger?.debug(
-            'Event stream $eventClientId для отключенного клиента очищен');
+        _logger?.debug('Event stream $eventClientId для отключенного клиента очищен');
       }
 
       // Уведомляем подписчиков об отключении клиента
@@ -259,28 +239,24 @@ final class RouterResponderImpl implements IRouterContract {
   }
 
   @override
-  int sendToGroup(String groupName, RouterMessage message,
-      {String? excludeClientId}) {
+  int sendToGroup(String groupName, RouterMessage message, {String? excludeClientId}) {
     int sentCount = 0;
 
     for (final clientInfo in _clientsInfo.values) {
-      if (clientInfo.groups.contains(groupName) &&
-          clientInfo.clientId != excludeClientId) {
+      if (clientInfo.groups.contains(groupName) && clientInfo.clientId != excludeClientId) {
         if (sendToClient(clientInfo.clientId, message)) {
           sentCount++;
         }
       }
     }
 
-    _logger?.debug(
-        'Multicast сообщение отправлено группе $groupName: $sentCount получателей');
+    _logger?.debug('Multicast сообщение отправлено группе $groupName: $sentCount получателей');
     return sentCount;
   }
 
   @override
   int sendBroadcast(RouterMessage message, {String? excludeClientId}) {
-    final sentCount =
-        _messageBus.sendBroadcast(message, excludeClientId: excludeClientId);
+    final sentCount = _messageBus.sendBroadcast(message, excludeClientId: excludeClientId);
 
     // Обновляем активность всех клиентов которым доставили
     for (final clientId in _messageBus.getRegisteredClientIds()) {
@@ -335,8 +311,7 @@ final class RouterResponderImpl implements IRouterContract {
     try {
       // Проверяем, не зарегистрирован ли уже клиент
       if (_clientsInfo.containsKey(clientId)) {
-        _logger?.warning(
-            'Клиент $clientId уже зарегистрирован, обновляем информацию');
+        _logger?.warning('Клиент $clientId уже зарегистрирован, обновляем информацию');
 
         // Закрываем старое соединение если есть
         final oldStream = _clientStreams[clientId];
@@ -361,8 +336,7 @@ final class RouterResponderImpl implements IRouterContract {
 
       _clientsInfo[clientId] = clientInfo;
 
-      _logger?.info(
-          'Клиент зарегистрирован: $clientId (${clientInfo.clientName})');
+      _logger?.info('Клиент зарегистрирован: $clientId (${clientInfo.clientName})');
 
       // Уведомляем подписчиков о новом клиенте
       emitEvent(RouterEvent.clientConnected(
@@ -373,8 +347,7 @@ final class RouterResponderImpl implements IRouterContract {
 
       return true;
     } catch (e, stackTrace) {
-      _logger?.error('Ошибка регистрации клиента: $e',
-          error: e, stackTrace: stackTrace);
+      _logger?.error('Ошибка регистрации клиента: $e', error: e, stackTrace: stackTrace);
       _errorCount++;
       return false;
     }
@@ -400,8 +373,7 @@ final class RouterResponderImpl implements IRouterContract {
   void _startHealthCheckTimer() {
     _healthCheckTimer?.cancel();
 
-    _logger?.info(
-        'Запуск мониторинга клиентов (интервал: ${_healthCheckInterval.inSeconds}s)');
+    _logger?.info('Запуск мониторинга клиентов (интервал: ${_healthCheckInterval.inSeconds}s)');
 
     _healthCheckTimer = Timer.periodic(_healthCheckInterval, (_) {
       _performHealthCheck();
@@ -426,8 +398,7 @@ final class RouterResponderImpl implements IRouterContract {
 
       // Проверяем таймаут неактивности
       if (inactivityDuration > _clientInactivityTimeout) {
-        _logger?.warning(
-            'Клиент $clientId неактивен ${inactivityDuration.inMinutes}м, отключаем');
+        _logger?.warning('Клиент $clientId неактивен ${inactivityDuration.inMinutes}м, отключаем');
         clientsToDisconnect.add(clientId);
       } else if (inactivityDuration > _healthCheckInterval * 2 &&
           clientInfo.status != ClientStatus.idle) {
@@ -439,16 +410,14 @@ final class RouterResponderImpl implements IRouterContract {
       // Детекция zombie connections
       final streamController = _clientStreams[clientId];
       if (streamController != null && streamController.isClosed) {
-        _logger?.warning(
-            'Zombie connection обнаружен: $clientId (стрим закрыт, но клиент в реестре)');
+        _logger
+            ?.warning('Zombie connection обнаружен: $clientId (стрим закрыт, но клиент в реестре)');
         zombieClients.add(clientId);
       }
 
       // Проверка синхронизации с GlobalMessageBus
-      if (!_messageBus.isClientRegistered(clientId) &&
-          _clientsInfo.containsKey(clientId)) {
-        _logger?.warning(
-            'Рассинхронизация: $clientId есть в реестре, но отсутствует в MessageBus');
+      if (!_messageBus.isClientRegistered(clientId) && _clientsInfo.containsKey(clientId)) {
+        _logger?.warning('Рассинхронизация: $clientId есть в реестре, но отсутствует в MessageBus');
         zombieClients.add(clientId);
       }
     }
@@ -482,8 +451,8 @@ final class RouterResponderImpl implements IRouterContract {
       emitEvent(RouterEvent.topologyChanged(
         activeClients: _clientStreams.length,
         clientIds: _clientStreams.keys.toList(),
-        capabilities: Map.fromEntries(
-            _clientsInfo.entries.map((e) => MapEntry(e.key, e.value.groups))),
+        capabilities:
+            Map.fromEntries(_clientsInfo.entries.map((e) => MapEntry(e.key, e.value.groups))),
       ));
     }
   }
@@ -497,15 +466,13 @@ final class RouterResponderImpl implements IRouterContract {
   }
 
   @override
-  bool replaceClientStream(
-      String clientId, StreamController<RouterMessage> newStreamController) {
+  bool replaceClientStream(String clientId, StreamController<RouterMessage> newStreamController) {
     if (!_clientsInfo.containsKey(clientId)) {
       return false; // Клиент не зарегистрирован
     }
 
     // Регистрируем стрим в глобальной шине
-    _messageBus.registerClientStream(
-        clientId, newStreamController, 'shared_router');
+    _messageBus.registerClientStream(clientId, newStreamController, 'shared_router');
 
     // Также сохраняем локально для обратной совместимости
     final oldStream = _clientStreams[clientId];

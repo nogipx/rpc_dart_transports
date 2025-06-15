@@ -64,8 +64,7 @@ void main() {
         // Assert
         final response = await responseCompleter.future.timeout(
           Duration(seconds: 5),
-          onTimeout: () =>
-              throw TimeoutException('Timeout waiting for response'),
+          onTimeout: () => throw TimeoutException('Timeout waiting for response'),
         );
 
         expect(response, equals('Echo: Hello, HTTP/2 gRPC!'));
@@ -160,8 +159,7 @@ void main() {
 }
 
 /// Выполняет простой RPC вызов и возвращает ответ
-Future<String> _makeRpcCall(
-    RpcHttp2CallerTransport client, String message) async {
+Future<String> _makeRpcCall(RpcHttp2CallerTransport client, String message) async {
   final requestData = utf8.encode(message);
   final responseCompleter = Completer<String>();
 
@@ -233,14 +231,14 @@ class Http2TestServer {
   }
 
   void _handleConnection(Socket socket) {
-    print(
-        '📞 Новое подключение от ${socket.remoteAddress}:${socket.remotePort}');
+    print('📞 Новое подключение от ${socket.remoteAddress}:${socket.remotePort}');
 
     try {
       // Создаем HTTP/2 server connection
       final connection = http2.ServerTransportConnection.viaSocket(socket);
-      final transport =
-          RpcHttp2ResponderTransport.create(connection: connection);
+      final transport = RpcHttp2ResponderTransport(
+        connection: connection,
+      );
 
       // Обрабатываем входящие сообщения
       final subscription = transport.incomingMessages.listen(
@@ -284,8 +282,7 @@ class Http2TestServer {
           await Future.delayed(Duration(milliseconds: 10));
 
           // Отправляем ответ
-          await transport.sendMessage(
-              message.streamId, Uint8List.fromList(responseData));
+          await transport.sendMessage(message.streamId, Uint8List.fromList(responseData));
         }
 
         // Завершаем поток если это конец

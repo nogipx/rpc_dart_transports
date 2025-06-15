@@ -18,7 +18,7 @@ library;
 export 'interfaces/router_interface.dart';
 
 // Реализации
-export 'implementations/router_responder.dart';
+export 'implementations/_index.dart';
 
 // Обработчики
 export 'handlers/message_handler.dart';
@@ -45,9 +45,3 @@ export 'models/_index.dart';
 
 // Статистика
 export 'router_stats.dart';
-
-// Глобальная шина сообщений
-export 'global_message_bus.dart';
-
-// Транспорт-агностичный сервер
-export 'router_server.dart';

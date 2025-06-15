@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 export 'rpc_http2_caller_transport.dart';
+export 'rpc_http2_common.dart';
 export 'rpc_http2_responder_transport.dart';
 export 'rpc_http2_server.dart';
-export 'rpc_http2_client.dart';
-export 'http2_common.dart';

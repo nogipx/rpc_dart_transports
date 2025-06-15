@@ -42,7 +42,7 @@ typedef RpcIsolateEntrypoint = void Function(
 
 /// Фабрика для создания транспортов изолята с поддержкой Stream ID.
 /// Позволяет создавать пары хост-воркер транспортов с мультиплексированием.
-class RpcIsolateTransport {
+abstract interface class RpcIsolateTransport {
   /// Запускает изолят с пользовательской entrypoint функцией и возвращает хост-транспорт
   static Future<({IRpcTransport transport, void Function() kill})> spawn({
     required RpcIsolateEntrypoint entrypoint,

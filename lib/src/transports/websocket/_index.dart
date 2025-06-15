@@ -16,4 +16,4 @@ export 'websocket_caller_transport.dart';
 export 'websocket_responder_transport.dart';
 
 // Только нужные менеджеры
-export 'managers/reconnect_manager.dart';
+export 'reconnect_manager.dart';

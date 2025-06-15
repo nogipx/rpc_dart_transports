@@ -2,11 +2,7 @@
 //
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-import 'dart:async';
-import 'package:rpc_dart/rpc_dart.dart';
-import 'router_contract.dart';
-import 'implementations/router_responder.dart';
-import 'global_message_bus.dart';
+part of '_index.dart';
 
 /// Транспорт-агностичный роутер сервер
 ///
@@ -32,8 +28,7 @@ class RpcRouterServer {
     RpcLogger? logger,
     RouterResponderImpl? sharedRouterImpl,
   })  : _logger = logger?.child('RouterServer'),
-        _sharedRouterImpl =
-            sharedRouterImpl ?? RouterResponderImpl(logger: logger);
+        _sharedRouterImpl = sharedRouterImpl ?? RouterResponderImpl(logger: logger);
 
   /// Доступ к реализации роутера
   RouterResponderImpl get routerImpl => _sharedRouterImpl;
@@ -67,7 +62,7 @@ class RpcRouterServer {
         address: clientAddress ?? 'unknown',
         connectedAt: DateTime.now(),
       );
-      GlobalMessageBus().registerEndpoint(connectionId, endpointInfo);
+      _GlobalMessageBus().registerEndpoint(connectionId, endpointInfo);
 
       // Создаем RPC эндпоинт с указанным транспортом
       final endpoint = RpcResponderEndpoint(
@@ -97,12 +92,11 @@ class RpcRouterServer {
 
   /// Закрывает конкретное соединение
   Future<void> closeConnection(String connectionId, {String? reason}) async {
-    _logger?.info(
-        'Закрытие соединения $connectionId${reason != null ? ' ($reason)' : ''}');
+    _logger?.info('Закрытие соединения $connectionId${reason != null ? ' ($reason)' : ''}');
 
     try {
       // Удаляем из глобальной шины
-      GlobalMessageBus().unregisterEndpoint(connectionId);
+      _GlobalMessageBus().unregisterEndpoint(connectionId);
 
       // Закрываем endpoint
       final endpoint = _endpoints.remove(connectionId);

@@ -8,7 +8,7 @@ import 'package:rpc_dart/rpc_dart.dart';
 
 import 'router_models.dart';
 import 'models/_index.dart';
-import 'implementations/router_responder.dart';
+import 'implementations/_index.dart';
 import 'interfaces/router_interface.dart';
 import 'handlers/rpc_handler.dart';
 import 'handlers/event_handler.dart';

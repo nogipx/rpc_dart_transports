@@ -9,10 +9,7 @@ import 'package:args/args.dart';
 import 'package:rpc_dart_transports/rpc_dart_transports.dart';
 
 import 'config.dart';
-import 'daemon.dart';
 import 'server.dart';
-import 'signals.dart';
-import 'error_handler.dart';
 
 const String version = '2.0.0';
 
@@ -29,15 +26,6 @@ class RouterCLI {
   /// Сервер роутера
   RouterServer? _server;
 
-  /// Daemon менеджер
-  late final DaemonManager _daemon;
-
-  /// Обработчик ошибок
-  late final ErrorHandler _errorHandler;
-
-  /// Обработчик сигналов
-  late final SignalHandler _signalHandler;
-
   RouterCLI._();
 
   /// Создает и инициализирует CLI
@@ -51,203 +39,36 @@ class RouterCLI {
   Future<void> _initialize(List<String> arguments) async {
     // Парсим аргументы и создаем конфигурацию
     config = await _createConfig(arguments);
-
-    // Инициализируем компоненты
-    _errorHandler = ErrorHandler(
-      verbose: config.verbose,
-      isDaemon: config.daemon,
-      logFile: config.logFile,
-    );
-
-    _daemon = DaemonManager(config: config);
-
-    _signalHandler = SignalHandler();
   }
 
   /// Запускает CLI приложение
   Future<void> run() async {
     try {
-      // Обработка daemon команд
-      if (config.stopDaemon) {
-        await _daemon.stop();
-        return;
-      }
-
-      if (config.statusDaemon) {
-        await _daemon.status();
-        return;
-      }
-
-      if (config.reloadDaemon) {
-        await _daemon.reload();
-        return;
-      }
-
-      // Демонизация если нужно
-      if (config.daemon && !config.isDaemonChild) {
-        await _daemon.daemonize();
-        return; // Родительский процесс завершается
-      }
-
-      // Настраиваем обработчики сигналов
-      _setupSignalHandlers();
+      // Создаем HTTP/2 сервер с контрактами
+      final contracts = _createRouterContracts();
+      final http2Server = RpcHttp2Server.createWithContracts(
+        port: config.port,
+        host: config.host,
+        contracts: contracts,
+        logger: RpcLogger('RouterCLI'),
+      );
 
       // Создаем и запускаем сервер
-      _server = RouterServer(config: config, logger: null);
-
-      // В daemon режиме логируем запуск
-      if (config.isDaemonChild) {
-        await _logDaemonStartup();
-      }
+      _server = RouterServer(
+        config: config,
+        server: http2Server,
+        logger: RpcLogger('RouterCLI'),
+      );
 
       await _server!.start();
 
-      // В daemon режиме логируем успешный запуск
-      if (config.isDaemonChild) {
-        await _logDaemonReady();
-      }
-
-      // Ждем сигнал завершения
-      await _signalHandler.waitForShutdown();
-
-      // Graceful shutdown
-      await _gracefulShutdown();
+      // Ждем завершения (RpcServerBootstrap сам обрабатывает сигналы)
+      // Сервер будет работать до получения сигнала завершения
     } catch (e, stackTrace) {
-      // В daemon режиме логируем ошибку
-      if (config.isDaemonChild) {
-        await _logDaemonError(e, stackTrace);
+      print('❌ Ошибка запуска роутера: $e');
+      if (config.verbose) {
+        print('Stack trace: $stackTrace');
       }
-
-      await _errorHandler.handleError(e, stackTrace);
-      exit(1);
-    }
-  }
-
-  /// Настраивает обработчики сигналов
-  void _setupSignalHandlers() {
-    _signalHandler.initialize();
-
-    // Настраиваем колбэки для daemon режима
-    if (config.isDaemonChild) {
-      _signalHandler.onReload = () async {
-        await _logDaemonEvent('Configuration reload requested');
-        // TODO: Реализовать перезагрузку конфигурации
-        print('🔄 Перезагрузка конфигурации...');
-      };
-
-      _signalHandler.onStats = () async {
-        await _logDaemonEvent('Statistics requested');
-        if (_server != null) {
-          // TODO: Добавить метод getStats в RouterServer
-          await _logDaemonStats('Statistics not implemented yet');
-        }
-      };
-
-      _signalHandler.onToggleDebug = () async {
-        await _logDaemonEvent('Debug mode toggle requested');
-        // TODO: Реализовать переключение debug режима
-        print('🐛 Переключение debug режима...');
-      };
-    }
-  }
-
-  /// Логирует запуск daemon
-  Future<void> _logDaemonStartup() async {
-    if (config.logFile == null) return;
-
-    try {
-      final timestamp = DateTime.now().toIso8601String();
-      final message = '''
-$timestamp: [INFO] RPC Dart Router daemon starting
-$timestamp: [INFO] Configuration: host=${config.host}, port=${config.port}
-$timestamp: [INFO] Log level: ${config.logLevel}
-$timestamp: [INFO] Stats enabled: ${config.enableStats}
-$timestamp: [INFO] Metrics enabled: ${config.enableMetrics}
-''';
-      await File(config.logFile!).writeAsString(message, mode: FileMode.writeOnlyAppend);
-    } catch (e) {
-      // Игнорируем ошибки логирования
-    }
-  }
-
-  /// Логирует готовность daemon
-  Future<void> _logDaemonReady() async {
-    if (config.logFile == null) return;
-
-    try {
-      final timestamp = DateTime.now().toIso8601String();
-      final message = '''
-$timestamp: [INFO] RPC Dart Router daemon ready
-$timestamp: [INFO] HTTP/2 gRPC server listening on ${config.host}:${config.port}
-$timestamp: [INFO] PID: ${pid}
-$timestamp: [INFO] Ready to accept connections
-''';
-      await File(config.logFile!).writeAsString(message, mode: FileMode.writeOnlyAppend);
-    } catch (e) {
-      // Игнорируем ошибки логирования
-    }
-  }
-
-  /// Логирует событие daemon
-  Future<void> _logDaemonEvent(String event) async {
-    if (config.logFile == null) return;
-
-    try {
-      final timestamp = DateTime.now().toIso8601String();
-      final message = '$timestamp: [INFO] $event\n';
-      await File(config.logFile!).writeAsString(message, mode: FileMode.writeOnlyAppend);
-    } catch (e) {
-      // Игнорируем ошибки логирования
-    }
-  }
-
-  /// Логирует ошибку daemon
-  Future<void> _logDaemonError(Object error, StackTrace stackTrace) async {
-    if (config.logFile == null) return;
-
-    try {
-      final timestamp = DateTime.now().toIso8601String();
-      final message = '''
-$timestamp: [ERROR] Daemon error: $error
-$timestamp: [ERROR] Stack trace: $stackTrace
-''';
-      await File(config.logFile!).writeAsString(message, mode: FileMode.writeOnlyAppend);
-    } catch (e) {
-      // Игнорируем ошибки логирования
-    }
-  }
-
-  /// Логирует статистику daemon
-  Future<void> _logDaemonStats(dynamic stats) async {
-    if (config.logFile == null) return;
-
-    try {
-      final timestamp = DateTime.now().toIso8601String();
-      final message = '''
-$timestamp: [INFO] Router statistics:
-$timestamp: [INFO] $stats
-''';
-      await File(config.logFile!).writeAsString(message, mode: FileMode.writeOnlyAppend);
-    } catch (e) {
-      // Игнорируем ошибки логирования
-    }
-  }
-
-  /// Graceful shutdown с таймаутом
-  Future<void> _gracefulShutdown() async {
-    print('🔄 Graceful shutdown в процессе...');
-
-    try {
-      await _server?.stop().timeout(
-        Duration(seconds: 10),
-        onTimeout: () {
-          print('⚠️ Graceful shutdown превысил 10 секунд, принудительное завершение');
-          exit(1);
-        },
-      );
-      print('✅ Graceful shutdown завершен успешно');
-    } catch (e) {
-      print('❌ Ошибка при graceful shutdown: $e');
       exit(1);
     }
   }
@@ -282,21 +103,16 @@ $timestamp: [INFO] $stats
   ArgParser _buildArgParser() {
     return ArgParser()
       ..addOption(
-        'config',
-        abbr: 'c',
-        help: 'Путь к конфигурационному файлу',
-      )
-      ..addOption(
         'host',
         abbr: 'h',
         defaultsTo: '0.0.0.0',
-        help: 'Хост для привязки HTTP/2 сервера',
+        help: 'Хост для привязки сервера',
       )
       ..addOption(
         'port',
         abbr: 'p',
         defaultsTo: '8080',
-        help: 'Порт для HTTP/2 gRPC сервера',
+        help: 'Порт для сервера',
       )
       ..addOption(
         'log-level',
@@ -314,37 +130,6 @@ $timestamp: [INFO] $stats
         'verbose',
         abbr: 'v',
         help: 'Подробный режим (детальный вывод)',
-      )
-      ..addFlag(
-        'stats',
-        abbr: 's',
-        defaultsTo: true,
-        help: 'Показывать статистику роутера',
-      )
-      ..addFlag(
-        'metrics',
-        abbr: 'm',
-        help: 'Включить экспорт метрик Prometheus',
-      )
-      ..addOption(
-        'metrics-port',
-        defaultsTo: '9090',
-        help: 'Порт для экспорта метрик Prometheus',
-      )
-      ..addFlag(
-        'health-check',
-        defaultsTo: true,
-        help: 'Включить мониторинг клиентов',
-      )
-      ..addOption(
-        'client-timeout',
-        defaultsTo: '300',
-        help: 'Таймаут неактивности клиента в секундах',
-      )
-      ..addOption(
-        'max-connections',
-        defaultsTo: '1000',
-        help: 'Максимальное количество соединений',
       )
       ..addFlag(
         'daemon',
@@ -386,34 +171,46 @@ $timestamp: [INFO] $stats
       );
   }
 
+  /// Создает Router контракты
+  List<RpcResponderContract> _createRouterContracts() {
+    final contracts = <RpcResponderContract>[];
+
+    // Создаем настоящий P2P роутер контракт
+    contracts.add(_createP2PRouterContract());
+
+    return contracts;
+  }
+
+  /// Создает P2P роутер контракт
+  RpcResponderContract _createP2PRouterContract() {
+    return RouterResponderContract(
+      logger: RpcLogger('RouterCLI').child('P2PRouter'),
+    );
+  }
+
   /// Показывает справку
   void _printUsage(ArgParser parser) {
-    print('🚀 RPC Dart Router v$version - HTTP/2 gRPC роутер для RPC вызовов\n');
+    print('🚀 RPC Dart Router v$version - P2P роутер для RPC сообщений\n');
     print('Использование: rpc_dart_router [options]\n');
     print('Опции:');
     print(parser.usage);
     print('\nПримеры:');
-    print('  rpc_dart_router                           # HTTP/2 на порту 8080');
-    print('  rpc_dart_router -p 8080                   # HTTP/2 на порту 8080');
-    print('  rpc_dart_router -c config.yaml            # Из конфигурационного файла');
-    print('  rpc_dart_router -h 192.168.1.100          # HTTP/2 на определенном IP');
+    print('  rpc_dart_router                           # Запуск на порту 8080');
+    print('  rpc_dart_router -p 8081                   # Запуск на порту 8081');
+    print('  rpc_dart_router -h 192.168.1.100          # Запуск на определенном IP');
+    print('  rpc_dart_router --verbose                 # Подробное логирование');
     print('  rpc_dart_router --quiet                   # Тихий режим');
-    print('  rpc_dart_router -v --log-level debug      # Детальная отладка');
-    print('  rpc_dart_router --metrics                 # С экспортом метрик Prometheus');
-    print('  rpc_dart_router --max-connections 5000    # Лимит соединений');
     print('\nДемон режим:');
     print('  rpc_dart_router -d                        # Запуск в фоновом режиме');
-    print('  rpc_dart_router -d --config daemon.yaml   # Daemon с конфигурацией');
     print('  rpc_dart_router --status                  # Проверить статус daemon');
     print('  rpc_dart_router --stop                    # Остановить daemon');
     print('  rpc_dart_router --reload                  # Перезагрузить daemon');
-    print('\nТранспорты:');
-    print('  HTTP/2 gRPC     Современный бинарный протокол с мультиплексингом');
-    print('                  Поддерживает все типы RPC вызовов и потоки');
-    print('\nМониторинг:');
-    print('  • Встроенная статистика роутера');
-    print('  • Экспорт метрик Prometheus (--metrics)');
-    print('  • Health check клиентов');
+    print('\nP2P функции:');
+    print('  • Регистрация клиентов в роутере');
+    print('  • Unicast, multicast, broadcast сообщения');
+    print('  • Request-response между клиентами');
+    print('  • Подписка на события роутера');
+    print('  • Автоматический мониторинг клиентов');
     print('  • Graceful shutdown через SIGTERM');
   }
 }
