@@ -8,7 +8,6 @@ import 'dart:io';
 import 'package:args/args.dart';
 import 'package:rpc_dart/rpc_dart.dart';
 
-import '../transports/http2/rpc_http2_server.dart';
 import 'rpc_server_interface.dart';
 
 const String _defaultVersion = '1.0.0';

@@ -3,9 +3,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 import 'dart:async';
-import 'dart:io';
 
-import 'package:http2/http2.dart' as http2;
 import 'package:rpc_dart_transports/rpc_dart_transports.dart';
 
 /// Мощная демонстрация всех типов RPC с настоящим HTTP/2 транспортом! 🚀

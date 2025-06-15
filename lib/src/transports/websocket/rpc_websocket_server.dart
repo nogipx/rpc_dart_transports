@@ -6,10 +6,8 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:rpc_dart_transports/rpc_dart_transports.dart';
-import 'package:shelf/shelf.dart';
-import 'package:shelf/shelf_io.dart' as shelf_io;
-import 'package:shelf_web_socket/shelf_web_socket.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
+import 'package:web_socket_channel/io.dart';
 
 /// Высокоуровневый WebSocket RPC сервер
 ///
@@ -104,14 +102,15 @@ class RpcWebSocketServer implements IRpcServer {
     _logger?.info('Запуск WebSocket сервера на $_host:$_port');
 
     try {
-      // Создаем Shelf handler для WebSocket соединений
-      final handler = webSocketHandler(_handleWebSocketConnection);
-
-      // Оборачиваем в Pipeline для логирования
-      final pipeline = const Pipeline().addMiddleware(logRequests()).addHandler(handler);
-
-      _httpServer = await shelf_io.serve(pipeline, _host, _port);
+      // Создаем HTTP сервер для WebSocket upgrade
+      _httpServer = await HttpServer.bind(_host, _port);
       _isRunning = true;
+
+      // Обрабатываем входящие HTTP запросы для WebSocket upgrade
+      _httpServer!.listen(_handleHttpRequest, onError: (error, stackTrace) {
+        _logger?.error('Ошибка WebSocket сервера', error: error, stackTrace: stackTrace);
+        _onConnectionError?.call(error, stackTrace);
+      });
 
       _logger?.info('WebSocket сервер запущен на $_host:$_port');
     } catch (e, stackTrace) {
@@ -145,11 +144,45 @@ class RpcWebSocketServer implements IRpcServer {
     _logger?.info('WebSocket сервер остановлен');
   }
 
-  /// Обрабатывает новое WebSocket соединение
-  void _handleWebSocketConnection(WebSocketChannel channel, String? subprotocol) {
-    final clientAddress = channel.sink.toString(); // Нет простого способа получить адрес
-    _logger?.debug('Новое WebSocket подключение');
+  /// Обрабатывает HTTP запросы для WebSocket upgrade
+  void _handleHttpRequest(HttpRequest request) {
+    try {
+      // Проверяем, что это WebSocket upgrade запрос
+      if (WebSocketTransformer.isUpgradeRequest(request)) {
+        _handleWebSocketUpgrade(request);
+      } else {
+        // Отклоняем не-WebSocket запросы
+        request.response.statusCode = HttpStatus.badRequest;
+        request.response.write('WebSocket connection required');
+        request.response.close();
+      }
+    } catch (e, stackTrace) {
+      _logger?.error('Ошибка при обработке HTTP запроса', error: e, stackTrace: stackTrace);
+      request.response.statusCode = HttpStatus.internalServerError;
+      request.response.close();
+    }
+  }
 
+  /// Обрабатывает WebSocket upgrade
+  void _handleWebSocketUpgrade(HttpRequest request) async {
+    try {
+      // Выполняем WebSocket upgrade
+      final webSocket = await WebSocketTransformer.upgrade(request);
+      final channel = IOWebSocketChannel(webSocket);
+
+      final clientAddress =
+          '${request.connectionInfo?.remoteAddress}:${request.connectionInfo?.remotePort}';
+      _logger?.debug('Новое WebSocket подключение от $clientAddress');
+
+      _handleWebSocketConnection(channel, clientAddress);
+    } catch (e, stackTrace) {
+      _logger?.error('Ошибка при WebSocket upgrade', error: e, stackTrace: stackTrace);
+      _onConnectionError?.call(e, stackTrace);
+    }
+  }
+
+  /// Обрабатывает новое WebSocket соединение
+  void _handleWebSocketConnection(WebSocketChannel channel, String clientAddress) {
     _onConnectionOpened?.call(channel);
 
     try {
@@ -174,15 +207,15 @@ class RpcWebSocketServer implements IRpcServer {
       // Запускаем endpoint
       endpoint.start();
 
-      _logger?.debug('RPC endpoint создан для WebSocket соединения');
+      _logger?.debug('RPC endpoint создан для WebSocket соединения $clientAddress');
 
       // Обрабатываем закрытие соединения
       channel.sink.done.then((_) {
-        _logger?.debug('WebSocket соединение закрыто');
+        _logger?.debug('WebSocket соединение $clientAddress закрыто');
         _endpoints.remove(endpoint);
         _onConnectionClosed?.call(channel);
       }).catchError((error) {
-        _logger?.warning('Ошибка при закрытии WebSocket соединения: $error');
+        _logger?.warning('Ошибка при закрытии WebSocket соединения $clientAddress: $error');
         _endpoints.remove(endpoint);
         _onConnectionClosed?.call(channel);
       });

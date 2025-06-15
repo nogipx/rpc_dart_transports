@@ -294,7 +294,7 @@ class Http2RpcTestServer {
     try {
       // Создаем HTTP/2 соединение и серверный транспорт
       final connection = http2.ServerTransportConnection.viaSocket(socket);
-      final serverTransport = RpcHttp2ResponderTransport.create(connection: connection);
+      final serverTransport = RpcHttp2ResponderTransport(connection: connection);
 
       // Создаем RpcResponderEndpoint с HTTP/2 транспортом
       final responderEndpoint = RpcResponderEndpoint(transport: serverTransport);

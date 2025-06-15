@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 /// Транспорты для RPC Dart
-library rpc_dart_transports;
+library;
 
 // Экспорт основной библиотеки RPC Dart
 export 'package:rpc_dart/rpc_dart.dart';
