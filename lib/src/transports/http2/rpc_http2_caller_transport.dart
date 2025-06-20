@@ -415,4 +415,12 @@ class RpcHttp2CallerTransport implements IRpcTransport {
 
     _logger?.info('HTTP/2 транспорт закрыт');
   }
+
+  @override
+  bool get isClosed => _isClosed;
+
+  @override
+  Future<void> sendDirectObject(int streamId, Object object, {bool endStream = false}) async {
+    throw UnimplementedError('Unsupport direct object sending');
+  }
 }

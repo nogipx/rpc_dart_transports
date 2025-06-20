@@ -303,6 +303,15 @@ class _IsolateHostTransport implements IRpcTransport {
       await _messageController.close();
     }
   }
+
+  @override
+  bool get isClosed => _isClosed;
+
+  @override
+  Future<void> sendDirectObject(int streamId, Object object, {bool endStream = false}) {
+    // TODO: implement sendDirectObject
+    throw UnimplementedError();
+  }
 }
 
 /// Транспорт на стороне воркера (изолят) с поддержкой Stream ID
@@ -469,5 +478,14 @@ class _IsolateWorkerTransport implements IRpcTransport {
     if (!_messageController.isClosed) {
       await _messageController.close();
     }
+  }
+
+  @override
+  bool get isClosed => _isClosed;
+
+  @override
+  Future<void> sendDirectObject(int streamId, Object object, {bool endStream = false}) {
+    // TODO: implement sendDirectObject
+    throw UnimplementedError();
   }
 }

@@ -27,6 +27,9 @@ abstract class RpcWebSocketTransportBase implements IRpcTransport {
   /// Флаг закрытия транспорта
   bool _closed = false;
 
+  @override
+  bool get isClosed => _closed;
+
   /// Логгер для отладки
   final RpcLogger? _logger;
 
@@ -357,5 +360,10 @@ abstract class RpcWebSocketTransportBase implements IRpcTransport {
       _logger?.error('Ошибка при закрытии WebSocket: $e');
       rethrow;
     }
+  }
+
+  @override
+  Future<void> sendDirectObject(int streamId, Object object, {bool endStream = false}) async {
+    throw UnimplementedError('Unsupport direct object sending');
   }
 }
