@@ -14,6 +14,7 @@ enum _IsolateMessageType {
   init,
   metadata,
   data,
+  directObject,
   finish,
   close,
 }
@@ -194,6 +195,15 @@ class _IsolateHostTransport implements IRpcTransport {
         ));
         break;
 
+      case _IsolateMessageType.directObject:
+        // Передаем объект напрямую через directPayload поле
+        _messageController.add(RpcTransportMessage(
+          streamId: message.streamId,
+          isEndOfStream: message.isEndOfStream,
+          directPayload: message.data, // Объект передается как directPayload
+        ));
+        break;
+
       case _IsolateMessageType.finish:
         _messageController.add(RpcTransportMessage(
           isEndOfStream: true,
@@ -308,9 +318,19 @@ class _IsolateHostTransport implements IRpcTransport {
   bool get isClosed => _isClosed;
 
   @override
-  Future<void> sendDirectObject(int streamId, Object object, {bool endStream = false}) {
-    // TODO: implement sendDirectObject
-    throw UnimplementedError();
+  Future<void> sendDirectObject(int streamId, Object object, {bool endStream = false}) async {
+    if (_isClosed) return;
+
+    _workerSendPort.send(_IsolateMessage(
+      type: _IsolateMessageType.directObject,
+      streamId: streamId,
+      data: object, // Передаем объект напрямую
+      isEndOfStream: endStream,
+    ));
+
+    if (endStream) {
+      _streamSendingFinished[streamId] = true;
+    }
   }
 }
 
@@ -368,6 +388,15 @@ class _IsolateWorkerTransport implements IRpcTransport {
           isEndOfStream: message.isEndOfStream,
           streamId: message.streamId,
           methodPath: message.methodPath,
+        ));
+        break;
+
+      case _IsolateMessageType.directObject:
+        // Передаем объект напрямую через directPayload поле
+        _messageController.add(RpcTransportMessage(
+          streamId: message.streamId,
+          isEndOfStream: message.isEndOfStream,
+          directPayload: message.data, // Объект передается как directPayload
         ));
         break;
 
@@ -484,8 +513,18 @@ class _IsolateWorkerTransport implements IRpcTransport {
   bool get isClosed => _isClosed;
 
   @override
-  Future<void> sendDirectObject(int streamId, Object object, {bool endStream = false}) {
-    // TODO: implement sendDirectObject
-    throw UnimplementedError();
+  Future<void> sendDirectObject(int streamId, Object object, {bool endStream = false}) async {
+    if (_isClosed) return;
+
+    _hostSendPort.send(_IsolateMessage(
+      type: _IsolateMessageType.directObject,
+      streamId: streamId,
+      data: object, // Передаем объект напрямую
+      isEndOfStream: endStream,
+    ));
+
+    if (endStream) {
+      _streamSendingFinished[streamId] = true;
+    }
   }
 }
