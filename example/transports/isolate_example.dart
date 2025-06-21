@@ -17,7 +17,6 @@ Future<void> runIsolateExample() async {
   final result = await RpcIsolateTransport.spawn(
     entrypoint: customEchoServer,
     customParams: {
-      'log': (String message) => print('rpc customlog: $message'),
       'serverName': 'CustomEchoServer',
       'messagePrefix': '[ECHO]: ',
     },
@@ -28,15 +27,12 @@ Future<void> runIsolateExample() async {
   final killIsolate = result.kill;
 
   print('Изолят запущен, настраиваем клиент...');
-  final serializer = RpcCodec(RpcString.fromJson);
 
   // Создаем клиент для двустороннего потока
   final client = BidirectionalStreamCaller<RpcString, RpcString>(
     transport: result.transport,
     serviceName: 'EchoService',
     methodName: 'Echo',
-    requestCodec: serializer,
-    responseCodec: serializer,
     logger: RpcLogger(
       "Host",
       colors: RpcLoggerColors.singleColor(AnsiColor.brightMagenta),
@@ -94,9 +90,6 @@ void customEchoServer(transport, customParams) {
     colors: RpcLoggerColors.singleColor(AnsiColor.brightGreen),
   );
 
-  // Создаем сериализатор
-  final serializer = RpcCodec(RpcString.fromJson);
-
   RpcLogger.setDefaultMinLogLevel(RpcLoggerLevel.debug);
 
   // Создаем двунаправленный стрим-сервер
@@ -105,8 +98,6 @@ void customEchoServer(transport, customParams) {
     transport: transport,
     serviceName: 'EchoService',
     methodName: 'Echo',
-    requestCodec: serializer,
-    responseCodec: serializer,
     logger: logger,
   );
 

@@ -423,4 +423,7 @@ class RpcHttp2CallerTransport implements IRpcTransport {
   Future<void> sendDirectObject(int streamId, Object object, {bool endStream = false}) async {
     throw UnimplementedError('Unsupport direct object sending');
   }
+
+  @override
+  bool get supportsZeroCopy => false;
 }

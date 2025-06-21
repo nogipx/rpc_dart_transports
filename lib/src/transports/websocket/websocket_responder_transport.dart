@@ -28,4 +28,7 @@ class RpcWebSocketResponderTransport extends RpcWebSocketTransportBase {
     super.channel, {
     super.logger,
   });
+
+  @override
+  bool get supportsZeroCopy => false;
 }

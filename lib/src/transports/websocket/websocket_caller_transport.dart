@@ -49,4 +49,7 @@ class RpcWebSocketCallerTransport extends RpcWebSocketTransportBase {
     );
     return RpcWebSocketCallerTransport(channel, logger: logger);
   }
+
+  @override
+  bool get supportsZeroCopy => false;
 }

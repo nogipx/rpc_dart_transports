@@ -332,6 +332,9 @@ class _IsolateHostTransport implements IRpcTransport {
       _streamSendingFinished[streamId] = true;
     }
   }
+
+  @override
+  bool get supportsZeroCopy => true;
 }
 
 /// Транспорт на стороне воркера (изолят) с поддержкой Stream ID
@@ -527,4 +530,7 @@ class _IsolateWorkerTransport implements IRpcTransport {
       _streamSendingFinished[streamId] = true;
     }
   }
+
+  @override
+  bool get supportsZeroCopy => true;
 }

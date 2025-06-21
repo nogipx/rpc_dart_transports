@@ -17,7 +17,13 @@ Future<void> main() async {
   // Запускаем HTTP/2 сервер с настоящим RPC обработчиком
   print('📡 Запуск HTTP/2 сервера с RPC обработчиком...');
   final serverPort = 8765;
-  final rpcServer = _createInkapsulatedHttp2Server(serverPort);
+  final rpcServer = RpcHttp2Server.createWithContracts(
+    port: serverPort,
+    logger: RpcLogger('Http2Server'),
+    contracts: [
+      _DemoServiceContract(),
+    ],
+  );
   await rpcServer.start();
 
   try {
@@ -185,20 +191,6 @@ Future<void> _demonstrateBidirectionalRpc(RpcCallerEndpoint endpoint) async {
     print('   ❌ Ошибка: $e');
   }
   print('');
-}
-
-/// Создает инкапсулированный HTTP/2 RPC сервер (новый подход!)
-RpcHttp2Server _createInkapsulatedHttp2Server(int port) {
-  final logger = RpcLogger('Http2Server');
-
-  // Используем новый инкапсулированный сервер
-  return RpcHttp2Server.createWithContracts(
-    port: port,
-    logger: logger,
-    contracts: [
-      _DemoServiceContract(),
-    ],
-  );
 }
 
 // Старый _Http2RpcServer удален - теперь используем RpcHttp2Server!
