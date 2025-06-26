@@ -8,11 +8,11 @@
     <a href="https://github.com/nogipx/rpc_dart/actions/workflows/ci.yml"><img src="https://github.com/nogipx/rpc_dart/workflows/CI/badge.svg" alt="CI"></a>
     <a href="https://coveralls.io/github/nogipx/rpc_dart?branch=main"><img src="https://coveralls.io/repos/github/nogipx/rpc_dart/badge.svg?branch=main" alt="Coverage Status"></a>
   </p> -->
-  
+<!--   
   <p>
     <a href="README.md">🇺🇸 English</a> | 
     <a href="README_RU.md">🇷🇺 Русский</a>
-  </p>
+  </p> -->
 </div>
 
 ## Поддерживаемые транспорты
@@ -27,7 +27,7 @@
 - Высокая производительность для CPU-интенсивных задач
 - Изоляция ошибок
 
-### 🚀 HTTP/2 Transport (NEW!)
+### 🚀 HTTP/2 Transport
 - Современный HTTP/2 протокол
 - gRPC-совместимый формат сообщений
 - Мультиплексирование потоков
@@ -108,15 +108,6 @@ transport.incomingMessages.listen((message) {
   }
 });
 ```
-
-### gRPC совместимость
-
-HTTP/2 транспорт использует стандартный gRPC протокол:
-
-- **Headers**: Стандартные HTTP/2 pseudo-headers (`:method`, `:path`, `:scheme`, `:authority`)
-- **Content-Type**: `application/grpc+proto`
-- **Frame format**: 5-байтовый префикс + protobuf данные
-- **Status codes**: Стандартные gRPC статус коды
 
 ### Примеры
 

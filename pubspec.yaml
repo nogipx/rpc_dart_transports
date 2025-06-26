@@ -1,6 +1,6 @@
 name: rpc_dart_transports
 description: RPC Dart Transports library
-version: 1.0.0
+version: 0.1.0
 publish_to: none
 
 environment:
