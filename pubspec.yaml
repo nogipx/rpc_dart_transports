@@ -1,24 +1,13 @@
 name: rpc_dart_transports
-description: A starting point for Dart libraries or applications.
+description: RPC Dart Transports library
 version: 1.0.0
 publish_to: none
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
 
-executables:
-  rpc_dart_router: rpc_dart_router
-
-# Скрипты для компиляции
-scripts:
-  build:macos: dart compile exe bin/rpc_dart_router.dart -o build/rpc_dart_router-macos
-  build:linux: dart compile exe bin/rpc_dart_router.dart -o build/rpc_dart_router-linux  
-  build:windows: dart compile exe bin/rpc_dart_router.dart -o build/rpc_dart_router-windows.exe
-  build:all: dart run build_all.dart
-
-# Add regular dependencies here.
 dependencies:
-  rpc_dart: ^1.8.0
+  rpc_dart: ^2.0.0
   uuid: ^4.5.1
   web_socket_channel: ^3.0.3
   args: ^2.6.0
@@ -27,5 +16,3 @@ dependencies:
 dev_dependencies:
   lints: ^5.0.0
   test: ^1.24.0
-  shelf: ^1.4.2
-  shelf_web_socket: ^3.0.0
