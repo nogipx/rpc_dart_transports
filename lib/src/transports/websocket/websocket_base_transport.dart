@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2025 Karim "nogipx" Mamatkazin <nogipx@gmail.com>
 //
-// SPDX-License-Identifier: LGPL-3.0-or-later
+// SPDX-License-Identifier: MIT
 
 import 'dart:async';
 import 'dart:convert';
@@ -75,7 +75,8 @@ abstract class RpcWebSocketTransportBase implements IRpcTransport {
         }
 
         // Извлекаем streamId (big-endian)
-        final streamId = (bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3];
+        final streamId =
+            (bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3];
 
         // Извлекаем флаги
         final flags = bytes[4];
@@ -103,7 +104,8 @@ abstract class RpcWebSocketTransportBase implements IRpcTransport {
   }
 
   /// Обрабатывает сообщение с метаданными
-  void _handleMetadataMessage(int streamId, Uint8List payload, bool isEndOfStream) {
+  void _handleMetadataMessage(
+      int streamId, Uint8List payload, bool isEndOfStream) {
     try {
       // Десериализуем метаданные из JSON
       final jsonStr = utf8.decode(payload);
@@ -134,7 +136,8 @@ abstract class RpcWebSocketTransportBase implements IRpcTransport {
       _incomingController.add(transportMessage);
       _logger?.debug('Получены метаданные для stream $streamId');
     } catch (e, stackTrace) {
-      _logger?.error('Ошибка при парсинге метаданных: $e', error: e, stackTrace: stackTrace);
+      _logger?.error('Ошибка при парсинге метаданных: $e',
+          error: e, stackTrace: stackTrace);
     }
   }
 
@@ -176,7 +179,8 @@ abstract class RpcWebSocketTransportBase implements IRpcTransport {
         _incomingController.add(transportMessage);
       }
 
-      _logger?.debug('Обработано ${messages.length} сообщений для stream $streamId');
+      _logger?.debug(
+          'Обработано ${messages.length} сообщений для stream $streamId');
 
       // Очищаем парсер при завершении потока
       if (isEndOfStream) {
@@ -184,7 +188,8 @@ abstract class RpcWebSocketTransportBase implements IRpcTransport {
         idManager.releaseId(streamId);
       }
     } catch (e, stackTrace) {
-      _logger?.error('Ошибка при парсинге данных: $e', error: e, stackTrace: stackTrace);
+      _logger?.error('Ошибка при парсинге данных: $e',
+          error: e, stackTrace: stackTrace);
     }
   }
 
@@ -204,7 +209,8 @@ abstract class RpcWebSocketTransportBase implements IRpcTransport {
   }
 
   @override
-  Stream<RpcTransportMessage> get incomingMessages => _incomingController.stream;
+  Stream<RpcTransportMessage> get incomingMessages =>
+      _incomingController.stream;
 
   @override
   Stream<RpcTransportMessage> getMessagesForStream(int streamId) {
@@ -259,9 +265,11 @@ abstract class RpcWebSocketTransportBase implements IRpcTransport {
       await _sendWithHeader(streamId, Uint8List.fromList(payload),
           isMetadata: true, endStream: endStream);
 
-      _logger?.debug('Отправлены метаданные для stream $streamId, endStream: $endStream');
+      _logger?.debug(
+          'Отправлены метаданные для stream $streamId, endStream: $endStream');
     } catch (e, stackTrace) {
-      _logger?.error('Ошибка при отправке метаданных: $e', error: e, stackTrace: stackTrace);
+      _logger?.error('Ошибка при отправке метаданных: $e',
+          error: e, stackTrace: stackTrace);
       rethrow;
     }
   }
@@ -309,7 +317,8 @@ abstract class RpcWebSocketTransportBase implements IRpcTransport {
 
       idManager.releaseId(streamId);
     } catch (e, stackTrace) {
-      _logger?.error('Ошибка при завершении отправки: $e', error: e, stackTrace: stackTrace);
+      _logger?.error('Ошибка при завершении отправки: $e',
+          error: e, stackTrace: stackTrace);
       rethrow;
     }
   }
@@ -363,7 +372,8 @@ abstract class RpcWebSocketTransportBase implements IRpcTransport {
   }
 
   @override
-  Future<void> sendDirectObject(int streamId, Object object, {bool endStream = false}) async {
+  Future<void> sendDirectObject(int streamId, Object object,
+      {bool endStream = false}) async {
     throw UnimplementedError('Unsupport direct object sending');
   }
 }

@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2025 Karim "nogipx" Mamatkazin <nogipx@gmail.com>
 //
-// SPDX-License-Identifier: LGPL-3.0-or-later
+// SPDX-License-Identifier: MIT
 
 import 'dart:async';
 import 'dart:io';
@@ -68,14 +68,16 @@ class RpcWebSocketServer implements IRpcServer {
       port: port,
       logger: logger,
       onEndpointCreated: (endpoint) {
-        logger?.debug('Регистрация ${contracts.length} контрактов на новом WebSocket endpoint');
+        logger?.debug(
+            'Регистрация ${contracts.length} контрактов на новом WebSocket endpoint');
         for (final contract in contracts) {
           endpoint.registerServiceContract(contract);
           logger?.debug('Зарегистрирован контракт: ${contract.serviceName}');
         }
       },
       onConnectionError: (error, stackTrace) {
-        logger?.error('Ошибка WebSocket соединения', error: error, stackTrace: stackTrace);
+        logger?.error('Ошибка WebSocket соединения',
+            error: error, stackTrace: stackTrace);
       },
     );
   }
@@ -108,13 +110,15 @@ class RpcWebSocketServer implements IRpcServer {
 
       // Обрабатываем входящие HTTP запросы для WebSocket upgrade
       _httpServer!.listen(_handleHttpRequest, onError: (error, stackTrace) {
-        _logger?.error('Ошибка WebSocket сервера', error: error, stackTrace: stackTrace);
+        _logger?.error('Ошибка WebSocket сервера',
+            error: error, stackTrace: stackTrace);
         _onConnectionError?.call(error, stackTrace);
       });
 
       _logger?.info('WebSocket сервер запущен на $_host:$_port');
     } catch (e, stackTrace) {
-      _logger?.error('Не удалось запустить WebSocket сервер', error: e, stackTrace: stackTrace);
+      _logger?.error('Не удалось запустить WebSocket сервер',
+          error: e, stackTrace: stackTrace);
       _isRunning = false;
       rethrow;
     }
@@ -157,7 +161,8 @@ class RpcWebSocketServer implements IRpcServer {
         request.response.close();
       }
     } catch (e, stackTrace) {
-      _logger?.error('Ошибка при обработке HTTP запроса', error: e, stackTrace: stackTrace);
+      _logger?.error('Ошибка при обработке HTTP запроса',
+          error: e, stackTrace: stackTrace);
       request.response.statusCode = HttpStatus.internalServerError;
       request.response.close();
     }
@@ -176,13 +181,15 @@ class RpcWebSocketServer implements IRpcServer {
 
       _handleWebSocketConnection(channel, clientAddress);
     } catch (e, stackTrace) {
-      _logger?.error('Ошибка при WebSocket upgrade', error: e, stackTrace: stackTrace);
+      _logger?.error('Ошибка при WebSocket upgrade',
+          error: e, stackTrace: stackTrace);
       _onConnectionError?.call(e, stackTrace);
     }
   }
 
   /// Обрабатывает новое WebSocket соединение
-  void _handleWebSocketConnection(WebSocketChannel channel, String clientAddress) {
+  void _handleWebSocketConnection(
+      WebSocketChannel channel, String clientAddress) {
     _onConnectionOpened?.call(channel);
 
     try {
@@ -207,7 +214,8 @@ class RpcWebSocketServer implements IRpcServer {
       // Запускаем endpoint
       endpoint.start();
 
-      _logger?.debug('RPC endpoint создан для WebSocket соединения $clientAddress');
+      _logger?.debug(
+          'RPC endpoint создан для WebSocket соединения $clientAddress');
 
       // Обрабатываем закрытие соединения
       channel.sink.done.then((_) {
@@ -215,7 +223,8 @@ class RpcWebSocketServer implements IRpcServer {
         _endpoints.remove(endpoint);
         _onConnectionClosed?.call(channel);
       }).catchError((error) {
-        _logger?.warning('Ошибка при закрытии WebSocket соединения $clientAddress: $error');
+        _logger?.warning(
+            'Ошибка при закрытии WebSocket соединения $clientAddress: $error');
         _endpoints.remove(endpoint);
         _onConnectionClosed?.call(channel);
       });

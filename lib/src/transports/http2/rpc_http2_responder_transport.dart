@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2025 Karim "nogipx" Mamatkazin <nogipx@gmail.com>
 //
-// SPDX-License-Identifier: LGPL-3.0-or-later
+// SPDX-License-Identifier: MIT
 
 import 'dart:async';
 
@@ -64,7 +64,8 @@ class RpcHttp2ResponderTransport implements IRpcTransport {
         _handleIncomingStream(stream);
       },
       onError: (error, stackTrace) {
-        _logger?.error('Ошибка в соединении HTTP/2', error: error, stackTrace: stackTrace);
+        _logger?.error('Ошибка в соединении HTTP/2',
+            error: error, stackTrace: stackTrace);
 
         if (!_messageController.isClosed) {
           _messageController.addError(error, stackTrace);
@@ -83,7 +84,8 @@ class RpcHttp2ResponderTransport implements IRpcTransport {
     _logger?.internal('Получен новый входящий stream: $streamId');
 
     _incomingStreams[streamId] = stream;
-    _logger?.internal('Сохранен stream $streamId (активных: ${_incomingStreams.length})');
+    _logger?.internal(
+        'Сохранен stream $streamId (активных: ${_incomingStreams.length})');
 
     // Настраиваем обработку сообщений от этого stream
     final subscription = stream.incomingMessages.listen(
@@ -91,7 +93,8 @@ class RpcHttp2ResponderTransport implements IRpcTransport {
         _handleIncomingMessage(streamId, message);
       },
       onError: (error, stackTrace) {
-        _logger?.error('Ошибка в stream $streamId', error: error, stackTrace: stackTrace);
+        _logger?.error('Ошибка в stream $streamId',
+            error: error, stackTrace: stackTrace);
 
         if (!_messageController.isClosed) {
           _messageController.addError(error, stackTrace);
@@ -141,7 +144,8 @@ class RpcHttp2ResponderTransport implements IRpcTransport {
   }
 
   /// Обрабатывает входящие HTTP/2 headers от клиента
-  void _handleIncomingHeaders(int streamId, http2.HeadersStreamMessage message) {
+  void _handleIncomingHeaders(
+      int streamId, http2.HeadersStreamMessage message) {
     // Извлекаем путь метода из headers
     String? methodPath;
     for (final header in message.headers) {
@@ -198,10 +202,13 @@ class RpcHttp2ResponderTransport implements IRpcTransport {
         }
       }
 
-      _logger?.internal('Обработано ${messages.length} входящих сообщений для stream $streamId');
+      _logger?.internal(
+          'Обработано ${messages.length} входящих сообщений для stream $streamId');
     } catch (e, stackTrace) {
-      _logger?.error('Ошибка при распаковке входящих gRPC данных для stream $streamId',
-          error: e, stackTrace: stackTrace);
+      _logger?.error(
+          'Ошибка при распаковке входящих gRPC данных для stream $streamId',
+          error: e,
+          stackTrace: stackTrace);
 
       if (!_messageController.isClosed) {
         _messageController.addError(e, stackTrace);
@@ -231,9 +238,11 @@ class RpcHttp2ResponderTransport implements IRpcTransport {
     if (incomingStream != null) {
       try {
         incomingStream.sendData(Uint8List(0), endStream: true);
-        _logger?.internal('Отправлен END_STREAM при освобождении входящего stream $streamId');
+        _logger?.internal(
+            'Отправлен END_STREAM при освобождении входящего stream $streamId');
       } catch (e) {
-        _logger?.internal('Используем terminate для входящего stream $streamId: $e');
+        _logger?.internal(
+            'Используем terminate для входящего stream $streamId: $e');
         incomingStream.terminate();
       }
     }
@@ -243,9 +252,11 @@ class RpcHttp2ResponderTransport implements IRpcTransport {
     if (outgoingStream != null) {
       try {
         outgoingStream.sendData(Uint8List(0), endStream: true);
-        _logger?.internal('Отправлен END_STREAM при освобождении исходящего stream $streamId');
+        _logger?.internal(
+            'Отправлен END_STREAM при освобождении исходящего stream $streamId');
       } catch (e) {
-        _logger?.internal('Используем terminate для исходящего stream $streamId: $e');
+        _logger?.internal(
+            'Используем terminate для исходящего stream $streamId: $e');
         outgoingStream.terminate();
       }
     }
@@ -273,7 +284,8 @@ class RpcHttp2ResponderTransport implements IRpcTransport {
     // Для серверных ответов ищем входящий stream
     final incomingStream = _incomingStreams[streamId];
     if (incomingStream == null) {
-      _logger?.warning('Incoming stream $streamId not found, skipping metadata send');
+      _logger?.warning(
+          'Incoming stream $streamId not found, skipping metadata send');
       return;
     }
 
@@ -309,11 +321,13 @@ class RpcHttp2ResponderTransport implements IRpcTransport {
 
     final incomingStream = _incomingStreams[streamId];
     if (incomingStream == null) {
-      _logger?.warning('Incoming stream $streamId not found, skipping message send');
+      _logger?.warning(
+          'Incoming stream $streamId not found, skipping message send');
       return;
     }
 
-    _logger?.internal('Отправка ответных данных для stream $streamId: ${data.length} байт');
+    _logger?.internal(
+        'Отправка ответных данных для stream $streamId: ${data.length} байт');
 
     try {
       // Упаковываем данные в gRPC frame формат
@@ -335,7 +349,8 @@ class RpcHttp2ResponderTransport implements IRpcTransport {
 
     final incomingStream = _incomingStreams[streamId];
     if (incomingStream == null) {
-      _logger?.internal('Incoming stream $streamId not found, skipping finish sending');
+      _logger?.internal(
+          'Incoming stream $streamId not found, skipping finish sending');
       return;
     }
 
@@ -347,7 +362,8 @@ class RpcHttp2ResponderTransport implements IRpcTransport {
 
       _logger?.internal('Отправка ответа завершена для stream $streamId');
     } catch (e) {
-      _logger?.warning('Ошибка при завершении отправки для stream $streamId: $e');
+      _logger
+          ?.warning('Ошибка при завершении отправки для stream $streamId: $e');
     }
   }
 
@@ -378,14 +394,17 @@ class RpcHttp2ResponderTransport implements IRpcTransport {
       try {
         // Пытаемся закрыть stream мягко
         stream.sendData(Uint8List(0), endStream: true);
-        _logger?.internal('Отправлен END_STREAM для входящего stream ${stream.id}');
+        _logger?.internal(
+            'Отправлен END_STREAM для входящего stream ${stream.id}');
       } catch (e) {
-        _logger?.internal('Используем terminate для входящего stream ${stream.id}: $e');
+        _logger?.internal(
+            'Используем terminate для входящего stream ${stream.id}: $e');
         // В крайнем случае используем terminate
         try {
           stream.terminate();
         } catch (e2) {
-          _logger?.warning('Ошибка при terminate входящего stream ${stream.id}: $e2');
+          _logger?.warning(
+              'Ошибка при terminate входящего stream ${stream.id}: $e2');
         }
       }
     }
@@ -395,13 +414,16 @@ class RpcHttp2ResponderTransport implements IRpcTransport {
     for (final stream in _outgoingStreams.values) {
       try {
         stream.sendData(Uint8List(0), endStream: true);
-        _logger?.internal('Отправлен END_STREAM для исходящего stream ${stream.id}');
+        _logger?.internal(
+            'Отправлен END_STREAM для исходящего stream ${stream.id}');
       } catch (e) {
-        _logger?.internal('Используем terminate для исходящего stream ${stream.id}: $e');
+        _logger?.internal(
+            'Используем terminate для исходящего stream ${stream.id}: $e');
         try {
           stream.terminate();
         } catch (e2) {
-          _logger?.warning('Ошибка при terminate исходящего stream ${stream.id}: $e2');
+          _logger?.warning(
+              'Ошибка при terminate исходящего stream ${stream.id}: $e2');
         }
       }
     }
@@ -431,7 +453,8 @@ class RpcHttp2ResponderTransport implements IRpcTransport {
   bool get isClosed => _isClosed;
 
   @override
-  Future<void> sendDirectObject(int streamId, Object object, {bool endStream = false}) async {
+  Future<void> sendDirectObject(int streamId, Object object,
+      {bool endStream = false}) async {
     throw UnimplementedError('Unsupport direct object sending');
   }
 

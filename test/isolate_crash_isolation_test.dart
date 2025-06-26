@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2025 Karim "nogipx" Mamatkazin <nogipx@gmail.com>
 //
-// SPDX-License-Identifier: LGPL-3.0-or-later
+// SPDX-License-Identifier: MIT
 
 import 'dart:async';
 import 'dart:isolate';
@@ -33,7 +33,8 @@ void crashingServer(IRpcTransport transport, Map<String, dynamic> params) {
         switch (payload) {
           case 'PING':
             print('🏓 [Crashing Server] PONG от ${currentIsolate.debugName}');
-            await transport.sendDirectObject(message.streamId, 'PONG', endStream: true);
+            await transport.sendDirectObject(message.streamId, 'PONG',
+                endStream: true);
             break;
 
           case 'CRASH_NOW':
@@ -79,7 +80,8 @@ void stableServer(IRpcTransport transport, Map<String, dynamic> params) {
 
       if (payload is String && payload == 'PING') {
         print('🏓 [Stable Server] PONG от ${currentIsolate.debugName}');
-        await transport.sendDirectObject(message.streamId, 'PONG from stable', endStream: true);
+        await transport.sendDirectObject(message.streamId, 'PONG from stable',
+            endStream: true);
       }
     }
   });
@@ -130,7 +132,8 @@ void main() {
         final stableStreamId1 = stableResult.transport.createStream();
         final stablePingFuture1 = stableResult.transport
             .getMessagesForStream(stableStreamId1)
-            .where((msg) => msg.isDirect && msg.directPayload == 'PONG from stable')
+            .where((msg) =>
+                msg.isDirect && msg.directPayload == 'PONG from stable')
             .first
             .timeout(Duration(seconds: 2));
 
@@ -144,7 +147,8 @@ void main() {
         final crashStreamId2 = crashResult.transport.createStream();
 
         // Отправляем команду краша и ожидаем что соединение разорвется
-        await crashResult.transport.sendDirectObject(crashStreamId2, 'CRASH_NOW');
+        await crashResult.transport
+            .sendDirectObject(crashStreamId2, 'CRASH_NOW');
 
         // Ждем немного чтобы краш произошел
         await Future.delayed(Duration(milliseconds: 100));
@@ -161,13 +165,15 @@ void main() {
         final stableStreamId2 = stableResult.transport.createStream();
         final stablePingFuture2 = stableResult.transport
             .getMessagesForStream(stableStreamId2)
-            .where((msg) => msg.isDirect && msg.directPayload == 'PONG from stable')
+            .where((msg) =>
+                msg.isDirect && msg.directPayload == 'PONG from stable')
             .first
             .timeout(Duration(seconds: 2));
 
         await stableResult.transport.sendDirectObject(stableStreamId2, 'PING');
         await stablePingFuture2;
-        print('✅ Stable worker продолжает работать после краша другого изолята');
+        print(
+            '✅ Stable worker продолжает работать после краша другого изолята');
 
         // Act 4 - проверяем что crashed worker действительно мертв
         print('💀 Проверяем что crashed worker действительно мертв...');
@@ -184,7 +190,8 @@ void main() {
           await shouldTimeout;
           fail('Crashed worker не должен отвечать');
         } on TimeoutException {
-          print('✅ Crashed worker действительно мертв (timeout при попытке связи)');
+          print(
+              '✅ Crashed worker действительно мертв (timeout при попытке связи)');
         }
       } finally {
         // Cleanup
@@ -198,7 +205,8 @@ void main() {
     test('множественные_crash_не_влияют_на_оставшиеся_изоляты', () async {
       // Arrange - создаем несколько изолятов
       const totalIsolates = 5;
-      final isolateResults = <({IRpcTransport transport, void Function() kill, String name})>[];
+      final isolateResults =
+          <({IRpcTransport transport, void Function() kill, String name})>[];
 
       // Создаем 3 crash изолята и 2 stable
       for (int i = 0; i < totalIsolates; i++) {
@@ -243,7 +251,8 @@ void main() {
 
           print('💀 Крашим ${crashIsolate.name}...');
           await crashIsolate.transport.sendDirectObject(streamId, 'CRASH_NOW');
-          await Future.delayed(Duration(milliseconds: 50)); // Даем время на краш
+          await Future.delayed(
+              Duration(milliseconds: 50)); // Даем время на краш
         }
 
         // Act 3 - проверяем что stable изоляты все еще работают
@@ -255,7 +264,8 @@ void main() {
           final streamId = stableIsolate.transport.createStream();
           final pingFuture = stableIsolate.transport
               .getMessagesForStream(streamId)
-              .where((msg) => msg.isDirect && msg.directPayload == 'PONG from stable')
+              .where((msg) =>
+                  msg.isDirect && msg.directPayload == 'PONG from stable')
               .first
               .timeout(Duration(seconds: 2));
 

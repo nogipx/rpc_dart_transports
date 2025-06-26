@@ -4,6 +4,7 @@
 pubspec.lock
 .pub-cache/
 .pub/
+**/coverage/
 
 # FVM Version Cache
 .fvm/

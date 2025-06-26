@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2025 Karim "nogipx" Mamatkazin <nogipx@gmail.com>
 //
-// SPDX-License-Identifier: LGPL-3.0-or-later
+// SPDX-License-Identifier: MIT
 
 import 'dart:async';
 
@@ -12,7 +12,8 @@ Future<void> main() async {
   RpcLogger.setDefaultMinLogLevel(RpcLoggerLevel.debug);
 
   print('🚀 === ДЕМОНСТРАЦИЯ ВСЕХ ТИПОВ RPC С HTTP/2 ТРАНСПОРТОМ === 🚀\n');
-  print('📱 Покажем Unary, Server Streaming, Client Streaming и Bidirectional!\n');
+  print(
+      '📱 Покажем Unary, Server Streaming, Client Streaming и Bidirectional!\n');
 
   // Запускаем HTTP/2 сервер с настоящим RPC обработчиком
   print('📡 Запуск HTTP/2 сервера с RPC обработчиком...');
@@ -244,7 +245,8 @@ final class _DemoServiceContract extends RpcResponderContract {
           print('🔄 HTTP/2 AccumulateMessages: получено "${request.value}"');
         }
 
-        final result = 'HTTP/2 накоплено ${messages.length} сообщений: ${messages.join(", ")}';
+        final result =
+            'HTTP/2 накоплено ${messages.length} сообщений: ${messages.join(", ")}';
         print('🔄 HTTP/2 AccumulateMessages: завершен с результатом');
         return RpcString(result);
       },

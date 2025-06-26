@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2025 Karim "nogipx" Mamatkazin <nogipx@gmail.com>
 //
-// SPDX-License-Identifier: LGPL-3.0-or-later
+// SPDX-License-Identifier: MIT
 
 import 'dart:async';
 import 'dart:io';
@@ -216,7 +216,8 @@ class RpcServerBootstrap {
   /// Демонизирует процесс
   Future<void> _daemonize(List<String> originalArgs) async {
     if (!Platform.isLinux && !Platform.isMacOS) {
-      throw UnsupportedError('Daemon режим поддерживается только на Linux/macOS');
+      throw UnsupportedError(
+          'Daemon режим поддерживается только на Linux/macOS');
     }
 
     print('🔄 Запуск в daemon режиме...');
@@ -348,9 +349,11 @@ class RpcServerBootstrap {
   /// Парсер аргументов
   ArgParser _createArgParser() {
     return ArgParser()
-      ..addOption('host', abbr: 'h', defaultsTo: 'localhost', help: 'Хост сервера')
+      ..addOption('host',
+          abbr: 'h', defaultsTo: 'localhost', help: 'Хост сервера')
       ..addOption('port', abbr: 'p', defaultsTo: '8080', help: 'Порт сервера')
-      ..addOption('log-level', allowed: ['debug', 'info', 'warning', 'error'], defaultsTo: 'info')
+      ..addOption('log-level',
+          allowed: ['debug', 'info', 'warning', 'error'], defaultsTo: 'info')
       ..addFlag('verbose', abbr: 'v', help: 'Подробный вывод')
       ..addFlag('quiet', abbr: 'q', help: 'Тихий режим')
       ..addOption('log-file', help: 'Файл логов для daemon режима')
@@ -419,7 +422,8 @@ class RpcServerBootstrap {
 
   /// Логирует готовность daemon
   Future<void> _logDaemonReady() async {
-    await _logDaemonEvent('$appName daemon ready on ${_config.host}:${_config.port}');
+    await _logDaemonEvent(
+        '$appName daemon ready on ${_config.host}:${_config.port}');
   }
 
   /// Логирует статистику daemon

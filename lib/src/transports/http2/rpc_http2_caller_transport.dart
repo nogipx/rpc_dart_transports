@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2025 Karim "nogipx" Mamatkazin <nogipx@gmail.com>
 //
-// SPDX-License-Identifier: LGPL-3.0-or-later
+// SPDX-License-Identifier: MIT
 
 import 'dart:async';
 import 'dart:io';
@@ -128,7 +128,8 @@ class RpcHttp2CallerTransport implements IRpcTransport {
     if (stream != null) {
       try {
         stream.sendData(Uint8List(0), endStream: true);
-        _logger?.internal('Отправлен END_STREAM при освобождении stream $streamId');
+        _logger?.internal(
+            'Отправлен END_STREAM при освобождении stream $streamId');
       } catch (e) {
         _logger?.internal('Используем terminate для stream $streamId: $e');
         stream.terminate();
@@ -156,8 +157,8 @@ class RpcHttp2CallerTransport implements IRpcTransport {
     // Получаем путь метода из метаданных
     final methodPath = metadata.methodPath ?? '/Unknown/Unknown';
 
-    _logger
-        ?.internal('Отправка метаданных для stream $streamId: $methodPath (endStream: $endStream)');
+    _logger?.internal(
+        'Отправка метаданных для stream $streamId: $methodPath (endStream: $endStream)');
 
     // Конвертируем RPC метаданные в HTTP/2 headers
     final headers = rpcMetadataToHttp2Headers(
@@ -172,7 +173,8 @@ class RpcHttp2CallerTransport implements IRpcTransport {
     final stream = _connection.makeRequest(headers, endStream: endStream);
     _activeStreams[streamId] = stream;
 
-    _logger?.internal('HTTP/2 stream создан: $streamId (активных: ${_activeStreams.length})');
+    _logger?.internal(
+        'HTTP/2 stream создан: $streamId (активных: ${_activeStreams.length})');
 
     // Настраиваем обработку входящих сообщений
     _setupStreamListener(streamId, stream, methodPath);
@@ -221,7 +223,8 @@ class RpcHttp2CallerTransport implements IRpcTransport {
   }
 
   /// Настраивает обработчик входящих сообщений для HTTP/2 stream
-  void _setupStreamListener(int streamId, http2.ClientTransportStream stream, String methodPath) {
+  void _setupStreamListener(
+      int streamId, http2.ClientTransportStream stream, String methodPath) {
     _logger?.internal('Настройка обработчика для stream $streamId');
 
     final subscription = stream.incomingMessages.listen(
@@ -229,7 +232,8 @@ class RpcHttp2CallerTransport implements IRpcTransport {
         _handleIncomingMessage(streamId, message, methodPath);
       },
       onError: (error, stackTrace) {
-        _logger?.error('Ошибка в stream $streamId', error: error, stackTrace: stackTrace);
+        _logger?.error('Ошибка в stream $streamId',
+            error: error, stackTrace: stackTrace);
 
         if (!_messageController.isClosed) {
           _messageController.addError(error, stackTrace);
@@ -257,7 +261,8 @@ class RpcHttp2CallerTransport implements IRpcTransport {
   }
 
   /// Обрабатывает входящее сообщение от HTTP/2 stream
-  void _handleIncomingMessage(int streamId, http2.StreamMessage message, String methodPath) {
+  void _handleIncomingMessage(
+      int streamId, http2.StreamMessage message, String methodPath) {
     // Убираем избыточное логирование - оставляем только в конкретных обработчиках
 
     try {
@@ -279,7 +284,8 @@ class RpcHttp2CallerTransport implements IRpcTransport {
   }
 
   /// Обрабатывает входящие HTTP/2 headers
-  void _handleHeadersMessage(int streamId, http2.HeadersStreamMessage message, String methodPath) {
+  void _handleHeadersMessage(
+      int streamId, http2.HeadersStreamMessage message, String methodPath) {
     // Конвертируем HTTP/2 headers в RPC метаданные
     final metadata = http2HeadersToRpcMetadata(message.headers);
 
@@ -297,7 +303,8 @@ class RpcHttp2CallerTransport implements IRpcTransport {
   }
 
   /// Обрабатывает входящие HTTP/2 данные
-  void _handleDataMessage(int streamId, http2.DataStreamMessage message, String methodPath) {
+  void _handleDataMessage(
+      int streamId, http2.DataStreamMessage message, String methodPath) {
     try {
       // Получаем или создаем парсер для этого stream
       final parser = _streamParsers.putIfAbsent(
@@ -325,7 +332,8 @@ class RpcHttp2CallerTransport implements IRpcTransport {
         }
       }
 
-      _logger?.internal('Обработано ${messages.length} сообщений для stream $streamId');
+      _logger?.internal(
+          'Обработано ${messages.length} сообщений для stream $streamId');
     } catch (e, stackTrace) {
       _logger?.error('Ошибка при распаковке gRPC данных для stream $streamId',
           error: e, stackTrace: stackTrace);
@@ -353,7 +361,8 @@ class RpcHttp2CallerTransport implements IRpcTransport {
 
     // Даем серверу время на завершение обработки активных потоков
     if (_activeStreams.isNotEmpty) {
-      _logger?.internal('Ожидание завершения ${_activeStreams.length} активных потоков');
+      _logger?.internal(
+          'Ожидание завершения ${_activeStreams.length} активных потоков');
       await Future.delayed(Duration(milliseconds: 50));
     }
 
@@ -420,7 +429,8 @@ class RpcHttp2CallerTransport implements IRpcTransport {
   bool get isClosed => _isClosed;
 
   @override
-  Future<void> sendDirectObject(int streamId, Object object, {bool endStream = false}) async {
+  Future<void> sendDirectObject(int streamId, Object object,
+      {bool endStream = false}) async {
     throw UnimplementedError('Unsupport direct object sending');
   }
 

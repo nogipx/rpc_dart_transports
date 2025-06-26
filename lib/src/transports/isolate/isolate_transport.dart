@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2025 Karim "nogipx" Mamatkazin <nogipx@gmail.com>
 //
-// SPDX-License-Identifier: LGPL-3.0-or-later
+// SPDX-License-Identifier: MIT
 
 // ignore_for_file: annotate_overrides
 
@@ -79,7 +79,8 @@ abstract interface class RpcIsolateTransport {
 
       // Ожидаем SendPort для основной коммуникации
       messageController.stream.listen((message) {
-        if (message is _IsolateMessage && message.type == _IsolateMessageType.init) {
+        if (message is _IsolateMessage &&
+            message.type == _IsolateMessageType.init) {
           // Получаем SendPort для основной коммуникации
           final mainHostSendPort = message.data as SendPort;
 
@@ -318,7 +319,8 @@ class _IsolateHostTransport implements IRpcTransport {
   bool get isClosed => _isClosed;
 
   @override
-  Future<void> sendDirectObject(int streamId, Object object, {bool endStream = false}) async {
+  Future<void> sendDirectObject(int streamId, Object object,
+      {bool endStream = false}) async {
     if (_isClosed) return;
 
     _workerSendPort.send(_IsolateMessage(
@@ -516,7 +518,8 @@ class _IsolateWorkerTransport implements IRpcTransport {
   bool get isClosed => _isClosed;
 
   @override
-  Future<void> sendDirectObject(int streamId, Object object, {bool endStream = false}) async {
+  Future<void> sendDirectObject(int streamId, Object object,
+      {bool endStream = false}) async {
     if (_isClosed) return;
 
     _hostSendPort.send(_IsolateMessage(

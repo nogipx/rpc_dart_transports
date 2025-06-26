@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2025 Karim "nogipx" Mamatkazin <nogipx@gmail.com>
 //
-// SPDX-License-Identifier: LGPL-3.0-or-later
+// SPDX-License-Identifier: MIT
 
 import 'package:rpc_dart/rpc_dart.dart';
 
@@ -12,7 +12,8 @@ import 'websocket_base_transport.dart';
 /// и использует четные StreamID для мультиплексирования.
 class RpcWebSocketResponderTransport extends RpcWebSocketTransportBase {
   /// Реализация менеджера ID для серверной стороны
-  final RpcStreamIdManager _streamIdManager = RpcStreamIdManager(isClient: false);
+  final RpcStreamIdManager _streamIdManager =
+      RpcStreamIdManager(isClient: false);
 
   @override
   RpcStreamIdManager get idManager => _streamIdManager;

@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2025 Karim "nogipx" Mamatkazin <nogipx@gmail.com>
 //
-// SPDX-License-Identifier: LGPL-3.0-or-later
+// SPDX-License-Identifier: MIT
 
 import 'dart:async';
 import 'dart:math';
@@ -49,7 +49,8 @@ class ComputeRequest {
   /// Генерирует большой запрос для тестирования производительности
   factory ComputeRequest.generateLarge(int numbersCount) {
     final random = Random();
-    final numbers = List.generate(numbersCount, (_) => random.nextDouble() * 1000);
+    final numbers =
+        List.generate(numbersCount, (_) => random.nextDouble() * 1000);
 
     return ComputeRequest(
       operationType: 'complexAnalysis',
@@ -123,7 +124,8 @@ class ComputeStepResponse {
 // ============================================================================
 
 /// Респондер для вычислительного сервиса
-final class CalculatorResponder extends RpcResponderContract implements ICalculatorContract {
+final class CalculatorResponder extends RpcResponderContract
+    implements ICalculatorContract {
   CalculatorResponder() : super(ICalculatorContract.name) {
     // Настраиваем методы
     addUnaryMethod<ComputeRequest, ComputeResponse>(
@@ -143,9 +145,11 @@ final class CalculatorResponder extends RpcResponderContract implements ICalcula
   }
 
   @override
-  Future<ComputeResponse> compute(ComputeRequest request, {RpcContext? context}) async {
+  Future<ComputeResponse> compute(ComputeRequest request,
+      {RpcContext? context}) async {
     final stopwatch = Stopwatch()..start();
-    print('🧮 [Calculator] Обработка ${request.operationType} с ${request.numbers.length} числами');
+    print(
+        '🧮 [Calculator] Обработка ${request.operationType} с ${request.numbers.length} числами');
 
     // CPU-intensive вычисления (идеально для изолята!)
     double result = 0.0;
@@ -161,13 +165,16 @@ final class CalculatorResponder extends RpcResponderContract implements ICalcula
         details['operation'] = 'product';
         break;
       case 'mean':
-        result = request.numbers.reduce((a, b) => a + b) / request.numbers.length;
+        result =
+            request.numbers.reduce((a, b) => a + b) / request.numbers.length;
         details['operation'] = 'mean';
         details['count'] = request.numbers.length;
         break;
       case 'variance':
-        final mean = request.numbers.reduce((a, b) => a + b) / request.numbers.length;
-        final squaredDiffs = request.numbers.map((x) => (x - mean) * (x - mean));
+        final mean =
+            request.numbers.reduce((a, b) => a + b) / request.numbers.length;
+        final squaredDiffs =
+            request.numbers.map((x) => (x - mean) * (x - mean));
         result = squaredDiffs.reduce((a, b) => a + b) / request.numbers.length;
         details['operation'] = 'variance';
         details['mean'] = mean;
@@ -192,7 +199,8 @@ final class CalculatorResponder extends RpcResponderContract implements ICalcula
     }
 
     stopwatch.stop();
-    print('✅ [Calculator] Обработка завершена за ${stopwatch.elapsedMilliseconds}мс');
+    print(
+        '✅ [Calculator] Обработка завершена за ${stopwatch.elapsedMilliseconds}мс');
 
     return ComputeResponse(
       result: result,
@@ -206,7 +214,8 @@ final class CalculatorResponder extends RpcResponderContract implements ICalcula
   Future<BatchComputeResponse> batchCompute(BatchComputeRequest request,
       {RpcContext? context}) async {
     final stopwatch = Stopwatch()..start();
-    print('📊 [Calculator] Пакетная обработка ${request.requests.length} запросов');
+    print(
+        '📊 [Calculator] Пакетная обработка ${request.requests.length} запросов');
 
     final results = <ComputeResponse>[];
     int successCount = 0;
@@ -250,7 +259,8 @@ final class CalculatorResponder extends RpcResponderContract implements ICalcula
     }
 
     stopwatch.stop();
-    print('✅ [Calculator] Пакетная обработка завершена за ${stopwatch.elapsedMilliseconds}мс');
+    print(
+        '✅ [Calculator] Пакетная обработка завершена за ${stopwatch.elapsedMilliseconds}мс');
 
     return BatchComputeResponse(
       results: results,
@@ -278,12 +288,14 @@ final class CalculatorResponder extends RpcResponderContract implements ICalcula
             currentResult = request.numbers.length.toDouble();
             break;
           case 'validation':
-            currentResult = request.numbers.where((n) => n > 0).length.toDouble();
+            currentResult =
+                request.numbers.where((n) => n > 0).length.toDouble();
             break;
           case 'computation':
             currentResult = request.numbers.isEmpty
                 ? 0.0
-                : request.numbers.reduce((a, b) => a + b) / request.numbers.length;
+                : request.numbers.reduce((a, b) => a + b) /
+                    request.numbers.length;
             break;
           case 'optimization':
             currentResult = currentResult * 1.1; // "оптимизированный" результат
@@ -308,8 +320,10 @@ final class CalculatorResponder extends RpcResponderContract implements ICalcula
 // ============================================================================
 
 /// Калер для вычислительного сервиса
-final class CalculatorCaller extends RpcCallerContract implements ICalculatorContract {
-  CalculatorCaller(RpcCallerEndpoint endpoint) : super(ICalculatorContract.name, endpoint);
+final class CalculatorCaller extends RpcCallerContract
+    implements ICalculatorContract {
+  CalculatorCaller(RpcCallerEndpoint endpoint)
+      : super(ICalculatorContract.name, endpoint);
 
   @override
   Future<ComputeResponse> compute(ComputeRequest request) async {
@@ -391,8 +405,10 @@ Future<void> main() async {
       print('✅ Сложные вычисления завершены!');
       print('   📊 Обработано чисел: ${largeRequest.numbers.length}');
       print('   🧮 Результат: ${complexResponse.result.toStringAsFixed(4)}');
-      print('   ⏱️ Время клиент-сервер: ${processingStopwatch.elapsedMilliseconds}мс');
-      print('   ⚙️ Время в изоляте: ${complexResponse.processingTime.inMilliseconds}мс');
+      print(
+          '   ⏱️ Время клиент-сервер: ${processingStopwatch.elapsedMilliseconds}мс');
+      print(
+          '   ⚙️ Время в изоляте: ${complexResponse.processingTime.inMilliseconds}мс');
     }
 
     // ================================================================
@@ -402,22 +418,29 @@ Future<void> main() async {
     print('\n📦 === ПАКЕТНАЯ ОБРАБОТКА ===');
 
     final batchRequests = [
-      ComputeRequest(operationType: 'sum', numbers: List.generate(1000, (i) => i.toDouble())),
+      ComputeRequest(
+          operationType: 'sum',
+          numbers: List.generate(1000, (i) => i.toDouble())),
       ComputeRequest(operationType: 'product', numbers: [1.1, 2.2, 3.3]),
-      ComputeRequest(operationType: 'variance', numbers: List.generate(5000, (i) => (i * 0.1))),
+      ComputeRequest(
+          operationType: 'variance',
+          numbers: List.generate(5000, (i) => (i * 0.1))),
     ];
 
-    final batchRequest = BatchComputeRequest(requests: batchRequests, parallel: true);
+    final batchRequest =
+        BatchComputeRequest(requests: batchRequests, parallel: true);
     final batchResponse = await calculator.batchCompute(batchRequest);
 
     print('✅ Пакетная обработка завершена!');
     print('   📊 Обработано запросов: ${batchResponse.results.length}');
     print('   ✅ Успешных: ${batchResponse.successCount}');
-    print('   ⏱️ Общее время: ${batchResponse.totalProcessingTime.inMilliseconds}мс');
+    print(
+        '   ⏱️ Общее время: ${batchResponse.totalProcessingTime.inMilliseconds}мс');
 
     for (int i = 0; i < batchResponse.results.length; i++) {
       final result = batchResponse.results[i];
-      print('      ${i + 1}. ${result.details['operation']}: ${result.result.toStringAsFixed(4)}');
+      print(
+          '      ${i + 1}. ${result.details['operation']}: ${result.result.toStringAsFixed(4)}');
     }
 
     // ================================================================
@@ -430,7 +453,8 @@ Future<void> main() async {
     final streamingRequests = Stream.fromIterable([
       ComputeRequest(operationType: 'mean', numbers: [10.0, 20.0, 30.0]),
       ComputeRequest(operationType: 'sum', numbers: [1.0, 2.0, 3.0, 4.0]),
-      ComputeRequest(operationType: 'variance', numbers: [5.0, 15.0, 25.0, 35.0]),
+      ComputeRequest(
+          operationType: 'variance', numbers: [5.0, 15.0, 25.0, 35.0]),
     ]).asyncMap((request) async {
       // Небольшая задержка между запросами для корректной передачи
       await Future.delayed(Duration(milliseconds: 100));
@@ -440,7 +464,8 @@ Future<void> main() async {
     print('📊 Потоковая обработка нескольких запросов...');
     await for (final step in calculator.streamCompute(streamingRequests)) {
       final status = step.isComplete ? '✅' : '🔄';
-      print('   $status ${step.step}: ${step.intermediateResult.toStringAsFixed(2)}');
+      print(
+          '   $status ${step.step}: ${step.intermediateResult.toStringAsFixed(2)}');
     }
 
     print('\n🏁 Потоковая обработка завершена!');
@@ -469,7 +494,8 @@ Future<void> main() async {
 
 /// Entry point для сервера в изоляте
 @pragma('vm:entry-point')
-void isolateServerEntrypoint(IRpcTransport transport, Map<String, dynamic> params) {
+void isolateServerEntrypoint(
+    IRpcTransport transport, Map<String, dynamic> params) {
   print('🖥️ [Isolate Server] Запущен Calculator RPC сервер');
 
   // Настраиваем RPC endpoint в изоляте
