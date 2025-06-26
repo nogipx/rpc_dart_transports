@@ -108,9 +108,11 @@ void processingServer(IRpcTransport transport, Map<String, dynamic> params) {
           processingTime: stopwatch.elapsed,
         );
 
-        print('✅ [Processing Server] Обработка завершена за ${stopwatch.elapsedMilliseconds}мс');
+        print(
+            '✅ [Processing Server] Обработка завершена за ${stopwatch.elapsedMilliseconds}мс');
 
-        await transport.sendDirectObject(message.streamId, result, endStream: true);
+        await transport.sendDirectObject(message.streamId, result,
+            endStream: true);
       }
     }
   });
@@ -140,7 +142,8 @@ void main() {
         final streamId = transport.createStream();
         final responsesFuture = transport
             .getMessagesForStream(streamId)
-            .where((msg) => msg.isDirect && msg.directPayload is ProcessingResult)
+            .where(
+                (msg) => msg.isDirect && msg.directPayload is ProcessingResult)
             .first;
 
         await transport.sendDirectObject(streamId, testData);
@@ -158,7 +161,8 @@ void main() {
         print('   📊 Обработано: ${processingResult.processedCount} элементов');
         print('   📈 Сумма: ${processingResult.sum.toStringAsFixed(2)}');
         print('   📈 Среднее: ${processingResult.average.toStringAsFixed(2)}');
-        print('   ⏱️ Время: ${processingResult.processingTime.inMilliseconds}мс');
+        print(
+            '   ⏱️ Время: ${processingResult.processingTime.inMilliseconds}мс');
       } finally {
         await transport.close();
         result.kill();
@@ -181,7 +185,8 @@ void main() {
         final streamId = transport.createStream();
         final responsesFuture = transport
             .getMessagesForStream(streamId)
-            .where((msg) => msg.isDirect && msg.directPayload is ProcessingResult)
+            .where(
+                (msg) => msg.isDirect && msg.directPayload is ProcessingResult)
             .first;
 
         final stopwatch = Stopwatch()..start();
@@ -194,7 +199,8 @@ void main() {
         // Assert
         expect(processingResult.originalId, equals(largeData.id));
         expect(processingResult.processedCount, equals(5000));
-        expect(stopwatch.elapsedMilliseconds, lessThan(1000)); // Максимум 1 секунда
+        expect(stopwatch.elapsedMilliseconds,
+            lessThan(1000)); // Максимум 1 секунда
 
         print('🚀 Performance тест пройден:');
         print('   📊 Размер: 5000 чисел + сложные метаданные');

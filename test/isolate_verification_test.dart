@@ -113,9 +113,11 @@ void isolateInfoServer(IRpcTransport transport, Map<String, dynamic> params) {
           timestamp: DateTime.now(),
         );
 
-        print('📤 [Isolate Info Server] Отправляю информацию об изоляте: $isolateInfo');
+        print(
+            '📤 [Isolate Info Server] Отправляю информацию об изоляте: $isolateInfo');
 
-        await transport.sendDirectObject(message.streamId, isolateInfo, endStream: true);
+        await transport.sendDirectObject(message.streamId, isolateInfo,
+            endStream: true);
       }
     }
   });
@@ -137,7 +139,8 @@ void cpuIntensiveServer(IRpcTransport transport, Map<String, dynamic> params) {
       if (payload is CpuIntensiveTask) {
         final stopwatch = Stopwatch()..start();
 
-        print('🔥 [CPU Server] Начинаю CPU-интенсивную задачу: ${payload.taskId}');
+        print(
+            '🔥 [CPU Server] Начинаю CPU-интенсивную задачу: ${payload.taskId}');
         print('   🔢 Итераций: ${payload.iterations}');
 
         // CPU-blocking операция - вычисляем числа Фибоначчи
@@ -183,7 +186,8 @@ void cpuIntensiveServer(IRpcTransport transport, Map<String, dynamic> params) {
             '✅ [CPU Server] Задача ${payload.taskId} завершена за ${stopwatch.elapsedMilliseconds}мс');
         print('   📊 Результат: $result');
 
-        await transport.sendDirectObject(message.streamId, taskResult, endStream: true);
+        await transport.sendDirectObject(message.streamId, taskResult,
+            endStream: true);
       }
     }
   });
@@ -193,7 +197,8 @@ void cpuIntensiveServer(IRpcTransport transport, Map<String, dynamic> params) {
 
 /// Сервер для тестирования изоляции памяти
 @pragma('vm:entry-point')
-void memoryIsolationServer(IRpcTransport transport, Map<String, dynamic> params) {
+void memoryIsolationServer(
+    IRpcTransport transport, Map<String, dynamic> params) {
   final currentIsolate = Isolate.current;
 
   print('🖥️ [Memory Server] Запущен в изоляте ${currentIsolate.debugName}');
@@ -229,7 +234,8 @@ void memoryIsolationServer(IRpcTransport transport, Map<String, dynamic> params)
           isolateInfo: isolateInfo,
         );
 
-        await transport.sendDirectObject(message.streamId, result, endStream: true);
+        await transport.sendDirectObject(message.streamId, result,
+            endStream: true);
       }
     }
   });
@@ -246,7 +252,8 @@ void main() {
     test('isolate_имеет_разные_идентификаторы_от_основного_потока', () async {
       // Arrange
       final mainIsolate = Isolate.current;
-      print('🔍 Main thread isolate: ${mainIsolate.debugName}, hashCode: ${mainIsolate.hashCode}');
+      print(
+          '🔍 Main thread isolate: ${mainIsolate.debugName}, hashCode: ${mainIsolate.hashCode}');
 
       final result = await RpcIsolateTransport.spawn(
         entrypoint: isolateInfoServer,
@@ -271,10 +278,13 @@ void main() {
 
         // Assert
         print('📋 Comparison:');
-        print('   🔸 Main isolate: ${mainIsolate.debugName} (${mainIsolate.hashCode})');
-        print('   🔸 Worker isolate: ${isolateInfo.isolateName} (${isolateInfo.isolateHashCode})');
+        print(
+            '   🔸 Main isolate: ${mainIsolate.debugName} (${mainIsolate.hashCode})');
+        print(
+            '   🔸 Worker isolate: ${isolateInfo.isolateName} (${isolateInfo.isolateHashCode})');
 
-        expect(isolateInfo.isolateHashCode, isNot(equals(mainIsolate.hashCode)));
+        expect(
+            isolateInfo.isolateHashCode, isNot(equals(mainIsolate.hashCode)));
         expect(isolateInfo.isolateName, contains('VerificationIsolate'));
 
         print('✅ Верификация пройдена: изоляты имеют разные идентификаторы');
@@ -315,7 +325,8 @@ void main() {
 
         // Пока задача выполняется в изоляте, основной поток должен оставаться отзывчивым
         var mainThreadCounter = 0;
-        final mainThreadTimer = Timer.periodic(Duration(milliseconds: 1), (timer) {
+        final mainThreadTimer =
+            Timer.periodic(Duration(milliseconds: 1), (timer) {
           mainThreadCounter++;
           if (mainThreadCounter >= 50) {
             // 50мс работы основного потока
@@ -327,7 +338,8 @@ void main() {
         final results = await Future.wait([
           taskFuture,
           mainThreadTimer.isActive
-              ? Future.delayed(Duration(milliseconds: 60)) // Даем чуть больше времени
+              ? Future.delayed(
+                  Duration(milliseconds: 60)) // Даем чуть больше времени
               : Future.value(null),
         ]);
 
@@ -338,20 +350,26 @@ void main() {
 
         // Assert
         print('📊 CPU Task Results:');
-        print('   ⏱️ Task processing time: ${taskResult.processingTime.inMilliseconds}ms');
+        print(
+            '   ⏱️ Task processing time: ${taskResult.processingTime.inMilliseconds}ms');
         print('   🔢 Calculated value: ${taskResult.calculatedValue}');
-        print('   🖥️ Processed in isolate: ${taskResult.isolateInfo.isolateName}');
-        print('   🔄 Main thread counter: $mainThreadCounter (должно быть >= 50)');
-        print('   ⏱️ Main thread total time: ${mainThreadStopwatch.elapsedMilliseconds}ms');
+        print(
+            '   🖥️ Processed in isolate: ${taskResult.isolateInfo.isolateName}');
+        print(
+            '   🔄 Main thread counter: $mainThreadCounter (должно быть >= 50)');
+        print(
+            '   ⏱️ Main thread total time: ${mainThreadStopwatch.elapsedMilliseconds}ms');
 
         expect(taskResult.taskId, equals(task.taskId));
         expect(taskResult.processingTime.inMilliseconds, greaterThan(0));
         expect(taskResult.isolateInfo.isolateName, contains('CpuWorker'));
 
         // Основной поток должен был оставаться отзывчивым
-        expect(mainThreadCounter, greaterThanOrEqualTo(40)); // Даем небольшую погрешность
+        expect(mainThreadCounter,
+            greaterThanOrEqualTo(40)); // Даем небольшую погрешность
 
-        print('✅ CPU-интенсивная задача выполнена в изоляте без блокировки основного потока');
+        print(
+            '✅ CPU-интенсивная задача выполнена в изоляте без блокировки основного потока');
       } finally {
         await transport.close();
         result.kill();
@@ -388,19 +406,23 @@ void main() {
         // Assert
         print('📊 Memory Isolation Results:');
         print('   📝 Original counter (main thread): ${originalCounter.value}');
-        print('   📝 Mutated counter (from isolate): ${mutationResult.counter.value}');
-        print('   🖥️ Mutation happened in: ${mutationResult.isolateInfo.isolateName}');
+        print(
+            '   📝 Mutated counter (from isolate): ${mutationResult.counter.value}');
+        print(
+            '   🖥️ Mutation happened in: ${mutationResult.isolateInfo.isolateName}');
 
         // Проверяем что изолят получил копию и мутировал её
         expect(mutationResult.counter.value, equals(13)); // 10 + 3 increments
-        expect(mutationResult.isolateInfo.isolateName, contains('MemoryWorker'));
+        expect(
+            mutationResult.isolateInfo.isolateName, contains('MemoryWorker'));
 
         // ВАЖНО: В Dart isolates, объекты копируются, поэтому оригинал не должен измениться
         // НО: если используется zero-copy (что и происходит), то изменения могут быть видны
         // Это нормальное поведение для zero-copy передачи
 
         print('✅ Память корректно обрабатывается между изолятами');
-        print('   ℹ️ Zero-copy позволяет эффективную передачу без полного копирования');
+        print(
+            '   ℹ️ Zero-copy позволяет эффективную передачу без полного копирования');
       } finally {
         await transport.close();
         result.kill();
@@ -410,7 +432,8 @@ void main() {
     test('множественные_изоляты_работают_параллельно', () async {
       // Arrange - создаем несколько изолятов
       const isolateCount = 3;
-      final isolateResults = <({IRpcTransport transport, void Function() kill})>[];
+      final isolateResults =
+          <({IRpcTransport transport, void Function() kill})>[];
 
       for (int i = 0; i < isolateCount; i++) {
         final result = await RpcIsolateTransport.spawn(
@@ -436,7 +459,8 @@ void main() {
           final streamId = transport.createStream();
           final taskFuture = transport
               .getMessagesForStream(streamId)
-              .where((msg) => msg.isDirect && msg.directPayload is CpuTaskResult)
+              .where(
+                  (msg) => msg.isDirect && msg.directPayload is CpuTaskResult)
               .first
               .then((msg) => msg.directPayload as CpuTaskResult);
 
@@ -452,7 +476,8 @@ void main() {
         expect(results.length, equals(isolateCount));
 
         print('📊 Parallel Execution Results:');
-        print('   ⏱️ Total parallel execution time: ${stopwatch.elapsedMilliseconds}ms');
+        print(
+            '   ⏱️ Total parallel execution time: ${stopwatch.elapsedMilliseconds}ms');
 
         final isolateNames = <String>{};
         for (int i = 0; i < results.length; i++) {
@@ -466,13 +491,15 @@ void main() {
         expect(isolateNames.length, equals(isolateCount));
 
         // Параллельное выполнение должно быть быстрее последовательного
-        final averageTaskTime =
-            results.map((r) => r.processingTime.inMilliseconds).reduce((a, b) => a + b) /
-                results.length;
+        final averageTaskTime = results
+                .map((r) => r.processingTime.inMilliseconds)
+                .reduce((a, b) => a + b) /
+            results.length;
         expect(
             stopwatch.elapsedMilliseconds,
-            lessThan(
-                averageTaskTime * isolateCount * 0.8)); // Должно быть как минимум на 20% быстрее
+            lessThan(averageTaskTime *
+                isolateCount *
+                0.8)); // Должно быть как минимум на 20% быстрее
 
         print('✅ Множественные изоляты работают параллельно и эффективно');
         print(
