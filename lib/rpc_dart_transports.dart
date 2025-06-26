@@ -14,6 +14,3 @@ export 'src/transports/_index.dart';
 
 // Экспорт server bootstrap фасада
 export 'src/server/rpc_server_bootstrap.dart';
-
-// Экспорт P2P роутера
-export 'src/router/_index.dart';

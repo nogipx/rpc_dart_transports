@@ -581,7 +581,7 @@ void main() {
         );
 
         final transport = result.transport;
-        final streamId = transport.createStream();
+        // transport.createStream();
         final receivedMessages = <RpcTransportMessage>[];
 
         transport.incomingMessages.listen(receivedMessages.add);
@@ -665,8 +665,8 @@ void main() {
         stopwatchSerialized.stop();
         final serializedTime = stopwatchSerialized.elapsedMicroseconds;
 
-        print('Zero-copy время: ${zeroCopyTime}μs');
-        print('Сериализация время: ${serializedTime}μs');
+        print('Zero-copy время: $zeroCopyTimeμs');
+        print('Сериализация время: $serializedTimeμs');
 
         if (zeroCopyTime < serializedTime) {
           print('✅ Zero-copy быстрее в ${(serializedTime / zeroCopyTime).toStringAsFixed(2)}x раз');
